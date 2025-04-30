@@ -21,7 +21,7 @@ function Projects() {
 
   const handleDelete = (id) => {
     if (window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-      axios.delete(`http://localhost:5000/delete_project/${id}`)
+      axios.delete(`http://localhost:5000/api/projects/${id}`)
         .then((response) => {
           alert('Project deleted successfully!');
           loadProjects(); // Reload the list after deleting

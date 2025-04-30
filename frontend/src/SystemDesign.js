@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -17,136 +15,183 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 function SystemDesign({ projectId }) {
-  const [panelKW, setPanelKW] = useState('');
-  const [batteryKWh, setBatteryKWh] = useState('');
   const [systemType, setSystemType] = useState('grid');
+  const [panelKw, setPanelKw] = useState('');
+  const [batteryKwh, setBatteryKwh] = useState('');
+  const [inverterKva, setInverterKva] = useState('');
+  const [allowExport, setAllowExport] = useState(false);
   const [simulationData, setSimulationData] = useState(null);
-  const [startDate, setStartDate] = useState(new Date('2025-01-01'));
-  const [endDate, setEndDate] = useState(new Date('2025-01-07'));
+  const [startDate, setStartDate] = useState('2025-01-01');
+  const [endDate, setEndDate] = useState('2025-12-31');
+  const [loading, setLoading] = useState(false);
 
-  const handleSimulate = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await axios.post('http://localhost:5000/api/simulate', {
-        project_id: parseInt(projectId),
-        system: {
-          panel_kw: parseFloat(panelKW),
-          battery_kwh: systemType === 'grid' ? 0 : parseFloat(batteryKWh || 0),
-          system_type: systemType
-        }
-      });
-      setSimulationData(response.data);
-    } catch (error) {
-      console.error('Simulation error:', error);
-      alert('Simulation failed. See console for details.');
-    }
+  const handleSimulate = () => {
+    setLoading(true);
+    axios.post('http://localhost:5000/api/simulate', {
+      project_id: projectId,
+      system: {
+        panel_kw: parseFloat(panelKw),
+        battery_kwh: parseFloat(batteryKwh),
+        system_type: systemType,
+        inverter_kva: parseFloat(inverterKva),
+        allow_export: allowExport
+      }
+    })
+    .then(res => {
+      console.log('Simulation result:', res.data);
+      if (!res.data.timestamps) {
+        alert('Simulation did not return expected data');
+        return;
+      }
+      setSimulationData(res.data);
+      setLoading(false);
+    })
+    .catch(err => {
+      console.error('Simulation error:', err);
+      alert('Simulation failed. See console for details');
+      setLoading(false);
+    });
   };
 
-  const filterByDateRange = (timestamps, values) => {
-    return timestamps.map((t, i) => {
-      const time = new Date(t);
-      return (time >= startDate && time <= endDate) ? values[i] : null;
-    }).filter((v) => v !== null);
+  const filterData = () => {
+    if (!simulationData || !simulationData.timestamps) return null;
+    if (!startDate && !endDate) return simulationData;
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const filtered = {
+      timestamps: [],
+      demand: [],
+      generation: [],
+      battery_soc: [],
+      import_from_grid: [],
+      export_to_grid: []
+    };
+
+    simulationData.timestamps.forEach((ts, i) => {
+      const date = new Date(ts);
+      if ((!startDate || date >= start) && (!endDate || date <= end)) {
+        filtered.timestamps.push(ts);
+        filtered.demand.push(simulationData.demand[i]);
+        filtered.generation.push(simulationData.generation[i]);
+        filtered.battery_soc.push(simulationData.battery_soc[i]);
+        filtered.import_from_grid.push(simulationData.import_from_grid[i]);
+        filtered.export_to_grid.push(simulationData.export_to_grid[i]);
+      }
+    });
+    return filtered;
   };
 
-  const filterTimestamps = (timestamps) => {
-    return timestamps.map(t => new Date(t))
-      .filter(t => t >= startDate && t <= endDate)
-      .map(t => t.toLocaleString());
-  };
-
-  const showFullYear = () => {
-    setStartDate(new Date('2025-01-01'));
-    setEndDate(new Date('2025-12-31'));
-  };
+  const filtered = filterData();
 
   return (
     <div className="container">
       <h4>System Design</h4>
-      <form onSubmit={handleSimulate} className="row g-3">
-        <div className="col-md-4">
-          <label className="form-label">Panel Size (kWp)</label>
-          <input type="number" className="form-control" value={panelKW} onChange={(e) => setPanelKW(e.target.value)} step="0.1" required />
-        </div>
-        <div className="col-md-4">
-          <label className="form-label">Battery Size (kWh)</label>
-          <input type="number" className="form-control" value={batteryKWh} onChange={(e) => setBatteryKWh(e.target.value)} step="0.1" disabled={systemType === 'grid'} />
-        </div>
-        <div className="col-md-4">
+
+      <div className="row g-3 mb-3">
+        <div className="col-md-3">
           <label className="form-label">System Type</label>
-          <select className="form-select" value={systemType} onChange={(e) => setSystemType(e.target.value)}>
-            <option value="grid">Grid-Tied</option>
+          <select className="form-select" value={systemType} onChange={e => setSystemType(e.target.value)}>
+            <option value="grid">Grid-tied</option>
             <option value="hybrid">Hybrid</option>
-            <option value="off-grid">Off-Grid</option>
+            <option value="off-grid">Off-grid</option>
           </select>
         </div>
-        <div className="col-12">
-          <button className="btn btn-success">Simulate</button>
+
+        <div className="col-md-3">
+          <label className="form-label">Panel Size (kWp)</label>
+          <input type="number" className="form-control" value={panelKw} onChange={e => setPanelKw(e.target.value)} />
         </div>
-      </form>
 
-      {simulationData && (
-        <div className="mt-4">
-          <div className="row mb-3">
-            <div className="col-md-4">
-              <label>Start Date</label>
-              <DatePicker selected={startDate} onChange={setStartDate} className="form-control" dateFormat="yyyy-MM-dd" />
-            </div>
-            <div className="col-md-4">
-              <label>End Date</label>
-              <DatePicker selected={endDate} onChange={setEndDate} className="form-control" dateFormat="yyyy-MM-dd" />
-            </div>
-            <div className="col-md-4 d-flex align-items-end">
-              <button className="btn btn-outline-secondary w-100" onClick={showFullYear}>Full Year</button>
-            </div>
+        <div className="col-md-3">
+          <label className="form-label">Battery Size (kWh)</label>
+          <input type="number" className="form-control" value={batteryKwh} onChange={e => setBatteryKwh(e.target.value)} disabled={systemType === 'grid'} />
+        </div>
+
+        <div className="col-md-3">
+          <label className="form-label">Inverter Size (kVA)</label>
+          <input type="number" className="form-control" value={inverterKva} onChange={e => setInverterKva(e.target.value)} />
+        </div>
+
+        <div className="col-md-3">
+          <label className="form-label">Start Date</label>
+          <input type="date" className="form-control" value={startDate} onChange={e => setStartDate(e.target.value)} />
+        </div>
+
+        <div className="col-md-3">
+          <label className="form-label">End Date</label>
+          <input type="date" className="form-control" value={endDate} onChange={e => setEndDate(e.target.value)} />
+        </div>
+
+        <div className="col-md-3">
+          <label className="form-label">Allow Grid Export?</label>
+          <div className="form-check">
+            <input className="form-check-input" type="checkbox" checked={allowExport} onChange={() => setAllowExport(!allowExport)} />
+            <label className="form-check-label">Yes</label>
           </div>
+        </div>
 
-          <Line
-            data={{
-              labels: filterTimestamps(simulationData.timestamps),
-              datasets: [
-                {
-                  label: 'Demand (kW)',
-                  data: filterByDateRange(simulationData.timestamps, simulationData.demand),
-                  borderColor: 'red',
-                  tension: 0.2,
-                },
-                {
-                  label: 'Generation (kW)',
-                  data: filterByDateRange(simulationData.timestamps, simulationData.generation),
-                  borderColor: 'green',
-                  tension: 0.2,
-                },
-                {
-                  label: 'Battery SOC (%)',
-                  data: filterByDateRange(simulationData.timestamps, simulationData.battery_soc),
-                  borderColor: 'blue',
-                  tension: 0.2,
-                  yAxisID: 'y1'
-                }
-              ]
-            }}
-            options={{
-              responsive: true,
-              plugins: {
-                legend: { position: 'top' },
-                title: { display: true, text: 'System Simulation Results' }
+        <div className="col-md-3 align-self-end">
+          <button className="btn btn-primary" onClick={handleSimulate} disabled={loading}>
+            {loading ? 'Simulating...' : 'Simulate'}
+          </button>
+        </div>
+      </div>
+
+      {filtered && (
+        <Line
+          data={{
+            labels: filtered.timestamps,
+            datasets: [
+              { label: 'Demand (kW)', data: filtered.demand, borderColor: 'red', borderWidth: 2, tension: 0.3, pointRadius: 0 },
+              { label: 'Generation (kW)', data: filtered.generation, borderColor: 'green', borderWidth: 2, tension: 0.3, pointRadius: 0 },
+              { label: 'Battery SOC (%)', data: filtered.battery_soc, borderColor: 'orange', borderWidth: 2, tension: 0.3, pointRadius: 0 },
+              { label: 'Grid Import (kW)', data: filtered.import_from_grid, borderColor: 'blue', borderWidth: 2, tension: 0.3, pointRadius: 0 },
+              allowExport && {
+                label: 'Grid Export (kW)',
+                data: filtered.export_to_grid,
+                borderColor: 'purple',
+                borderWidth: 2,
+                tension: 0.3,
+                pointRadius: 0
+              }
+            ].filter(Boolean)
+          }}
+          options={{
+            responsive: true,
+            plugins: {
+              title: {
+                display: true,
+                text: 'System Simulation (filtered)'
               },
-              scales: {
-                y: {
-                  title: { display: true, text: 'Power (kW)' },
-                },
-                y1: {
-                  position: 'right',
-                  title: { display: true, text: 'Battery SOC (%)' },
-                  grid: { drawOnChartArea: false },
-                  min: 0,
-                  max: 100
+              legend: {
+                display: true,
+                position: 'bottom'
+              }
+            },
+            elements: {
+              line: {
+                tension: 0.3
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: 'Power (kW) / SOC (%)'
+                }
+              },
+              x: {
+                ticks: { maxTicksLimit: 20 },
+                title: {
+                  display: true,
+                  text: 'Timestamp'
                 }
               }
-            }}
-          />
-        </div>
+            }
+          }}
+        />
       )}
     </div>
   );

@@ -25,7 +25,7 @@ function EditProject() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    axios.put(`http://localhost:5000/update_project/${id}`, project)
+    axios.put(`http://localhost:5000/api/projects/${id}`, project)
       .then(() => {
         alert('Project updated successfully!');
         navigate('/projects');

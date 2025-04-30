@@ -11,7 +11,7 @@ function EditClient() {
   const [phone, setPhone] = useState('');
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/clients/${id}`)
+    axios.get(`http://localhost:5000/api/clients/${id}`)
       .then((response) => {
         setClientName(response.data.client_name);
         setEmail(response.data.email);
@@ -31,7 +31,7 @@ function EditClient() {
       phone: phone
     };
 
-    axios.put(`http://localhost:5000/clients/${id}`, payload)
+    axios.put(`http://localhost:5000/api/clients/${id}`, payload)
       .then(() => {
         alert('Client updated successfully!');
         navigate('/clients');
