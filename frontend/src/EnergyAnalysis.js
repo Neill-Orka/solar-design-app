@@ -19,7 +19,7 @@ function EnergyAnalysis({ projectId }) {
     if (startDate) params.start_date = startDate.toISOString().split('T')[0];
     if (endDate) params.end_date = endDate.toISOString().split('T')[0];
 
-    axios.get(`http://localhost:5000/consumption_data/${projectId}`, { params })
+    axios.get(`http://localhost:5000/api/consumption_data/${projectId}`, { params })
       .then((res) => setConsumptionData(res.data))
       .catch((err) => {
         console.error('Error loading data:', err);

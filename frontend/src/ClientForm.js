@@ -15,7 +15,7 @@ function ClientForm() {
       phone: phone
     };
 
-    axios.post('http://localhost:5000/add_client', payload)
+    axios.post('http://localhost:5000/api/clients', payload)
       .then((response) => {
         console.log('Client added:', response.data);
         alert('Client added successfully!');

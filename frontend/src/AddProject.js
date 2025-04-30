@@ -28,7 +28,7 @@ function AddProject() {
   }, []);
 
   const loadClients = () => {
-    axios.get('http://localhost:5000/clients')
+    axios.get('http://localhost:5000/api/clients')
       .then((res) => setClients(res.data))
       .catch((err) => {
         console.error('Error loading clients:', err);
@@ -55,7 +55,7 @@ function AddProject() {
         return;
       }
       try {
-        const res = await axios.post('http://localhost:5000/add_client', {
+        const res = await axios.post('http://localhost:5000/api/clients', {
           client_name: newClientName,
           email: newClientEmail,
           phone: '' // Optional: user can edit phone later
@@ -72,7 +72,7 @@ function AddProject() {
     }
 
     try {
-      await axios.post('http://localhost:5000/add_project', {
+      await axios.post('http://localhost:5000/api/projects', {
         ...projectData,
         client_id: clientId
       });
