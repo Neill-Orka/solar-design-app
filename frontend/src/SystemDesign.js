@@ -24,6 +24,8 @@ function SystemDesign({ projectId }) {
   const [startDate, setStartDate] = useState('2025-01-01');
   const [endDate, setEndDate] = useState('2025-12-31');
   const [loading, setLoading] = useState(false);
+  const [tariff, setTariff] = useState(2.2);
+  const [feedInTariff, setFeedInTariff] = useState(1.0);
 
   const handleSimulate = () => {
     setLoading(true);
@@ -49,6 +51,33 @@ function SystemDesign({ projectId }) {
     .catch(err => {
       console.error('Simulation error:', err);
       alert('Simulation failed. See console for details');
+      setLoading(false);
+    });
+  };
+
+  const handleOptimize = () => {
+    setLoading(true);
+    axios.post('http://localhost:5000/api/optimize', {
+      project_id: projectId,
+      tariff: tariff,
+      export_enabled: allowExport,
+      feed_in_tariff: feedInTariff
+    })
+    .then(res => {
+      setLoading(false);
+      if (res.data.error) {
+        alert("Optimization failed: " + res.data.error);
+        return;
+      }
+      const config = res.data.best_config;
+      setPanelKw(config.panel_kw);
+      setBatteryKwh(config.battery_kwh);
+      setInverterKva(config.inverter_kva);
+      alert("Optimal configuration loaded. You can now run a simulation.");
+    })
+    .catch(err => {
+      console.error('Optimizer error:', err);
+      alert('Optimizer failed. See console for details');
       setLoading(false);
     });
   };
@@ -131,9 +160,22 @@ function SystemDesign({ projectId }) {
           </div>
         </div>
 
-        <div className="col-md-3 align-self-end">
+        <div className="col-md-3">
+          <label className="form-label">Eskom Tariff (R/kWh)</label>
+          <input type="number" className="form-control" value={tariff} onChange={e => setTariff(e.target.value)} step="0.01" />
+        </div>
+
+        <div className="col-md-3">
+          <label className="form-label">Feed-in Tariff (R/kWh)</label>
+          <input type="number" className="form-control" value={feedInTariff} onChange={e => setFeedInTariff(e.target.value)} step="0.01" disabled={!allowExport} />
+        </div>
+
+        <div className="col-md-3 d-flex align-items-end gap-2">
           <button className="btn btn-primary" onClick={handleSimulate} disabled={loading}>
             {loading ? 'Simulating...' : 'Simulate'}
+          </button>
+          <button className="btn btn-success" onClick={handleOptimize} disabled={loading}>
+            {loading ? 'Optimizing...' : 'Optimize System'}
           </button>
         </div>
       </div>
