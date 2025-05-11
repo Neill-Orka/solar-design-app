@@ -40,27 +40,30 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         soc_trace, import_from_grid, export_to_grid = [], [], []
 
         for i in range(len(demand_kw)):
-            raw_gen = generation_kw.iloc[i]
+            gen = generation_kw.iloc[i]
             demand = demand_kw[i]
+            time_diff = (times[i] - times[i-1]).total_seconds() / 3600 if i > 0 else 0.5  # in 30 min intervals
 
-            if allow_export:
-                actual_gen = min(raw_gen, inverter_kva) # limited by inverter size
-                export_kw = max(0, actual_gen = demand)
-                pv_used = actual_gen
-            else:
-                actual_gen = min(raw_gen, inverter_kva, demand)
-                export_kw = 0
-                pv_used = actual_gen
-
-            net = pv_used - demand
-
+            net = gen - demand
+            
             if system_type in ['hybrid', 'off-grid'] and battery_max > 0:
-                battery_soc += net * 1000 * 0.5
+                battery_soc += net * 1000 * time_diff
                 battery_soc = max(0, min(battery_soc, battery_max))
             else:
                 battery_soc = 0
 
             soc_trace.append(round(battery_soc / battery_max * 100, 2) if battery_max > 0 else 0)
+
+            if allow_export:
+                actual_gen = min(gen, inverter_kva) # limited by inverter size
+                export_kw = max(0, actual_gen = demand)
+                pv_used = actual_gen
+            else:
+                actual_gen = min(gen, inverter_kva, demand)
+                export_kw = 0
+                pv_used = actual_gen
+
+            net = pv_used - demand
 
             import_kw = max(0, -net) if system_type != 'off-grid' else 0
 
