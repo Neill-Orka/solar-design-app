@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify
 from models import db, Projects, EnergyData
 from services.simulation_engine import simulate_system_inner
 from datetime import datetime
+import logging
 
 financial_bp = Blueprint('financial', __name__)
 
@@ -10,6 +11,8 @@ financial_bp = Blueprint('financial', __name__)
 def financial_model():
     try:
         data = request.get_json()
+        logging.debug(f"Financial Model Input: {data}")
+
         project_id = data.get("project_id")
         eskom_tariff = float(data.get("tariff", 2.2))
         export_enabled = data.get("export_enabled", False)
@@ -17,13 +20,18 @@ def financial_model():
 
         project = Projects.query.get(project_id)
         if not project:
+            logging.error(f"Project {project_id} not found")
             return jsonify({"error": "Project not found"}), 404
+
+        logging.debug(f"Simulating for project: {project.id}, kw={project.panel_kw}, battery={project.battery_kwh}, type={project.system_type}")
 
         sim_response = simulate_system_inner(
             project_id,
             project.panel_kw,
             project.battery_kwh or 0,
-            project.system_type
+            project.system_type,
+            project.inverter_kva or 0,
+            export_enabled
         )
 
         if "error" in sim_response:
@@ -37,6 +45,15 @@ def financial_model():
 
         degradation_rate = 0.005
         system_cost = project.project_value_excl_vat or 0
+        # --- make sure we actually have a project CAPEX ----------------------
+        if project.project_value_excl_vat in (None, 0, ""):
+            return jsonify({
+                "error": "Project value (ex‑VAT) is missing. "
+                         "Please edit the project and enter the full system cost."
+            }), 400
+
+        system_cost = float(project.project_value_excl_vat)
+
 
         base_savings = 0
         monthly_costs = {}

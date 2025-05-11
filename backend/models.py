@@ -41,3 +41,21 @@ class EnergyData(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     timestamp = db.Column(db.DateTime)
     demand_kw = db.Column(db.Float)
+
+class Product(db.Model):
+    __tablename__ = 'products'
+    id          = db.Column(db.Integer, primary_key=True)
+    category    = db.Column(db.String(20), index=True)  # 'panel', 'inverter', 'battery'
+    brand       = db.Column(db.String(80))
+    model       = db.Column(db.String(120))
+    power_w     = db.Column(db.Float,  nullable=True)   # panel STC power
+    rating_kva  = db.Column(db.Float,  nullable=True)   # inverter rating
+    capacity_kwh= db.Column(db.Float,  nullable=True)   # battery capacity
+    cost        = db.Column(db.Float,  nullable=True)   # your cost
+    price       = db.Column(db.Float,  nullable=True)   # selling price
+    warranty_y  = db.Column(db.Integer, nullable=True)
+    notes       = db.Column(db.String(250))
+
+    def as_dict(self):
+        "Return a plain-dict representation of the Product instance (handy for JSON)."
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}

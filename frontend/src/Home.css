@@ -1,0 +1,94 @@
+/* Home.css */
+.hero {
+    height: 40vh;               /* a bit taller */
+    padding-top: 0px;          /* navbar height so text isn't hidden */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    color: #fff;
+    text-align: center;
+    background-position: center bottom;
+  }
+
+  @media (max-width: 700px) {
+    .hero {
+      height: 30vh;           /* a bit shorter on mobile */
+    }
+  }
+
+  .hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.45));
+  }
+  .hero h1 {
+    z-index: 1;
+    font-size: 3.5rem;
+    font-weight: 700;
+    text-shadow: 0 3px 8px rgba(0,0,0,0.6);
+  }
+  .wave {
+    margin-top: -200px;
+  }
+  .card-hover {
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+  }
+
+  /* ---- glass card ---- */
+.glass-card {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(10px);
+    border-radius: 1rem !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.10);
+    transition: border-color .3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .glass-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(60deg, #bbb, #ddd);
+    pointer-events: none;
+  
+    /* --- dual masks for browser compatibility --- */
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+  
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+
+  
+    opacity: 0;
+    transition: opacity .3s;
+  }
+  /* blue card hover */
+.glass-card.border-primary::before {
+    background: linear-gradient(60deg, #0d6efd, #3d8bfd);
+  }
+/* green card hover */
+.glass-card.border-success::before {
+    background: linear-gradient(60deg, #198754, #45b36b);
+  }
+  
+  /* yellow card hover */
+  .glass-card.border-warning::before {
+    background: linear-gradient(60deg, #ffc107, #ffe173);
+  }
+  
+  
+  .glass-card:hover::before { opacity: 1; }
+  
+  

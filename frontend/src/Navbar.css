@@ -1,0 +1,51 @@
+/* Glassy, subtle shadow */
+.navbar-glass {
+    background: rgba(255, 255, 255, 0.65) !important;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+  
+  /* Brand group (logo + text) */
+  .navbar-brand-group {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 600;
+    font-size: 1.15rem;
+  }
+  
+  /* Square logo sizing */
+  .navbar-logo {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+  }
+  
+  /* Link styling */
+  .navbar-link {
+    position: relative;
+    font-weight: 500;
+    margin-right: 0.75rem;
+  }
+  
+  .navbar-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    width: 0;
+    height: 2px;
+    background: currentColor;
+    transition: width 0.25s;
+  }
+  
+  .navbar-link:hover::after,
+  .navbar-link.active::after {
+    width: 100%;
+  }
+  
+  /* Toggler (hamburger) color in light theme */
+  .navbar-light .navbar-toggler-icon {
+    filter: invert(30%);
+  }
+  

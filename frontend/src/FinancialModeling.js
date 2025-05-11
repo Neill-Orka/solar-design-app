@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
 import {
@@ -20,6 +20,10 @@ function FinancialModeling({ projectId }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    console.log("Received projectID: ", projectId);
+  }, [projectId]);
+
   const handleCalculate = () => {
     setLoading(true);
     axios.post('http://localhost:5000/api/financial_model', {
@@ -33,10 +37,13 @@ function FinancialModeling({ projectId }) {
         setLoading(false);
       })
       .catch(err => {
-        console.error('Error calculating financials:', err);
-        alert('Calculation failed');
+        const msg = err.response?.data?.error || err.message;
+        console.error('Error calculating financials:', msg);
+        alert('Calculation failed: ' + msg + 
+              '\n(Hint: did you click "Save System" first?)');
         setLoading(false);
       });
+      
   };
 
   return (
