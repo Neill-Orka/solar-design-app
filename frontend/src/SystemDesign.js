@@ -34,6 +34,7 @@ function SystemDesign({ projectId }) {
   const [startDate, setStartDate] = useState('2025-01-01');
   const [endDate, setEndDate] = useState('2025-12-31');
   const [loading, setLoading] = useState(false);
+  const [allowExport, setAllowExport] = useState(false);
 
   // pull saved values when component mounts
   useEffect (() => {
@@ -73,7 +74,7 @@ function SystemDesign({ projectId }) {
         system_type: systemType,
         battery_kwh: systemType === 'grid' ? 0 : parseFloat(batteryKwh),
         inverter_kva: parseFloat(inverterKva),
-        allow_export: false
+        allow_export: allowExport
       }
     })
     .then(res => {
@@ -101,33 +102,6 @@ function SystemDesign({ projectId }) {
       .find(o => o.value === inverterKva);
     setSelectedInvOpt(opt || null);
   }, [inverters, inverterKva]);
-
-  // const handleOptimize = () => {
-  //   setLoading(true);
-  //   axios.post('http://localhost:5000/api/optimize', {
-  //     project_id: projectId,
-  //     tariff: tariff,
-  //     export_enabled: allowExport,
-  //     feed_in_tariff: feedInTariff
-  //   })
-  //   .then(res => {
-  //     setLoading(false);
-  //     if (res.data.error) {
-  //       alert("Optimization failed: " + res.data.error);
-  //       return;
-  //     }
-  //     const config = res.data.best_config;
-  //     setPanelKw(config.panel_kw);
-  //     setBatteryKwh(config.battery_kwh);
-  //     setInverterKva(config.inverter_kva);
-  //     alert("Optimal configuration loaded. You can now run a simulation.");
-  //   })
-  //   .catch(err => {
-  //     console.error('Optimizer error:', err);
-  //     alert('Optimizer failed. See console for details');
-  //     setLoading(false);
-  //   });
-  // };
 
   const filterData = () => {
     if (!simulationData || !simulationData.timestamps) return null;
@@ -174,6 +148,18 @@ function SystemDesign({ projectId }) {
             <option value="hybrid">Hybrid</option>
             <option value="off-grid">Off‑grid</option>
           </select>
+          <div className='form-check mt-2'>
+            <input
+              className="form-check-input"
+              type="checkbox"
+              checked={allowExport}
+              onChange={e => setAllowExport(e.target.checked)}
+              id="allow_export"
+            />
+            <label className="form-check-label" htmlFor="allow_export">
+              Allow export to grid
+            </label>
+          </div>
         </div>
 
         {/* kWp, kVA, kWh */}

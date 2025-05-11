@@ -40,9 +40,19 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         soc_trace, import_from_grid, export_to_grid = [], [], []
 
         for i in range(len(demand_kw)):
-            gen = min(generation_kw.iloc[i], inverter_kva)
+            raw_gen = generation_kw.iloc[i]
             demand = demand_kw[i]
-            net = gen - demand
+
+            if allow_export:
+                actual_gen = min(raw_gen, inverter_kva) # limited by inverter size
+                export_kw = max(0, actual_gen = demand)
+                pv_used = actual_gen
+            else:
+                actual_gen = min(raw_gen, inverter_kva, demand)
+                export_kw = 0
+                pv_used = actual_gen
+
+            net = pv_used - demand
 
             if system_type in ['hybrid', 'off-grid'] and battery_max > 0:
                 battery_soc += net * 1000 * 0.5
@@ -53,7 +63,6 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
             soc_trace.append(round(battery_soc / battery_max * 100, 2) if battery_max > 0 else 0)
 
             import_kw = max(0, -net) if system_type != 'off-grid' else 0
-            export_kw = max(0, net) if (system_type != 'off-grid' and allow_export) else 0
 
             import_from_grid.append(import_kw)
             export_to_grid.append(export_kw)
@@ -61,7 +70,7 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         return {
             "timestamps": [r.timestamp.isoformat() for r in records],
             "demand": demand_kw,
-            "generation": list(generation_kw.clip(upper=inverter_kva).round(2)),
+            "generation": list(pd.Series([min(generation_kw.iloc[i], inverter_kva if allow_export else min(inverter_kva, demand_kw[i])) for i in range(len(demand_kw))]).round(2)),
             "battery_soc": soc_trace,
             "import_from_grid": import_from_grid,
             "export_to_grid": export_to_grid
