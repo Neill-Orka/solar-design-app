@@ -1,6 +1,8 @@
 import React, { useState , useEffect} from 'react';
 import axios from 'axios';
 import { Line } from 'react-chartjs-2';
+import Modal from 'react-bootstrap/Modal';
+import Button from 'react-bootstrap/Button';
 import Select from 'react-select'
 import {
   Chart as ChartJS,
@@ -35,6 +37,7 @@ function SystemDesign({ projectId }) {
   const [endDate, setEndDate] = useState('2025-12-31');
   const [loading, setLoading] = useState(false);
   const [allowExport, setAllowExport] = useState(false);
+  const [showDateModal, setShowDateModal] = useState(false);
 
   // pull saved values when component mounts
   useEffect (() => {
@@ -49,6 +52,15 @@ function SystemDesign({ projectId }) {
     })
     .catch(err => console.error('Load project error:', err));
   }, [projectId]);
+
+  useEffect(() => {
+  const today = new Date();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(today.getDate() - 30);
+  setStartDate(thirtyDaysAgo.toISOString().slice(0, 10));
+  setEndDate(today.toISOString().slice(0, 10));
+  }, []);
+
 
   // --- helpers ---------------------------------------------------
   const saveProject = () => {
@@ -134,10 +146,10 @@ function SystemDesign({ projectId }) {
 
   const filtered = filterData();
 
-  return (
+    return (
     <div className="container">
       <h4>System Design</h4>
-
+    
       <div className="row g-3 mb-3">
         {/* system type */}
         <div className="col-md-3">
@@ -161,14 +173,14 @@ function SystemDesign({ projectId }) {
             </label>
           </div>
         </div>
-
+    
         {/* kWp, kVA, kWh */}
         <div className="col-md-3">
           <label className="form-label">Panel Size (kWp)</label>
           <input type="number" className="form-control"
                  value={panelKw} onChange={e => setPanelKw(e.target.value)} />
         </div>
-
+    
         <div className="col-md-3">
           <Form.Label>Inverter</Form.Label>
           <Select
@@ -184,27 +196,14 @@ function SystemDesign({ projectId }) {
             isClearable
           />
         </div>
-
+          
         <div className="col-md-3">
           <label className="form-label">Battery Size (kWh)</label>
           <input type="number" className="form-control"
                  value={batteryKwh} onChange={e => setBatteryKwh(e.target.value)}
                  disabled={systemType === 'grid'} />
         </div>
-
-        {/* date range */}
-        <div className="col-md-3">
-          <label className="form-label">Start Date</label>
-          <input type="date" className="form-control"
-                 value={startDate} onChange={e => setStartDate(e.target.value)} />
-        </div>
-
-        <div className="col-md-3">
-          <label className="form-label">End Date</label>
-          <input type="date" className="form-control"
-                 value={endDate} onChange={e => setEndDate(e.target.value)} />
-        </div>
-
+          
         {/* buttons */}
         <div className="col-md-6 d-flex align-items-end gap-2">
           <button className="btn btn-secondary" onClick={saveProject}>
@@ -215,78 +214,135 @@ function SystemDesign({ projectId }) {
           </button>
         </div>
       </div>
-
-      {/* chart rendering unchanged … */}
+          
+      {/* -------- Simulation Chart + Zoom Buttons -------- */}
       {filtered && (
-        <Line
-  data={{
-    labels: filtered.timestamps,
-    datasets: [
-      {
-        label: 'Demand (kW)',
-        data: filtered.demand,
-        borderColor: 'red',
-        borderWidth: 2,
-        tension: 0.3,
-        pointRadius: 0
-      },
-      {
-        label: 'Generation (kW)',
-        data: filtered.generation,
-        borderColor: 'green',
-        borderWidth: 2,
-        tension: 0.3,
-        pointRadius: 0
-      },
-      {
-        label: 'Battery SOC (%)',
-        data: filtered.battery_soc,
-        borderColor: 'orange',
-        backgroundColor: 'rgba(212, 162, 69, 0.15)',
-        fill: true,
-        borderWidth: 2,
-        tension: 0.3,
-        pointRadius: 0,
-        yAxisID: 'socAxis'
-      },
-      {
-        label: 'Grid Import (kW)',
-        data: filtered.import_from_grid,
-        borderColor: 'blue',
-        borderWidth: 2,
-        tension: 0.3,
-        pointRadius: 0
-      }
-    ]
-  }}
-  options={{
-    responsive: true,
-    plugins: {
-      title: { display: true, text: 'System Simulation' },
-      legend: { display: true, position: 'bottom' }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        title: { display: true, text: 'Power (kW)' }
-      },
-      socAxis: {
-        position: 'right',
-        min: 0,
-        max: 100,
-        ticks: { callback: v => v + ' %' },
-        grid: { drawOnChartArea: false },
-        title: { display: true, text: 'Battery SOC (%)' }
-      },
-      x: {
-        ticks: { maxTicksLimit: 20 },
-        title: { display: true, text: 'Timestamp' }
-      }
-    }
-  }}
-/>
-)}
-
+        <>
+          <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <h5 className="mb-0">Simulation Results</h5>
+            <div className="btn-group">
+              <button className="btn btn-outline-secondary" onClick={() => {
+                const today = new Date();
+                const weekAgo = new Date();
+                weekAgo.setDate(today.getDate() - 7);
+                setStartDate(weekAgo.toISOString().slice(0, 10));
+                setEndDate(today.toISOString().slice(0, 10));
+              }}>Last 7 Days</button>
+  
+              <button className="btn btn-outline-secondary" onClick={() => {
+                const today = new Date();
+                const monthAgo = new Date();
+                monthAgo.setDate(today.getDate() - 30);
+                setStartDate(monthAgo.toISOString().slice(0, 10));
+                setEndDate(today.toISOString().slice(0, 10));
+              }}>Last 30 Days</button>
+  
+              <button className="btn btn-outline-secondary" onClick={() => {
+                setStartDate('2025-01-01');
+                setEndDate('2025-12-31');
+              }}>Full Year</button>
+  
+              <button className="btn btn-outline-primary" onClick={() => setShowDateModal(true)}>
+                Custom Range
+              </button>
+            </div>
+          </div>
+            
+          <Line
+            data={{
+              labels: filtered.timestamps,
+              datasets: [
+                {
+                  label: 'Demand (kW)',
+                  data: filtered.demand,
+                  borderColor: 'red',
+                  borderWidth: 2,
+                  tension: 0.3,
+                  pointRadius: 0
+                },
+                {
+                  label: 'Generation (kW)',
+                  data: filtered.generation,
+                  borderColor: 'green',
+                  borderWidth: 2,
+                  tension: 0.3,
+                  pointRadius: 0
+                },
+                {
+                  label: 'Battery SOC (%)',
+                  data: filtered.battery_soc,
+                  borderColor: 'orange',
+                  backgroundColor: 'rgba(212, 162, 69, 0.15)',
+                  fill: true,
+                  borderWidth: 2,
+                  tension: 0.3,
+                  pointRadius: 0,
+                  yAxisID: 'socAxis'
+                },
+                {
+                  label: 'Grid Import (kW)',
+                  data: filtered.import_from_grid,
+                  borderColor: 'blue',
+                  borderWidth: 2,
+                  tension: 0.3,
+                  pointRadius: 0
+                }
+              ]
+            }}
+            options={{
+              responsive: true,
+              plugins: {
+                title: { display: true, text: 'System Simulation' },
+                legend: { display: true, position: 'bottom' },
+                decimation: {
+                  enabled: true,
+                  algorithm: 'lttb',
+                  samples: Math.min(100, filtered.timestamps.length)
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  title: { display: true, text: 'Power (kW)' }
+                },
+                socAxis: {
+                  position: 'right',
+                  min: 0,
+                  max: 100,
+                  ticks: { callback: v => v + ' %' },
+                  grid: { drawOnChartArea: false },
+                  title: { display: true, text: 'Battery SOC (%)' }
+                },
+                x: {
+                  ticks: { maxTicksLimit: 20 },
+                  title: { display: true, text: 'Timestamp' }
+                }
+              }
+            }}
+          />
+  
+          {/* Modal for custom date range */}
+          <Modal show={showDateModal} onHide={() => setShowDateModal(false)}>
+            <Modal.Header closeButton>
+              <Modal.Title>Select Date Range</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <Form.Group className="mb-3">
+                <Form.Label>Start Date</Form.Label>
+                <Form.Control type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>End Date</Form.Label>
+                <Form.Control type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+              </Form.Group>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={() => setShowDateModal(false)}>Cancel</Button>
+              <Button variant="primary" onClick={() => setShowDateModal(false)}>Apply</Button>
+            </Modal.Footer>
+          </Modal>
+        </>
+      )}
     </div>
   );
 }
