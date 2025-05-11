@@ -1,116 +1,251 @@
-import React, { useEffect, useState } from 'react';
+/* ----------  Reporting.js  ---------- */
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import axios from 'axios';
+
+/* pdfmake (robust import) */
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
-import logo from './assets/orka_logo_transparent_background.png'; // adjust path if needed
+import logo from './assets/orka_logo_transparent_background.png';
 
+/* Chart.js */
+import { Line, Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Tooltip,
+  Legend
+} from 'chart.js';
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
+
+/* logo */
 pdfMake.vfs = (pdfFonts.pdfMake ? pdfFonts.pdfMake.vfs : pdfFonts.default);
 
+/* helper to load image → base‑64 */
+const toBase64 = src =>
+  fetch(src)
+    .then(r => r.blob())
+    .then(
+      blob =>
+        new Promise(res => {
+          const fr = new FileReader();
+          fr.onload = () => res(fr.result);
+          fr.readAsDataURL(blob);
+        })
+    );
 
 function Reporting({ projectId }) {
-  const [project, setProject] = useState(null);
+  /* ------------ state ------------ */
+  const [project, setProject]       = useState(null);
   const [simulation, setSimulation] = useState(null);
+  const [financial, setFinancial]   = useState(null);
+  const [inverter, setInverter]     = useState(null);
 
+  /* chart refs + captured images */
+  const simRef   = useRef(null);
+  const dailyRef = useRef(null);
+  const [simImg,   setSimImg]   = useState(null);
+  const [dailyImg, setDailyImg] = useState(null);
+
+  /* ------------ load project + sim + finance ------------ */
   useEffect(() => {
-    // Load project
     axios.get(`http://localhost:5000/api/projects/${projectId}`)
-      .then(res => setProject(res.data))
-      .catch(err => console.error('Failed to load project', err));
+      .then(r => {
+        setProject(r.data);
 
-    // Load simulation from sessionStorage
+        /* fetch inverter meta for BOM */
+        axios
+          .get('http://localhost:5000/api/products?category=inverter')
+          .then(res => {
+            const match = res.data.find(p => p.rating_kva === r.data.inverter_kva);
+            setInverter(match || null);
+          })
+          .catch(() => {});
+
+        /* call financial endpoint */
+        axios
+          .post('http://localhost:5000/api/financial_model', {
+            project_id: projectId,
+            tariff: 2.2,
+            export_enabled: false,
+            feed_in_tariff: 1.0
+          })
+          .then(resF => setFinancial(resF.data))
+          .catch(() => {});
+      })
+      .catch(err => console.error('Project load error', err));
+
+    /* cached sim */
     const cached = sessionStorage.getItem(`simulationData_${projectId}`);
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        setSimulation(parsed);
-      } catch (err) {
-        console.error('Error parsing cached simulation data:', err);
-      }
+        if (parsed.timestamps) setSimulation(parsed);
+      } catch {/* ignore */}
     }
   }, [projectId]);
 
+  /* ------------ build dailyEnergyMap ------------- */
+  const dailyEnergyMap = useMemo(() => {
+    if (!simulation?.timestamps) return null;
+    const map = {};
+    simulation.timestamps.forEach((ts, i) => {
+      const d = ts.split('T')[0];
+      if (!map[d]) map[d] = 0;
+      map[d] += simulation.demand[i] * 0.5; // kWh
+    });
+    return map;
+  }, [simulation]);
+
+  /* ------------ capture chart images once rendered ------------ */
+  useEffect(() => {
+    if (simulation && simRef.current && !simImg) {
+      setSimImg(simRef.current.toBase64Image());
+    }
+    if (dailyEnergyMap && dailyRef.current && !dailyImg) {
+      setDailyImg(dailyRef.current.toBase64Image());
+    }
+  }, [simulation, dailyEnergyMap, simImg, dailyImg]);
+
+  /* ------------ helpers ------------ */
+  const sumKwh = arr => (arr?.reduce((s, v) => s + v, 0) * 0.5).toFixed(0);
+
+  /* ------------ PDF generation ------------ */
   const generatePdf = async () => {
-    const logoDataUrl = await toBase64(logo);
+    if (!project) return;
 
-    const docDefinition = {
+    const logoB64 = await toBase64(logo);
+    const capex   = project.project_value_excl_vat || 0;
+    const firstYr = financial?.annual_savings || 0;
+    const payback = financial ? financial.payback_years.toFixed(1) : '-';
+    const roi20   = financial ? financial.roi_20yr.toFixed(1) : '-';
+
+    /* small BOM array */
+    const bom = [
+      ['PV Modules', `${project.panel_kw} kWp (generic)`, '1 lot'],
+      ['Inverter', inverter ? `${inverter.brand} ${inverter.model}` : `${project.inverter_kva} kVA`, '1'],
+      ...(project.system_type !== 'grid' && project.battery_kwh > 0
+        ? [['Battery', `${project.battery_kwh} kWh (generic)`, '1']]
+        : [])
+    ];
+
+    const doc = {
+      pageMargins: [40, 60, 40, 60],
       content: [
-        {
-          image: logoDataUrl,
-          width: 120,
-          alignment: 'center',
-          margin: [0, 0, 0, 20]
-        },
-        { text: 'Project Report', style: 'header', alignment: 'center' },
-        { text: `Client: ${project.client_name}`, margin: [0, 10, 0, 0] },
-        { text: `Location: ${project.location}` },
-        { text: `System Type: ${project.system_type}` },
-        { text: `Panel: ${project.panel_kw} kWp` },
-        { text: `Inverter: ${project.inverter_kva} kVA` },
-        ...(project.system_type !== 'grid' && project.battery_kwh > 0
-          ? [{ text: `Battery: ${project.battery_kwh} kWh` }]
-          : []),
+        /* --- cover --- */
+        { image: logoB64, width: 140, alignment: 'center', margin: [0, 0, 0, 20] },
+        { text: 'Solar PV System Design Report', style: 'h1', alignment: 'center', margin: [0, 0, 0, 30] },
 
-        { text: '\nSimulation Summary', style: 'subheader' },
-        ...(simulation?.timestamps?.length
-          ? [
-              { text: `Period: ${simulation.timestamps[0].split('T')[0]} to ${simulation.timestamps.at(-1).split('T')[0]}` },
-              { text: `Total Demand: ${sum(simulation.demand).toFixed(0)} kWh` },
-              { text: `Total PV Generation: ${sum(simulation.generation).toFixed(0)} kWh` },
-              { text: `Grid Import: ${sum(simulation.import_from_grid).toFixed(0)} kWh` },
-              { text: `Grid Export: ${sum(simulation.export_to_grid).toFixed(0)} kWh` }
+        /* --- project info --- */
+        { text: 'Project Information', style: 'h2' },
+        {
+          ul: [
+            `Client: ${project.client_name}`,
+            `Location: ${project.location}`,
+            `System Type: ${project.system_type}`,
+            `Size: ${project.panel_kw} kWp • ${project.inverter_kva} kVA` +
+              (project.battery_kwh && project.system_type !== 'grid' ? ` • Battery ${project.battery_kwh} kWh` : '')
+          ],
+          margin: [0, 5, 0, 15]
+        },
+
+        /* --- executive summary --- */
+        { text: 'Executive Summary', style: 'h2', margin: [0, 10, 0, 5] },
+        {
+          table: {
+            widths: ['*', '*'],
+            body: [
+              ['CAPEX (ex-VAT)', `R ${capex.toLocaleString()}`],
+              ['1st-Year Savings', `R ${firstYr.toLocaleString()}`],
+              ['Payback (yrs)', payback],
+              ['20-yr ROI (%)', roi20]
             ]
-          : [{ text: 'No simulation data available.', italics: true }])
+          },
+          layout: 'lightHorizontalLines',
+          margin: [0, 0, 0, 15]
+        },
+
+        /* --- simulation chart --- */
+        simImg && { text: 'System Simulation', style: 'h2', margin: [0, 10, 0, 5] },
+        simImg && { image: simImg, width: 500 },
+
+        /* --- daily energy bar --- */
+        dailyImg && { text: 'Daily Load Variability', style: 'h2', margin: [0, 15, 0, 5] },
+        dailyImg && { image: dailyImg, width: 500 },
+
+        /* --- BOM --- */
+        { text: 'Bill of Materials', style: 'h2', margin: [0, 20, 0, 5] },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', '*', 'auto'],
+            body: [
+              [{ text: 'Item', bold: true }, { text: 'Specification', bold: true }, { text: 'Qty', bold: true }],
+              ...bom
+            ]
+          },
+          layout: 'lightHorizontalLines'
+        }
       ],
       styles: {
-        header: {
-          fontSize: 18,
-          bold: true
-        },
-        subheader: {
-          fontSize: 14,
-          bold: true,
-          margin: [0, 20, 0, 8]
-        }
+        h1: { fontSize: 20, bold: true },
+        h2: { fontSize: 14, bold: true }
       }
     };
 
-    pdfMake.createPdf(docDefinition).download(`project_${projectId}_report.pdf`);
+    pdfMake.createPdf(doc).download(`Project_${projectId}_Report.pdf`);
   };
 
-  const toBase64 = (imgPath) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      fetch(imgPath)
-        .then(res => res.blob())
-        .then(blob => {
-          reader.readAsDataURL(blob);
-          reader.onloadend = () => resolve(reader.result);
-        })
-        .catch(err => reject(err));
-    });
-  };
-
-  const sum = arr => arr?.reduce((a, b) => a + b, 0) * 0.5;
-
+  /* ------------ render ------------ */
   return (
     <div className="container">
       <h4>Reporting</h4>
-
-      {!project && <p>Loading project info...</p>}
+      {!project && <p>Loading project…</p>}
       {project && (
         <>
           <p>
             <strong>Client:</strong> {project.client_name}<br />
             <strong>Location:</strong> {project.location}<br />
-            <strong>System:</strong> {project.system_type}, {project.panel_kw} kWp, {project.inverter_kva} kVA
-            {project.battery_kwh && project.system_type !== 'grid' && `, Battery: ${project.battery_kwh} kWh`}
+            <strong>System:</strong> {project.panel_kw} kWp • {project.inverter_kva} kVA
+            {project.battery_kwh && project.system_type !== 'grid' && ` • Battery ${project.battery_kwh} kWh`}
           </p>
-
-          <button className="btn btn-primary" onClick={generatePdf}>
-            Download PDF Report
+          <button className="btn btn-primary" onClick={generatePdf} disabled={!simImg || !dailyImg}>
+            {simImg && dailyImg ? 'Download PDF Report' : 'Preparing charts…'}
           </button>
         </>
       )}
+
+      {/* ---- hidden canvases for screenshot ---- */}
+      <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+        {simulation && (
+          <Line
+            ref={simRef}
+            data={{
+              labels: simulation.timestamps,
+              datasets: [
+                { label: 'Demand', data: simulation.demand, borderColor: 'red', pointRadius: 0, tension: 0.2 },
+                { label: 'PV Gen', data: simulation.generation, borderColor: 'green', pointRadius: 0, tension: 0.2 },
+                { label: 'SOC %', data: simulation.battery_soc, borderColor: 'orange', yAxisID: 'soc', pointRadius: 0, tension: 0.2 }
+              ]
+            }}
+            options={{ responsive: false, animation: false, scales: { soc: { position: 'right', min: 0, max: 100 } } }}
+          />
+        )}
+
+        {dailyEnergyMap && (
+          <Bar
+            ref={dailyRef}
+            data={{
+              labels: Object.keys(dailyEnergyMap),
+              datasets: [{ label: 'Daily kWh', data: Object.values(dailyEnergyMap), backgroundColor: 'steelblue' }]
+            }}
+            options={{ responsive: false, animation: false }}
+          />
+        )}
+      </div>
     </div>
   );
 }
