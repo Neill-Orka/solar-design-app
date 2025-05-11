@@ -8,3 +8,5 @@ node_modules/
 build/
 .env
 .DS_Store
+
+backend/client_onboarding.backup
