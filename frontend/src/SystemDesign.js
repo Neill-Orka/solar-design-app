@@ -51,6 +51,20 @@ function SystemDesign({ projectId }) {
       setInverterKva(p.inverter_kva ?? ''); 
     })
     .catch(err => console.error('Load project error:', err));
+
+    // load simulation data from sessionStorage
+    const cached = sessionStorage.getItem(`simulationData_${projectId}`);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed.timestamps) {
+          setSimulationData(parsed);
+        }
+      } catch (e) {
+        console.error('Failed to parse cached simulation data:', e);
+      }
+    }
+
   }, [projectId]);
 
   useEffect(() => {
@@ -96,6 +110,7 @@ function SystemDesign({ projectId }) {
         return;
       }
       setSimulationData(res.data);
+      sessionStorage.setItem(`simulationData_${projectId}`, JSON.stringify(res.data));
     })
     .catch(err => {
       console.error('Simulation error: ', err);
@@ -149,7 +164,7 @@ function SystemDesign({ projectId }) {
     return (
     <div className="container">
       <h4>System Design</h4>
-    
+
       <div className="row g-3 mb-3">
         {/* system type */}
         <div className="col-md-3">
@@ -173,14 +188,14 @@ function SystemDesign({ projectId }) {
             </label>
           </div>
         </div>
-    
+
         {/* kWp, kVA, kWh */}
         <div className="col-md-3">
           <label className="form-label">Panel Size (kWp)</label>
           <input type="number" className="form-control"
                  value={panelKw} onChange={e => setPanelKw(e.target.value)} />
         </div>
-    
+
         <div className="col-md-3">
           <Form.Label>Inverter</Form.Label>
           <Select
@@ -196,14 +211,14 @@ function SystemDesign({ projectId }) {
             isClearable
           />
         </div>
-          
+
         <div className="col-md-3">
           <label className="form-label">Battery Size (kWh)</label>
           <input type="number" className="form-control"
                  value={batteryKwh} onChange={e => setBatteryKwh(e.target.value)}
                  disabled={systemType === 'grid'} />
         </div>
-          
+
         {/* buttons */}
         <div className="col-md-6 d-flex align-items-end gap-2">
           <button className="btn btn-secondary" onClick={saveProject}>
@@ -214,7 +229,7 @@ function SystemDesign({ projectId }) {
           </button>
         </div>
       </div>
-          
+
       {/* -------- Simulation Chart + Zoom Buttons -------- */}
       {filtered && (
         <>
@@ -228,7 +243,7 @@ function SystemDesign({ projectId }) {
                 setStartDate(weekAgo.toISOString().slice(0, 10));
                 setEndDate(today.toISOString().slice(0, 10));
               }}>Last 7 Days</button>
-  
+
               <button className="btn btn-outline-secondary" onClick={() => {
                 const today = new Date();
                 const monthAgo = new Date();
@@ -236,18 +251,18 @@ function SystemDesign({ projectId }) {
                 setStartDate(monthAgo.toISOString().slice(0, 10));
                 setEndDate(today.toISOString().slice(0, 10));
               }}>Last 30 Days</button>
-  
+
               <button className="btn btn-outline-secondary" onClick={() => {
                 setStartDate('2025-01-01');
                 setEndDate('2025-12-31');
               }}>Full Year</button>
-  
+
               <button className="btn btn-outline-primary" onClick={() => setShowDateModal(true)}>
                 Custom Range
               </button>
             </div>
           </div>
-            
+
           <Line
             data={{
               labels: filtered.timestamps,
@@ -268,7 +283,7 @@ function SystemDesign({ projectId }) {
                   tension: 0.3,
                   pointRadius: 0
                 },
-                {
+                ...batteryKwh > 0 ? [{
                   label: 'Battery SOC (%)',
                   data: filtered.battery_soc,
                   borderColor: 'orange',
@@ -278,7 +293,7 @@ function SystemDesign({ projectId }) {
                   tension: 0.3,
                   pointRadius: 0,
                   yAxisID: 'socAxis'
-                },
+                }] : [],
                 {
                   label: 'Grid Import (kW)',
                   data: filtered.import_from_grid,
@@ -320,7 +335,7 @@ function SystemDesign({ projectId }) {
               }
             }}
           />
-  
+
           {/* Modal for custom date range */}
           <Modal show={showDateModal} onHide={() => setShowDateModal(false)}>
             <Modal.Header closeButton>
