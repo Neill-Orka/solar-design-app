@@ -18,6 +18,7 @@ from routes.financial import financial_bp
 from routes.consumption import consumption_bp
 from routes.optimize import optimize_bp
 from routes.products import products_bp
+from routes.energy_data import energy_data_bp
 
 app.register_blueprint(clients_bp, url_prefix='/api')
 app.register_blueprint(projects_bp, url_prefix='/api')
@@ -26,6 +27,7 @@ app.register_blueprint(financial_bp, url_prefix='/api')
 app.register_blueprint(consumption_bp, url_prefix='/api')
 app.register_blueprint(optimize_bp, url_prefix='/api')
 app.register_blueprint(products_bp, url_prefix='/api')
+app.register_blueprint(energy_data_bp, url_prefix='/api')
 
 db.init_app(app)
 
