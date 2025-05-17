@@ -59,3 +59,13 @@ class Product(db.Model):
     def as_dict(self):
         "Return a plain-dict representation of the Product instance (handy for JSON)."
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+    
+class OptimizationRun(db.Model):
+    __tablename__ = "optimization_runs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    system_type = db.Column(db.String(20))
+    inputs_json = db.Column(db.JSON)
+    best_json = db.Column(db.JSON)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

@@ -56,7 +56,7 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
 
             if allow_export:
                 actual_gen = min(gen, inverter_kva) # limited by inverter size
-                export_kw = max(0, actual_gen = demand)
+                export_kw = max(0, actual_gen - demand)
                 pv_used = actual_gen
             else:
                 actual_gen = min(gen, inverter_kva, demand)

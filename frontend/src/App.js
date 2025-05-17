@@ -11,6 +11,7 @@ import EditProject from './EditProject';
 import SystemDesign from './SystemDesign';
 import FinancialModeling from './FinancialModeling';
 import ProductsAdmin from './ProductsAdmin';
+import Optimize from './Optimize';
 import logo from './assets/orka_logo_transparent_background.png';
 import './Navbar.css';
 
@@ -87,6 +88,7 @@ function App() {
           <Route path="/projects/add" element={<AddProject />} />
           <Route path="/projects/edit/:id" element={<EditProject />} />
           <Route path="/products-admin" element={<ProductsAdmin />} />
+          <Route path="/projects/:id/optimize" element={<Optimize />} />
         </Routes>
         </div>
     </Router>
