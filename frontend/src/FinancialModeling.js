@@ -14,6 +14,7 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 function FinancialModeling({ projectId }) {
+  const [projectValue, setProjectValue] = useState('');
   const [eskomTariff, setEskomTariff] = useState(2.2);
   const [feedInTariff, setFeedInTariff] = useState(1.0);
   const [allowExport, setAllowExport] = useState(false);
@@ -23,6 +24,46 @@ function FinancialModeling({ projectId }) {
   useEffect(() => {
     console.log("Received projectID: ", projectId);
   }, [projectId]);
+
+  useEffect(() => {
+    axios.get(`http://localhost:5000/api/projects/${projectId}`)
+      .then(res => {
+        const p = res.data;
+        if (p && p.project_value_excl_vat != null) {
+          setProjectValue(p.project_value_excl_vat);
+        }
+      })
+      .catch(err => {
+        console.error("Error loading project value:", err);
+      });
+  }, [projectId]);
+
+
+  useEffect(() => {
+    const cached = sessionStorage.getItem(`financialResult_${projectId}`);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.yearly_savings) {
+          setResult(parsed);
+        }
+      } catch (e) {
+        console.error("Error parsing cached financial result:", e);
+      }
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    const t = sessionStorage.getItem(`eskomTariff_${projectId}`);
+    const f = sessionStorage.getItem(`feedInTariff_${projectId}`);
+    const ex = sessionStorage.getItem(`allowExport_${projectId}`);
+
+    if (t) setEskomTariff(t);
+    if (f) setFeedInTariff(f);
+    if (ex) setAllowExport(ex === 'true');
+
+  }, [projectId]);
+
 
   const handleCalculate = () => {
     setLoading(true);
@@ -34,6 +75,7 @@ function FinancialModeling({ projectId }) {
     })
       .then(res => {
         setResult(res.data);
+        sessionStorage.setItem(`financialResult_${projectId}`, JSON.stringify(res.data));
         setLoading(false);
       })
       .catch(err => {
@@ -50,20 +92,50 @@ function FinancialModeling({ projectId }) {
     <div className="container">
       <h4>Financial Modeling</h4>
 
+      <div className="mb-3">
+        <label className="form-label">
+          Project Value (excl. VAT)
+          <span className="text-muted" style={{ fontSize: '0.85em' }}>
+            {' '}
+            (Prefer editing in Project tab)
+          </span>
+        </label>
+        <input
+          type="number"
+          className="form-control border-warning"
+          value={projectValue}
+          onChange={(e) => {
+            setProjectValue(e.target.value);
+            sessionStorage.setItem(`projectValue_${projectId}`, e.target.value);
+          }}
+          onBlur={() => {
+            // Auto-save to DB on blur
+            axios.put(`http://localhost:5000/api/projects/${projectId}`, {
+              project_value_excl_vat: parseFloat(projectValue)
+            })
+            .then(() => console.log('Project value updated'))
+            .catch(err => {
+              console.error("Error saving project value:", err);
+              alert("Could not save project value.");
+            });
+          }}
+        />
+      </div>
+
       <div className="row g-3 mb-3">
         <div className="col-md-4">
           <label className="form-label">Eskom Tariff (R/kWh)</label>
-          <input type="number" className="form-control" value={eskomTariff} onChange={(e) => setEskomTariff(e.target.value)} step="0.01" />
+          <input type="number" className="form-control" value={eskomTariff} onChange={(e) => {setEskomTariff(e.target.value); sessionStorage.setItem(`eskomTariff_${projectId}`, e.target.value);}} step="0.01" />
         </div>
 
         <div className="col-md-4">
           <label className="form-label">Allow Export to Grid?</label><br />
-          <input type="checkbox" checked={allowExport} onChange={() => setAllowExport(!allowExport)} />
+          <input type="checkbox" checked={allowExport} onChange={() => {const newVal = !allowExport; setAllowExport(newVal); sessionStorage.setItem(`allowExport_${projectId}`, newVal);}} />
         </div>
 
         <div className="col-md-4">
           <label className="form-label">Feed-in Tariff (R/kWh)</label>
-          <input type="number" className="form-control" value={feedInTariff} onChange={(e) => setFeedInTariff(e.target.value)} step="0.01" disabled={!allowExport} />
+          <input type="number" className="form-control" value={feedInTariff} onChange={(e) => {setFeedInTariff(e.target.value); sessionStorage.setItem(`feedInTariff_${projectId}`, e.target.value);}} step="0.01" disabled={!allowExport} />
         </div>
 
         <div className="col-12">

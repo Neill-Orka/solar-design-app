@@ -47,27 +47,29 @@ function App() {
             >
             <span className="navbar-toggler-icon"></span>
           </button>
-          <div className="collapse navbar-collapse justify-content-end" id="navbarNav">
-            <ul className="navbar-nav">
-              {[
-                { to: '/', label: 'Home', exact: true },
-                { to: '/clients', label: 'Clients' },
-                { to: '/projects', label: 'Projects' },
-                { to: '/products-admin', label: 'Products' }
-              ].map(link => (
-                <li className="nav-item" key={link.to}>
-                  <NavLink
-                    to={link.to}
-                    end={link.exact}
-                    className={({ isActive }) =>
-                      `nav-link navbar-link ${isActive ? 'active' : ''}`
-                    }
-                  >
-                    {link.label}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
+          <div className="collapse navbar-collapse justify-content-center" id="navbarNav">
+            <div className='position-absolute top-1 start-50 translate-middle-x'>
+              <ul className="navbar-nav">
+                {[
+                  { to: '/', label: 'Home', exact: true },
+                  { to: '/clients', label: 'Clients' },
+                  { to: '/projects', label: 'Projects' },
+                  { to: '/products-admin', label: 'Products' }
+                ].map(link => (
+                  <li className="nav-item" key={link.to}>
+                    <NavLink
+                      to={link.to}
+                      end={link.exact}
+                      className={({ isActive }) =>
+                        `nav-link navbar-link ${isActive ? 'active' : ''}`
+                      }
+                    >
+                      {link.label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div> 
         </div>
       </nav>

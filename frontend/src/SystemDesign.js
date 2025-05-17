@@ -22,7 +22,6 @@ function SystemDesign({ projectId }) {
   // ---- state ---------------------------------------------------
   const [systemType, setSystemType] = useState('grid');
   const [panelKw, setPanelKw] = useState('');
-  const [batteryKwh, setBatteryKwh] = useState('');
   const [inverterKva, setInverterKva] = useState('');
   const [selectedInvOpt, setSelectedInvOpt] = useState(null);
   const [inverters, setInverters] = useState([]);
@@ -32,6 +31,16 @@ function SystemDesign({ projectId }) {
         setInverters(r.data);
       });
   }, []);
+  const [batteryKwh, setBatteryKwh] = useState('');
+  const [selectedBatteryOpt, setSelectedBatteryOpt] = useState(null);
+  const [batteries, setBatteries] = useState([]);
+  useEffect(() => {
+    axios.get('http://localhost:5000/api/products?category=battery')
+      .then(r => {
+        setBatteries(r.data);
+      });
+  }, []);
+
   const [simulationData, setSimulationData] = useState(null);
   const [startDate, setStartDate] = useState('2025-01-01');
   const [endDate, setEndDate] = useState('2025-12-31');
@@ -130,6 +139,18 @@ function SystemDesign({ projectId }) {
     setSelectedInvOpt(opt || null);
   }, [inverters, inverterKva]);
 
+  useEffect(() => {
+  if (!batteries.length || !batteryKwh) return;
+  const opt = batteries
+    .map(bat => ({
+      value: bat.capacity_kwh,
+      label: `${bat.brand} ${bat.model} (${bat.capacity_kwh} kWh)`
+    }))
+    .find(o => o.value === batteryKwh);
+  setSelectedBatteryOpt(opt || null);
+}, [batteries, batteryKwh]);
+
+
   const filterData = () => {
     if (!simulationData || !simulationData.timestamps) return null;
     if (!startDate && !endDate) return simulationData;
@@ -214,9 +235,19 @@ function SystemDesign({ projectId }) {
 
         <div className="col-md-3">
           <label className="form-label">Battery Size (kWh)</label>
-          <input type="number" className="form-control"
-                 value={batteryKwh} onChange={e => setBatteryKwh(e.target.value)}
-                 disabled={systemType === 'grid'} />
+            <Select
+              isDisabled={systemType === 'grid'}
+              options={batteries.map(bat => ({
+                value: bat.capacity_kwh,
+                label: `${bat.brand} ${bat.model} (${bat.capacity_kwh} kWh)`
+              }))}
+              value={selectedBatteryOpt}
+              onChange={opt => {
+                setSelectedBatteryOpt(opt);
+                setBatteryKwh(opt ? opt.value : '');
+              }}
+              isClearable
+            />
         </div>
 
         {/* buttons */}
