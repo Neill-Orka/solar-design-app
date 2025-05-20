@@ -6,6 +6,7 @@ import EnergyAnalysis from './EnergyAnalysis';
 import SystemDesign from './SystemDesign';
 import FinancialModeling from './FinancialModeling';
 import Reporting from './Reporting';
+import Optimize from './Optimize';
 
 function ProjectDashboard() {
   const { id } = useParams();  // project_id from URL
@@ -47,6 +48,9 @@ function ProjectDashboard() {
           <button className={`nav-link ${activeTab === 'design' ? 'active' : ''}`} onClick={() => setActiveTab('design')}>System Design</button>
         </li>
         <li className="nav-item">
+          <button className={`nav-link ${activeTab === 'optimize' ? 'active' : ''}`} onClick={() => setActiveTab('optimize')}>Optimize System</button>
+        </li>
+        <li className="nav-item">
           <button className={`nav-link ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => setActiveTab('finance')}>Financial Modeling</button>
         </li>
         <li className="nav-item">
@@ -59,6 +63,7 @@ function ProjectDashboard() {
         {activeTab === 'analysis' && <EnergyAnalysis projectId={id} />}
         {activeTab === 'design' && <SystemDesign projectId={id} />}
         {activeTab === 'finance' && <FinancialModeling projectId={id} />}
+        {activeTab === 'optimize' && <Optimize projectId={id} />}
         {activeTab === 'report' && <Reporting projectId={id} />}
       </div>
     </div>
