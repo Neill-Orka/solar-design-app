@@ -7,7 +7,7 @@ import pandas as pd
 from models import EnergyData
 
 
-def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export):
+def simulate_system_inner(project_id, panel_kw, battery_kwh, battery_count, system_type, inverter_kva, inverter_count, allow_export):
     try:
         records = EnergyData.query.filter_by(project_id=project_id).order_by(EnergyData.timestamp).all()
         if not records:
@@ -35,9 +35,9 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         generation_kw = mc.results.ac.fillna(0) / 1000  # kW
         demand_kw = [r.demand_kw for r in records]
 
-        battery_max = (battery_kwh or 0) * 1000
+        battery_max = (battery_kwh or 0) * battery_count * 1000
         battery_soc = 0
-        soc_trace, import_from_grid, export_to_grid = [], [], []
+        soc_trace, import_from_grid, export_to_grid, generation_trace = [], [], [], []
 
         for i in range(len(demand_kw)):
             gen = generation_kw.iloc[i]
@@ -54,26 +54,32 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
 
             soc_trace.append(round(battery_soc / battery_max * 100, 2) if battery_max > 0 else 0)
 
-            if allow_export:
-                actual_gen = min(gen, inverter_kva) # limited by inverter size
-                export_kw = max(0, actual_gen - demand)
-                pv_used = actual_gen
+            # total inverter capacity in kW
+            total_inv_kw = inverter_kva * inverter_count
+            inv_gen = min(gen, total_inv_kw)
+
+            # decide how much PV is used for load.
+            if system_type == 'grid' and not allow_export:
+                # all generation goes to load, no export
+                pv_used = min(inv_gen, demand)
             else:
-                actual_gen = min(gen, inverter_kva, demand)
-                export_kw = 0
-                pv_used = actual_gen
+                # hybrid or off-grid system, or grid-tied with export allowed
+                pv_used = inv_gen
 
-            net = pv_used - demand
+            # export only if allowed
+            export_kw = allow_export and max(0, pv_used - demand) or 0
 
-            import_kw = max(0, -net) if system_type != 'off-grid' else 0
+            # import only if system is not off-grid
+            import_kw = system_type != 'off-grid' and max(0, demand - pv_used) or 0
 
-            import_from_grid.append(import_kw)
-            export_to_grid.append(export_kw)
+            generation_trace.append(round(pv_used, 2))
+            import_from_grid.append(round(import_kw, 2))
+            export_to_grid.append(round(export_kw, 2))
 
         return {
             "timestamps": [r.timestamp.isoformat() for r in records],
             "demand": demand_kw,
-            "generation": list(pd.Series([min(generation_kw.iloc[i], inverter_kva if allow_export else min(inverter_kva, demand_kw[i])) for i in range(len(demand_kw))]).round(2)),
+            "generation": generation_trace,
             "battery_soc": soc_trace,
             "import_from_grid": import_from_grid,
             "export_to_grid": export_to_grid

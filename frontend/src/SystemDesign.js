@@ -40,6 +40,9 @@ function SystemDesign({ projectId }) {
         setBatteries(r.data);
       });
   }, []);
+  const [inverterCount, setInverterCount] = useState(1);
+  const [batteryCount, setBatteryCount] = useState(0);
+
 
   const [simulationData, setSimulationData] = useState(null);
   const [startDate, setStartDate] = useState('2025-01-01');
@@ -58,6 +61,7 @@ function SystemDesign({ projectId }) {
       setPanelKw(p.panel_kw ?? '');
       setBatteryKwh(p.battery_kwh ?? '');
       setInverterKva(p.inverter_kva ?? ''); 
+      
     })
     .catch(err => console.error('Load project error:', err));
 
