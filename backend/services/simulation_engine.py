@@ -9,6 +9,11 @@ from models import EnergyData
 
 def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export):
     try:
+
+        # Calculate total capacities from lists
+        total_inverter_kva = sum(inverter_kva) if isinstance(inverter_kva, list) else inverter_kva
+        total_battery_kwh = sum(battery_kwh) if isinstance(battery_kwh, list) else battery_kwh
+
         records = EnergyData.query.filter_by(project_id=project_id).order_by(EnergyData.timestamp).all()
         if not records:
             return {"error": "No energy data found for project"}
@@ -23,7 +28,7 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
             surface_tilt=30,
             surface_azimuth=0,
             module_parameters={'pdc0': panel_kw * 1000, 'gamma_pdc': -0.004},
-            inverter_parameters={'pdc0': inverter_kva * 1000},
+            inverter_parameters={'pdc0': total_inverter_kva * 1000},
             temperature_model_parameters=temperature_params,
             racking_model='open_rack',
             module_type='glass_glass'
@@ -35,7 +40,7 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         generation_kw = mc.results.ac.fillna(0) / 1000  # kW
         demand_kw = [r.demand_kw for r in records]
 
-        battery_max = (battery_kwh or 0) * 1000
+        battery_max = (total_battery_kwh or 0) * 1000
         battery_soc = 0
         soc_trace, import_from_grid, export_to_grid = [], [], []
 
@@ -55,11 +60,11 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
             soc_trace.append(round(battery_soc / battery_max * 100, 2) if battery_max > 0 else 0)
 
             if allow_export:
-                actual_gen = min(gen, inverter_kva) # limited by inverter size
+                actual_gen = min(gen, total_inverter_kva) # limited by inverter size
                 export_kw = max(0, actual_gen - demand)
                 pv_used = actual_gen
             else:
-                actual_gen = min(gen, inverter_kva, demand)
+                actual_gen = min(gen, total_inverter_kva, demand)
                 export_kw = 0
                 pv_used = actual_gen
 

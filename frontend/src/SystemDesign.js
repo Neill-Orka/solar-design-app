@@ -22,18 +22,25 @@ function SystemDesign({ projectId }) {
   // ---- state ---------------------------------------------------
   const [systemType, setSystemType] = useState('grid');
   const [panelKw, setPanelKw] = useState('');
-  const [inverterKva, setInverterKva] = useState('');
-  const [selectedInvOpt, setSelectedInvOpt] = useState(null);
+  const [selectedInverterIds, setSelectedInverterIds] = useState([]);
   const [inverters, setInverters] = useState([]);
+  const inverterKvas = selectedInverterIds.map(id => {
+    const inv = inverters.find(i => i.id === id);
+    return inv ? inv.rating_kva : 0;
+  });
   useEffect(() => {
     axios.get('http://localhost:5000/api/products?category=inverter')
       .then(r => {
         setInverters(r.data);
       });
   }, []);
-  const [batteryKwh, setBatteryKwh] = useState('');
-  const [selectedBatteryOpt, setSelectedBatteryOpt] = useState(null);
+  const [selectedBatteryIds, setSelectedBatteryIds] = useState([]);
   const [batteries, setBatteries] = useState([]);
+  const batteryKwhs = selectedBatteryIds.map(id => {
+    const bat = batteries.find(b => b.id === id);
+    return bat ? bat.capacity_kwh : 0;
+  })
+
   useEffect(() => {
     axios.get('http://localhost:5000/api/products?category=battery')
       .then(r => {
@@ -54,12 +61,31 @@ function SystemDesign({ projectId }) {
     .then(res => {
       const p = res.data;
       if (!p) return;
+
       setSystemType(p.system_type || 'grid');
       setPanelKw(p.panel_kw ?? '');
-      setBatteryKwh(p.battery_kwh ?? '');
-      setInverterKva(p.inverter_kva ?? ''); 
-    })
-    .catch(err => console.error('Load project error:', err));
+
+      // Convert saved ratings to IDs
+      if (p.inverter_kva) {
+        const savedRatings = Array.isArray(p.inverter_kva) ? p.inverter_kva : [p.inverter_kva];
+        const ids = inverters
+          .filter(inv => savedRatings.includes(inv.rating_kva))
+          .map(inv => inv.id);
+        setSelectedInverterIds(ids);
+      }
+
+      // Convert saved capacities to IDs
+      if (p.battery_kwh) {
+        const savedCapacities = Array.isArray(p.battery_kwh) ? p.battery_kwh : [p.battery_kwh];
+        const ids = batteries
+          .filter(bat => savedCapacities.includes(bat.capacity_kwh))
+          .map(bat => bat.id);
+        setSelectedBatteryIds(ids);
+      }
+    });
+    
+  
+  
 
     // load simulation data from sessionStorage
     const cached = sessionStorage.getItem(`simulationData_${projectId}`);
@@ -74,7 +100,7 @@ function SystemDesign({ projectId }) {
       }
     }
 
-  }, [projectId]);
+  }, [projectId, inverters, batteries]);
 
   useEffect(() => {
   const today = new Date();
@@ -90,8 +116,8 @@ function SystemDesign({ projectId }) {
     axios.put(`http://localhost:5000/api/projects/${projectId}`, {
       system_type: systemType,
       panel_kw : parseFloat(panelKw),
-      battery_kwh: systemType === 'grid' ? 0 : parseFloat(batteryKwh),
-      inverter_kva: parseFloat(inverterKva)
+      battery_kwh: systemType === 'grid'? [] : batteryKwhs,
+      inverter_kva: inverterKvas,
     })
     .then(() => alert('System saved to project 👍'))
     .catch(err => {
@@ -107,8 +133,8 @@ function SystemDesign({ projectId }) {
       system: {
         panel_kw: parseFloat(panelKw),
         system_type: systemType,
-        battery_kwh: systemType === 'grid' ? 0 : parseFloat(batteryKwh),
-        inverter_kva: parseFloat(inverterKva),
+        battery_kwh: systemType === 'grid' ? [] : batteryKwhs,
+        inverter_kva: inverterKvas,
         allow_export: allowExport
       }
     })
@@ -128,27 +154,27 @@ function SystemDesign({ projectId }) {
     .finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    if (!inverters.length || !inverterKva) return;
-    const opt = inverters
-      .map(inv => ({
-        value: inv.rating_kva,
-        label: `${inv.brand} ${inv.model} (${inv.rating_kva} kVA)`
-      }))
-      .find(o => o.value === inverterKva);
-    setSelectedInvOpt(opt || null);
-  }, [inverters, inverterKva]);
+//   useEffect(() => {
+//     if (!inverters.length || !selectedInverterIds) return;
+//     const opt = inverters
+//       .map(inv => ({
+//         value: inv.rating_kva,
+//         label: `${inv.brand} ${inv.model} (${inv.rating_kva} kVA)`
+//       }))
+//       .find(o => o.value === selectedInverterIds);
+//     setSelectedInvOpt(opt || null);
+//   }, [inverters, selectedInverterIds]);
 
-  useEffect(() => {
-  if (!batteries.length || !batteryKwh) return;
-  const opt = batteries
-    .map(bat => ({
-      value: bat.capacity_kwh,
-      label: `${bat.brand} ${bat.model} (${bat.capacity_kwh} kWh)`
-    }))
-    .find(o => o.value === batteryKwh);
-  setSelectedBatteryOpt(opt || null);
-}, [batteries, batteryKwh]);
+//   useEffect(() => {
+//   if (!batteries.length || !selectedBatteryIds) return;
+//   const opt = batteries
+//     .map(bat => ({
+//       value: bat.capacity_kwh,
+//       label: `${bat.brand} ${bat.model} (${bat.capacity_kwh} kWh)`
+//     }))
+//     .find(o => o.value === selectedBatteryIds);
+//   setSelectedBatteryOpt(opt || null);
+// }, [batteries, selectedBatteryIds]);
 
 
   const filterData = () => {
@@ -220,34 +246,44 @@ function SystemDesign({ projectId }) {
         <div className="col-md-3">
           <Form.Label>Inverter</Form.Label>
           <Select
+            isMulti
             options={inverters.map(inv => ({
-              value: inv.rating_kva,
+              value: inv.id,
               label: `${inv.brand} ${inv.model} (${inv.rating_kva} kVA)`
             }))}
-            value={selectedInvOpt}
-            onChange={opt => {
-              setSelectedInvOpt(opt);
-              setInverterKva(opt ? opt.value : '');
+            value={selectedInverterIds.map(id => {
+              const inv = inverters.find(i => i.id === id);
+              return {
+                value: inv.id,
+                label: `${inv.brand} ${inv.model} (${inv.rating_kva} kVA)`
+              };
+            })}
+            onChange={opts => {
+              setSelectedInverterIds(opts ? opts.map(o => o.value) : []);
             }}
-            isClearable
           />
         </div>
 
         <div className="col-md-3">
           <label className="form-label">Battery Size (kWh)</label>
-            <Select
-              isDisabled={systemType === 'grid'}
-              options={batteries.map(bat => ({
-                value: bat.capacity_kwh,
+          <Select
+            isMulti
+            isDisabled={systemType === 'grid'}
+            options={batteries.map(bat => ({
+              value: bat.id,
+              label: `${bat.brand} ${bat.model} (${bat.capacity_kwh} kWh)`
+            }))}
+            value={selectedBatteryIds.map(id => {
+              const bat = batteries.find(b => b.id === id);
+              return {
+                value: bat.id,
                 label: `${bat.brand} ${bat.model} (${bat.capacity_kwh} kWh)`
-              }))}
-              value={selectedBatteryOpt}
-              onChange={opt => {
-                setSelectedBatteryOpt(opt);
-                setBatteryKwh(opt ? opt.value : '');
-              }}
-              isClearable
-            />
+              };
+            })}
+            onChange={opts => {
+              setSelectedBatteryIds(opts ? opts.map(o => o.value) : []);
+            }}
+          />
         </div>
 
         {/* buttons */}
@@ -314,7 +350,7 @@ function SystemDesign({ projectId }) {
                   tension: 0.3,
                   pointRadius: 0
                 },
-                ...batteryKwh > 0 ? [{
+                ...(selectedBatteryIds.length > 0) ? [{
                   label: 'Battery SOC (%)',
                   data: filtered.battery_soc,
                   borderColor: 'orange',

@@ -8,6 +8,9 @@ projects_bp = Blueprint('projects', __name__)
 def get_projects():
     try:
         projects = Projects.query.all()
+        for p in projects:
+            print(f"Project {p.id}: inverter_kva={p.inverter_kva}, type={type(p.inverter_kva)}")
+            print(f"Project {p.id}: battery_kwh={p.battery_kwh}, type={type(p.battery_kwh)}")
         return jsonify([
             {
                 'id': p.id,
@@ -17,8 +20,8 @@ def get_projects():
                 'location': p.location,
                 'system_type': p.system_type,
                 'panel_kw': p.panel_kw,
-                'inverter_kva': p.inverter_kva,
-                'battery_kwh': p.battery_kwh,
+                'inverter_kva': p.inverter_kva if isinstance(p.inverter_kva, list) else [p.inverter_kva] if p.inverter_kva else [],
+                'battery_kwh': p.battery_kwh if isinstance(p.battery_kwh, list) else [p.battery_kwh] if p.battery_kwh else [],
                 'project_value_excl_vat': p.project_value_excl_vat,
                 'site_contact_person': p.site_contact_person,
                 'site_phone': p.site_phone
@@ -43,8 +46,8 @@ def get_project_by_id(project_id):
             'location': project.location,
             'system_type': project.system_type,
             'panel_kw': project.panel_kw,
-            'inverter_kva': project.inverter_kva,
-            'battery_kwh': project.battery_kwh,
+            'inverter_ids': project.inverter_ids or [],
+            'battery_ids': project.battery_ids or [],
             'project_value_excl_vat': project.project_value_excl_vat,
             'site_contact_person': project.site_contact_person,
             'site_phone': project.site_phone
