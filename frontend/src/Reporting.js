@@ -123,12 +123,26 @@ function Reporting({ projectId }) {
     const payback = financial ? financial.payback_years.toFixed(1) : '-';
     const roi20   = financial ? financial.roi_20yr.toFixed(1) : '-';
 
+    // Format inverter size for display - handle null case
+    const inverterDisplay = project.inverter_kva ? (
+      typeof project.inverter_kva === 'object' 
+        ? `${project.inverter_kva.capacity} kVA (x${project.inverter_kva.quantity})`
+        : `${project.inverter_kva} kVA`
+    ) : '0 kVA';
+
+    // Format battery size for display - handle null case
+    const batteryDisplay = project.battery_kwh ? (
+      typeof project.battery_kwh === 'object'
+        ? `${project.battery_kwh.capacity} kWh (x${project.battery_kwh.quantity})`
+        : `${project.battery_kwh} kWh`
+    ) : '0 kWh';
+
     /* small BOM array */
     const bom = [
       ['PV Modules', `${project.panel_kw} kWp (generic)`, '1 lot'],
-      ['Inverter', inverter ? `${inverter.brand} ${inverter.model}` : `${project.inverter_kva} kVA`, '1'],
-      ...(project.system_type !== 'grid' && project.battery_kwh > 0
-        ? [['Battery', `${project.battery_kwh} kWh (generic)`, '1']]
+      ['Inverter', inverter ? `${inverter.brand} ${inverter.model}` : inverterDisplay, '1'],
+      ...(project.system_type !== 'grid' && project.battery_kwh
+        ? [['Battery', batteryDisplay, '1']]
         : [])
     ];
 
@@ -146,8 +160,8 @@ function Reporting({ projectId }) {
             `Client: ${project.client_name}`,
             `Location: ${project.location}`,
             `System Type: ${project.system_type}`,
-            `Size: ${project.panel_kw} kWp • ${project.inverter_kva} kVA` +
-              (project.battery_kwh && project.system_type !== 'grid' ? ` • Battery ${project.battery_kwh} kWh` : '')
+            `Size: ${project.panel_kw} kWp • ${inverterDisplay}` +
+              (project.battery_kwh && project.system_type !== 'grid' ? ` • Battery ${batteryDisplay}` : '')
           ],
           margin: [0, 5, 0, 15]
         },
@@ -209,8 +223,17 @@ function Reporting({ projectId }) {
           <p>
             <strong>Client:</strong> {project.client_name}<br />
             <strong>Location:</strong> {project.location}<br />
-            <strong>System:</strong> {project.panel_kw} kWp • {project.inverter_kva} kVA
-            {project.battery_kwh && project.system_type !== 'grid' && ` • Battery ${project.battery_kwh} kWh`}
+            <strong>System:</strong> {project.panel_kw} kWp • 
+            {project.inverter_kva ? (
+              typeof project.inverter_kva === 'object' 
+                ? `${project.inverter_kva.capacity} kVA (x${project.inverter_kva.quantity})`
+                : `${project.inverter_kva} kVA`
+            ) : '0 kVA'}
+            {project.battery_kwh && project.system_type !== 'grid' && (
+              typeof project.battery_kwh === 'object' 
+                ? ` • Battery ${project.battery_kwh.capacity} kWh (x${project.battery_kwh.quantity})`
+                : ` • Battery ${project.battery_kwh} kWh`
+            )}
           </p>
           <button className="btn btn-primary" onClick={generatePdf} disabled={!simImg || !dailyImg}>
             {simImg && dailyImg ? 'Download PDF Report' : 'Preparing charts…'}

@@ -23,14 +23,28 @@ def financial_model():
             logging.error(f"Project {project_id} not found")
             return jsonify({"error": "Project not found"}), 404
 
-        logging.debug(f"Simulating for project: {project.id}, kw={project.panel_kw}, battery={project.battery_kwh}, type={project.system_type}")
+        # Handle battery_kwh (could be number of dict)
+        battery_total_kwh = 0
+        if isinstance(project.battery_kwh, dict):
+            battery_total_kwh = project.battery_kwh.get('capacity', 0) * project.battery_kwh.get('quantity', 1)
+        elif project.battery_kwh:
+            battery_total_kwh = project.battery_kwh or 0
+
+        # Handle inverter_kva (could be number of dict)
+        inverter_total_kva = 0
+        if isinstance(project.inverter_kva, dict):
+            inverter_total_kva = project.inverter_kva.get('capacity', 0) * project.inverter_kva.get('quantity', 1)
+        elif project.inverter_kva:
+            inverter_total_kva = project.inverter_kva or 0
+
+        logging.debug(f"Simulating for project: {project.id}, kw={project.panel_kw}, battery={battery_total_kwh}, type={project.system_type}")
 
         sim_response = simulate_system_inner(
             project_id,
             project.panel_kw,
-            project.battery_kwh or 0,
+            battery_total_kwh,
             project.system_type,
-            project.inverter_kva or 0,
+            inverter_total_kva,
             export_enabled
         )
 
@@ -48,7 +62,7 @@ def financial_model():
         # --- make sure we actually have a project CAPEX ----------------------
         if project.project_value_excl_vat in (None, 0, ""):
             return jsonify({
-                "error": "Project value (ex‑VAT) is missing. "
+                "error": "Project value (ex-VAT) is missing. "
                          "Please edit the project and enter the full system cost."
             }), 400
 

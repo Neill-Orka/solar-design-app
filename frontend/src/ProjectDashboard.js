@@ -31,12 +31,19 @@ function ProjectDashboard() {
         <strong>Client:</strong> {project.client_name}<br />
         <strong>Location:</strong> {project.location}<br />
         <strong>System Type:</strong> {project.system_type || 'Not set'}<br />
-        <strong>Size:</strong> {project.panel_kw || '-'} kWp, {project.inverter_kva || '-'} kVA
+        <strong>Size:</strong> {project.panel_kw || '-'} kWp,{' '}
+        {typeof project.inverter_kva === 'object'
+          ? `${project.inverter_kva.capacity} kVA (x${project.inverter_kva.quantity})`
+          : (project.inverter_kva || '-')} kVA
         {project.system_type !== 'grid' && project.battery_kwh && (
-          <> | Battery: {project.battery_kwh} kWh</>
+          <> | Battery:{' '}
+            {typeof project.battery_kwh === 'object'
+              ? `${project.battery_kwh.capacity} kWh (x${project.battery_kwh.quantity})`
+              : project.battery_kwh} kWh
+          </>
         )}
       </p>
-
+      
       <ul className="nav nav-tabs mt-4">
         <li className="nav-item">
           <button className={`nav-link ${activeTab === 'upload' ? 'active' : ''}`} onClick={() => setActiveTab('upload')}>Energy Upload</button>

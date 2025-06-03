@@ -25,6 +25,9 @@ function SystemDesign({ projectId }) {
   const [inverterKva, setInverterKva] = useState('');
   const [selectedInvOpt, setSelectedInvOpt] = useState(null);
   const [inverters, setInverters] = useState([]);
+  const [inverterQuantity, setInverterQuantity] = useState(1);
+  const [batteryQuantity, setBatteryQuantity] = useState(1);
+
   useEffect(() => {
     axios.get('http://localhost:5000/api/products?category=inverter')
       .then(r => {
@@ -48,16 +51,56 @@ function SystemDesign({ projectId }) {
   const [allowExport, setAllowExport] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
 
+  // New state variables for metrics
+  const [totalPVGeneration, setTotalPVGeneration] = useState(0);
+  const [utilizedPVGeneration, setUtilizedPVGeneration] = useState(0);
+  const [gridImport, setGridImport] = useState(0);
+  const [gridExport, setGridExport] = useState(0);
+  const [batteryChargeDischarge, setBatteryChargeDischarge] = useState(0);
+
+  // Additional metrics state variables
+  const [daytimeConsumption, setDaytimeConsumption] = useState('0');
+  const [pvUtilization, setPvUtilization] = useState('0');
+  const [consumptionFromPV, setConsumptionFromPV] = useState('0');
+  const [potentialGenerationDaily, setPotentialGenerationDaily] = useState('0');
+  const [utilizedGenerationDaily, setUtilizedGenerationDaily] = useState('0');
+  const [throttlingLossesDaily, setThrottlingLossesDaily] = useState('0');
+  const [specificYieldWithThrottling, setSpecificYieldWithThrottling] = useState('0');
+  const [potentialGenerationAnnual, setPotentialGenerationAnnual] = useState('0');
+  const [utilizedGenerationAnnual, setUtilizedGenerationAnnual] = useState('0');
+  const [throttlingLossesAnnual, setThrottlingLossesAnnual] = useState('0');
+  const [specificYieldExclThrottling, setSpecificYieldExclThrottling] = useState('0');
+  const [batteryCyclesAnnual, setBatteryCyclesAnnual] = useState('0');
+  
+
   // pull saved values when component mounts
   useEffect (() => {
     axios.get(`http://localhost:5000/api/projects/${projectId}`)
     .then(res => {
       const p = res.data;
       if (!p) return;
+
       setSystemType(p.system_type || 'grid');
       setPanelKw(p.panel_kw ?? '');
-      setBatteryKwh(p.battery_kwh ?? '');
-      setInverterKva(p.inverter_kva ?? ''); 
+
+      // Handle inverter data (old and new formats)
+
+      if (p.inverter_kva && typeof p.inverter_kva === 'object') {
+        setInverterKva(p.inverter_kva.capacity ?? '');
+        setInverterQuantity(p.inverter_kva.quantity || 1);       
+      } else {
+        setInverterKva(p.inverter_kva ?? '');
+        setInverterQuantity(1);
+      }
+
+      // Handle battery data (old and new formats)
+      if (p.battery_kwh && typeof p.battery_kwh === 'object') {
+        setBatteryKwh(p.battery_kwh.capacity ?? '');
+        setBatteryQuantity(p.battery_kwh.quantity || 1);
+      } else {
+        setBatteryKwh(p.battery_kwh ?? '');
+        setBatteryQuantity(1);
+      }
     })
     .catch(err => console.error('Load project error:', err));
 
@@ -76,6 +119,7 @@ function SystemDesign({ projectId }) {
 
   }, [projectId]);
 
+  // Set default date range to last 30 days
   useEffect(() => {
   const today = new Date();
   const thirtyDaysAgo = new Date();
@@ -90,8 +134,14 @@ function SystemDesign({ projectId }) {
     axios.put(`http://localhost:5000/api/projects/${projectId}`, {
       system_type: systemType,
       panel_kw : parseFloat(panelKw),
-      battery_kwh: systemType === 'grid' ? 0 : parseFloat(batteryKwh),
-      inverter_kva: parseFloat(inverterKva)
+      battery_kwh: systemType === 'grid' ? null : {
+        capacity: parseFloat(batteryKwh),
+        quantity: batteryQuantity
+      },
+      inverter_kva: {
+        capacity: parseFloat(inverterKva),
+        quantity: inverterQuantity
+      }
     })
     .then(() => alert('System saved to project 👍'))
     .catch(err => {
@@ -102,13 +152,19 @@ function SystemDesign({ projectId }) {
 
   const handleSimulate = () => {
     setLoading(true);
+
+    // Calculate total capacities
+    const totalInverterKva = parseFloat(inverterKva) * inverterQuantity;
+    const totalBatteryKwh = systemType === 'grid' ? 0 :
+      safeParseFloat(batteryKwh) * batteryQuantity;
+
     axios.post('http://localhost:5000/api/simulate', {
       project_id: projectId,
       system: {
         panel_kw: parseFloat(panelKw),
         system_type: systemType,
-        battery_kwh: systemType === 'grid' ? 0 : parseFloat(batteryKwh),
-        inverter_kva: parseFloat(inverterKva),
+        battery_kwh: totalBatteryKwh,
+        inverter_kva: totalInverterKva,
         allow_export: allowExport
       }
     })
@@ -161,6 +217,7 @@ function SystemDesign({ projectId }) {
       timestamps: [],
       demand: [],
       generation: [],
+      potential_generation: [],
       battery_soc: [],
       import_from_grid: [],
       export_to_grid: []
@@ -172,6 +229,7 @@ function SystemDesign({ projectId }) {
         filtered.timestamps.push(ts);
         filtered.demand.push(simulationData.demand[i]);
         filtered.generation.push(simulationData.generation[i]);
+        filtered.potential_generation.push(simulationData.potential_generation ? simulationData.potential_generation[i] : simulationData.generation[i]);
         filtered.battery_soc.push(simulationData.battery_soc[i]);
         filtered.import_from_grid.push(simulationData.import_from_grid[i]);
         filtered.export_to_grid.push(simulationData.export_to_grid[i]);
@@ -181,6 +239,136 @@ function SystemDesign({ projectId }) {
   };
 
   const filtered = filterData();
+
+  // Calculate metrics from filtered data
+  useEffect(() => {
+    if (!filtered || !filtered.timestamps.length) return;
+
+    // Determine day vs night
+    const dayData = filtered.timestamps.map((ts, i) => {
+      const hour = new Date(ts).getHours();
+      return { isDaytime: hour >= 6 && hour < 18, index: i };
+    });
+
+    // Total demand
+    const totalDemand = filtered.demand.reduce((sum, val) => sum + val, 0) * 0.5;
+
+    // Daytime demand
+    const daytimeDemand = dayData
+      .filter(d => d.isDaytime)
+      .reduce((sum, d) => sum + filtered.demand[d.index], 0) * 0.5;
+
+    // 1. Daytime Consumption (%)
+    const daytimeConsumptionPct = totalDemand > 0 ? (daytimeDemand / totalDemand) * 100 : 0;
+    setDaytimeConsumption(daytimeConsumptionPct.toFixed(0));
+
+    // Total PV Generation
+    const totalPotentialGen = filtered.potential_generation ? filtered.potential_generation.reduce((sum, val) => sum + val, 0) * 0.5 : 
+    filtered.generation.reduce((sum, val) => sum + val, 0) * 0.5;
+    setTotalPVGeneration(totalPotentialGen.toFixed(0));
+
+    // Grid metrics
+    const totalImport = filtered.import_from_grid.reduce((sum, val) => sum + val, 0) * 0.5;
+    setGridImport(totalImport.toFixed(0));
+
+    const totalExport = filtered.export_to_grid.reduce((sum, val) => sum + val, 0) * 0.5;
+    setGridExport(totalExport.toFixed(0));
+
+    // Utilized PV Generation
+    const utilizedGen = filtered.generation.map((gen, i) => {
+      const exportGrid = filtered.export_to_grid[i];
+      return Math.max(0, gen - exportGrid);
+    }).reduce((sum, val) => sum + val, 0) * 0.5;
+    setUtilizedPVGeneration(utilizedGen.toFixed(0));
+
+    // 2. PV Utilization (%)
+    const pvUtilizationPct = totalPotentialGen > 0 ? (utilizedGen / totalPotentialGen) * 100 : 0;
+    setPvUtilization(pvUtilizationPct.toFixed(0));
+
+    // 3. Consumption from PV (%)
+    const consumptionFromPVPct = totalDemand > 0 ? (utilizedGen / totalDemand) * 100 : 0;
+    setConsumptionFromPV(consumptionFromPVPct.toFixed(0));
+
+    // Calculate days in data
+    const startDate = new Date(filtered.timestamps[0]);
+    const endDate = new Date(filtered.timestamps[filtered.timestamps.length - 1]);
+    const daysDiff = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
+
+    // Daily metrics
+    const potentialGenDaily = totalPotentialGen / daysDiff;
+    setPotentialGenerationDaily(potentialGenDaily.toFixed(0));
+    
+    const utilizedGenDaily = utilizedGen / daysDiff;
+    setUtilizedGenerationDaily(utilizedGenDaily.toFixed(0));
+    
+    const throttlingLosses = totalPotentialGen - utilizedGen;
+    const throttlingLossesDaily = throttlingLosses / daysDiff;
+    setThrottlingLossesDaily(throttlingLossesDaily.toFixed(0));
+    
+    // Specific yield with throttling
+    const specificYield = safeParseFloat(panelKw) > 0 ? potentialGenDaily / safeParseFloat(panelKw) : 0;
+    setSpecificYieldWithThrottling(specificYield.toFixed(2));
+    
+    // Annual projections
+    const daysInYear = 365;
+    const potentialGenAnnual = potentialGenDaily * daysInYear;
+    setPotentialGenerationAnnual(potentialGenAnnual.toFixed(0));
+    
+    const utilizedGenAnnual = utilizedGenDaily * daysInYear;
+    setUtilizedGenerationAnnual(utilizedGenAnnual.toFixed(0));
+    
+    const throttlingLossesAnnual = throttlingLossesDaily * daysInYear;
+    setThrottlingLossesAnnual(throttlingLossesAnnual.toFixed(0));
+    
+    // Specific yield excluding throttling
+    const specificYieldExcl = safeParseFloat(panelKw) > 0 ? utilizedGenAnnual / safeParseFloat(panelKw) : 0;
+    setSpecificYieldExclThrottling(specificYieldExcl.toFixed(0));
+    
+    // Battery cycles calculation
+    if (filtered.battery_soc?.length > 1 && safeParseFloat(batteryKwh) > 0) {
+      const totalBatteryCapacity = safeParseFloat(batteryKwh) * batteryQuantity;
+      let totalChargeEnergy = 0;
+      
+      for (let i = 1; i < filtered.battery_soc.length; i++) {
+        const socDiff = filtered.battery_soc[i] - filtered.battery_soc[i-1];
+        if (socDiff > 0) { // Only count charging
+          totalChargeEnergy += (socDiff / 100) * totalBatteryCapacity;
+        }
+      }
+      
+      // Daily cycles
+      const dailyCycles = totalBatteryCapacity > 0 ? totalChargeEnergy / totalBatteryCapacity : 0;
+      // Annual projection
+      const cyclesAnnual = (dailyCycles / daysDiff) * 365;
+      setBatteryCyclesAnnual(cyclesAnnual.toFixed(1));
+    } else {
+      setBatteryCyclesAnnual('-');
+    }
+
+    // Battery net change calculation (existing)
+    if (filtered.battery_soc.length > 1 && batteryKwh > 0) {
+      const totalBatteryKwh = safeParseFloat(batteryKwh) * batteryQuantity * 1000; // Wh
+      let netBatteryChange = 0;
+      for (let i = 1; i < filtered.battery_soc.length; i++) {
+        const socDiff = (filtered.battery_soc[i] - filtered.battery_soc[i - 1]) / 100 * totalBatteryKwh;
+        netBatteryChange += socDiff;
+      }
+      setBatteryChargeDischarge((netBatteryChange / 1000).toFixed(0)); // Convert to kWh
+    } else {
+      setBatteryChargeDischarge(0);
+    }
+    
+  }, [filtered, batteryKwh, batteryQuantity, panelKw]);
+
+  // Helper function so safely parse values
+  const safeParseFloat = (value) => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return parseFloat(value) || 0;
+    if (value && typeof value === 'object') {
+      return parseFloat(value.capacity) || 0;
+    }
+    return 0;
+  }
 
     return (
     <div className="container">
@@ -231,10 +419,20 @@ function SystemDesign({ projectId }) {
             }}
             isClearable
           />
+          <div className='mt-2'>
+            <label className='form-label'>Quantity</label>
+            <input
+              type="number"
+              min="1"
+              className="form-control"
+              value={inverterQuantity}
+              onChange={e => setInverterQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+          </div>
         </div>
 
         <div className="col-md-3">
-          <label className="form-label">Battery Size (kWh)</label>
+          <label className="form-label">Battery (kWh)</label>
             <Select
               isDisabled={systemType === 'grid'}
               options={batteries.map(bat => ({
@@ -248,6 +446,17 @@ function SystemDesign({ projectId }) {
               }}
               isClearable
             />
+            <div className="mt-2">
+              <label className="form-label">Quantity</label>
+              <input 
+                type="number"
+                min="1"
+                className="form-control"
+                value={batteryQuantity}
+                onChange={e => setBatteryQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                disabled={systemType === 'grid'}
+              /> 
+            </div>
         </div>
 
         {/* buttons */}
@@ -314,7 +523,7 @@ function SystemDesign({ projectId }) {
                   tension: 0.3,
                   pointRadius: 0
                 },
-                ...batteryKwh > 0 ? [{
+                ...(safeParseFloat(batteryKwh)) > 0 ? [{
                   label: 'Battery SOC (%)',
                   data: filtered.battery_soc,
                   borderColor: 'orange',
@@ -366,6 +575,120 @@ function SystemDesign({ projectId }) {
               }
             }}
           />
+          
+          {/* New Metrics Cards */}
+          <div className="row mb-4 g-3 mt-4">
+            <div className="col-md-4">
+              <div className="border-start border-4 border-primary bg-white shadow-sm rounded p-3 h-100">
+                <div className="text-muted small">Total PV Generation</div>
+                <div className="fs-4 fw-bold">{totalPVGeneration} kWh</div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="border-start border-4 border-success bg-white shadow-sm rounded p-3 h-100">
+                <div className="text-muted small">Utilized PV Generation</div>
+                <div className="fs-4 fw-bold">{utilizedPVGeneration} kWh</div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="border-start border-4 border-danger bg-white shadow-sm rounded p-3 h-100">
+                <div className="text-muted small">Grid Import</div>
+                <div className="fs-4 fw-bold">{gridImport} kWh</div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="border-start border-4 border-warning bg-white shadow-sm rounded p-3 h-100">
+                <div className="text-muted small">Grid Export</div>
+                <div className="fs-4 fw-bold">{gridExport} kWh</div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="border-start border-4 border-info bg-white shadow-sm rounded p-3 h-100">
+                <div className="text-muted small">Battery Charge/Discharge</div>
+                <div className="fs-4 fw-bold">{batteryChargeDischarge} kWh</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Advanced System Metrics */}
+          {filtered && (
+  <div className="mt-5">
+    <h5 className="mb-3">Plant Output Specifications</h5>
+    <div className="table-responsive">
+      <table className="table table-bordered table-striped">
+        <thead className="table-light">
+          <tr>
+            <th>Metric</th>
+            <th>Value</th>
+            <th>Units</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Daytime Consumption</td>
+            <td>{daytimeConsumption}</td>
+            <td>%</td>
+          </tr>
+          <tr>
+            <td>PV Utilization</td>
+            <td>{pvUtilization}</td>
+            <td>%</td>
+          </tr>
+          <tr>
+            <td>Overall Consumption from PV</td>
+            <td>{consumptionFromPV}</td>
+            <td>%</td>
+          </tr>
+          <tr>
+            <td>Potential Generation (daily)</td>
+            <td>{potentialGenerationDaily}</td>
+            <td>kWh</td>
+          </tr>
+          <tr>
+            <td>Utilized Generation (daily)</td>
+            <td>{utilizedGenerationDaily}</td>
+            <td>kWh</td>
+          </tr>
+          <tr>
+            <td>Throttling Losses (daily)</td>
+            <td>{throttlingLossesDaily}</td>
+            <td>kWh</td>
+          </tr>
+          <tr>
+            <td>Specific Yield Including Throttling Losses</td>
+            <td>{specificYieldWithThrottling}</td>
+            <td>kWh/kWp/day</td>
+          </tr>
+          <tr>
+            <td>Potential Generation p.a.</td>
+            <td>{potentialGenerationAnnual}</td>
+            <td>kWh</td>
+          </tr>
+          <tr>
+            <td>Utilized Generation p.a.</td>
+            <td>{utilizedGenerationAnnual}</td>
+            <td>kWh</td>
+          </tr>
+          <tr>
+            <td>Throttling Losses p.a.</td>
+            <td>{throttlingLossesAnnual}</td>
+            <td>kWh</td>
+          </tr>
+          <tr>
+            <td>Specific Yield Excl. Throttling Losses</td>
+            <td>{specificYieldExclThrottling}</td>
+            <td>kWh/kWp/y</td>
+          </tr>
+          <tr>
+            <td>Battery cycles in 1 year</td>
+            <td>{batteryCyclesAnnual}</td>
+            <td>cycles/y</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+)}
 
           {/* Modal for custom date range */}
           <Modal show={showDateModal} onHide={() => setShowDateModal(false)}>

@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -84,9 +85,19 @@ function FinancialModeling({ projectId }) {
         alert('Calculation failed: ' + msg + 
               '\n(Hint: did you click "Save System" first?)');
         setLoading(false);
-      });
-      
+      });      
   };
+
+  // Summation for 2025
+  const costComparison = result?.cost_comparison || [];
+  const oldCost2025 = costComparison
+    .filter(item => item.period.startsWith('2025-'))
+    .reduce((acc, val) => acc + val.old_cost, 0);
+  const newCost2025 = costComparison
+    .filter(item => item.period.startsWith('2025-'))
+    .reduce((acc, val) => acc + val.new_cost, 0);
+
+  const savings2025 = oldCost2025 - newCost2025;
 
   return (
     <div className="container">
@@ -179,16 +190,16 @@ function FinancialModeling({ projectId }) {
           <div className="mt-5">
             <Bar
               data={{
-                labels: result.cost_comparison.map(e => e.period),
+                labels: costComparison.map(e => e.period),
                 datasets: [
                   {
                     label: 'Cost Without Solar (R)',
-                    data: result.cost_comparison.map(e => e.old_cost),
+                    data: costComparison.map(e => e.old_cost),
                     backgroundColor: 'rgba(255, 99, 132, 0.5)'
                   },
                   {
                     label: 'Cost With Solar (R)',
-                    data: result.cost_comparison.map(e => e.new_cost),
+                    data: costComparison.map(e => e.new_cost),
                     backgroundColor: 'rgba(54, 162, 235, 0.5)'
                   }
                 ]
@@ -208,6 +219,47 @@ function FinancialModeling({ projectId }) {
               }}
             />
           </div>
+              
+          <div className="mt-5">
+            {costComparison.length > 0 && (
+            <Bar
+              data={{
+                labels: ['2025 Costs'],
+                datasets: [
+                  {
+                    label: 'Current Cost (R)',
+                    data: [oldCost2025],
+                    backgroundColor: 'rgba(255, 99, 132, 0.5)'
+                  },
+                  {
+                    label: 'New Cost (R)',
+                    data: [newCost2025],
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    stack: 'combined'
+                  },
+                  {
+                    label: 'Savings (R)',
+                    data: [savings2025],
+                    backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                    stack: 'combined'
+                  }
+                ]
+              }}
+              options={{
+                plugins: {
+                  title: { display: true, text: '2025 Annual Cost Comparison' },
+
+                },
+                responsive: true,
+                scales: {
+                  y: { beginAtZero: true, title: { display: true, text: 'Rand' }, stacked: true },
+                  x: { stacked: true }
+                }
+              }}
+            />
+            )}
+          </div>
+
         </div>
       )}
     </div>

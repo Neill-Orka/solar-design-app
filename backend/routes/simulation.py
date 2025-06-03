@@ -17,10 +17,16 @@ def simulate_system():
         data = request.get_json()
         project_id = data.get("project_id")
         panel_kw = data["system"]["panel_kw"]
-        battery_kwh = data["system"].get("battery_kwh", 0)
         system_type = data["system"]["system_type"]
         inverter_kva = data["system"].get("inverter_kva")
+        battery_kwh = data["system"].get("battery_kwh", 0)
         allow_export = data["system"].get("allow_export", False)
+
+        # If we get an object instead of number
+        if isinstance(inverter_kva, dict):
+            inverter_kva = inverter_kva.get('capacity', 0) * inverter_kva.get('quantity', 1)
+        if isinstance(battery_kwh, dict):
+            battery_kwh = battery_kwh.get('capacity', 0) * battery_kwh.get('quantity', 1)
 
         project = Projects.query.get(project_id)
         if not project:

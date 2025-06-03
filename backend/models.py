@@ -1,6 +1,7 @@
 # models.py
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import JSONB
 
 db = SQLAlchemy()
 
@@ -22,8 +23,10 @@ class Projects(db.Model):
     description = db.Column(db.String(200), nullable=True)
     system_type = db.Column(db.String(20))
     panel_kw = db.Column(db.Float)
-    inverter_kva = db.Column(db.Float)
-    battery_kwh = db.Column(db.Float)
+    inverter_kva = db.Column(JSONB)
+    battery_kwh = db.Column(JSONB)
+    inverter_ids = db.Column(JSONB) # NEW COLUMN
+    battery_ids = db.Column(JSONB) # NEW COLUMN
     project_value_excl_vat = db.Column(db.Float, nullable=True)
     site_contact_person = db.Column(db.String(80), nullable=True)
     site_phone = db.Column(db.String(20), nullable=True)

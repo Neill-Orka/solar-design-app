@@ -279,7 +279,7 @@ function EnergyAnalysis({ projectId }) {
         <div className="row mb-4 g-3">
           <div className="col-md-4">
             <div className="border-start border-4 border-warning bg-white shadow-sm rounded p-3 h-100">
-              <div className="text-muted small">Baseload</div>
+              <div className="text-muted small">Maak die average nocturnal load (7-5 is dag)</div>
               <div className="fs-4 fw-bold">{minDemand} kW</div>
             </div>
           </div>

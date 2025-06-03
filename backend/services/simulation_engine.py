@@ -13,15 +13,15 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         if not records:
             return {"error": "No energy data found for project"}
 
-        latitude, longitude = -29.7538, 24.0859
+        latitude, longitude = -26.71085739284715, 27.081064165934936 # -29.7538, 24.0859 De Aar 
         times = pd.to_datetime([r.timestamp for r in records]).tz_localize('Africa/Johannesburg')
         site = Location(latitude, longitude, tz='Africa/Johannesburg')
         clearsky = site.get_clearsky(times)
 
         temperature_params = TEMPERATURE_MODEL_PARAMETERS['sapm']['open_rack_glass_glass']
         system = PVSystem(
-            surface_tilt=30,
-            surface_azimuth=0,
+            surface_tilt=15,
+            surface_azimuth=14,
             module_parameters={'pdc0': panel_kw * 1000, 'gamma_pdc': -0.004},
             inverter_parameters={'pdc0': inverter_kva * 1000},
             temperature_model_parameters=temperature_params,
@@ -32,7 +32,10 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         mc = ModelChain(system, site, aoi_model='no_loss', spectral_model='no_loss', losses_model='no_loss')
         mc.run_model(clearsky)
 
-        generation_kw = mc.results.ac.fillna(0) / 1000  # kW
+        if mc.results.ac is not None:
+            generation_kw = mc.results.ac.fillna(0) / 1000  # kW
+        else:
+            generation_kw = pd.Series([0] * len(records))
         demand_kw = [r.demand_kw for r in records]
 
         battery_max = (battery_kwh or 0) * 1000
@@ -73,7 +76,11 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         return {
             "timestamps": [r.timestamp.isoformat() for r in records],
             "demand": demand_kw,
-            "generation": list(pd.Series([min(generation_kw.iloc[i], inverter_kva if allow_export else min(inverter_kva, demand_kw[i])) for i in range(len(demand_kw))]).round(2)),
+            "generation": list(pd.Series([min(generation_kw.iloc[i], inverter_kva) if (system_type in ['hybrid', 'off-grid'] or allow_export) 
+                                          else min(generation_kw.iloc[i], inverter_kva, demand_kw[i])
+                                          for i in range(len(demand_kw))]).round(2)),
+            # uncapped potential generation (limited by inverter size)
+            "potential_generation": list(pd.Series([min(generation_kw.iloc[i], inverter_kva) for i in range(len(demand_kw))]).round(2)),
             "battery_soc": soc_trace,
             "import_from_grid": import_from_grid,
             "export_to_grid": export_to_grid

@@ -49,16 +49,28 @@ function Projects() {
               <div className="card shadow-sm h-100">
                 <div className="card-body">
                   <h5 className="card-title">{project.name}</h5>
-                  <p className="card-text">
-                    <strong>Client:</strong> {project.client_name}<br />
-                    <strong>Location:</strong> {project.location}<br />
-                    <strong>Type:</strong> {project.system_type || 'Not set'}<br />
-                    <strong>Size:</strong> {project.panel_kw || '-'} kWp, {project.inverter_kva || '-'} kVA<br />
-                    {project.system_type !== 'grid' && project.battery_kwh && (
-                      <><strong>Battery:</strong> {project.battery_kwh} kWh<br /></>
-                    )}
-                  </p>
-                  <div className="d-flex justify-content-between">
+                    <p className="card-text">
+                      <strong>Client:</strong> {project.client_name}<br />
+                      <strong>Location:</strong> {project.location}<br />
+                      <strong>Type:</strong> {project.system_type || 'Not set'}<br />
+                      <strong>Size:</strong> {project.panel_kw || '-'} kWp, 
+                      {project.inverter_kva 
+                        ? (typeof project.inverter_kva === 'object' && 'capacity' in project.inverter_kva && 'quantity' in project.inverter_kva
+                          ? `${project.inverter_kva.capacity} kVA (x${project.inverter_kva.quantity})`
+                          : project.inverter_kva)
+                        : '-'} kVA<br />
+                      {project.system_type !== 'grid' && project.battery_kwh && (
+                        <>
+                          <strong>Battery:</strong> 
+                          {project.battery_kwh 
+                            ? (typeof project.battery_kwh === 'object' && 'capacity' in project.battery_kwh && 'quantity' in project.battery_kwh
+                              ? `${project.battery_kwh.capacity} kWh (x${project.battery_kwh.quantity})`
+                              : project.battery_kwh)
+                            : '-'} kWh<br />
+                        </>
+                      )}
+                    </p>
+                    <div className="d-flex justify-content-between">
                     <Link to={`/projects/${project.id}`} className="btn btn-primary btn-sm">Open</Link>
                     <Link to={`/projects/edit/${project.id}`} className="btn btn-outline-primary btn-sm">Edit</Link>
                     <button className="btn btn-outline-danger btn-sm" onClick={() => handleDelete(project.id)}>Delete</button>

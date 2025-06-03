@@ -57,6 +57,8 @@ def get_project_by_id(project_id):
 def add_project():
     try:
         data = request.json
+        if data is None:
+            return jsonify({'error': 'No JSON data provided'}), 400
         new_project = Projects(
             client_id=data['client_id'],
             name=data['name'],
@@ -86,8 +88,27 @@ def update_project(project_id):
             return jsonify({'error': 'Project not found'}), 404
 
         data = request.json
+
+        # Handle new quantity format
+        for key in ['inverter_kva', 'battery_kwh']:
+            if key in data:
+                if isinstance(data[key], dict):
+                    # new format with capacity and quantity
+                    setattr(project, key, data[key])
+                elif data[key] is not None:
+                    # Backward compatibility
+                    if key == 'inverter_kva':
+                        setattr(project, key, {'capacity': data[key], 'quantity': 1})
+                    else:
+                        setattr(project, key, {'capacity': data[key], 'quantity': 1})
+                else:
+                    setattr(project, key, None)
+                
+        # Handle other fields
         for key, value in data.items():
-            setattr(project, key, value)
+            if key not in ['inverter_kva', 'battery_kwh']:
+                setattr(project, key, value)
+
         db.session.commit()
         return jsonify({'message': 'Project updated successfully!'})
     except Exception as e:
