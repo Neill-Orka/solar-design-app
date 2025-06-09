@@ -306,8 +306,15 @@ function SystemDesign({ projectId }) {
     setThrottlingLossesDaily(throttlingLossesDaily.toFixed(0));
     
     // Specific yield with throttling
-    const specificYield = safeParseFloat(panelKw) > 0 ? potentialGenDaily / safeParseFloat(panelKw) : 0;
-    setSpecificYieldWithThrottling(specificYield.toFixed(2));
+    let specYield = 0;
+    if (systemType === 'grid') {
+      specYield = safeParseFloat(panelKw) > 0 ? (utilizedGenDaily / safeParseFloat(panelKw)) : 0;
+    }
+    else
+    {
+      specYield = safeParseFloat(panelKw) > 0 ? (potentialGenDaily / safeParseFloat(panelKw)) : 0;
+    }
+    setSpecificYieldWithThrottling(specYield.toFixed(2));
     
     // Annual projections
     const daysInYear = 365;
