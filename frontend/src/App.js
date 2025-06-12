@@ -14,6 +14,9 @@ import ProductsAdmin from './ProductsAdmin';
 import Optimize from './Optimize';
 import logo from './assets/orka_logo_transparent_background.png';
 import './Navbar.css';
+import 'bootstrap/dist/css/bootstrap.min.css'; // Your existing Bootstrap CSS
+import 'bootstrap-icons/font/bootstrap-icons.css'; // Add this
+import './index.css'; // Your custom CSS if any
 
 // ------ tiny wrappers to inject :id into the components -----------
 function SystemDesignWrapper() {
