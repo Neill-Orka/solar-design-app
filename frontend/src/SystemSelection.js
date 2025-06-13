@@ -7,7 +7,7 @@ function SystemSelection({ projectId, onSelect, onBack }) { // Added projectId p
     { 
       id: 'system_gt_50', 
       name: 'Standard 50kW Grid-Tied', 
-      description: 'Ideal for medium commercial rooftops with stable grid access. Maximizes solar energy usage during daylight hours.',
+      description: 'Ideal for businesses that want to save on their  Maximizes solar energy usage during daylight hours.',
       cost: 850000, 
       capacity_kw: 50,
       type: 'Grid-Tied',
@@ -16,7 +16,7 @@ function SystemSelection({ projectId, onSelect, onBack }) { // Added projectId p
     { 
       id: 'system_hyb_100', 
       name: 'Advanced 100kW Hybrid', 
-      description: 'Offers energy independence with battery storage. Suitable for businesses needing backup power or off-peak energy utilization.',
+      description: '',
       cost: 1800000, 
       capacity_kw: 100, 
       battery_kwh: 50,
@@ -26,7 +26,7 @@ function SystemSelection({ projectId, onSelect, onBack }) { // Added projectId p
     { 
       id: 'system_gt_200', 
       name: 'Large Scale 200kW Grid-Tied', 
-      description: 'Designed for large commercial or industrial facilities aiming for significant electricity bill reduction.',
+      description: '',
       cost: 3200000, 
       capacity_kw: 200,
       type: 'Grid-Tied',

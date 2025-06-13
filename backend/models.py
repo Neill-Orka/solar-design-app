@@ -112,3 +112,4 @@ class QuickDesignData(db.Model):
 
     def __repr__(self):
         return f'<QuickDesignData for Project {self.project_id}>'
+    
