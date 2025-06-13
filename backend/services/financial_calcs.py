@@ -1,5 +1,6 @@
 # services/financial_calcs.py
 from datetime import datetime
+import logging
 
 def calculate_financial_model(project, sim_response, eskom_tariff, export_enabled, feed_in_tariff):
     try:
@@ -59,3 +60,51 @@ def calculate_financial_model(project, sim_response, eskom_tariff, export_enable
 
     except Exception as e:
         return {"error": str(e)}
+
+
+def run_quick_financials(sim_response, system_cost, tariff):
+    try:
+        demand, imports, exports = sim_response["demand"], sim_response["import_from_grid"], sim_response["export_to_grid"]
+        generation = sim_response["generation"]
+        timestamps = [datetime.fromisoformat(ts) for ts in sim_response["timestamps"]]
+        
+        time_interval_hours, degradation_rate = 0.5, 0.005
+
+        total_demand_kwh = sum(d * time_interval_hours for d in demand)
+        total_generation_kwh = sum(g * time_interval_hours for g in generation)
+        total_import_kwh = sum(imp * time_interval_hours for imp in imports)
+        total_export_kwh = 0 # Hardcoded to zero
+        pv_used_on_site_kwh = total_generation_kwh - total_export_kwh
+        
+        original_annual_cost = total_demand_kwh * tariff
+        new_annual_cost = total_import_kwh * tariff
+        # annual_export_revenue is removed
+        annual_savings = original_annual_cost - new_annual_cost
+
+        total_20yr_saving = sum(annual_savings * ((1 - degradation_rate) ** i) for i in range(20))
+        payback_years = system_cost / annual_savings if annual_savings > 0 else float('inf')
+        roi_20yr = ((total_20yr_saving - system_cost) / system_cost) * 100 if system_cost > 0 else float('inf')
+
+        monthly_costs = {}
+        for i, ts in enumerate(timestamps):
+            month_key = ts.strftime('%Y-%m')
+            if month_key not in monthly_costs: monthly_costs[month_key] = {"old_cost": 0, "new_cost": 0}
+            monthly_costs[month_key]["old_cost"] += demand[i] * time_interval_hours * tariff
+            monthly_costs[month_key]["new_cost"] += (imports[i] * time_interval_hours * tariff)
+        
+        cost_comparison_data = [{"month": key, **value} for key, value in sorted(monthly_costs.items())]
+
+        return {
+            "annual_savings": round(annual_savings),
+            "payback_period": round(payback_years, 1),
+            "roi": round(roi_20yr, 1),
+            "total_demand_kwh": round(total_demand_kwh),
+            "total_generation_kwh": round(total_generation_kwh),
+            "pv_used_on_site_kwh": round(pv_used_on_site_kwh),
+            "total_import_kwh": round(total_import_kwh),
+            "total_export_kwh": round(total_export_kwh),
+            "self_consumption_rate": round((pv_used_on_site_kwh / total_generation_kwh) * 100, 1) if total_generation_kwh > 0 else 0,
+            "grid_independence_rate": round((pv_used_on_site_kwh / total_demand_kwh) * 100, 1) if total_demand_kwh > 0 else 0,
+            "cost_comparison": cost_comparison_data,
+        }
+    except Exception as e: return {"error": str(e)}

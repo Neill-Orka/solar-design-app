@@ -1,39 +1,28 @@
-import React from 'react';
-import { Card, Button, Row, Col } from 'react-bootstrap'; // Added Row, Col
+import React, { useState, useEffect }from 'react';
+import { Card, Button, Row, Col, Spinner, Alert } from 'react-bootstrap'; 
+import axios from 'axios';
 
-function SystemSelection({ projectId, onSelect, onBack }) { // Added projectId prop
-  // Placeholder systems - In a real app, these might come from an API or config
-  const systems = [
-    { 
-      id: 'system_gt_50', 
-      name: 'Standard 50kW Grid-Tied', 
-      description: 'Ideal for businesses that want to save on their  Maximizes solar energy usage during daylight hours.',
-      cost: 850000, 
-      capacity_kw: 50,
-      type: 'Grid-Tied',
-      icon: 'bi-sun' // Example icon
-    },
-    { 
-      id: 'system_hyb_100', 
-      name: 'Advanced 100kW Hybrid', 
-      description: '',
-      cost: 1800000, 
-      capacity_kw: 100, 
-      battery_kwh: 50,
-      type: 'Hybrid',
-      icon: 'bi-lightning-charge' // Example icon
-    },
-    { 
-      id: 'system_gt_200', 
-      name: 'Large Scale 200kW Grid-Tied', 
-      description: '',
-      cost: 3200000, 
-      capacity_kw: 200,
-      type: 'Grid-Tied',
-      icon: 'bi-building' // Example icon
-    },
-    // Add more predefined systems as needed
-  ];
+function SystemSelection({ projectId, onSelect, onBack }) {
+
+  const [systems, setSystems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    axios.get('http://localhost:5000/api/system_templates')
+      .then(res => {
+        setSystems(res.data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching system templates:", err);
+        setError('Failed to load system configurations. Please try again later.');
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) return <div className="text-center p-5"><Spinner animation="border" /></div>;
+  if (error) return <Alert variant="danger">{error}</Alert>;
 
   return (
     <div 
@@ -54,18 +43,18 @@ function SystemSelection({ projectId, onSelect, onBack }) { // Added projectId p
                 </Card.Text>
                 <div className="mt-2 mb-3 pt-2 border-top border-gray-200">
                   <p className="text-sm text-gray-700 mb-1">
-                    <strong>Type:</strong> {system.type}
+                    <strong>Type:</strong> {system.system_type}
                   </p>
                   <p className="text-sm text-gray-700 mb-1">
-                    <strong>Capacity:</strong> {system.capacity_kw} kW
+                    <strong>Capacity:</strong> {system.panel_kw} kWp
                   </p>
-                  {system.battery_kwh && (
+                  {system.battery_kwh > 0 && (
                     <p className="text-sm text-gray-700 mb-1">
                       <strong>Battery:</strong> {system.battery_kwh} kWh
                     </p>
                   )}
                   <p className="text-lg font-bold text-primary mt-2">
-                    Est. Cost: R{system.cost.toLocaleString()}
+                    Est. Cost: R{system.total_cost.toLocaleString()}
                   </p>
                 </div>
                 <Button

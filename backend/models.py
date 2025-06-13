@@ -112,4 +112,32 @@ class QuickDesignData(db.Model):
 
     def __repr__(self):
         return f'<QuickDesignData for Project {self.project_id}>'
+
+# Die stoor die naam en tipe "kit", bv (Standard 50 kW Grid-Tied)
+class SystemTemplate(db.Model):
+    __tablename__ = 'system_templates'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    description = db.Column(db.String(250))
+    system_type = db.Column(db.String(50)) # 'Grid-Tied', 'Hybrid', 'Off-Grid'
+    extras_cost = db.Column(db.Float, nullable=True, default=0)  # Extra cost for this template
     
+    # Relationship to the components in the template
+    components = db.relationship('SystemTemplateComponent', backref='template', lazy='dynamic', cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f'<SystemTemplate {self.name}>'
+
+# Die is die crucial "linking" table tussen 'n SystemTemplate en die Products wat dit kort
+class SystemTemplateComponent(db.Model):
+    __tablename__ = 'system_template_components'
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer, db.ForeignKey('system_templates.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    
+    # Relationship to the actual product
+    product = db.relationship('Product')
+
+    def __repr__(self):
+        return f'<{self.quantity}x of ProductID {self.product_id} for TemplateID {self.template_id}>'

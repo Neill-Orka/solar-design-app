@@ -84,6 +84,7 @@ function ProjectDashboard() {
             basicInfo={basicInfo}
             onSelect={(profile) => { // profile object is passed from ProfileSelection
               setSelectedProfile(profile); // Contains the full profile data including profile_data
+              localStorage.setItem('selectedProfileForQuickDesign', JSON.stringify(profile)); // Save to localStorage
               setCurrentStep(3);
               // Backend save for selectedProfileId is handled within ProfileSelection's handleProfileSelect
             }} 
@@ -109,6 +110,12 @@ function ProjectDashboard() {
           />
         )}
         {currentStep === 4 && (
+          <>
+            {console.log('--- ProjectDashboard State ---')}
+            {console.log('Passing to QuickResults - basicInfo:', basicInfo)}
+            {console.log('Passing to QuickResults - selectedProfile:', selectedProfile)}
+            {console.log('Passing to QuickResults - selectedSystem:', selectedSystem)}          
+
           <QuickResults 
             basicInfo={basicInfo}
             selectedProfile={selectedProfile}
@@ -116,6 +123,7 @@ function ProjectDashboard() {
             onGenerate={() => alert('Proposal generated!')} // Implement real functionality nog hier
             onBack={() => setCurrentStep(3)}
           />
+          </>
           )}
       </div>
     );

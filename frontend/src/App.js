@@ -12,6 +12,7 @@ import SystemDesign from './SystemDesign';
 import FinancialModeling from './FinancialModeling';
 import ProductsAdmin from './ProductsAdmin';
 import Optimize from './Optimize';
+import SystemBuilder from './SystemBuilder';
 import logo from './assets/orka_logo_transparent_background.png';
 import './Navbar.css';
 import 'bootstrap/dist/css/bootstrap.min.css'; // Your existing Bootstrap CSS
@@ -58,7 +59,8 @@ function App() {
                   { to: '/', label: 'Home', exact: true },
                   { to: '/clients', label: 'Clients' },
                   { to: '/projects', label: 'Projects' },
-                  { to: '/products-admin', label: 'Products' }
+                  { to: '/products-admin', label: 'Products' },
+                  { to: '/system-builder', label: 'System Builder' }
                 ].map(link => (
                   <li className="nav-item" key={link.to}>
                     <NavLink
@@ -91,6 +93,7 @@ function App() {
           <Route path="/projects/add" element={<AddProject />} />
           <Route path="/projects/edit/:id" element={<EditProject />} />
           <Route path="/products-admin" element={<ProductsAdmin />} />
+          <Route path="/system-builder" element={<SystemBuilder />} />
           <Route path="/projects/:id/optimize" element={<Optimize />} />
         </Routes>
         </div>
