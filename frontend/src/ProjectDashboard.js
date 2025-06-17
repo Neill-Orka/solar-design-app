@@ -7,11 +7,19 @@ import SystemDesign from './SystemDesign';
 import FinancialModeling from './FinancialModeling';
 import Reporting from './Reporting';
 import Optimize from './Optimize';
+import BasicInfoForm from './BasicInfoForm';
+import ProfileSelection from './ProfileSelection';
+import SystemSelection from './SystemSelection';
+import QuickResults from './QuickResults';
 
 function ProjectDashboard() {
   const { id } = useParams();  // project_id from URL
   const [project, setProject] = useState(null);
   const [activeTab, setActiveTab] = useState('upload');
+  const [currentStep, setCurrentStep] = useState(1); // Tracks quick design step
+  const [basicInfo, setBasicInfo] = useState(null);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [selectedSystem, setSelectedSystem] = useState(null);
 
   useEffect(() => {
     axios.get(`http://localhost:5000/api/projects/${id}`)
@@ -23,6 +31,103 @@ function ProjectDashboard() {
   }, [id]);
 
   if (!project) return <div className="container mt-5">Loading project...</div>;
+
+  console.log('Project design type:', project.design_type);
+
+  // Quick Design: Wizard Flow
+  if (project.design_type === 'Quick')
+  {
+    return(
+      // MODIFIED: Apply page background and padding here
+      <div className='min-vh-100 py-4 py-md-5 px-md-3' style={{ backgroundColor: '#f8f9fa' }}> 
+        <div className="container"> {/* Optional: to constrain the width of the header content below */}
+          <div className="mb-4 p-3 bg-white rounded-lg shadow-sm text-center"> {/* Header card */}
+            <h1 className="text-3xl font-bold text-gray-800 mb-1">{project.name} - Quick Design</h1>
+            <p className="text-sm text-gray-600">
+              <strong>Client:</strong> {project.client_name} | <strong>Location:</strong> {project.location}
+            </p>
+          </div>
+
+          <div className='progress mb-4 mx-auto' style={{height: '10px', maxWidth: '700px'}}> {/* Styled progress bar */}
+            <div
+              className="progress-bar bg-primary" // Use a primary color
+              role="progressbar"
+              style={{width: `${(currentStep/4)*100}%`}}
+              aria-valuenow={currentStep}
+              aria-valuemin={1}
+              aria-valuemax={4}
+            >
+              {/* Step {currentStep} of 4 */} {/* Text can be removed for cleaner look */}
+            </div>
+          </div>
+        </div>
+        {currentStep === 1 && (
+          <BasicInfoForm 
+            projectId={id} // Pass projectId
+            onSubmit={(data) => {
+              axios.post(`http://localhost:5000/api/projects/${id}/quick_design`, data)
+                .then(() => {
+                  setBasicInfo(data);
+                  setCurrentStep(2);
+                })
+                .catch(err => {
+                  console.error("Error saving basic info:", err);
+                  alert("Failed to save basic info. " + (err.response?.data?.error || err.message));
+                });
+            }} />
+        )}
+        {currentStep === 2 && (
+          <ProfileSelection 
+            projectId={id} // Pass projectId
+            consumerType={basicInfo?.consumerType} 
+            basicInfo={basicInfo}
+            onSelect={(profile) => {
+              // Also save the scaler to the backend
+              axios.post(`http://localhost:5000/api/projects/${id}/quick_design`, {
+                selectedProfileId: profile.id,
+                profileScaler: profile.scaler // <-- IMPORTANT: Save the scaler
+              }).then(() => {
+                setSelectedProfile(profile);
+                // localStorage.setItem('selectedProfileForQuickDesign', JSON.stringify(profile));
+                setCurrentStep(3);
+              }).catch(err => {
+                 console.error("Error saving profile selection:", err);
+                 alert("Failed to save profile selection.");
+              });
+            }}
+            onBack={() => setCurrentStep(1)}
+          />
+        )}
+        {currentStep === 3 && (
+          <SystemSelection 
+            projectId={id} // Pass projectId
+            onSelect={(system) => {
+              // Save selected system to backend
+               axios.post(`http://localhost:5000/api/projects/${id}/quick_design`, { selectedSystem: system })
+                .then(() => {
+                  setSelectedSystem(system);
+                  setCurrentStep(4);
+                })
+                .catch(err => {
+                  console.error("Error saving system selection:", err);
+                  alert("Failed to save system selection. " + (err.response?.data?.error || err.message));
+                });
+            }} 
+            onBack={() => setCurrentStep(2)}
+          />
+        )}
+        {currentStep === 4 && (
+          <QuickResults
+            projectId={id}
+            clientName={project.client_name}
+            basicInfo={basicInfo}
+            selectedSystem={selectedSystem}
+            onBack={() => setCurrentStep(3)}
+          />
+          )}
+      </div>
+    );
+  }
 
   return (
     <div className="container mt-5">

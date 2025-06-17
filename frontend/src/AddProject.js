@@ -12,13 +12,15 @@ function AddProject() {
     name: '',
     description: '',
     system_type: '',
-    panel_kw: '',
-    inverter_kva: '',
-    battery_kwh: '',
+    panel_kw: '0',
+    inverter_kva: '0',
+    battery_kwh: '0',
     location: '',
-    project_value_excl_vat: '',
+    project_value_excl_vat: '0',
     site_contact_person: '',
-    site_phone: ''
+    site_phone: '0',
+    design_type: '',
+    project_type: ''
   });
 
   const navigate = useNavigate();
@@ -92,6 +94,24 @@ function AddProject() {
     <div className="container mt-5">
       <h2>Add New Project</h2>
 
+      {/* Design Type Selection */}
+      <div className="mb-4">
+        <button
+          className={`btn btn-lg me-3 ${projectData.design_type === 'Quick' ? 'btn-primary' : 'btn-outline-primary'}`}
+          onClick={() => setProjectData({ ...projectData, design_type: 'Quick'})}
+          type="button"
+        >
+          Quick Design
+        </button>
+        <button
+          className={`btn btn-lg ${projectData.design_type === 'Detailed' ? 'btn-primary' : 'btn-outline-primary'}`}
+          onClick={() => setProjectData({ ...projectData, design_type: 'Detailed'})}
+          type="button"
+        >
+          Detailed Design
+        </button>
+      </div>
+
       <form onSubmit={handleSubmit} className="row g-3">
 
         {/* Client Selection */}
@@ -144,41 +164,56 @@ function AddProject() {
         </div>
 
         <div className="col-md-4">
-          <label className="form-label">Panel Size (kWp)</label>
-          <input type="number" className="form-control" name="panel_kw" value={projectData.panel_kw} onChange={handleInputChange} step="0.1" />
+          <label className="form-label">Project Type</label>
+          <select className="form-select" name="project_type" value={projectData.project_type} onChange={handleInputChange} required>
+            <option value="">-- Choose Type --</option>
+            <option value="Residential">Residential</option>
+            <option value="Commercial">Commercial</option>
+          </select>
         </div>
 
-        <div className="col-md-4">
-          <label className="form-label">Inverter Size (kVA)</label>
-          <input type="number" className="form-control" name="inverter_kva" value={projectData.inverter_kva} onChange={handleInputChange} step="0.1" />
-        </div>
+        {projectData.design_type === 'Detailed' && (
+          <>
+            <div className="col-md-4">
+              <label className="form-label">Panel Size (kWp)</label>
+              <input type="number" className="form-control" name="panel_kw" value={projectData.panel_kw} onChange={handleInputChange} step="0.1" />
+            </div>
+            
+            <div className="col-md-4">
+              <label className="form-label">Inverter Size (kVA)</label>
+              <input type="number" className="form-control" name="inverter_kva" value={projectData.inverter_kva} onChange={handleInputChange} step="0.1" />
+            </div>
+            
+            {projectData.system_type !== 'grid' && (
+              <div className="col-md-4">
+                <label className="form-label">Battery Size (kWh)</label>
+                <input type="number" className="form-control" name="battery_kwh" value={projectData.battery_kwh} onChange={handleInputChange} step="0.1" />
+              </div>
+            )}     
+            
+            <div className="col-md-4">
+              <label className="form-label">Project Value (excl. VAT)</label>
+              <input type="number" className="form-control" name="project_value_excl_vat" value={projectData.project_value_excl_vat} onChange={handleInputChange} step="0.01" />
+            </div>
 
-        {projectData.system_type !== 'grid' && (
-          <div className="col-md-4">
-            <label className="form-label">Battery Size (kWh)</label>
-            <input type="number" className="form-control" name="battery_kwh" value={projectData.battery_kwh} onChange={handleInputChange} step="0.1" />
-          </div>
-        )}
+            <div className="col-md-6">
+              <label className="form-label">Site Contact Person</label>
+              <input type="text" className="form-control" name="site_contact_person" value={projectData.site_contact_person} onChange={handleInputChange} />
+            </div>
+
+            <div className="col-md-6">
+              <label className="form-label">Site Phone</label>
+              <input type="text" className="form-control" name="site_phone" value={projectData.site_phone} onChange={handleInputChange} />
+            </div>                 
+              </>
+            )}
 
         <div className="col-md-6">
           <label className="form-label">Location</label>
           <input type="text" className="form-control" name="location" value={projectData.location} onChange={handleInputChange} />
         </div>
 
-        <div className="col-md-4">
-          <label className="form-label">Project Value (excl. VAT)</label>
-          <input type="number" className="form-control" name="project_value_excl_vat" value={projectData.project_value_excl_vat} onChange={handleInputChange} step="0.01" />
-        </div>
 
-        <div className="col-md-6">
-          <label className="form-label">Site Contact Person</label>
-          <input type="text" className="form-control" name="site_contact_person" value={projectData.site_contact_person} onChange={handleInputChange} />
-        </div>
-
-        <div className="col-md-6">
-          <label className="form-label">Site Phone</label>
-          <input type="text" className="form-control" name="site_phone" value={projectData.site_phone} onChange={handleInputChange} />
-        </div>
 
         {/* Submit */}
         <div className="col-12">
@@ -187,21 +222,19 @@ function AddProject() {
         </div>
 
       </form>
+      {showToast && (
+      <div className="toast-container position-fixed bottom-0 end-0 p-3">
+        <div className="toast show text-bg-success">
+          <div className="toast-body">
+            Project added successfully!
+          </div>
+        </div>
+      </div>
+      )}   
     </div>
   );
 
-  {showToast && (
-    <div className="toast-container position-fixed bottom-0 end-0 p-3">
-      <div className="toast show text-bg-success">
-        <div className="toast-body">
-          Project added successfully!
-        </div>
-      </div>
-    </div>
-)}
 }
 
-
-  
 
 export default AddProject;

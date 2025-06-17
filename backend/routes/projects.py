@@ -1,6 +1,6 @@
 # routes/projects.py
 from flask import Blueprint, request, jsonify
-from models import db, Projects, Clients
+from models import db, Projects, Clients, LoadProfiles, QuickDesignData
 
 projects_bp = Blueprint('projects', __name__)
 
@@ -47,7 +47,8 @@ def get_project_by_id(project_id):
             'battery_kwh': project.battery_kwh,
             'project_value_excl_vat': project.project_value_excl_vat,
             'site_contact_person': project.site_contact_person,
-            'site_phone': project.site_phone
+            'site_phone': project.site_phone,
+            'design_type': project.design_type
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -70,7 +71,9 @@ def add_project():
             location=data.get('location'),
             project_value_excl_vat=data.get('project_value_excl_vat'),
             site_contact_person=data.get('site_contact_person'),
-            site_phone=data.get('site_phone')
+            site_phone=data.get('site_phone'),
+            design_type=data.get('design_type', 'Quick'),
+            project_type=data.get('project_type', 'Residential'),
         )
         db.session.add(new_project)
         db.session.commit()
@@ -129,3 +132,72 @@ def delete_project(project_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@projects_bp.route('/load_profiles', methods=['GET'])
+def get_load_profiles():
+    try:
+        consumer_type_filter = request.args.get('consumer_type') # Optional filter
+        
+        query = LoadProfiles.query
+        if consumer_type_filter:
+            query = query.filter(LoadProfiles.profile_type == consumer_type_filter)
+        
+        profiles = query.all()
+        
+        profiles_list = []
+        for profile in profiles:
+            profiles_list.append({
+                'id': profile.id,
+                'name': profile.name,
+                'description': profile.description,
+                'profile_type': profile.profile_type, # Changed from consumer_type to match your model
+                'annual_kwh': profile.annual_kwh,
+                'profile_data': profile.profile_data # This is the array of data points
+            })
+        return jsonify(profiles_list), 200
+    except Exception as e:
+        print(f"Error fetching load profiles: {str(e)}") # Log error
+        return jsonify({'error': 'Failed to fetch load profiles', 'details': str(e)}), 500
+    
+@projects_bp.route('/projects/<int:project_id>/quick_design', methods=['POST', 'PUT'])
+def save_or_update_quick_design(project_id):
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        quick_data_entry = QuickDesignData.query.filter_by(project_id=project_id).first()
+
+        if not quick_data_entry:
+            if request.method == 'PUT':
+                 return jsonify({'error': 'Quick design data not found for this project to update.'}), 404
+            quick_data_entry = QuickDesignData()
+            quick_data_entry.project_id = project_id
+            db.session.add(quick_data_entry)
+        
+        # Update fields from BasicInfoForm
+        if 'consumption' in data: quick_data_entry.consumption = data.get('consumption')
+        if 'tariff' in data: quick_data_entry.tariff = data.get('tariff')
+        if 'consumerType' in data: quick_data_entry.consumer_type = data.get('consumerType') # Matches frontend
+        if 'transformerSize' in data: quick_data_entry.transformer_size = data.get('transformerSize') # Matches frontend
+        
+        # Update field from ProfileSelection
+        if 'selectedProfileId' in data:
+            quick_data_entry.selected_profile_id = data.get('selectedProfileId')
+        
+        if 'profileScaler' in data:
+            quick_data_entry.profile_scaler = data.get('profileScaler', 1.0)
+
+        # Update field from SystemSelection (example)
+        if 'selectedSystem' in data: # Assuming selectedSystem is an object with system details
+            quick_data_entry.selected_system_config_json = data.get('selectedSystem')
+
+        db.session.commit()
+        return jsonify({
+            'message': 'Quick design data saved/updated successfully', 
+            'id': quick_data_entry.id
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error in save_or_update_quick_design: {str(e)}") # Log error
+        return jsonify({'error': 'Failed to save/update quick design data', 'details': str(e)}), 500

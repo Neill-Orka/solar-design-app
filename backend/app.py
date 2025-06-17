@@ -4,11 +4,16 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from config import Config
 from models import db
+from flask_migrate import Migrate
+import logging
+import sys
 
 # Initialize app
 app = Flask(__name__)
 app.config.from_object(Config)
 CORS(app)
+
+logging.basicConfig(level=logging.INFO)
 
 # Import and register blueprints
 from routes.clients import clients_bp
@@ -19,6 +24,10 @@ from routes.consumption import consumption_bp
 from routes.optimize import optimize_bp
 from routes.products import products_bp
 from routes.energy_data import energy_data_bp
+from routes.system_templates import system_templates_bp
+from routes.system_builder import system_builder_bp
+from routes.quick_design import quick_design_bp
+from routes.proposal_data import proposal_data_bp
 
 app.register_blueprint(clients_bp, url_prefix='/api')
 app.register_blueprint(projects_bp, url_prefix='/api')
@@ -28,8 +37,13 @@ app.register_blueprint(consumption_bp, url_prefix='/api')
 app.register_blueprint(optimize_bp, url_prefix='/api')
 app.register_blueprint(products_bp, url_prefix='/api')
 app.register_blueprint(energy_data_bp, url_prefix='/api')
+app.register_blueprint(system_templates_bp, url_prefix='/api')
+app.register_blueprint(system_builder_bp, url_prefix='/api')
+app.register_blueprint(quick_design_bp, url_prefix='/api')
+app.register_blueprint(proposal_data_bp, url_prefix='/api')
 
 db.init_app(app)
+migrate = Migrate(app, db)
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from models import EnergyData
 import logging
+import os
 
 
 def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export):
@@ -200,3 +201,88 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
 
     except Exception as e:
         return {"error": str(e)}
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Assumes your folder structure is: project_root/services/simulation_engine.py
+project_root = os.path.abspath(os.path.join(current_dir, '..'))
+csv_path = os.path.join(project_root, 'utils', 'generation_profile.csv')
+try:
+    GENERATION_PROFILE_DF = pd.read_csv(csv_path, header=None)
+    print(f"--- SUCCESS: Loaded generation profile from: {csv_path} ---")
+except FileNotFoundError:
+    print(f"--- FATAL STARTUP ERROR: Could not find 'generation_profile.csv'. Searched at path: {csv_path} ---")
+    GENERATION_PROFILE_DF = pd.DataFrame()
+
+def run_quick_simulation(scaled_load_profile, panel_kw, battery_kwh, system_type, inverter_kva):
+    try:
+        if GENERATION_PROFILE_DF.empty:
+            return {"error": "Generation profile CSV could not be loaded on server startup."}
+
+        demand_kw = [dp['demand_kw'] for dp in scaled_load_profile]
+        timestamps = [dp['timestamp'] for dp in scaled_load_profile]
+        percentages = GENERATION_PROFILE_DF.iloc[:, 0].tolist()
+
+        if len(percentages) != len(demand_kw): return {"error": f"Profile length mismatch."}
+        
+        panel_degrading_factor = 0.9
+        real_panel_kw = panel_degrading_factor * panel_kw
+
+        # inverter limiting
+        raw_pv_generation_kw = pd.Series([(perc / 100) * real_panel_kw * 0.9 for perc in percentages])
+        potential_generation_kw = pd.Series([min(gen, inverter_kva) for gen in raw_pv_generation_kw])
+
+        battery_capacity_kwh, battery_soc_kwh = (battery_kwh or 0), 0.0
+        import_from_grid, battery_soc_trace = [], []
+        time_interval_hours = 0.5
+
+        usable_generation_kw = []
+        potential_gen_kw = []
+
+        for i in range(len(demand_kw)):
+            gen_kwh, demand_kwh = potential_generation_kw.iloc[i] * time_interval_hours, demand_kw[i] * time_interval_hours
+
+            current_usable_gen_kwh = 0
+            if system_type == "Grid-Tied":
+                current_usable_gen_kwh = min(gen_kwh, demand_kwh)
+            else:
+                current_usable_gen_kwh = gen_kwh
+
+            usable_generation_kw.append(current_usable_gen_kwh / time_interval_hours)
+
+            potential_gen_kw.append(gen_kwh / time_interval_hours)
+
+            energy_from_pv_to_load = min(gen_kwh, demand_kwh)
+            remaining_load_kwh, excess_gen_kwh = demand_kwh - energy_from_pv_to_load, gen_kwh - energy_from_pv_to_load
+            
+            if excess_gen_kwh > 0 and system_type in ['Hybrid', 'Off-Grid']:
+                charge_amount = min(excess_gen_kwh, battery_capacity_kwh - battery_soc_kwh)
+                battery_soc_kwh += charge_amount
+            
+            # Any remaining excess generation is now clipped (discarded)
+            
+            if remaining_load_kwh > 0 and system_type in ['Hybrid', 'Off-Grid']:
+                min_soc_limit_kwh = 0.0
+                if system_type == 'Hybrid':
+                    min_soc_limit_kwh = battery_capacity_kwh * 0.2 # 20% limit
+
+                available_discharge_kwh = max(0, battery_soc_kwh - min_soc_limit_kwh)
+                discharge_amount = min(remaining_load_kwh, available_discharge_kwh)
+                battery_soc_kwh -= discharge_amount
+                remaining_load_kwh -= discharge_amount
+            
+            import_kwh = remaining_load_kwh if remaining_load_kwh > 0 and system_type != 'Off-Grid' else 0
+            
+            import_from_grid.append(import_kwh / time_interval_hours)
+            battery_soc_trace.append((battery_soc_kwh / battery_capacity_kwh * 100) if battery_capacity_kwh > 0 else 0)
+
+        return {
+            "timestamps": timestamps,
+            "demand": demand_kw,
+            "generation": [round(val, 2) for val in usable_generation_kw],
+            "import_from_grid": import_from_grid,
+            "export_to_grid": [0] * len(demand_kw), # Always return a list of zeros for consistency
+            "battery_soc": [round(val, 2) for val in battery_soc_trace],
+            "panel_kw": real_panel_kw,
+            "potential_generation": [round(val, 2) for val in potential_gen_kw]
+        }
+    except Exception as e: return {"error": str(e)}
