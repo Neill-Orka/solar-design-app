@@ -224,25 +224,49 @@ def run_quick_simulation(scaled_load_profile, panel_kw, battery_kwh, system_type
 
         if len(percentages) != len(demand_kw): return {"error": f"Profile length mismatch."}
         
-        generation_kw = pd.Series([(perc / 100) * panel_kw * 0.9 for perc in percentages])
+        panel_degrading_factor = 0.9
+        real_panel_kw = panel_degrading_factor * panel_kw
+
+        # inverter limiting
+        raw_pv_generation_kw = pd.Series([(perc / 100) * real_panel_kw * 0.9 for perc in percentages])
+        potential_generation_kw = pd.Series([min(gen, inverter_kva) for gen in raw_pv_generation_kw])
+
         battery_capacity_kwh, battery_soc_kwh = (battery_kwh or 0), 0.0
         import_from_grid, battery_soc_trace = [], []
         time_interval_hours = 0.5
 
+        usable_generation_kw = []
+        potential_gen_kw = []
+
         for i in range(len(demand_kw)):
-            gen_kwh, demand_kwh = generation_kw.iloc[i] * time_interval_hours, demand_kw[i] * time_interval_hours
+            gen_kwh, demand_kwh = potential_generation_kw.iloc[i] * time_interval_hours, demand_kw[i] * time_interval_hours
+
+            current_usable_gen_kwh = 0
+            if system_type == "Grid-Tied":
+                current_usable_gen_kwh = min(gen_kwh, demand_kwh)
+            else:
+                current_usable_gen_kwh = gen_kwh
+
+            usable_generation_kw.append(current_usable_gen_kwh / time_interval_hours)
+
+            potential_gen_kw.append(gen_kwh / time_interval_hours)
+
             energy_from_pv_to_load = min(gen_kwh, demand_kwh)
             remaining_load_kwh, excess_gen_kwh = demand_kwh - energy_from_pv_to_load, gen_kwh - energy_from_pv_to_load
             
             if excess_gen_kwh > 0 and system_type in ['Hybrid', 'Off-Grid']:
                 charge_amount = min(excess_gen_kwh, battery_capacity_kwh - battery_soc_kwh)
                 battery_soc_kwh += charge_amount
-                excess_gen_kwh -= charge_amount
             
             # Any remaining excess generation is now clipped (discarded)
             
             if remaining_load_kwh > 0 and system_type in ['Hybrid', 'Off-Grid']:
-                discharge_amount = min(remaining_load_kwh, battery_soc_kwh)
+                min_soc_limit_kwh = 0.0
+                if system_type == 'Hybrid':
+                    min_soc_limit_kwh = battery_capacity_kwh * 0.2 # 20% limit
+
+                available_discharge_kwh = max(0, battery_soc_kwh - min_soc_limit_kwh)
+                discharge_amount = min(remaining_load_kwh, available_discharge_kwh)
                 battery_soc_kwh -= discharge_amount
                 remaining_load_kwh -= discharge_amount
             
@@ -252,10 +276,13 @@ def run_quick_simulation(scaled_load_profile, panel_kw, battery_kwh, system_type
             battery_soc_trace.append((battery_soc_kwh / battery_capacity_kwh * 100) if battery_capacity_kwh > 0 else 0)
 
         return {
-            "timestamps": timestamps, "demand": demand_kw,
-            "generation": generation_kw.round(2).tolist(),
+            "timestamps": timestamps,
+            "demand": demand_kw,
+            "generation": [round(val, 2) for val in usable_generation_kw],
             "import_from_grid": import_from_grid,
             "export_to_grid": [0] * len(demand_kw), # Always return a list of zeros for consistency
-            "battery_soc": battery_soc_trace
+            "battery_soc": [round(val, 2) for val in battery_soc_trace],
+            "panel_kw": real_panel_kw,
+            "potential_generation": [round(val, 2) for val in potential_gen_kw]
         }
     except Exception as e: return {"error": str(e)}

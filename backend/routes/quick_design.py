@@ -29,6 +29,7 @@ def handle_quick_simulation():
             
             profile_data = selected_profile.get('profile_data')
             scaler = selected_profile.get('scaler', 1)
+
             if not profile_data: return jsonify({"error": "Load profile data is missing"}), 400
             
             scaled_profile_data = [{'timestamp': dp.get('Timestamp') or dp.get('timestamp'), 'demand_kw': (dp.get('Demand_kW') or dp.get('demand_kw', 0)) * scaler} for dp in profile_data]

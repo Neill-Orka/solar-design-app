@@ -13,6 +13,8 @@ import FinancialModeling from './FinancialModeling';
 import ProductsAdmin from './ProductsAdmin';
 import Optimize from './Optimize';
 import SystemBuilder from './SystemBuilder';
+import ProposalPage from './ProposalPage';
+
 import logo from './assets/orka_logo_transparent_background.png';
 import './Navbar.css';
 import 'bootstrap/dist/css/bootstrap.min.css'; // Your existing Bootstrap CSS
@@ -95,6 +97,7 @@ function App() {
           <Route path="/products-admin" element={<ProductsAdmin />} />
           <Route path="/system-builder" element={<SystemBuilder />} />
           <Route path="/projects/:id/optimize" element={<Optimize />} />
+          <Route path="/proposal/:id" element={<ProposalPage />} />
         </Routes>
         </div>
     </Router>

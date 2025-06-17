@@ -185,6 +185,9 @@ def save_or_update_quick_design(project_id):
         if 'selectedProfileId' in data:
             quick_data_entry.selected_profile_id = data.get('selectedProfileId')
         
+        if 'profileScaler' in data:
+            quick_data_entry.profile_scaler = data.get('profileScaler', 1.0)
+
         # Update field from SystemSelection (example)
         if 'selectedSystem' in data: # Assuming selectedSystem is an object with system details
             quick_data_entry.selected_system_config_json = data.get('selectedSystem')

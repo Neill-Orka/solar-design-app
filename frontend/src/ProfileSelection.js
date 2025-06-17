@@ -181,13 +181,16 @@ function ProfileSelection({ projectId, consumerType, basicInfo, onSelect, onBack
     setError('');
     try {
       const currentScaler = scalers[profile.id] || 1;
+      const profileToSave = { ...profile, scaler: currentScaler };
+      localStorage.setItem('selectedProfileForQuickDesign', JSON.stringify(profileToSave));
+      // Save the selected profile with its scaler to the backend
       await axios.post(`http://localhost:5000/api/projects/${projectId}/quick_design`, {
         selectedProfileId: profile.id,
-        // OPTIONAL: You might want to save the scaler if it's a crucial part of the quick design
-        // profileScaler: currentScaler 
+        profileScaler: currentScaler
       });
-      // Pass the profile and its current scaler to the next step if needed
-      onSelect({ ...profile, scaler: currentScaler });
+      
+      onSelect(profileToSave); // Pass the profile
+
     } catch (err) {
       console.error("Error saving profile selection:", err);
       setError(err.response?.data?.error || 'Failed to save selection. Please try again.');

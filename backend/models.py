@@ -103,6 +103,8 @@ class QuickDesignData(db.Model):
     # Field for ProfileSelection
     selected_profile_id = db.Column(db.Integer, db.ForeignKey('load_profiles.id'), nullable=True)
 
+    profile_scaler = db.Column(db.Float, nullable=True, default=1.0)  # Scaler for the load profile data
+
     # Field for SystemSelection (placeholder)
     selected_system_config_json = db.Column(JSONB, nullable=True)  # JSON to store selected system configuration
 

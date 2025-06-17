@@ -90,25 +90,34 @@ if __name__ == "__main__":
     db = SessionLocal()
     
     try:
-        # Residential - Anton Ackerman
+        # Residential - Frans Kruger
         import_profile_from_excel(
             db_session=db,
-            file_path='./utils/anton_ackerman_load_profile.xlsx',
-            profile_name='Anton Ackerman Residential',
+            file_path='./utils/frans_kruger_load_profile.xlsx',
+            profile_name='Frans Kruger Residential',
             profile_type='Residential',
             description='Residential load profile',
             interval_hours=0.5
         )
+        # Residential - Anton Ackerman
+        # import_profile_from_excel(
+        #     db_session=db,
+        #     file_path='./utils/anton_ackerman_load_profile.xlsx',
+        #     profile_name='Anton Ackerman Residential',
+        #     profile_type='Residential',
+        #     description='Residential load profile',
+        #     interval_hours=0.5
+        # )
 
-        # Commercial - QTyres
-        import_profile_from_excel(
-            db_session=db,
-            file_path='./utils/qtyres_load_profile.xlsx',
-            profile_name='QTyres Commercial',
-            profile_type='Commercial',
-            description='Commercial load profile',
-            interval_hours=0.5
-        )
+        # # Commercial - QTyres
+        # import_profile_from_excel(
+        #     db_session=db,
+        #     file_path='./utils/qtyres_load_profile.xlsx',
+        #     profile_name='QTyres Commercial',
+        #     profile_type='Commercial',
+        #     description='Commercial load profile',
+        #     interval_hours=0.5
+        # )
     finally:
         db.close()
         print("Database session closed.")

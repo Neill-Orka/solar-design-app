@@ -67,18 +67,22 @@ def run_quick_financials(sim_response, system_cost, tariff):
         demand, imports, exports = sim_response["demand"], sim_response["import_from_grid"], sim_response["export_to_grid"]
         generation = sim_response["generation"]
         timestamps = [datetime.fromisoformat(ts) for ts in sim_response["timestamps"]]
+        panel_kw = sim_response.get("panel_kw", 1)
+        potential_generation = sim_response["potential_generation"]
         
         time_interval_hours, degradation_rate = 0.5, 0.005
 
         total_demand_kwh = sum(d * time_interval_hours for d in demand)
         total_generation_kwh = sum(g * time_interval_hours for g in generation)
+        potential_generation_kwh = sum(pg * time_interval_hours for pg in potential_generation)
         total_import_kwh = sum(imp * time_interval_hours for imp in imports)
         total_export_kwh = 0 # Hardcoded to zero
         pv_used_on_site_kwh = total_generation_kwh - total_export_kwh
+        yield_incl_losses = total_generation_kwh / panel_kw / 365
+        yield_excl_losses = potential_generation_kwh / panel_kw / 365
         
         original_annual_cost = total_demand_kwh * tariff
         new_annual_cost = total_import_kwh * tariff
-        # annual_export_revenue is removed
         annual_savings = original_annual_cost - new_annual_cost
 
         total_20yr_saving = sum(annual_savings * ((1 - degradation_rate) ** i) for i in range(20))
@@ -106,5 +110,10 @@ def run_quick_financials(sim_response, system_cost, tariff):
             "self_consumption_rate": round((pv_used_on_site_kwh / total_generation_kwh) * 100, 1) if total_generation_kwh > 0 else 0,
             "grid_independence_rate": round((pv_used_on_site_kwh / total_demand_kwh) * 100, 1) if total_demand_kwh > 0 else 0,
             "cost_comparison": cost_comparison_data,
+            "yield_incl_losses": round(yield_incl_losses, 2),
+            "yield_excl_losses": round(yield_excl_losses, 2),
+            "potential_generation_kwh": round(potential_generation_kwh),
+            "original_annual_cost": round(original_annual_cost),
+            "new_annual_cost": round(new_annual_cost),
         }
     except Exception as e: return {"error": str(e)}

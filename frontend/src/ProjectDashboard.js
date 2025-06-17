@@ -65,7 +65,6 @@ function ProjectDashboard() {
           <BasicInfoForm 
             projectId={id} // Pass projectId
             onSubmit={(data) => {
-              // It's good practice to save to backend here as well
               axios.post(`http://localhost:5000/api/projects/${id}/quick_design`, data)
                 .then(() => {
                   setBasicInfo(data);
@@ -82,12 +81,20 @@ function ProjectDashboard() {
             projectId={id} // Pass projectId
             consumerType={basicInfo?.consumerType} 
             basicInfo={basicInfo}
-            onSelect={(profile) => { // profile object is passed from ProfileSelection
-              setSelectedProfile(profile); // Contains the full profile data including profile_data
-              localStorage.setItem('selectedProfileForQuickDesign', JSON.stringify(profile)); // Save to localStorage
-              setCurrentStep(3);
-              // Backend save for selectedProfileId is handled within ProfileSelection's handleProfileSelect
-            }} 
+            onSelect={(profile) => {
+              // Also save the scaler to the backend
+              axios.post(`http://localhost:5000/api/projects/${id}/quick_design`, {
+                selectedProfileId: profile.id,
+                profileScaler: profile.scaler // <-- IMPORTANT: Save the scaler
+              }).then(() => {
+                setSelectedProfile(profile);
+                // localStorage.setItem('selectedProfileForQuickDesign', JSON.stringify(profile));
+                setCurrentStep(3);
+              }).catch(err => {
+                 console.error("Error saving profile selection:", err);
+                 alert("Failed to save profile selection.");
+              });
+            }}
             onBack={() => setCurrentStep(1)}
           />
         )}
@@ -110,20 +117,13 @@ function ProjectDashboard() {
           />
         )}
         {currentStep === 4 && (
-          <>
-            {console.log('--- ProjectDashboard State ---')}
-            {console.log('Passing to QuickResults - basicInfo:', basicInfo)}
-            {console.log('Passing to QuickResults - selectedProfile:', selectedProfile)}
-            {console.log('Passing to QuickResults - selectedSystem:', selectedSystem)}          
-
-          <QuickResults 
+          <QuickResults
+            projectId={id}
+            clientName={project.client_name}
             basicInfo={basicInfo}
-            selectedProfile={selectedProfile}
-            selectedSystem={selectedSystem} 
-            onGenerate={() => alert('Proposal generated!')} // Implement real functionality nog hier
+            selectedSystem={selectedSystem}
             onBack={() => setCurrentStep(3)}
           />
-          </>
           )}
       </div>
     );
