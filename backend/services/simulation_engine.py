@@ -231,7 +231,8 @@ def run_quick_simulation(scaled_load_profile, panel_kw, battery_kwh, system_type
         raw_pv_generation_kw = pd.Series([(perc / 100) * real_panel_kw * 0.9 for perc in percentages])
         potential_generation_kw = pd.Series([min(gen, inverter_kva) for gen in raw_pv_generation_kw])
 
-        battery_capacity_kwh, battery_soc_kwh = (battery_kwh or 0), 0.0
+        battery_capacity_kwh = battery_kwh or 0
+        battery_soc_kwh = battery_capacity_kwh
         import_from_grid, battery_soc_trace = [], []
         time_interval_hours = 0.5
 

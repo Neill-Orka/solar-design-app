@@ -18,7 +18,9 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import { enZA } from 'date-fns/locale';
-import ProposalView from './ProposalView'; // Import the new proposal component
+
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 ChartJS.register(
     CategoryScale,
@@ -32,62 +34,6 @@ ChartJS.register(
     TimeScale
 );
 
-// A new utility component to handle rendering content in a new browser window
-function NewWindow({ children, closeWindow }) {
-    const [container, setContainer] = useState(null);
-    const newWindow = React.useRef(null);
-
-    useEffect(() => {
-        // Open a new window and set its basic structure
-        newWindow.current = window.open('', '', 'width=1024,height=768');
-        
-        // This is the HTML structure for the new window's head
-        const headContent = `
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Solar Proposal</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-            <style>
-                body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-                @media print {
-                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .no-print { display: none; }
-                    .page-break { page-break-before: always; }
-                }
-            </style>
-        `;
-        
-        newWindow.current.document.head.innerHTML = headContent;
-        
-        // Create a root div for our React app to mount to
-        const root = newWindow.current.document.createElement('div');
-        newWindow.current.document.body.appendChild(root);
-        
-        // Set the container state to this new root div
-        setContainer(root);
-        
-        // Add an event listener to call the closeWindow prop when the new window is closed by the user
-        const interval = setInterval(() => {
-            if (newWindow.current.closed) {
-                closeWindow();
-                clearInterval(interval);
-            }
-        }, 500);
-
-        // Cleanup function to close the window when this component unmounts
-        return () => {
-            clearInterval(interval);
-            if (newWindow.current && !newWindow.current.closed) {
-                newWindow.current.close();
-            }
-        };
-    }, []); // Empty dependency array means this runs once
-
-    return container && ReactDOM.createPortal(children, container);
-}
-
 // Helper to format currency
 const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(value || 0);
@@ -98,7 +44,8 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [showProposal, setShowProposal] = useState(false); // State to control the proposal window
+    const [startDate, setStartDate] = useState(null);
+    const [endDate, setEndDate] = useState(null);
 
     useEffect(() => {
         const runSimulation = async () => {
@@ -118,6 +65,20 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
                 const payload = { basicInfo, selectedProfile, selectedSystem };
                 const response = await axios.post('http://localhost:5000/api/quick_simulate', payload);
                 setData(response.data);
+
+                if (response.data?.simulation?.timestamps?.length > 0)
+                {
+                    const timestamps = response.data.simulation.timestamps;
+                    const firstDate = new Date(timestamps[0]);
+                    const lastDate = new Date(timestamps[timestamps.length - 1]);
+
+                    const defaultEndDate = new Date(firstDate);
+                    defaultEndDate.setDate(firstDate.getDate() + 7); // Default to 7 days later
+
+                    setStartDate(firstDate);
+                    setEndDate(defaultEndDate > lastDate ? lastDate : defaultEndDate);
+                }
+
             } catch (err) {
                 setError(err.response?.data?.error || 'An API error occurred.');
             } finally {
@@ -129,20 +90,31 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
     
     // Memoized chart data to prevent re-calculation on every render
     const energyChartData = useMemo(() => {
-        if (!data?.simulation) return { labels: [], datasets: [] };
+        if (!data?.simulation || !startDate || !endDate) 
+        {
+            return { labels: [], datasets: [] }
+        };
+
         const sim = data.simulation;
-        const sampleSize = 336;
-        const labels = sim.timestamps.slice(0, sampleSize).map(t => new Date(t));
+        
+        const startIndex = sim.timestamps.findIndex(t => new Date(t) >= startDate);
+        let endIndex = sim.timestamps.findIndex(t => new Date(t) > endDate);    
+        if (endIndex === -1) endIndex = sim.timestamps.length; // If no end date found, use full length
+
+        if (startIndex === -1) return { labels: [], datasets: [] }; // If no start date found, return empty
+
+        const labels = sim.timestamps.slice(startIndex, endIndex).map(t => new Date(t));
+
         return {
             labels,
             datasets: [
-                { label: 'Demand (kW)', data: sim.demand.slice(0, sampleSize), borderColor: '#ff6384', backgroundColor: '#ff638420', tension: 0.3, pointRadius: 0, borderWidth: 2 },
-                { label: 'Solar Generation (kW)', data: sim.generation.slice(0, sampleSize), borderColor: '#ffce56', backgroundColor: '#ffce5620', tension: 0.3, pointRadius: 0, borderWidth: 2 },
-                { label: 'Grid Import (kW)', data: sim.import_from_grid.slice(0, sampleSize), borderColor: '#cc65fe', backgroundColor: '#cc65fe20', tension: 0.3, pointRadius: 0, borderWidth: 1.5, borderDash: [5, 5] },
-                { label: 'Battery SOC (%)', data: sim.battery_soc.slice(0, sampleSize), borderColor: '#4bc0c0', backgroundColor: '#4bc0c020', yAxisID: 'y1', tension: 0.3, pointRadius: 0, borderWidth: 2 }
+                { label: 'Demand (kW)', data: sim.demand.slice(startIndex, endIndex), borderColor: '#ff6384', backgroundColor: '#ff638420', tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                { label: 'Solar Generation (kW)', data: sim.generation.slice(startIndex, endIndex), borderColor: '#ffce56', backgroundColor: '#ffce5620', tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                { label: 'Grid Import (kW)', data: sim.import_from_grid.slice(startIndex, endIndex), borderColor: '#cc65fe', backgroundColor: '#cc65fe20', tension: 0.3, pointRadius: 0, borderWidth: 1.5, borderDash: [5, 5] },
+                { label: 'Battery SOC (%)', data: sim.battery_soc.slice(startIndex, endIndex), borderColor: '#4bc0c0', backgroundColor: '#4bc0c020', yAxisID: 'y1', tension: 0.3, pointRadius: 0, borderWidth: 2 }
             ]
         };
-    }, [data]);
+    }, [data, startDate, endDate]);
 
     const financialChartData = useMemo(() => {
         if (!data?.financials?.cost_comparison) return { labels: [], datasets: [] };
@@ -175,18 +147,6 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
 
     return (
         <div className="p-lg-4" style={{ backgroundColor: '#f8f9fa' }}>
-            {/* This is the new window that will open when we click the button
-            {showProposal && (
-                <NewWindow>
-                    <ProposalView 
-                        data={data} 
-                        basicInfo={basicInfo} 
-                        selectedSystem={selectedSystem} 
-                        clientName={clientName} 
-                    />
-                </NewWindow>
-            )} */}
-
             <h2 className="text-3xl font-bold text-gray-800 mb-4 text-center">Quick Design Report</h2>
             
             <Row> {/* KPI Cards */}
@@ -197,7 +157,28 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
 
             {/* Energy Flow Chart */}
             <Card className="shadow-sm my-4">
-                <Card.Header as="h5"><i className="bi bi-bar-chart-line-fill me-2"></i>Weekly Energy Flow (Sample)</Card.Header>
+                <Card.Header as="h5" className='d-flex justify-content-between align-items-center flex-wrap'>
+                    <span><i className="bi bi-bar-chart-line-fill me-2"></i>Weekly Energy Flow (Sample)</span>
+                    <div className='date-picker-container'>
+                        <DatePicker
+                            selected={startDate}
+                            onChange={(dates) => {
+                                const [start, end] = dates;
+                                setStartDate(start);
+                                setEndDate(end);
+                            }}
+                            startDate={startDate}
+                            endDate={endDate}
+                            selectsRange
+                            isClearable={false}
+                            dateFormat={"dd/MM/yyyy"}
+                            className='form-control form-control-sm shadow-sm'
+                            popperPlacement='bottem-end'
+                            minDate={data?.simulation?.timestamps && new Date(data.simulation.timestamps[0])}
+                            maxDate={data?.simulation?.timestamps && new Date(data.simulation.timestamps[data.simulation.timestamps.length - 1])}
+                        />
+                    </div>
+                </Card.Header>
                 <Card.Body style={{ height: '400px' }}>
                     <Line options={chartOptions} data={energyChartData} />
                 </Card.Body>

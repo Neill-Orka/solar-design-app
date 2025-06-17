@@ -8,11 +8,31 @@ import 'chartjs-adapter-date-fns';
 import { enZA } from 'date-fns/locale';
 import logo from './assets/orka_logo_transparent_background.png';
 import './ProposalPage.css';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 // Register all necessary Chart.js components
 ChartJS.register(ArcElement, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, TimeScale);
 
 const formatCurrency = (value) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(value || 0);
+
+// Helper for date picker
+const ChartHeaderWithDatePicker = ({ title, selectedDate, setSelectedDate, minDate, maxDate }) => (
+    <div className="chart-header">
+        <h3>{title}</h3>
+        <div className="no-print date-picker-wrapper">
+            <DatePicker
+                selected={selectedDate}
+                onChange={(date) => setSelectedDate(date)}
+                dateFormat="MMM d, yyyy"
+                className="form-control form-control-sm"
+                popperPlacement="bottom-end"
+                minDate={minDate}
+                maxDate={maxDate}
+            />
+        </div>
+    </div>
+);
 
 function ProposalPage() {
     const { id } = useParams();
@@ -20,6 +40,8 @@ function ProposalPage() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [selectedDay, setSelectedDay] = useState(null);
+    const [selectedWeekStart, setSelectedWeekStart] = useState(null);
 
     useEffect(() => {
         document.body.classList.add('proposal-body');
@@ -27,6 +49,12 @@ function ProposalPage() {
             .then(response => {
                 setData(response.data);
                 document.title = `Proposal for ${response.data.client_name}`;
+
+                if (response.data?.simulation?.timestamps?.length > 0) {
+                    const firstDate = new Date(response.data.simulation.timestamps[0]);
+                    setSelectedDay(firstDate);
+                    setSelectedWeekStart(firstDate);
+                }
             })
             .catch(err => setError(err.response?.data?.error || 'Failed to load proposal data.'))
             .finally(() => setLoading(false));
@@ -37,20 +65,55 @@ function ProposalPage() {
     }, [id]);
 
     const dailyChartData = useMemo(() => {
-        if (!data?.simulation) return { labels: [], datasets: [] };
+        if (!data?.simulation || !selectedDay) return { labels: [], datasets: [] };
+
         const sim = data.simulation;
-        const sampleSize = 48; // 24 hours
-        const labels = sim.timestamps.slice(0, sampleSize).map(t => new Date(t));
+        const targetDateStr = selectedDay.toDateString();
+
+        const startIndex = sim.timestamps.findIndex(t => new Date(t).toDateString() === targetDateStr);
+        if (startIndex === -1) return { labels: [], datasets: [] };
+
+        const endIndex = startIndex + 48;
+        const labels = sim.timestamps.slice(startIndex, endIndex).map(t => new Date(t));
+        
         return {
             labels,
             datasets: [
-                { label: 'Home Energy Demand (kW)', data: sim.demand.slice(0, sampleSize), borderColor: '#ef4444', backgroundColor: '#fee2e2', fill: true, tension: 0.3, pointRadius: 0 },
-                { label: 'Solar Production (kW)', data: sim.generation.slice(0, sampleSize), borderColor: '#f59e0b', backgroundColor: '#fef3c7', fill: true, tension: 0.3, pointRadius: 0 },
-                { label: 'Battery SOC (%)', data: sim.battery_soc.slice(0, sampleSize), borderColor: '#22c55e', yAxisID: 'y1', pointRadius: 0, borderWidth: 2.5 }
+                { label: 'Home Energy Demand (kW)', data: sim.demand.slice(startIndex, endIndex), borderColor: '#ef4444', backgroundColor: '#fee2e2', fill: true, tension: 0.3, pointRadius: 0 },
+                { label: 'Solar Production (kW)', data: sim.generation.slice(startIndex, endIndex), borderColor: '#f59e0b', backgroundColor: '#fef3c7', fill: true, tension: 0.3, pointRadius: 0 },
+                { label: 'Grid Import (kW)', data: sim.import_from_grid.slice(startIndex, endIndex), borderColor: '#8b5cf6', fill: false, borderWidth: 1.5, borderDash: [5, 5], pointRadius: 0 },
+                { label: 'Battery SOC (%)', data: sim.battery_soc.slice(startIndex, endIndex), borderColor: '#22c55e', yAxisID: 'y1', pointRadius: 0, borderWidth: 2.5 }
             ]
         };
-    }, [data]);
+    }, [data, selectedDay]);
     
+    const weeklyChartData = useMemo(() => {
+        if (!data?.simulation || !selectedWeekStart) return { labels: [], datasets: [] };
+
+        const sim = data.simulation;
+        const weekStart = new Date(selectedWeekStart);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 7);
+        
+        const startIndex = sim.timestamps.findIndex(t => new Date(t) >= weekStart);
+        if (startIndex === -1) return { labels: [], datasets: [] };
+
+        let endIndex = sim.timestamps.findIndex(t => new Date(t) >= weekEnd);
+        if (endIndex === -1) endIndex = sim.timestamps.length;
+
+        const labels = sim.timestamps.slice(startIndex, endIndex).map(t => new Date(t));
+
+        return {
+            labels,
+            datasets: [
+                { label: 'Home Energy Demand (kW)', data: sim.demand.slice(startIndex, endIndex), borderColor: '#ef4444', fill: false, tension: 0.3, pointRadius: 0 },
+                { label: 'Solar Production (kW)', data: sim.generation.slice(startIndex, endIndex), borderColor: '#f59e0b', fill: false, tension: 0.3, pointRadius: 0 },
+                { label: 'Grid Import (kW)', data: sim.import_from_grid.slice(startIndex, endIndex), borderColor: '#8b5cf6', fill: false, borderWidth: 1.5, borderDash: [5, 5], pointRadius: 0 },
+                { label: 'Battery SOC (%)', data: sim.battery_soc.slice(startIndex, endIndex), borderColor: '#22c55e', yAxisID: 'y1', pointRadius: 0, borderWidth: 2.5 }
+            ]
+        };
+    }, [data, selectedWeekStart]);
+
     const monthlyChartData = useMemo(() => {
         if (!data?.financials?.cost_comparison) return { labels: [], datasets: [] };
         const labels = data.financials.cost_comparison.map(item => new Date(item.month).toLocaleString('en-US', { month: 'short' }));
@@ -94,6 +157,8 @@ function ProposalPage() {
     if (!data) return <div className="loading-container"><Alert variant="info">No data found for this proposal.</Alert></div>;
 
     const { client_name, location, selected_system, financials } = data;
+    const minDate = data?.simulation?.timestamps ? new Date(data.simulation.timestamps[0]) : new Date();
+    const maxDate = data?.simulation?.timestamps ? new Date(data.simulation.timestamps[data.simulation.timestamps.length - 1]) : new Date();
 
     return (
         <>
@@ -105,12 +170,12 @@ function ProposalPage() {
             <main className="proposal-container">
                 <section className="page cover-page">
                      <img src={logo} alt="Orka Solar Logo" className="logo" />
-                     <h1 className="main-title">Your Path to Energy Independence</h1>
+                     <h1 className="main-title">Orka Solar Proposal</h1>
                      <p className="subtitle">A Custom Solar & Battery Solution</p>
                      <div className="client-info">
                          <p>Prepared For:</p>
                          <h2>{client_name}</h2>
-                         <p className="location-info">Property at: {location || '[Client Address Placeholder]'}</p>
+                         <p className="location-info">{location || '[Client Address Placeholder]'}</p>
                      </div>
                      <div className="footer-info">
                         <p>Date: {new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
@@ -150,7 +215,30 @@ function ProposalPage() {
 
                  <section className="page">
                     <h2 className="section-title">Your Custom Solution</h2>
-                     <div className="system-grid">
+                    {/* <p className="intro-text" style={{ textAlign: 'center', marginTop: '-1rem', marginBottom: '2rem' }}>
+                        Based on your energy needs, we have designed the following high-performance solar solution.
+                    </p> */}
+                    <div className="summary-grid">
+                        <div className="summary-card">
+                            <p className="summary-icon solar"><i className="bi bi-grid-3x3-gap-fill"></i></p>
+                            <h3>PV Capacity</h3>
+                            <p className="summary-value">{selected_system.panel_kw} <span className="summary-unit">kWp</span></p>
+                        </div>
+                        <div className="summary-card">
+                            <p className="summary-icon inverter"><i className="bi bi-box-seam"></i></p>
+                            <h3>Inverter Power</h3>
+                            <p className="summary-value">{selected_system.inverter_kva} <span className="summary-unit">kVA</span></p>
+                        </div>
+                        {selected_system.battery_kwh > 0 && (
+                            <div className="summary-card">
+                                <p className="summary-icon battery"><i className="bi bi-battery-full"></i></p>
+                                <h3>Battery Storage</h3>
+                                <p className="summary-value">{selected_system.battery_kwh} <span className="summary-unit">kWh</span></p>
+                            </div>
+                        )}
+                    </div>
+                    <h3 className='component-list-title'>System Components</h3>                    
+                    <div className="system-grid">
                         {selected_system.components.map(comp => (
                             <div key={comp.product_id} className="component-card">
                                 <div className="component-icon">
@@ -164,19 +252,36 @@ function ProposalPage() {
                                 </div>
                             </div>
                         ))}
-                     </div>
+                    </div>
                 </section>
 
                 <section className="page">
                      <h2 className="section-title">Performance & Financials</h2>
                      <div className="chart-container half-page">
-                        <h3>A Day in the Life of Your System</h3>
-                        <div className="chart-wrapper" style={{height: '350px'}}><Line options={dailyChartOptions} data={dailyChartData} /></div>
+                        <ChartHeaderWithDatePicker
+                            title="Daily Performance Overview"
+                            selectedDate={selectedDay}
+                            setSelectedDate={setSelectedDay}
+                            minDate={minDate}
+                            maxDate={maxDate}
+                        />
+                        <div className='chart-wrapper' style={{height: '350px'}}><Line options={dailyChartOptions} data={dailyChartData}/></div>
                      </div>
                       <div className="chart-container half-page">
-                        <h3>Monthly Bill: Before vs. After</h3>
-                        <div className="chart-wrapper" style={{height: '350px'}}><Bar options={{ responsive: true, maintainAspectRatio: false, scales: { y: { title: { display: true, text: 'Estimated Monthly Cost (R)'}}} }} data={monthlyChartData} /></div>
+                        <ChartHeaderWithDatePicker
+                            title="Weekly Performance Overview"
+                            selectedDate={selectedWeekStart}
+                            setSelectedDate={setSelectedWeekStart}
+                            minDate={minDate}
+                            maxDate={maxDate}
+                        />
+                        <div className="chart-wrapper" style={{height: '350px'}}><Line options={dailyChartOptions} data={weeklyChartData} /></div>
                      </div>
+                </section>
+
+                <section className='page'>
+                    <h3 className='section-title'>Monthly Bill: Before vs. After</h3>
+                    <div className='chart-wrapper' style={{ height: '350px' }}><Bar options={{ responsive: true, maintainAspectRatio:false, scales: {y: { title: { display: true, text: 'Estimated Monthly Cost (R)'}}} }} data={monthlyChartData}/></div>
                 </section>
                 
                 <section className="page">
