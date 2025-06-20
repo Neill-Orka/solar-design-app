@@ -11,45 +11,96 @@ import BasicInfoForm from './BasicInfoForm';
 import ProfileSelection from './ProfileSelection';
 import SystemSelection from './SystemSelection';
 import QuickResults from './QuickResults';
+import { Spinner, Alert } from 'react-bootstrap'; // Import Spinner and Alert for loading/error states
 
 function ProjectDashboard() {
-  const { id } = useParams();  // project_id from URL
+  const { id: projectId } = useParams();  // project_id from URL
   const [project, setProject] = useState(null);
   const [activeTab, setActiveTab] = useState('upload');
   const [currentStep, setCurrentStep] = useState(1); // Tracks quick design step
   const [basicInfo, setBasicInfo] = useState(null);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [selectedSystem, setSelectedSystem] = useState(null);
+  const [quickDesignData, setQuickDesignData] = useState({
+    consumption: '',
+    tariff: '',
+    consumerType: 'Residential', // Default to Residential
+    transformerSize: '',
+    selectedProfileId: null,
+    profileScaler: 1, // Default scaler
+    selectedSystem: null,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/projects/${id}`)
-      .then((res) => {
-        setProject(res.data);
-        
-        if (res.data.quick_design_data) {
-          const qdd = res.data.quick_design_data;
-          // Set basic info if it has data
-          if (qdd.consumption && qdd.tariff) {
-            setBasicInfo({
-              consumption: qdd.consumption,
-              tariff: qdd.tariff,
-              consumerType: qdd.consumer_type || 'Residential', // Default to Residential
-              transformerSize: qdd.transformer_size,
-            });
-          }
-          // Pre-load selected system if it exists
-          if (qdd.selected_system) {
-            setSelectedSystem(qdd.selected_system);
-          }
+    const fetchData = async () => {
+        try {
+            // Fetch project details (client name, etc.)
+            const projectRes = await axios.get(`http://localhost:5000/api/projects/${projectId}`);
+            setProject(projectRes.data);
+            // Fetch existing quick design data
+            const quickDesignRes = await axios.get(`http://localhost:5000/api/projects/${projectId}/quick_design`);
+            if (quickDesignRes.data) {
+                // If data exists, update our state with it
+                setQuickDesignData(prevData => ({
+                    ...prevData,
+                    ...quickDesignRes.data,
+                    selectedSystem: quickDesignRes.data.selectedSystemConfigJson // map backend name to frontend name
+                }));
+            }
+        } catch (err) {
+            setError('Failed to load project data. Please try again.');
+            console.error("Data loading error:", err);
+        } finally {
+            setLoading(false);
         }
-      })
-      .catch((err) => {
-        console.error('Error loading project:', err);
-        alert('Failed to load project details');
-      });
-  }, [id]);
+    };
+    fetchData();
+  }, [projectId]);
 
-  if (!project) return <div className="container mt-5">Loading project...</div>;
+  const handleSaveAndNext = async (dataToSave, nextStep) => {
+    try {
+      const updatedData = { ...quickDesignData, ...dataToSave };
+      setQuickDesignData(updatedData);
+
+      // Call API to save the data to database
+      await axios.post(`http://localhost:5000/api/projects/${projectId}/quick_design`, dataToSave);
+
+      // Next step
+      setCurrentStep(nextStep);
+    } catch (err) {
+      setError("Failed to save data. " + (err.response?.data?.error || err.message));
+      console.error("Error saving data:", err);
+    }
+  };
+
+  const handleBasicInfoSubmit = (data) => {
+    handleSaveAndNext(data, 2);
+  }
+
+  const handleProfileSelect = (profileWithScaler) => {
+    const dataToSave = {
+      selectedProfileId: profileWithScaler.id,
+      profileScaler: profileWithScaler.scaler // Save the scaler
+    };
+    handleSaveAndNext(dataToSave, 3);
+  };
+
+  const handleSystemSelect = (system) => {
+    const dataToSave = { 
+      selectedSystem: system,
+      selectedSystemConfigJson: system
+    };
+    handleSaveAndNext(dataToSave, 4);
+  };
+
+  const handleBack = (step) => {
+    setCurrentStep(step);
+  };
+
+  if (loading) return <div className="text-center p-5"><Spinner animation="border" /></div>;
+  if (error) return <div className="text-center p-5"><Alert variant="danger">{error}</Alert></div>;
 
   console.log('Project design type:', project.design_type);
 
@@ -82,68 +133,38 @@ function ProjectDashboard() {
         </div>
         {currentStep === 1 && (
           <BasicInfoForm 
-            projectId={id} // Pass projectId
-            onSubmit={(data) => {
-              axios.post(`http://localhost:5000/api/projects/${id}/quick_design`, data)
-                .then(() => {
-                  setBasicInfo(data);
-                  setCurrentStep(2);
-                })
-                .catch(err => {
-                  console.error("Error saving basic info:", err);
-                  alert("Failed to save basic info. " + (err.response?.data?.error || err.message));
-                });
-            }} />
+            projectId={projectId} // Pass projectId
+            savedData={quickDesignData} // Pass saved data
+            onSubmit={handleBasicInfoSubmit}
+            />
         )}
         {currentStep === 2 && (
           <ProfileSelection 
-            projectId={id} // Pass projectId
-            consumerType={basicInfo?.consumerType} 
-            basicInfo={basicInfo}
-            onSelect={(profile) => {
-              // Also save the scaler to the backend
-              axios.post(`http://localhost:5000/api/projects/${id}/quick_design`, {
-                selectedProfileId: profile.id,
-                profileScaler: profile.scaler // <-- IMPORTANT: Save the scaler
-              }).then(() => {
-                setSelectedProfile(profile);
-                // localStorage.setItem('selectedProfileForQuickDesign', JSON.stringify(profile));
-                setCurrentStep(3);
-              }).catch(err => {
-                 console.error("Error saving profile selection:", err);
-                 alert("Failed to save profile selection.");
-              });
-            }}
-            onBack={() => setCurrentStep(1)}
+            projectId={projectId} // Pass projectId
+            consumerType={quickDesignData.consumerType} // Pass consumer type
+            basicInfo={quickDesignData} // Pass basic info
+            savedData={quickDesignData} // Pass saved data
+            onSelect={handleProfileSelect}
+            onBack={() => handleBack(1)} // Back to Basic Info
           />
         )}
         {currentStep === 3 && (
           <SystemSelection 
-            projectId={id} // Pass projectId
-            onSelect={(system) => {
-              // Save selected system to backend
-               axios.post(`http://localhost:5000/api/projects/${id}/quick_design`, { selectedSystem: system })
-                .then(() => {
-                  setSelectedSystem(system);
-                  setCurrentStep(4);
-                })
-                .catch(err => {
-                  console.error("Error saving system selection:", err);
-                  alert("Failed to save system selection. " + (err.response?.data?.error || err.message));
-                });
-            }} 
-            onBack={() => setCurrentStep(2)}
+            projectId={projectId} // Pass projectId
+            savedData={quickDesignData} // Pass saved data
+            onSelect={handleSystemSelect}
+            onBack={() => handleBack(2)} // Back to Profile Selection
           />
         )}
         {currentStep === 4 && (
           <QuickResults
-            projectId={id}
-            clientName={project.client_name}
-            basicInfo={basicInfo}
-            selectedSystem={selectedSystem}
-            onBack={() => setCurrentStep(3)}
+            projectId={projectId}
+            basicInfo={quickDesignData}
+            selectedSystem={quickDesignData.selectedSystem}
+            clientName={project?.client_name}
+            onBack={() => handleBack(3)} // Back to System Selection
           />
-          )}
+        )}
       </div>
     );
   }
@@ -190,12 +211,12 @@ function ProjectDashboard() {
       </ul>
 
       <div className="tab-content mt-4">
-        {activeTab === 'upload' && <EnergyDataUpload projectId={id} />}
-        {activeTab === 'analysis' && <EnergyAnalysis projectId={id} />}
-        {activeTab === 'design' && <SystemDesign projectId={id} />}
-        {activeTab === 'finance' && <FinancialModeling projectId={id} />}
-        {activeTab === 'optimize' && <Optimize projectId={id} />}
-        {activeTab === 'report' && <Reporting projectId={id} />}
+        {activeTab === 'upload' && <EnergyDataUpload projectId={projectId} />}
+        {activeTab === 'analysis' && <EnergyAnalysis projectId={projectId} />}
+        {activeTab === 'design' && <SystemDesign projectId={projectId} />}
+        {activeTab === 'finance' && <FinancialModeling projectId={projectId} />}
+        {activeTab === 'optimize' && <Optimize projectId={projectId} />}
+        {activeTab === 'report' && <Reporting projectId={projectId} />}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './index.css';
 import { Card, Button, Spinner, Alert, Form, Row, Col } from 'react-bootstrap'; // Added Row, Col
 import axios from 'axios';
 import { Line } from 'react-chartjs-2';
@@ -147,13 +148,14 @@ const chartOptions = {
 };
 
 // MODIFIED: Added basicInfo to props to get client's consumption
-function ProfileSelection({ projectId, consumerType, basicInfo, onSelect, onBack }) {
+function ProfileSelection({ projectId, consumerType, basicInfo, savedData, onSelect, onBack }) {
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // NEW STATE: To store scaler for each profile
   const [scalers, setScalers] = useState({});
 
+  // --- MODIFICATION 1: This hook now ONLY fetches the profiles ---
   useEffect(() => {
     const fetchProfiles = async () => {
       setLoading(true);
@@ -161,12 +163,6 @@ function ProfileSelection({ projectId, consumerType, basicInfo, onSelect, onBack
       try {
         const response = await axios.get(`http://localhost:5000/api/load_profiles`);
         setProfiles(response.data);
-        // Initialize scalers for each profile to 1
-        const initialScalers = {};
-        response.data.forEach(p => {
-          initialScalers[p.id] = 1;
-        });
-        setScalers(initialScalers);
       } catch (err) {
         console.error("Error fetching profiles:", err);
         setError(err.response?.data?.error || 'Failed to load profiles. Please try again.');
@@ -175,7 +171,27 @@ function ProfileSelection({ projectId, consumerType, basicInfo, onSelect, onBack
       }
     };
     fetchProfiles();
-  }, []); // Removed consumerType dependency as filter is off
+  }, []); // This dependency array is empty, so it only runs once on mount.
+
+  // --- MODIFICATION 2: This NEW hook intelligently sets all scalers ---
+  useEffect(() => {
+    // Don't run this logic until the list of profiles has been loaded.
+    if (profiles.length === 0) return;
+
+    const initialScalers = {};
+    profiles.forEach(p => {
+      // Check if the current profile in the list matches the saved profile ID
+      if (savedData?.selectedProfileId === p.id) {
+        // If it matches, use the scaler value from the saved data.
+        initialScalers[p.id] = savedData.profileScaler || 1;
+      } else {
+        // Otherwise, set the default scaler value of 1.
+        initialScalers[p.id] = 1;
+      }
+    });
+    setScalers(initialScalers);
+
+  }, [profiles, savedData]); 
 
   const handleProfileSelect = async (profile) => {
     setError('');
@@ -276,10 +292,12 @@ function ProfileSelection({ projectId, consumerType, basicInfo, onSelect, onBack
           const originalProfileMonthlyKWh = profile.annual_kwh ? profile.annual_kwh / 12 : 0;
           const currentScaler = scalers[profile.id] === '' ? 1 : (scalers[profile.id] || 1);
           const scaledProfileMonthlyKWh = originalProfileMonthlyKWh * currentScaler;
+          
+          const isSelected = profile.id === savedData?.selectedProfileId;
 
           return (
             <Col key={profile.id}>
-              <Card className="h-100 shadow-lg border-0 rounded-xl overflow-hidden transition-all duration-300 ease-in-out hover:scale-105"> {/* Modernized Card */}
+              <Card className={`h-100 shadow-lg rounded-xl transition-all duration-300 ease-in-out ${isSelected ? 'selected-card' : ''}`}>
                 <Card.Body className="d-flex flex-column p-4">
                   <Card.Title className="text-xl font-semibold text-gray-800 mb-1">{profile.name}</Card.Title>
                   <Card.Text className="text-xs text-gray-500 mb-2">{profile.description} ({profile.profile_type})</Card.Text>

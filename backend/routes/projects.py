@@ -220,3 +220,24 @@ def save_or_update_quick_design(project_id):
         db.session.rollback()
         print(f"Error in save_or_update_quick_design: {str(e)}") # Log error
         return jsonify({'error': 'Failed to save/update quick design data', 'details': str(e)}), 500
+    
+@projects_bp.route('/projects/<int:project_id>/quick_design', methods=['GET'])
+def get_quick_design_data(project_id):
+    try:
+        quick_data = QuickDesignData.query.filter_by(project_id=project_id).first()
+        if not quick_data:
+            return jsonify(None), 200 # Return null if no data exists yet, which is not an error
+
+        return jsonify({
+            'id': quick_data.id,
+            'project_id': quick_data.project_id,
+            'consumption': quick_data.consumption,
+            'tariff': quick_data.tariff,
+            'consumerType': quick_data.consumer_type,
+            'transformerSize': quick_data.transformer_size,
+            'selectedProfileId': quick_data.selected_profile_id,
+            'profileScaler': quick_data.profile_scaler,
+            'selectedSystemConfigJson': quick_data.selected_system_config_json
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

@@ -1,8 +1,9 @@
 import React, { useState, useEffect }from 'react';
 import { Card, Button, Row, Col, Spinner, Alert } from 'react-bootstrap'; 
 import axios from 'axios';
+import './index.css'; 
 
-function SystemSelection({ projectId, onSelect, onBack }) {
+function SystemSelection({ projectId, savedData, onSelect, onBack }) {
 
   const [systems, setSystems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,9 +33,12 @@ function SystemSelection({ projectId, onSelect, onBack }) {
       <h2 className="text-2xl lg:text-3xl font-semibold text-gray-800 mb-5 text-center">Select System Configuration</h2>
       
       <Row xs={1} md={2} lg={3} className="g-4">
-        {systems.map((system) => (
+        {systems.map((system) => {
+          const isSelected = system.id === savedData?.selectedSystem?.id;
+
+          return (
           <Col key={system.id}>
-            <Card className="h-100 shadow-lg border-0 rounded-xl overflow-hidden transition-all duration-300 ease-in-out hover:scale-105">
+            <Card className={`h-100 shadow-lg rounded-xl transition-all duration-300 ease-in-out hover:scale-105 ${isSelected ? 'selected-card' : ''}`}>
               <Card.Body className="d-flex flex-column p-4">
                 {system.icon && <i className={`${system.icon} fs-2 text-primary mb-3`}></i>}
                 <Card.Title className="text-xl font-semibold text-gray-800 mb-2">{system.name}</Card.Title>
@@ -68,7 +72,8 @@ function SystemSelection({ projectId, onSelect, onBack }) {
               </Card.Body>
             </Card>
           </Col>
-        ))}
+          )
+        })}
       </Row>
 
       <div className="mt-5 pt-3 text-center">

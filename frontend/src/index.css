@@ -66,3 +66,9 @@ code {
 .react-datepicker__day:hover {
   border-radius: 0.3rem !important;
 }
+
+.selected-card {
+  border: 3px solid #0d6efd !important; /* A prominent blue border */
+  transform: scale(1.02); /* A subtle zoom to make it stand out */
+  box-shadow: 0 8px 25px rgba(13, 110, 253, 0.3) !important;
+}
