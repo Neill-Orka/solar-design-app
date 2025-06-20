@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Form, Button, Alert, Row, Col } from 'react-bootstrap'; // Added Row, Col
 
-function BasicInfoForm({ projectId, onSubmit }) {
+function BasicInfoForm({ projectId, onSubmit, initialData }) {
   const [consumption, setConsumption] = useState('');
   const [tariff, setTariff] = useState('');
   const [consumerType, setConsumerType] = useState('Residential'); // Default value
   const [transformerSize, setTransformerSize] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (initialData) {
+      setConsumption(initialData.consumption || '');
+      setTariff(initialData.tariff || '');
+      setConsumerType(initialData.consumerType || 'Residential'); // Default to Residential
+      setTransformerSize(initialData.transformerSize || '');
+    }
+  }, [initialData]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

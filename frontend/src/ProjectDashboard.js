@@ -23,7 +23,26 @@ function ProjectDashboard() {
 
   useEffect(() => {
     axios.get(`http://localhost:5000/api/projects/${id}`)
-      .then((res) => setProject(res.data))
+      .then((res) => {
+        setProject(res.data);
+        
+        if (res.data.quick_design_data) {
+          const qdd = res.data.quick_design_data;
+          // Set basic info if it has data
+          if (qdd.consumption && qdd.tariff) {
+            setBasicInfo({
+              consumption: qdd.consumption,
+              tariff: qdd.tariff,
+              consumerType: qdd.consumer_type || 'Residential', // Default to Residential
+              transformerSize: qdd.transformer_size,
+            });
+          }
+          // Pre-load selected system if it exists
+          if (qdd.selected_system) {
+            setSelectedSystem(qdd.selected_system);
+          }
+        }
+      })
       .catch((err) => {
         console.error('Error loading project:', err);
         alert('Failed to load project details');

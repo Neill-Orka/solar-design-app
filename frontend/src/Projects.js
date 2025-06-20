@@ -135,7 +135,8 @@ function Projects() {
                       <div className="flex-grow-1">
                         <div className="d-flex justify-content-between align-items-start mb-3">
                           <div>
-                            <span className="badge bg-primary-subtle text-primary-emphasis rounded-pill mb-2">{project.project_type || 'Commercial'}</span>
+                            <span className="badge bg-primary-subtle text-primary-emphasis rounded-pill mb-2 me-2">{project.project_type || 'Commercial'}</span>
+                            <span className="badge bg-secondary-subtle text-secondary-emphasis rounded-pill mb-2">{project.design_type || 'Detailed'}</span>
                             <h4 className="card-title text-xl font-semibold text-gray-900 mb-1">{project.name}</h4>
                             <p className="card-subtitle text-muted">
                               <i className="bi bi-person-circle me-1"></i> {project.client_name}

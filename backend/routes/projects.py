@@ -21,7 +21,9 @@ def get_projects():
                 'battery_kwh': p.battery_kwh,
                 'project_value_excl_vat': p.project_value_excl_vat,
                 'site_contact_person': p.site_contact_person,
-                'site_phone': p.site_phone
+                'site_phone': p.site_phone,
+                'design_type': p.design_type,
+                'project_type': p.project_type
             }
             for p in projects
         ])
@@ -36,6 +38,21 @@ def get_project_by_id(project_id):
         if not project:
             return jsonify({'error': 'Project not found'}), 404
 
+        # Fetch and serialize quick design data if it exists.
+        quick_design_data = None
+        if project.quick_design_entry:
+            qdd = project.quick_design_entry
+            quick_design_data = {
+                'id': qdd.id,
+                'consumption': qdd.consumption,
+                'tariff': qdd.tariff,
+                'consumer_type': qdd.consumer_type,
+                'transformer_size': qdd.transformer_size,
+                'selected_profile_id': qdd.selected_profile_id,
+                'profile_scaler': qdd.profile_scaler,
+                'selected_system_config_json': qdd.selected_system_config_json
+            }
+
         return jsonify({
             'id': project.id,
             'name': project.name,
@@ -48,7 +65,9 @@ def get_project_by_id(project_id):
             'project_value_excl_vat': project.project_value_excl_vat,
             'site_contact_person': project.site_contact_person,
             'site_phone': project.site_phone,
-            'design_type': project.design_type
+            'design_type': project.design_type,
+            'project_type': project.project_type,
+            'quick_design_data': quick_design_data
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
