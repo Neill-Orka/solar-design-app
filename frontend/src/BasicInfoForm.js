@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Form, Button, Alert, Row, Col } from 'react-bootstrap'; // Added Row, Col
 
-function BasicInfoForm({ projectId, onSubmit }) {
+function BasicInfoForm({ projectId, savedData, onSubmit }) {
   const [consumption, setConsumption] = useState('');
   const [tariff, setTariff] = useState('');
   const [consumerType, setConsumerType] = useState('Residential'); // Default value
   const [transformerSize, setTransformerSize] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (savedData) {
+      setConsumption(savedData.consumption || '');
+      setTariff(savedData.tariff || '');
+      setConsumerType(savedData.consumerType || 'Residential');
+      setTransformerSize(savedData.transformerSize || '');
+    }
+  }, [savedData]); // This effect runs whenever the savedData prop changes
 
   const handleSubmit = (e) => {
     e.preventDefault();

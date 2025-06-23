@@ -95,28 +95,36 @@ function Projects() {
         <div className="container-fluid" style={{ maxWidth: '1000px', padding: '2rem 1rem' }}>
           
           {/* --- HEADER SECTION --- */}
-          <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-5">
-            <h1 className="text-3xl font-bold text-gray-800 mb-3 mb-md-0">Projects</h1>
-            <div className="d-flex align-items-center w-100 w-md-auto">
-              {/* --- SEARCH BAR --- */}
-              <div className="position-relative me-3 w-100">
-                <i className="bi bi-search position-absolute" style={{ top: '13px', left: '12px', color: '#6b7280' }}></i>
-                <input
-                  type="text"
-                  placeholder="Search by name, client, or location..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="form-control shadow-sm ps-5 py-2"
-                  style={{ borderRadius: '0.5rem', borderColor: '#d1d5db' }}
-                />
+          {/* <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-5"> */}
+          <div className="bg-white p-4 p-md-5 rounded-xl shadow-sm mb-5">  
+            <div className="d-flex justify-content-between align-items-start mb-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800">Projects</h1>
+                <p className="text-muted d-none d-md-block">
+                  Search, view, and manage all your client projects.
+                </p>
               </div>
               <Link
                 to="/projects/add"
-                className="btn btn-primary fw-semibold d-flex align-items-center shadow-sm"
+                className="btn btn-primary fw-semibold d-flex align-items-center shadow-sm flex-shrink-0"
                 style={{ backgroundColor: '#2563eb', borderColor: '#1d4ed8', padding: '0.6rem 1rem' }}
               >
-                <i className="bi bi-plus-lg me-2"></i>New
+                <i className="bi bi-plus-lg me-2"></i>
+                <span className="d-none d-sm-inline">New Project</span>
               </Link>
+            </div>
+
+            {/* Bottom Row: Search Bar */}
+            <div className="position-relative">
+              <i className="bi bi-search position-absolute" style={{ top: '50%', transform: 'translateY(-50%)', left: '16px', color: '#6b7280', fontSize: '1.1rem' }}></i>
+              <input
+                type="text"
+                placeholder="Search projects by name, client, or location..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="form-control form-control-lg ps-5" // Use form-control-lg for a better feel
+                style={{ borderRadius: '0.75rem', borderColor: '#d1d5db' }}
+              />
             </div>
           </div>
 
@@ -135,7 +143,8 @@ function Projects() {
                       <div className="flex-grow-1">
                         <div className="d-flex justify-content-between align-items-start mb-3">
                           <div>
-                            <span className="badge bg-primary-subtle text-primary-emphasis rounded-pill mb-2">{project.project_type || 'Commercial'}</span>
+                            <span className="badge bg-primary-subtle text-primary-emphasis rounded-pill mb-2 me-2">{project.project_type || 'Commercial'}</span>
+                            <span className="badge bg-secondary-subtle text-secondary-emphasis rounded-pill mb-2">{project.design_type || 'Detailed'}</span>
                             <h4 className="card-title text-xl font-semibold text-gray-900 mb-1">{project.name}</h4>
                             <p className="card-subtitle text-muted">
                               <i className="bi bi-person-circle me-1"></i> {project.client_name}

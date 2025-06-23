@@ -28,6 +28,7 @@ from routes.system_templates import system_templates_bp
 from routes.system_builder import system_builder_bp
 from routes.quick_design import quick_design_bp
 from routes.proposal_data import proposal_data_bp
+from routes.load_profiles import load_profiles_bp
 
 app.register_blueprint(clients_bp, url_prefix='/api')
 app.register_blueprint(projects_bp, url_prefix='/api')
@@ -41,6 +42,7 @@ app.register_blueprint(system_templates_bp, url_prefix='/api')
 app.register_blueprint(system_builder_bp, url_prefix='/api')
 app.register_blueprint(quick_design_bp, url_prefix='/api')
 app.register_blueprint(proposal_data_bp, url_prefix='/api')
+app.register_blueprint(load_profiles_bp, url_prefix='/api')
 
 db.init_app(app)
 migrate = Migrate(app, db)

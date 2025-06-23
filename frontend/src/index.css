@@ -11,3 +11,64 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+/* Custom styles for react-datepicker */
+.date-picker-container .react-datepicker-wrapper {
+  display: block;
+}
+
+.date-picker-container .react-datepicker__input-container input {
+  width: 100%;
+  border: 1px solid #ced4da; /* Bootstrap's default border color */
+  border-radius: 0.375rem; /* Bootstrap's default border-radius */
+  padding: 0.375rem 0.75rem;
+  font-size: 0.9rem;
+  transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+}
+
+.date-picker-container .react-datepicker__input-container input:focus {
+  color: #212529;
+  background-color: #fff;
+  border-color: #86b7fe; /* Bootstrap's focus color */
+  outline: 0;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, .25);
+}
+
+/* Make the calendar pop-up look modern */
+.react-datepicker {
+  font-family: 'Inter', sans-serif !important;
+  border-radius: 0.5rem !important;
+  border: 1px solid #dee2e6 !important;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.react-datepicker__header {
+  background-color: #f8f9fa !important;
+  border-bottom: 1px solid #dee2e6 !important;
+  border-top-left-radius: 0.5rem !important;
+  border-top-right-radius: 0.5rem !important;
+}
+
+.react-datepicker__current-month,
+.react-datepicker-time__header,
+.react-datepicker-year-header {
+  color: #212529 !important;
+  font-weight: 600 !important;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--in-selecting-range,
+.react-datepicker__day--in-range {
+  background-color: #0d6efd !important; /* Bootstrap primary blue */
+  color: white !important;
+  border-radius: 0.3rem !important;
+}
+
+.react-datepicker__day:hover {
+  border-radius: 0.3rem !important;
+}
+
+.selected-card {
+  border: 3px solid #0d6efd !important; /* A prominent blue border */
+  transform: scale(1.02); /* A subtle zoom to make it stand out */
+  box-shadow: 0 8px 25px rgba(13, 110, 253, 0.3) !important;
+}

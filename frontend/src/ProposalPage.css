@@ -22,7 +22,7 @@
 
 /* --- Controls --- */
 .print-controls {
-  position: fixed; top: 1.5rem; right: 1.5rem; z-index: 100;
+  position: fixed; top: 5rem; right: 1.5rem; z-index: 100;
   display: flex; gap: 1rem;
 }
 .print-controls button { box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
@@ -32,7 +32,7 @@
     text-align: center; justify-content: space-between;
     background: linear-gradient(rgba(255, 255, 255, 0.8), white), url('https://www.transparenttextures.com/patterns/az-subtle.png');
 }
-.cover-page .logo { width: 180px; margin: 0 auto; }
+.cover-page .logo { width: 360px; margin: 0 auto; }
 .cover-page .main-title { font-size: 3rem; font-weight: 800; color: #1e3a8a; line-height: 1.1; }
 .cover-page .subtitle { font-size: 1.5rem; color: #4b5563; margin-top: 0.5rem; }
 .cover-page .client-info h2 { font-size: 2.5rem; font-weight: 700; color: #111827; }
@@ -62,6 +62,20 @@
 .kpi-value.payback-value { color: #2563eb; }
 .kpi-value.independence-value { color: #f59e0b; }
 
+.chart-container { display: flex; flex-direction: column; }
+.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.chart-header h3 { margin-bottom: 0; font-size: 1.25rem; font-weight: 600; }
+.date-picker-wrapper .form-control-sm { max-width: 150px; text-align: center; font-weight: 500; }
+.chart-wrapper { position: relative; }
+.half-page { width: 100%; margin-bottom: 2rem; }
+.analysis-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: center; }
+.table-container table { width: 100%; border-collapse: collapse; }
+.table-container td { padding: 0.75rem 1rem; border-bottom: 1px solid #e5e7eb; }
+.table-container tr:last-child td { border-bottom: none; }
+.table-container td:last-child { text-align: right; font-weight: 700; font-size: 1.1rem; }
+.table-container .import-row td { color: #dc2626; }
+.table-container .highlight-row { background-color: #eff6ff; font-weight: 700; }
+
 .investment-card {
     background-color: #1f2937; color: white; border-radius: 0.75rem;
     padding: 1.5rem; text-align: center; margin-top: 2rem;
@@ -80,13 +94,13 @@
 /* --- Charts and Tables --- */
 .chart-container { display: flex; flex-direction: column; }
 .chart-container h3 { text-align: center; font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; }
-.chart-wrapper { position: relative; }
+/* .chart-wrapper { position: relative; } */
 .half-page { width: 100%; margin-bottom: 2rem; }
 .analysis-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: center; }
 .table-container table { width: 100%; border-collapse: collapse; }
 .table-container td { padding: 0.75rem 1rem; border-bottom: 1px solid #e5e7eb; }
 .table-container tr:last-child td { border-bottom: none; }
-.table-container td:last-child { text-align: right; font-weight: 700; font-family: monospace; font-size: 1.1rem; }
+.table-container td:last-child { text-align: right; font-weight: 700; font-size: 1.1rem; }
 .table-container .import-row td { color: #dc2626; }
 .table-container .highlight-row { background-color: #eff6ff; font-weight: 700; }
 
@@ -120,9 +134,95 @@
 
 /* --- Print Styles --- */
 @media print {
-  .proposal-body { background-color: white; }
+  body.proposal-body { 
+    background-color: white; 
+    margin: 0;
+  }
   .no-print, .print-controls { display: none !important; }
-  .proposal-container, .page { margin: 0; padding: 1.5cm; box-shadow: none; }
-  .page { width: 100%; height: auto; min-height: 26.7cm; page-break-after: always; }
+  .proposal-container { margin: 0; padding: 0cm;}
+  .page { 
+    margin: 0; 
+    padding: 2.0cm 3.0cm; 
+    box-shadow: none; 
+    width: 100%; 
+    height: auto; 
+    min-height: 26.7cm; 
+    page-break-after: always; 
+  }
+
+  .investment-card {
+    background-color: #1f2937 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  /* Ensures text inside the card is also visible */
+  .investment-card, .investment-card h3, .investment-card p, .investment-card span {
+    color: white !important;
+  }
+
+  .cover-page {
+    overflow: hidden !important;
+  }
+
 }
 @page { size: A4; margin: 0; }
+
+/* Add these new rules to the end of ProposalPage.css */
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.summary-card {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.summary-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    display: inline-block;
+}
+
+.summary-icon.solar { color: #f59e0b; }
+.summary-icon.inverter { color: #6366f1; }
+.summary-icon.battery { color: #22c55e; }
+
+.summary-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #4b5563;
+    margin-bottom: 0.5rem;
+}
+
+.summary-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #111827;
+    line-height: 1;
+    margin: 0;
+}
+
+.summary-value .summary-unit {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin-left: 0.25rem;
+}
+
+.component-list-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e3a8a;
+    padding-bottom: 0.5rem;
+    margin-top: 2rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid #e5e7eb;
+}

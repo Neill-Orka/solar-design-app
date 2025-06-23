@@ -6,10 +6,6 @@ system_builder_bp = Blueprint('system_builder', __name__)
 
 @system_builder_bp.route('/system_templates', methods=['POST'])
 def create_system_template():
-    """
-    Creates a new SystemTemplate and its associated components.
-    Expects a JSON payload with template details and a list of components.
-    """
     data = request.get_json()
 
     # Basic validation
@@ -56,6 +52,68 @@ def create_system_template():
 
     except Exception as e:
         # If any other error occurs, roll back
+        db.session.rollback()
+        return jsonify({"error": "An internal error occurred", "details": str(e)}), 500
+    
+    # To update the system template
+@system_builder_bp.route('/system_templates/<int:template_id>', methods=['PUT'])
+def update_system_template(template_id):
+    template = SystemTemplate.query.get_or_404(template_id)
+    data = request.get_json()
+
+    if not data or not data.get('name') or not data.get('components'):
+        return jsonify({"error": "Missing required fields: name and components"}), 400
+    
+    try: 
+        # update scalar fields
+        template.name = data.get('name')
+        template.description = data.get('description')
+        template.system_type = data.get('system_type')
+        template.extras_cost = data.get('extras_cost', 0)
+
+        # Delete old components
+        SystemTemplateComponent.query.filter_by(template_id=template.id).delete()
+
+        # Add new components
+        for comp_data in data.get('components', []):
+            product = Product.query.get(comp_data.get('product_id'))
+            if not product:
+                db.session.rollback()
+                return jsonify({"error": f"Product with ID {comp_data.get('product_id')} not found."}), 404
+               
+            new_component = SystemTemplateComponent(
+                template_id=template.id,
+                product_id=comp_data.get('product_id'),
+                quantity=comp_data.get('quantity')
+            )
+            db.session.add(new_component)
+
+        db.session.commit()
+        return jsonify({
+            "success": True, 
+            "message": "System template updated successfully", 
+            "template_id": template.id
+        }), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An internal error occurred", "details": str(e)}), 500
+    
+# New route to delete a template
+@system_builder_bp.route('/system_templates/<int:template_id>', methods=['DELETE'])
+def delete_system_template(template_id):
+    template = SystemTemplate.query.get_or_404(template_id)
+    if not template:
+        return jsonify({"error": "System template not found"}), 404
+
+    try:
+        # Delete the template itself
+        db.session.delete(template)
+        db.session.commit()
+        
+        return jsonify({"success": True, "message": "System template deleted successfully"}), 200
+    
+    except Exception as e:
         db.session.rollback()
         return jsonify({"error": "An internal error occurred", "details": str(e)}), 500
 

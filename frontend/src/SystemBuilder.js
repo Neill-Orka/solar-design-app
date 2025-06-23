@@ -1,144 +1,30 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Container, Row, Col, Card, Button, Form, Spinner, Alert, InputGroup, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Form, Spinner, Alert, InputGroup, Badge, ListGroup, Stack } from 'react-bootstrap';
 
-// Main Component for the System Builder page
-function SystemBuilder() {
-    // State for all available products fetched from the API
-    const [products, setProducts] = useState([]);
-    // State for loading and error handling during product fetch
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    
-    // State for the new system template being built
-    const [templateName, setTemplateName] = useState('');
-    const [templateDesc, setTemplateDesc] = useState('');
-    const [templateType, setTemplateType] = useState('Hybrid');
-    const [extrasCost, setExtrasCost] = useState('');
-    const [components, setComponents] = useState([]); // Array of {product, quantity}
+const ProductList = ({ category, products, searchFilter, onSearchChange, onAddComponent }) => {
+    const searchTerm = searchFilter.toLowerCase();
+    const filteredProducts = products.filter(p => 
+        p.category === category &&
+        `${p.brand} ${p.mode} ${p.power_w || ''} ${p.rating_kva || ''} ${p.capacity_kwh || ''}`.toLowerCase().includes(searchTerm)
+    );
 
-    // State for the save process
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveSuccess, setSaveSuccess] = useState('');
-    const [saveError, setSaveError] = useState('');
-
-    // Fetch all products on component mount
-    useEffect(() => {
-        axios.get('http://localhost:5000/api/products')
-            .then(res => {
-                setProducts(res.data);
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error("Error fetching products:", err);
-                setError('Failed to load products. The builder cannot be used.');
-                setLoading(false);
-            });
-    }, []);
-
-    // Memoized calculations for totals to avoid re-calculating on every render
-    const { totalCost, totalPanelKw, totalInverterKva, totalBatteryKwh } = useMemo(() => {
-        let cost = parseFloat(extrasCost) || 0;
-        let pKw = 0, iKva = 0, bKwh = 0;
-        
-        components.forEach(comp => {
-            cost += (comp.product.price || 0) * comp.quantity;
-            if (comp.product.category === 'panel') pKw += (comp.product.power_w || 0) * comp.quantity / 1000;
-            if (comp.product.category === 'inverter') iKva += (comp.product.rating_kva || 0) * comp.quantity;
-            if (comp.product.category === 'battery') bKwh += (comp.product.capacity_kwh || 0) * comp.quantity;
-        });
-
-        return {
-            totalCost: cost,
-            totalPanelKw: pKw.toFixed(2),
-            totalInverterKva: iKva.toFixed(2),
-            totalBatteryKwh: bKwh.toFixed(2),
-        };
-    }, [components, extrasCost]);
-
-    // Handlers for adding, removing, and updating components
-    const addComponent = (product) => {
-        // Prevent adding the same product twice
-        if (components.find(c => c.product.id === product.id)) {
-            alert(`${product.brand} ${product.model} is already in the system.`);
-            return;
-        }
-        setComponents([...components, { product, quantity: 1 }]);
-    };
-
-    const removeComponent = (productId) => {
-        setComponents(components.filter(c => c.product.id !== productId));
-    };
-
-    const updateQuantity = (productId, quantity) => {
-        const numQuantity = parseInt(quantity, 10);
-        if (numQuantity > 0) {
-            setComponents(components.map(c => 
-                c.product.id === productId ? { ...c, quantity: numQuantity } : c
-            ));
-        }
-    };
-
-    // Handler to clear the form and reset the builder
-    const handleClear = () => {
-        setTemplateName('');
-        setTemplateDesc('');
-        setTemplateType('Hybrid');
-        setExtrasCost('');
-        setComponents([]);
-        setSaveSuccess('');
-        setSaveError('');
-    };
-
-    // Handler for saving the new system template
-    const handleSave = () => {
-        if (!templateName.trim()) {
-            setSaveError('System Name is required.');
-            return;
-        }
-        if (components.length === 0) {
-            setSaveError('A system must have at least one component.');
-            return;
-        }
-
-        setIsSaving(true);
-        setSaveError('');
-        setSaveSuccess('');
-
-        const payload = {
-            name: templateName,
-            description: templateDesc,
-            system_type: templateType,
-            extras_cost: parseFloat(extrasCost) || 0,
-            components: components.map(c => ({
-                product_id: c.product.id,
-                quantity: c.quantity,
-            })),
-        };
-
-        axios.post('http://localhost:5000/api/system_templates', payload)
-            .then(res => {
-                setSaveSuccess(`System "${templateName}" saved successfully!`);
-                handleClear(); // Clear form for the next entry
-            })
-            .catch(err => {
-                console.error("Error saving template:", err);
-                setSaveError(err.response?.data?.error || "Failed to save the system. Please try again.");
-            })
-            .finally(() => {
-                setIsSaving(false);
-            });
-    };
-
-    // Helper to render a list of products by category
-    const ProductList = ({ category }) => {
-        const filteredProducts = products.filter(p => p.category === category);
-        return (
-            <>
-                <h4 className="text-xl font-semibold text-gray-700 mt-4 mb-3 ps-1">
+    return (
+        <>
+            <h4 className="text-xl font-semibold text-gray-700 mt-4 mb-2 ps-1 d-flex justify-content-between align-items-center">
+                <span>
                     <i className={`bi ${category === 'panel' ? 'bi-grid-3x3-gap-fill' : category === 'inverter' ? 'bi-box-seam' : 'bi-battery-full'} me-2`}></i>
                     {category.charAt(0).toUpperCase() + category.slice(1)}s
-                </h4>
+                </span>
+                <Form.Control
+                    size="sm"
+                    style={{ width: '200px' }}
+                    placeholder={`Search ${category}s...`}
+                    value={searchFilter}
+                    onChange={e => onSearchChange(category, e.target.value)} // Use prop for change handler
+                />
+            </h4>
+            <div style={{ maxHeight: '300px', overflowY: 'auto', padding: '0.5rem' }}>
                 {filteredProducts.length > 0 ? (
                     <Row xs={1} lg={2} xl={3} className="g-3">
                         {filteredProducts.map(product => (
@@ -153,7 +39,7 @@ function SystemBuilder() {
                                         </Card.Text>
                                         <div className="d-flex justify-content-between align-items-center">
                                             <span className="text-sm font-semibold text-primary">R{product.price?.toLocaleString()}</span>
-                                            <Button variant="outline-primary" size="sm" onClick={() => addComponent(product)}>
+                                            <Button variant="outline-primary" size="sm" onClick={() => onAddComponent(product)}>
                                                 <i className="bi bi-plus-lg me-1"></i> Add
                                             </Button>
                                         </div>
@@ -162,9 +48,151 @@ function SystemBuilder() {
                             </Col>
                         ))}
                     </Row>
-                ) : <p className="text-muted small">No {category} products found.</p>}
-            </>
-        );
+                ) : <p className="text-muted small">No {category} products found matching your search.</p>}
+            </div>
+        </>
+    );
+};
+
+function SystemBuilder() {
+    // State for all available products fetched from the API
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    // State for the new system template being built
+    const [templateName, setTemplateName] = useState('');
+    const [templateDesc, setTemplateDesc] = useState('');
+    const [templateType, setTemplateType] = useState('Hybrid');
+    const [extrasCost, setExtrasCost] = useState('');
+    const [components, setComponents] = useState([]);
+
+    // State for saving/updating
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState('');
+    const [saveError, setSaveError] = useState('');
+
+    // --- NEW: State for managing the list of existing templates ---
+    const [savedTemplates, setSavedTemplates] = useState([]);
+    const [loadingTemplates, setLoadingTemplates] = useState(true);
+    const [editingTemplate, setEditingTemplate] = useState(null); // Holds the template being edited
+
+    // --- NEW: State for search filters ---
+    const [searchFilters, setSearchFilters] = useState({ panel: '', inverter: '', battery: '' });
+
+    // Fetch all initial data on component mount
+    useEffect(() => {
+        fetchProducts();
+        fetchTemplates();
+    }, []);
+
+    const fetchProducts = () => {
+        axios.get('http://localhost:5000/api/products')
+            .then(res => setProducts(res.data))
+            .catch(err => {
+                console.error("Error fetching products:", err);
+                setError('Failed to load products. The builder cannot be used.');
+            })
+            .finally(() => setLoading(false));
+    };
+
+    const fetchTemplates = () => {
+        setLoadingTemplates(true);
+        axios.get('http://localhost:5000/api/system_templates')
+            .then(res => setSavedTemplates(res.data))
+            .catch(err => console.error("Error fetching templates:", err))
+            .finally(() => setLoadingTemplates(false));
+    };
+
+    // Memoized calculations for totals (no changes needed here)
+    const { totalCost, totalPanelKw, totalInverterKva, totalBatteryKwh } = useMemo(() => {
+        let cost = parseFloat(extrasCost) || 0;
+        let pKw = 0, iKva = 0, bKwh = 0;
+        components.forEach(comp => {
+            cost += (comp.product.price || 0) * comp.quantity;
+            if (comp.product.category === 'panel') pKw += (comp.product.power_w || 0) * comp.quantity / 1000;
+            if (comp.product.category === 'inverter') iKva += (comp.product.rating_kva || 0) * comp.quantity;
+            if (comp.product.category === 'battery') bKwh += (comp.product.capacity_kwh || 0) * comp.quantity;
+        });
+        return { totalCost: cost, totalPanelKw: pKw.toFixed(2), totalInverterKva: iKva.toFixed(2), totalBatteryKwh: bKwh.toFixed(2) };
+    }, [components, extrasCost]);
+
+    // Component and quantity handlers (no changes needed here)
+    const addComponent = (product) => {
+        if (components.find(c => c.product.id === product.id)) return;
+        setComponents([...components, { product, quantity: 1 }]);
+    };
+    const removeComponent = (productId) => setComponents(components.filter(c => c.product.id !== productId));
+    const updateQuantity = (productId, quantity) => {
+        const numQuantity = parseInt(quantity, 10);
+        if (numQuantity > 0) setComponents(components.map(c => c.product.id === productId ? { ...c, quantity: numQuantity } : c));
+    };
+
+    const handleClear = () => {
+        setTemplateName(''); setTemplateDesc(''); setTemplateType('Hybrid');
+        setExtrasCost(''); setComponents([]); setSaveSuccess(''); setSaveError('');
+        setEditingTemplate(null); // Also cancel editing mode
+    };
+
+    // Main save/update handler
+    const handleSaveOrUpdate = () => {
+        if (!templateName.trim() || components.length === 0) {
+            setSaveError('System Name and at least one component are required.');
+            return;
+        }
+        setIsSaving(true); setSaveError(''); setSaveSuccess('');
+
+        const payload = {
+            name: templateName, description: templateDesc, system_type: templateType,
+            extras_cost: parseFloat(extrasCost) || 0,
+            components: components.map(c => ({ product_id: c.product.id, quantity: c.quantity })),
+        };
+
+        const request = editingTemplate
+            ? axios.put(`http://localhost:5000/api/system_templates/${editingTemplate.id}`, payload)
+            : axios.post('http://localhost:5000/api/system_templates', payload);
+
+        request.then(res => {
+            setSaveSuccess(`System "${templateName}" ${editingTemplate ? 'updated' : 'saved'} successfully!`);
+            handleClear();
+            fetchTemplates(); // Refresh the list
+        }).catch(err => {
+            setSaveError(err.response?.data?.error || "An error occurred.");
+        }).finally(() => setIsSaving(false));
+    };
+
+    // --- NEW: Handlers for Edit and Delete ---
+    const handleEditClick = (template) => {
+        setEditingTemplate(template);
+        setTemplateName(template.name);
+        setTemplateDesc(template.description);
+        setTemplateType(template.system_type);
+        setExtrasCost(template.extras_cost || '');
+        
+        // Reconstruct the components list with full product details
+        const reconstructedComponents = template.components.map(comp => {
+            const fullProduct = products.find(p => p.id === comp.product_id);
+            return { product: fullProduct, quantity: comp.quantity };
+        }).filter(c => c.product); // Filter out any components if product not found
+        setComponents(reconstructedComponents);
+    };
+
+    const handleDelete = (templateId) => {
+        if (window.confirm("Are you sure you want to delete this system template?")) {
+            axios.delete(`http://localhost:5000/api/system_templates/${templateId}`)
+                .then(() => {
+                    alert('Template deleted successfully!');
+                    fetchTemplates(); // Refresh list
+                })
+                .catch(err => alert('Failed to delete template: ' + err.response?.data?.error));
+        }
+    };
+
+    const handleSearchChange = (category, value) => {
+        setSearchFilters(prevFilters => ({
+            ...prevFilters,
+            [category]: value
+        }));
     };
 
     // Main render
@@ -180,7 +208,6 @@ function SystemBuilder() {
                         <Card className="shadow-lg border-0 rounded-xl p-4 p-md-5">
                             <h2 className="text-3xl font-bold text-gray-800 mb-1">System Template Builder</h2>
                             <p className="text-muted mb-4">Create new system kits for the Quick Design tool.</p>
-                            
                             <Form>
                                 <Row>
                                     <Col md={6}><Form.Group className="mb-3"><Form.Label>System Name</Form.Label><Form.Control type="text" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g., Commercial 50kW Hybrid" /></Form.Group></Col>
@@ -191,16 +218,34 @@ function SystemBuilder() {
 
                             <hr className="my-4" />
 
-                            <ProductList category="panel" />
-                            <ProductList category="inverter" />
-                            <ProductList category="battery" />
+                            <ProductList 
+                                category="panel"
+                                products={products}
+                                searchFilter={searchFilters.panel}
+                                onSearchChange={handleSearchChange}
+                                onAddComponent={addComponent}
+                            />
+                            <ProductList
+                                category="inverter"
+                                products={products}
+                                searchFilter={searchFilters.inverter}
+                                onSearchChange={handleSearchChange}
+                                onAddComponent={addComponent}
+                            />
+                            <ProductList
+                                category="battery"
+                                products={products}
+                                searchFilter={searchFilters.battery}
+                                onSearchChange={handleSearchChange}
+                                onAddComponent={addComponent}
+                            />
                         </Card>
                     </Col>
 
                     {/* Right Column: Summary & Save */}
                     <Col lg={5} xl={4}>
                         <div className="sticky-top" style={{ top: '88px' }}>
-                            <Card className="shadow-lg border-0 rounded-xl">
+                            <Card className="shadow-lg border-0 rounded-xl mb-4">
                                 <Card.Header className="bg-dark text-white rounded-top-xl py-3">
                                     <h3 className="text-xl font-semibold mb-0"><i className="bi bi-card-checklist me-2"></i>System Summary</h3>
                                 </Card.Header>
@@ -244,7 +289,7 @@ function SystemBuilder() {
                                     </div>
                                     
                                     <div className="d-grid gap-2 mt-4">
-                                        <Button variant="primary" size="lg" onClick={handleSave} disabled={isSaving}>
+                                        <Button variant="primary" size="lg" onClick={handleSaveOrUpdate} disabled={isSaving}>
                                             {isSaving ? <><Spinner as="span" animation="border" size="sm" /> Saving...</> : <><i className="bi bi-save-fill me-2"></i>Save System</>}
                                         </Button>
                                         <Button variant="outline-secondary" onClick={handleClear}>Clear</Button>
@@ -254,6 +299,27 @@ function SystemBuilder() {
                                     {saveError && <Alert variant="danger" className="mt-3">{saveError}</Alert>}
 
                                 </Card.Body>
+                            </Card>
+                                                        {/* --- NEW: Existing Templates List --- */}
+                            <Card className="shadow-lg border-0 rounded-xl">
+                                <Card.Header className="bg-secondary text-white rounded-top-xl py-3">
+                                    <h3 className="text-xl font-semibold mb-0"><i className="bi bi-collection-fill me-2"></i>Existing Systems</h3>
+                                </Card.Header>
+                                <ListGroup variant="flush" style={{maxHeight: '400px', overflowY: 'auto'}}>
+                                    {loadingTemplates ? <ListGroup.Item className="text-center p-3"><Spinner size="sm" /></ListGroup.Item> :
+                                    savedTemplates.map(template => (
+                                        <ListGroup.Item key={template.id} className="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <p className="fw-bold mb-0">{template.name}</p>
+                                                <small className="text-muted">{template.panel_kw}kWp | {template.inverter_kva}kVA | {template.battery_kwh}kWh</small>
+                                            </div>
+                                            <Stack direction="horizontal" gap={2}>
+                                                <Button variant="outline-primary" size="sm" onClick={() => handleEditClick(template)}><i className="bi bi-pencil-fill"></i></Button>
+                                                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(template.id)}><i className="bi bi-trash-fill"></i></Button>
+                                            </Stack>
+                                        </ListGroup.Item>
+                                    ))}
+                                </ListGroup>
                             </Card>
                         </div>
                     </Col>
