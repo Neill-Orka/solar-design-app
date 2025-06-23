@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "./apiConfig";
 
 function AddProject() {
   const [showToast, setShowToast] = useState(false);
@@ -30,7 +31,7 @@ function AddProject() {
   }, []);
 
   const loadClients = () => {
-    axios.get('http://localhost:5000/api/clients')
+    axios.get(`${API_URL}/api/clients`)
       .then((res) => setClients(res.data))
       .catch((err) => {
         console.error('Error loading clients:', err);
@@ -57,7 +58,7 @@ function AddProject() {
         return;
       }
       try {
-        const res = await axios.post('http://localhost:5000/api/clients', {
+        const res = await axios.post(`${API_URL}/api/clients`, {
           client_name: newClientName,
           email: newClientEmail,
           phone: '' // Optional: user can edit phone later
@@ -74,7 +75,7 @@ function AddProject() {
     }
 
     try {
-      await axios.post('http://localhost:5000/api/projects', {
+      await axios.post(`${API_URL}/api/projects`, {
         ...projectData,
         client_id: clientId
       });
