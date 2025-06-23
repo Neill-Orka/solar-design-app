@@ -11,6 +11,7 @@ import {
   Legend
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
+import { API_URL } from './apiConfig';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -27,7 +28,7 @@ function FinancialModeling({ projectId }) {
   }, [projectId]);
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/projects/${projectId}`)
+    axios.get(`${API_URL}/api/projects/${projectId}`)
       .then(res => {
         const p = res.data;
         if (p && p.project_value_excl_vat != null) {
@@ -68,7 +69,7 @@ function FinancialModeling({ projectId }) {
 
   const handleCalculate = () => {
     setLoading(true);
-    axios.post('http://localhost:5000/api/financial_model', {
+    axios.post(`${API_URL}/api/financial_model`, {
       project_id: projectId,
       tariff: parseFloat(eskomTariff),
       export_enabled: allowExport,
@@ -121,7 +122,7 @@ function FinancialModeling({ projectId }) {
           }}
           onBlur={() => {
             // Auto-save to DB on blur
-            axios.put(`http://localhost:5000/api/projects/${projectId}`, {
+            axios.put(`${API_URL}/api/projects/${projectId}`, {
               project_value_excl_vat: parseFloat(projectValue)
             })
             .then(() => console.log('Project value updated'))

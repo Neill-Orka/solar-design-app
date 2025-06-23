@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { Modal, Button } from 'react-bootstrap';
+import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
 
 // A styled component for key project metrics
 const ProjectStat = ({ icon, label, value }) => (
@@ -28,7 +29,7 @@ function Projects() {
 
   const loadProjects = () => {
     setLoading(true);
-    axios.get('http://localhost:5000/api/projects')
+    axios.get(`${API_URL}/api/projects`)
       .then((response) => {
         setProjects(response.data);
         setError('');
@@ -49,7 +50,7 @@ function Projects() {
 
   const handleConfirmDelete = () => {
     if (!projectToDelete) return;
-    axios.delete(`http://localhost:5000/api/projects/${projectToDelete}`)
+    axios.delete(`${API_URL}/api/projects/${projectToDelete}`)
       .then(() => {
         setShowDeleteModal(false);
         setProjectToDelete(null);

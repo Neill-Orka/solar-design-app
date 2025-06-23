@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { API_URL } from './apiConfig'; 
 
 function EditClient() {
   const { id } = useParams();
@@ -11,7 +12,7 @@ function EditClient() {
   const [phone, setPhone] = useState('');
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/clients/${id}`)
+    axios.get(`${API_URL}/api/clients/${id}`)
       .then((response) => {
         setClientName(response.data.client_name);
         setEmail(response.data.email);
@@ -31,7 +32,7 @@ function EditClient() {
       phone: phone
     };
 
-    axios.put(`http://localhost:5000/api/clients/${id}`, payload)
+    axios.put(`${API_URL}/api/clients/${id}`, payload)
       .then(() => {
         alert('Client updated successfully!');
         navigate('/clients');

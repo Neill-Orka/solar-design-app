@@ -6,6 +6,7 @@ import axios from 'axios';
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import logo from './assets/orka_logo_transparent_background.png';
+import { API_URL } from './apiConfig';
 
 /* Chart.js */
 import { Line, Bar } from 'react-chartjs-2';
@@ -52,13 +53,13 @@ function Reporting({ projectId }) {
 
   /* ------------ load project + sim + finance ------------ */
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/projects/${projectId}`)
+    axios.get(`${API_URL}/api/projects/${projectId}`)
       .then(r => {
         setProject(r.data);
 
         /* fetch inverter meta for BOM */
         axios
-          .get('http://localhost:5000/api/products?category=inverter')
+          .get(`${API_URL}/api/products?category=inverter`)
           .then(res => {
             const match = res.data.find(p => p.rating_kva === r.data.inverter_kva);
             setInverter(match || null);
@@ -67,7 +68,7 @@ function Reporting({ projectId }) {
 
         /* call financial endpoint */
         axios
-          .post('http://localhost:5000/api/financial_model', {
+          .post(`${API_URL}/api/financial_model`, {
             project_id: projectId,
             tariff: 2.2,
             export_enabled: false,

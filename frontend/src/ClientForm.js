@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { API_URL } from './apiConfig';
 
 function ClientForm() {
   const [clientName, setClientName] = useState('');
@@ -15,7 +16,7 @@ function ClientForm() {
       phone: phone
     };
 
-    axios.post('http://localhost:5000/api/clients', payload)
+    axios.post(`${API_URL}/api/clients`, payload)
       .then((response) => {
         console.log('Client added:', response.data);
         alert('Client added successfully!');

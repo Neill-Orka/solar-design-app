@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Table, Button, Modal, Form, Row, Col, InputGroup } from "react-bootstrap";
 import { FaTrash, FaEdit, FaPlus } from "react-icons/fa";
+import { API_URL } from "./apiConfig"; // Adjust the import based on your project structure
 
 const EMPTY_PRODUCT = {
     category: 'panel', brand: '', model: '',
@@ -19,7 +20,7 @@ export default function ProductsAdmin() {
 
     // ------ load list -----------------------------------
     const fetchProducts = () => 
-        axios.get('http://localhost:5000/api/products')
+        axios.get(`${API_URL}/api/products`)
             .then(r => setProducts(r.data));
 
     useEffect(() => {
@@ -33,15 +34,15 @@ export default function ProductsAdmin() {
     // ------ delete --------------------------------------
     const deleteProduct = (id) => {
         if (!window.confirm('Delete this product?')) return;
-        axios.delete(`http://localhost:5000/api/products/${id}`)
+        axios.delete(`${API_URL}/api/products/${id}`)
             .then(fetchProducts);
     };
 
     // ------ save (add or update) ---------------------
     const handleSave = () => {
         setLoading(true);
-        const req = editId ? axios.put(`http://localhost:5000/api/products/${editId}`, form) :
-            axios.post('http://localhost:5000/api/products', form);
+        const req = editId ? axios.put(`${API_URL}/api/products/${editId}`, form) :
+            axios.post(`${API_URL}/api/products`, form);
         req.then(() => {
             setShowModal(false);
             fetchProducts();

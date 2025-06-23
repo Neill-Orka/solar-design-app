@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { API_URL } from './apiConfig';
 
 function EnergyDataUpload({ projectId }) {
   const [energyFile, setEnergyFile] = useState(null);
@@ -15,7 +16,7 @@ function EnergyDataUpload({ projectId }) {
     formData.append('file', energyFile);
     formData.append('project_id', projectId);
 
-    axios.post(`http://localhost:5000/api/projects/${projectId}/energy-data`, formData, {
+    axios.post(`${API_URL}/api/projects/${projectId}/energy-data`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
       .then((response) => {

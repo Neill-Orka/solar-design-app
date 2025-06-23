@@ -10,6 +10,7 @@ import logo from './assets/orka_logo_transparent_background.png';
 import './ProposalPage.css';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { API_URL } from './apiConfig';
 
 // Register all necessary Chart.js components
 ChartJS.register(ArcElement, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, TimeScale);
@@ -45,7 +46,7 @@ function ProposalPage() {
 
     useEffect(() => {
         document.body.classList.add('proposal-body');
-        axios.get(`http://localhost:5000/api/proposal_data/${id}`)
+        axios.get(`${API_URL}/api/proposal_data/${id}`)
             .then(response => {
                 setData(response.data);
                 document.title = `Proposal for ${response.data.client_name}`;

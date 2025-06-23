@@ -2,6 +2,7 @@ import React, { useState, useEffect }from 'react';
 import { Card, Button, Row, Col, Spinner, Alert } from 'react-bootstrap'; 
 import axios from 'axios';
 import './index.css'; 
+import { API_URL } from './apiConfig';
 
 function SystemSelection({ projectId, savedData, onSelect, onBack }) {
 
@@ -10,7 +11,7 @@ function SystemSelection({ projectId, savedData, onSelect, onBack }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/system_templates')
+    axios.get(`${API_URL}/api/system_templates`)
       .then(res => {
         setSystems(res.data);
         setLoading(false);

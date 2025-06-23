@@ -11,6 +11,7 @@ import BasicInfoForm from './BasicInfoForm';
 import ProfileSelection from './ProfileSelection';
 import SystemSelection from './SystemSelection';
 import QuickResults from './QuickResults';
+import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
 import { Spinner, Alert } from 'react-bootstrap'; // Import Spinner and Alert for loading/error states
 
 function ProjectDashboard() {
@@ -37,10 +38,10 @@ function ProjectDashboard() {
     const fetchData = async () => {
         try {
             // Fetch project details (client name, etc.)
-            const projectRes = await axios.get(`http://localhost:5000/api/projects/${projectId}`);
+            const projectRes = await axios.get(`${API_URL}/api/projects/${projectId}`);
             setProject(projectRes.data);
             // Fetch existing quick design data
-            const quickDesignRes = await axios.get(`http://localhost:5000/api/projects/${projectId}/quick_design`);
+            const quickDesignRes = await axios.get(`${API_URL}/api/projects/${projectId}/quick_design`);
             if (quickDesignRes.data) {
                 // If data exists, update our state with it
                 setQuickDesignData(prevData => ({
@@ -65,7 +66,7 @@ function ProjectDashboard() {
       setQuickDesignData(updatedData);
 
       // Call API to save the data to database
-      await axios.post(`http://localhost:5000/api/projects/${projectId}/quick_design`, dataToSave);
+      await axios.post(`${API_URL}/api/projects/${projectId}/quick_design`, dataToSave);
 
       // Next step
       setCurrentStep(nextStep);

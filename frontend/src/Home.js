@@ -5,12 +5,13 @@ import { motion } from 'framer-motion';
 import CountUp from 'react-countup';
 import { FaProjectDiagram, FaUsers, FaTools } from 'react-icons/fa';
 import './Home.css';
+import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
 
 function Home() {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/stats')
+    axios.get(`${API_URL}/api/stats`)
          .then(res => setStats(res.data))
          .catch(() => setStats(null));
   }, []);
