@@ -16,7 +16,6 @@ MarkupSafe==3.0.2
 numpy==2.2.5
 openpyxl==3.1.5
 pandas==2.2.3
-psycopg2==2.9.10
 pvlib==0.12.0
 python-dateutil==2.9.0.post0
 pytz==2025.2
