@@ -1,2 +1,2 @@
 // src/apiConfig.js
-export const API_URL = 'http://localhost:5000'; // We will change this later
+export const API_URL = 'https://orka-solar-api.onrender.com'; // We will change this later
