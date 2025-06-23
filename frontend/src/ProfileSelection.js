@@ -15,6 +15,7 @@ import {
     TimeScale,
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
 
 ChartJS.register(
     CategoryScale,
@@ -161,7 +162,7 @@ function ProfileSelection({ projectId, consumerType, basicInfo, savedData, onSel
       setLoading(true);
       setError('');
       try {
-        const response = await axios.get(`http://localhost:5000/api/load_profiles`);
+        const response = await axios.get(`${API_URL}/api/load_profiles`);
         setProfiles(response.data);
       } catch (err) {
         console.error("Error fetching profiles:", err);
@@ -200,7 +201,7 @@ function ProfileSelection({ projectId, consumerType, basicInfo, savedData, onSel
       const profileToSave = { ...profile, scaler: currentScaler };
       localStorage.setItem('selectedProfileForQuickDesign', JSON.stringify(profileToSave));
       // Save the selected profile with its scaler to the backend
-      await axios.post(`http://localhost:5000/api/projects/${projectId}/quick_design`, {
+      await axios.post(`${API_URL}/api/projects/${projectId}/quick_design`, {
         selectedProfileId: profile.id,
         profileScaler: currentScaler
       });

@@ -18,6 +18,7 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import { enZA } from 'date-fns/locale';
+import { API_URL } from './apiConfig';
 
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -63,7 +64,7 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
             }
             try {
                 const payload = { basicInfo, selectedProfile, selectedSystem };
-                const response = await axios.post('http://localhost:5000/api/quick_simulate', payload);
+                const response = await axios.post(`${API_URL}/api/quick_simulate`, payload);
                 setData(response.data);
 
                 if (response.data?.simulation?.timestamps?.length > 0)

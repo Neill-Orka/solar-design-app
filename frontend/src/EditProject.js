@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { API_URL } from "./apiConfig";
 
 function EditProject() {
   const { id } = useParams();
@@ -8,7 +9,7 @@ function EditProject() {
   const [project, setProject] = useState(null);
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/projects/${id}`)
+    axios.get(`${API_URL}/api/projects/${id}`)
       .then((res) => setProject(res.data))
       .catch((err) => {
         console.error('Error loading project:', err);
@@ -25,7 +26,7 @@ function EditProject() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    axios.put(`http://localhost:5000/api/projects/${id}`, project)
+    axios.put(`${API_URL}/api/projects/${id}`, project)
       .then(() => {
         alert('Project updated successfully!');
         navigate('/projects');

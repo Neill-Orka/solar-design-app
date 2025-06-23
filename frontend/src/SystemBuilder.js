@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Container, Row, Col, Card, Button, Form, Spinner, Alert, InputGroup, Badge, ListGroup, Stack } from 'react-bootstrap';
+import { API_URL } from './apiConfig';
 
 const ProductList = ({ category, products, searchFilter, onSearchChange, onAddComponent }) => {
     const searchTerm = searchFilter.toLowerCase();
@@ -87,7 +88,7 @@ function SystemBuilder() {
     }, []);
 
     const fetchProducts = () => {
-        axios.get('http://localhost:5000/api/products')
+        axios.get(`${API_URL}/api/products`)
             .then(res => setProducts(res.data))
             .catch(err => {
                 console.error("Error fetching products:", err);
@@ -98,7 +99,7 @@ function SystemBuilder() {
 
     const fetchTemplates = () => {
         setLoadingTemplates(true);
-        axios.get('http://localhost:5000/api/system_templates')
+        axios.get(`${API_URL}/api/system_templates`)
             .then(res => setSavedTemplates(res.data))
             .catch(err => console.error("Error fetching templates:", err))
             .finally(() => setLoadingTemplates(false));
@@ -149,8 +150,8 @@ function SystemBuilder() {
         };
 
         const request = editingTemplate
-            ? axios.put(`http://localhost:5000/api/system_templates/${editingTemplate.id}`, payload)
-            : axios.post('http://localhost:5000/api/system_templates', payload);
+            ? axios.put(`${API_URL}/system_templates/${editingTemplate.id}`, payload)
+            : axios.post(`${API_URL}/api/system_templates`, payload);
 
         request.then(res => {
             setSaveSuccess(`System "${templateName}" ${editingTemplate ? 'updated' : 'saved'} successfully!`);
@@ -179,7 +180,7 @@ function SystemBuilder() {
 
     const handleDelete = (templateId) => {
         if (window.confirm("Are you sure you want to delete this system template?")) {
-            axios.delete(`http://localhost:5000/api/system_templates/${templateId}`)
+            axios.delete(`${API_URL}/api/system_templates/${templateId}`)
                 .then(() => {
                     alert('Template deleted successfully!');
                     fetchTemplates(); // Refresh list

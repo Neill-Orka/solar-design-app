@@ -15,6 +15,7 @@ import {
   Legend
 } from 'chart.js';
 import Form from 'react-bootstrap/Form';
+import { API_URL } from './apiConfig';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
@@ -29,7 +30,7 @@ function SystemDesign({ projectId }) {
   const [batteryQuantity, setBatteryQuantity] = useState(1);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/products?category=inverter')
+    axios.get(`${API_URL}/api/products?category=inverter`)
       .then(r => {
         setInverters(r.data);
       });
@@ -38,7 +39,7 @@ function SystemDesign({ projectId }) {
   const [selectedBatteryOpt, setSelectedBatteryOpt] = useState(null);
   const [batteries, setBatteries] = useState([]);
   useEffect(() => {
-    axios.get('http://localhost:5000/api/products?category=battery')
+    axios.get(`${API_URL}/api/products?category=battery`)
       .then(r => {
         setBatteries(r.data);
       });
@@ -75,7 +76,7 @@ function SystemDesign({ projectId }) {
 
   // pull saved values when component mounts
   useEffect (() => {
-    axios.get(`http://localhost:5000/api/projects/${projectId}`)
+    axios.get(`${API_URL}/api/projects/${projectId}`)
     .then(res => {
       const p = res.data;
       if (!p) return;
@@ -131,7 +132,7 @@ function SystemDesign({ projectId }) {
 
   // --- helpers ---------------------------------------------------
   const saveProject = () => {
-    axios.put(`http://localhost:5000/api/projects/${projectId}`, {
+    axios.put(`${API_URL}/api/projects/${projectId}`, {
       system_type: systemType,
       panel_kw : parseFloat(panelKw),
       battery_kwh: systemType === 'grid' ? null : {
@@ -158,7 +159,7 @@ function SystemDesign({ projectId }) {
     const totalBatteryKwh = systemType === 'grid' ? 0 :
       safeParseFloat(batteryKwh) * batteryQuantity;
 
-    axios.post('http://localhost:5000/api/simulate', {
+    axios.post(`${API_URL}/api/simulate`, {
       project_id: projectId,
       system: {
         panel_kw: parseFloat(panelKw),

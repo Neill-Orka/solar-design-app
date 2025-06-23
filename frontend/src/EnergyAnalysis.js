@@ -6,6 +6,7 @@ import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import HeatMap from '@uiw/react-heat-map';
+import { API_URL } from './apiConfig';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
@@ -43,7 +44,7 @@ function EnergyAnalysis({ projectId }) {
   useEffect(() => {
     if (!projectId || !startDate || !endDate) return;
 
-    axios.get(`http://localhost:5000/api/consumption_data/${projectId}`, {
+    axios.get(`${API_URL}/api/consumption_data/${projectId}`, {
       params: {
         start_date: startDate,
         end_date: endDate

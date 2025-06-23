@@ -1,6 +1,7 @@
 // Optimize.js
 import React, { useState } from 'react';
 import axios from 'axios';
+import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
 
 function Optimize({ projectId }) {
   const [systemType, setSystemType] = useState("grid");
@@ -14,7 +15,7 @@ function Optimize({ projectId }) {
 
   const runOptimize = () => {
     setRunning(true);
-    axios.post("http://localhost:5000/api/optimize", {
+    axios.post(`${API_URL}/api/optimize`, {
       project_id: projectId,
       system_type: systemType,
       roof_kw_limit: parseFloat(roofKw),

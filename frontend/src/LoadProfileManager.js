@@ -4,6 +4,7 @@ import { Container, Row, Col, Card, Button, Form, Spinner, Alert, ListGroup, Inp
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, Filler } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
 
 // Register Chart.js components (important!)
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, Filler);
@@ -64,7 +65,7 @@ function LoadProfileManager() {
 
     const fetchProfiles = () => {
         setLoading(true);
-        axios.get('http://localhost:5000/api/load_profiles')
+        axios.get(`${API_URL}/api/load_profiles`)
             .then(res => setProfiles(res.data))
             .catch(err => setError("Failed to load existing profiles."))
             .finally(() => setLoading(false));
@@ -97,7 +98,7 @@ function LoadProfileManager() {
     
     const handleDelete = (profileId) => {
         if (window.confirm("Are you sure you want to delete this load profile? This action cannot be undone.")) {
-            axios.delete(`http://localhost:5000/api/load_profiles/${profileId}`)
+            axios.delete(`${API_URL}/api/load_profiles/${profileId}`)
                 .then(() => {
                     alert('Profile deleted successfully!');
                     fetchProfiles(); // Refresh the list
@@ -125,7 +126,7 @@ function LoadProfileManager() {
         if (editingProfile) {
             // This is an UPDATE action (only name and description)
             const payload = { name: profileName, description: profileDesc };
-            axios.put(`http://localhost:5000/api/load_profiles/${editingProfile.id}`, payload)
+            axios.put(`${API_URL}/api/load_profiles/${editingProfile.id}`, payload)
                 .then(() => {
                     setFormSuccess("Profile updated successfully!");
                     handleClearForm();
@@ -141,7 +142,7 @@ function LoadProfileManager() {
             formData.append('description', profileDesc);
             formData.append('profile_type', profileType);
 
-            axios.post('http://localhost:5000/api/load_profiles', formData, {
+            axios.post(`${API_URL}/api/load_profiles`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             })
             .then(() => {

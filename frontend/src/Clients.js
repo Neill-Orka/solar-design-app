@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
+import { API_URL } from "./apiConfig";
 
 function Clients() {
   const [clients, setClients] = useState([]);
@@ -10,7 +11,7 @@ function Clients() {
   }, []);
 
   const loadClients = () => {
-    axios.get("http://localhost:5000/api/clients")
+    axios.get(`${API_URL}/api/clients`)
       .then((response) => {
         setClients(response.data);
       })
@@ -22,7 +23,7 @@ function Clients() {
 
   const handleDelete = (id) => {
     if (window.confirm("Are you sure you want to delete this client? This action cannot be undone.")) {
-      axios.delete(`http://localhost:5000/api/clients/${id}`)
+      axios.delete(`${API_URL}/api/clients/${id}`)
         .then((response) => {
           alert("Client deleted successfully!");
           loadClients(); // Reload clients after deletion
