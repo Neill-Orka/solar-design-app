@@ -26,16 +26,22 @@ function Clients() {
       })
       .finally(() => setLoading(false));
   };
-
   const handleDelete = (id) => {
     if (window.confirm("Are you sure you want to delete this client? This action cannot be undone.")) {
       axios.delete(`${API_URL}/api/clients/${id}`)
         .then((response) => {
           loadClients(); // Reload clients after deletion
+          setError(''); // Clear any previous errors
         })
         .catch((error) => {
           console.error("Error deleting client:", error);
-          setError("Failed to delete client: " + (error.response?.data?.error || error.message));
+          const errorResponse = error.response?.data;
+          if (errorResponse && errorResponse.message) {
+            // Show the user-friendly message from backend
+            setError(errorResponse.message);
+          } else {
+            setError("Failed to delete client: " + (errorResponse?.error || error.message));
+          }
         });
     }
   };

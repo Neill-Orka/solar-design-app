@@ -1,20 +1,29 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Container, Row, Col, Card, Button, Form, Spinner, Alert } from 'react-bootstrap';
 import { API_URL } from "./apiConfig";
 
 function EditProject() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     axios.get(`${API_URL}/api/projects/${id}`)
-      .then((res) => setProject(res.data))
+      .then((res) => {
+        setProject(res.data);
+        setError('');
+      })
       .catch((err) => {
         console.error('Error loading project:', err);
-        alert('Failed to load project');
-      });
+        setError('Failed to load project: ' + (err.response?.data?.error || err.message));
+      })
+      .finally(() => setLoading(false));
   }, [id]);
 
   const handleChange = (e) => {
@@ -26,74 +35,290 @@ function EditProject() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
     axios.put(`${API_URL}/api/projects/${id}`, project)
       .then(() => {
-        alert('Project updated successfully!');
-        navigate('/projects');
+        setSuccess('Project updated successfully!');
+        setTimeout(() => navigate('/projects'), 1500);
       })
       .catch((err) => {
         console.error('Error updating project:', err);
-        alert('Failed to update project');
-      });
+        setError('Failed to update project: ' + (err.response?.data?.error || err.message));
+      })
+      .finally(() => setSaving(false));
   };
 
-  if (!project) return <div className="container mt-5">Loading...</div>;
+  if (loading) {
+    return (
+      <div className='min-vh-100 d-flex align-items-center justify-content-center' style={{ backgroundColor: '#f8f9fa' }}>
+        <Spinner animation="border" className="text-primary" />
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className='min-vh-100 d-flex align-items-center justify-content-center' style={{ backgroundColor: '#f8f9fa' }}>
+        <Alert variant="danger">Project not found</Alert>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mt-5">
-      <h2>Edit Project</h2>
-      <form onSubmit={handleSubmit} className="row g-3">
-        <div className="col-md-6">
-          <label className="form-label">Project Name</label>
-          <input type="text" className="form-control" name="name" value={project.name} onChange={handleChange} required />
-        </div>
-        <div className="col-md-6">
-          <label className="form-label">Description</label>
-          <input type="text" className="form-control" name="description" value={project.description || ''} onChange={handleChange} />
-        </div>
-        <div className="col-md-4">
-          <label className="form-label">System Type</label>
-          <select className="form-select" name="system_type" value={project.system_type || ''} onChange={handleChange}>
-            <option value="">Select</option>
-            <option value="grid">Grid-Tied</option>
-            <option value="hybrid">Hybrid</option>
-            <option value="off-grid">Off-Grid</option>
-          </select>
-        </div>
-        <div className="col-md-4">
-          <label className="form-label">Panel Size (kWp)</label>
-          <input type="number" className="form-control" name="panel_kw" value={project.panel_kw || ''} onChange={handleChange} />
-        </div>
-        <div className="col-md-4">
-          <label className="form-label">Inverter Size (kVA)</label>
-          <input type="number" className="form-control" name="inverter_kva" value={project.inverter_kva || ''} onChange={handleChange} />
-        </div>
-        {project.system_type !== 'grid' && (
-          <div className="col-md-4">
-            <label className="form-label">Battery Size (kWh)</label>
-            <input type="number" className="form-control" name="battery_kwh" value={project.battery_kwh || ''} onChange={handleChange} />
-          </div>
-        )}
-        <div className="col-md-6">
-          <label className="form-label">Location</label>
-          <input type="text" className="form-control" name="location" value={project.location || ''} onChange={handleChange} />
-        </div>
-        <div className="col-md-6">
-          <label className="form-label">Project Value (excl. VAT)</label>
-          <input type="number" className="form-control" name="project_value_excl_vat" value={project.project_value_excl_vat || ''} onChange={handleChange} />
-        </div>
-        <div className="col-md-6">
-          <label className="form-label">Site Contact Person</label>
-          <input type="text" className="form-control" name="site_contact_person" value={project.site_contact_person || ''} onChange={handleChange} />
-        </div>
-        <div className="col-md-6">
-          <label className="form-label">Site Phone</label>
-          <input type="text" className="form-control" name="site_phone" value={project.site_phone || ''} onChange={handleChange} />
-        </div>
-        <div className="col-12">
-          <button className="btn btn-primary">Save Changes</button>
-        </div>
-      </form>
+    <div className='min-vh-100' style={{ backgroundColor: '#f8f9fa' }}>
+      <Container fluid className="py-4 py-md-5">
+        <Row className="justify-content-center">
+          <Col lg={10} xl={8}>
+            <Card className="shadow-lg border-0 rounded-xl p-4 p-md-5">
+              <div className="text-center mb-5">
+                <div className="bg-primary bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
+                  <i className="bi bi-pencil-square text-primary" style={{fontSize: '2rem'}}></i>
+                </div>
+                <h2 className="text-3xl font-bold text-gray-800 mb-1">Edit Project</h2>
+                <p className="text-muted">Update project details and configuration</p>
+              </div>
+
+              {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
+              {success && <Alert variant="success" className="mb-4">{success}</Alert>}
+
+              <Form onSubmit={handleSubmit}>
+                {/* Basic Project Information */}
+                <Card className="border-light mb-4">
+                  <Card.Header className="bg-light border-0">
+                    <h5 className="mb-0 fw-semibold">
+                      <i className="bi bi-clipboard-data me-2"></i>Project Information
+                    </h5>
+                  </Card.Header>                  <Card.Body className="p-4">
+                    <Row>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Project Name</Form.Label>
+                          <Form.Control 
+                            type="text" 
+                            name="name" 
+                            value={project.name || ''} 
+                            onChange={handleChange} 
+                            required 
+                            size="lg"
+                            className="rounded-lg"
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Location</Form.Label>
+                          <Form.Control 
+                            type="text" 
+                            name="location" 
+                            value={project.location || ''} 
+                            onChange={handleChange} 
+                            size="lg"
+                            className="rounded-lg"
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Design Type</Form.Label>
+                          <Form.Select 
+                            name="design_type" 
+                            value={project.design_type || ''} 
+                            onChange={handleChange}
+                            size="lg"
+                            className="rounded-lg"
+                          >
+                            <option value="">-- Choose Type --</option>
+                            <option value="Quick">Quick Design</option>
+                            <option value="Detailed">Detailed Design</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Project Type</Form.Label>
+                          <Form.Select 
+                            name="project_type" 
+                            value={project.project_type || ''} 
+                            onChange={handleChange}
+                            size="lg"
+                            className="rounded-lg"
+                          >
+                            <option value="">-- Choose Type --</option>
+                            <option value="Residential">Residential</option>
+                            <option value="Commercial">Commercial</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={12}>
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Description</Form.Label>
+                          <Form.Control 
+                            as="textarea"
+                            rows={2}
+                            name="description" 
+                            value={project.description || ''} 
+                            onChange={handleChange} 
+                            className="rounded-lg"
+                          />
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+
+                {/* System Configuration */}
+                <Card className="border-light mb-4">
+                  <Card.Header className="bg-light border-0">
+                    <h5 className="mb-0 fw-semibold">
+                      <i className="bi bi-tools me-2"></i>System Configuration
+                    </h5>
+                  </Card.Header>
+                  <Card.Body className="p-4">
+                    <Row>
+                      <Col md={4}>
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">System Type</Form.Label>
+                          <Form.Select 
+                            name="system_type" 
+                            value={project.system_type || ''} 
+                            onChange={handleChange}
+                            size="lg"
+                            className="rounded-lg"
+                          >
+                            <option value="">-- Choose Type --</option>
+                            <option value="grid">Grid-Tied</option>
+                            <option value="hybrid">Hybrid</option>
+                            <option value="off-grid">Off-Grid</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={4}>
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Panel Size (kWp)</Form.Label>
+                          <Form.Control 
+                            type="number" 
+                            name="panel_kw" 
+                            value={project.panel_kw || ''} 
+                            onChange={handleChange} 
+                            step="0.1"
+                            size="lg"
+                            className="rounded-lg"
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={4}>
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Inverter Size (kVA)</Form.Label>
+                          <Form.Control 
+                            type="number" 
+                            name="inverter_kva" 
+                            value={project.inverter_kva || ''} 
+                            onChange={handleChange} 
+                            step="0.1"
+                            size="lg"
+                            className="rounded-lg"
+                          />
+                        </Form.Group>
+                      </Col>
+                      {project.system_type !== 'grid' && (
+                        <Col md={4}>
+                          <Form.Group className="mb-3">
+                            <Form.Label className="fw-semibold">Battery Size (kWh)</Form.Label>
+                            <Form.Control 
+                              type="number" 
+                              name="battery_kwh" 
+                              value={project.battery_kwh || ''} 
+                              onChange={handleChange} 
+                              step="0.1"
+                              size="lg"
+                              className="rounded-lg"
+                            />
+                          </Form.Group>
+                        </Col>
+                      )}
+                      <Col md={4}>
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Project Value (excl. VAT)</Form.Label>
+                          <Form.Control 
+                            type="number" 
+                            name="project_value_excl_vat" 
+                            value={project.project_value_excl_vat || ''} 
+                            onChange={handleChange} 
+                            step="0.01"
+                            size="lg"
+                            className="rounded-lg"
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={4}>
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Site Contact Person</Form.Label>
+                          <Form.Control 
+                            type="text" 
+                            name="site_contact_person" 
+                            value={project.site_contact_person || ''} 
+                            onChange={handleChange} 
+                            size="lg"
+                            className="rounded-lg"
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={4}>
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Site Phone</Form.Label>
+                          <Form.Control 
+                            type="text" 
+                            name="site_phone" 
+                            value={project.site_phone || ''} 
+                            onChange={handleChange} 
+                            size="lg"
+                            className="rounded-lg"
+                          />
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+
+                {/* Action Buttons */}
+                <div className="d-flex gap-3 mt-4">
+                  <Button 
+                    type="submit" 
+                    variant="primary" 
+                    size="lg" 
+                    disabled={saving}
+                    className="flex-fill rounded-lg"
+                  >
+                    {saving ? (
+                      <>
+                        <Spinner as="span" animation="border" size="sm" className="me-2" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-check-lg me-2"></i>
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline-secondary" 
+                    size="lg" 
+                    onClick={() => navigate('/projects')}
+                    className="flex-fill rounded-lg"
+                  >
+                    <i className="bi bi-arrow-left me-2"></i>
+                    Cancel
+                  </Button>
+                </div>
+              </Form>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
     </div>
   );
 }

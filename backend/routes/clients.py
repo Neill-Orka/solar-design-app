@@ -87,6 +87,15 @@ def delete_client(client_id):
         if not client:
             return jsonify({'error': 'Client not found'}), 404
 
+        # Check if client has any projects
+        if client.projects:
+            project_names = [project.name for project in client.projects]
+            return jsonify({
+                'error': 'Cannot delete client with existing projects',
+                'message': f'This client has {len(client.projects)} project(s): {", ".join(project_names)}. Please delete all projects first before deleting the client.',
+                'projects': project_names
+            }), 400
+
         db.session.delete(client)
         db.session.commit()
         return jsonify({'message': 'Client deleted successfully!'})

@@ -16,16 +16,12 @@ import { Spinner, Alert } from 'react-bootstrap'; // Import Spinner and Alert fo
 
 function ProjectDashboard() {
   const { id: projectId } = useParams();  // project_id from URL
-  const [project, setProject] = useState(null);
-  const [activeTab, setActiveTab] = useState('upload');
+  const [project, setProject] = useState(null);  const [activeTab, setActiveTab] = useState('upload');
   const [currentStep, setCurrentStep] = useState(1); // Tracks quick design step
-  const [basicInfo, setBasicInfo] = useState(null);
-  const [selectedProfile, setSelectedProfile] = useState(null);
-  const [selectedSystem, setSelectedSystem] = useState(null);
   const [quickDesignData, setQuickDesignData] = useState({
     consumption: '',
     tariff: '',
-    consumerType: 'Residential', // Default to Residential
+    consumerType: 'Residential', // Default to Residential, will be overridden by project data
     transformerSize: '',
     selectedProfileId: null,
     profileScaler: 1, // Default scaler
@@ -33,13 +29,19 @@ function ProjectDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   useEffect(() => {
     const fetchData = async () => {
         try {
             // Fetch project details (client name, etc.)
             const projectRes = await axios.get(`${API_URL}/api/projects/${projectId}`);
             setProject(projectRes.data);
+            
+            // Set the consumerType based on project_type from the project
+            setQuickDesignData(prevData => ({
+                ...prevData,
+                consumerType: projectRes.data.project_type || 'Residential'
+            }));
+            
             // Fetch existing quick design data
             const quickDesignRes = await axios.get(`${API_URL}/api/projects/${projectId}/quick_design`);
             if (quickDesignRes.data) {

@@ -48,11 +48,41 @@ function AddProject() {
       [e.target.name]: e.target.value
     });
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    // Validation
+    if (!selectedClientId) {
+      setError('Please select a client.');
+      setLoading(false);
+      return;
+    }
+
+    if (!projectData.name.trim()) {
+      setError('Please enter a project name.');
+      setLoading(false);
+      return;
+    }
+
+    if (!projectData.design_type) {
+      setError('Please select a design type.');
+      setLoading(false);
+      return;
+    }
+
+    if (!projectData.system_type) {
+      setError('Please select a system type.');
+      setLoading(false);
+      return;
+    }
+
+    if (!projectData.project_type) {
+      setError('Please select a project type.');
+      setLoading(false);
+      return;
+    }
 
     let clientId = selectedClientId;
 
