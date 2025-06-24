@@ -80,8 +80,8 @@ function ProposalPage() {
         return {
             labels,
             datasets: [
-                { label: 'Home Energy Demand (kW)', data: sim.demand.slice(startIndex, endIndex), borderColor: '#ef4444', backgroundColor: '#fee2e2', fill: true, tension: 0.3, pointRadius: 0 },
-                { label: 'Solar Production (kW)', data: sim.generation.slice(startIndex, endIndex), borderColor: '#f59e0b', backgroundColor: '#fef3c7', fill: true, tension: 0.3, pointRadius: 0 },
+                { label: 'Home Energy Demand (kW)', data: sim.demand.slice(startIndex, endIndex), borderColor: '#ef4444', backgroundColor: '#fee2e2', fill: false, tension: 0.3, pointRadius: 0 },
+                { label: 'Solar Production (kW)', data: sim.generation.slice(startIndex, endIndex), borderColor: '#f59e0b', backgroundColor: '#fef3c7', fill: false, tension: 0.3, pointRadius: 0 },
                 { label: 'Grid Import (kW)', data: sim.import_from_grid.slice(startIndex, endIndex), borderColor: '#8b5cf6', fill: false, borderWidth: 1.5, borderDash: [5, 5], pointRadius: 0 },
                 { label: 'Battery SOC (%)', data: sim.battery_soc.slice(startIndex, endIndex), borderColor: '#22c55e', yAxisID: 'y1', pointRadius: 0, borderWidth: 2.5 }
             ]

@@ -1,17 +1,17 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { Modal, Button } from 'react-bootstrap';
-import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
+import { Container, Row, Col, Card, Button, Modal, Badge, Spinner, Alert, Dropdown } from 'react-bootstrap';
+import { API_URL } from './apiConfig';
 
-// A styled component for key project metrics
-const ProjectStat = ({ icon, label, value }) => (
-  <div className="d-flex flex-column">
-    <small className="text-muted d-flex align-items-center" style={{ fontSize: '0.8rem' }}>
-      <i className={`bi ${icon} me-2`}></i>
-      {label}
-    </small>
-    <span className="fw-bold text-gray-800 mt-1">{value}</span>
+// A compact styled component for key project metrics
+const ProjectStat = ({ icon, label, value, variant = "secondary" }) => (
+  <div className="d-flex align-items-center">
+    <i className={`bi ${icon} me-2 text-muted`} style={{ fontSize: '0.9rem' }}></i>
+    <div>
+      <small className="text-muted d-block" style={{ fontSize: '0.75rem', lineHeight: '1' }}>{label}</small>
+      <Badge bg={variant} className="mt-1" style={{ fontSize: '0.7rem' }}>{value}</Badge>
+    </div>
   </div>
 );
 
@@ -62,7 +62,6 @@ function Projects() {
         setShowDeleteModal(false);
       });
   };
-
   // Memoize the filtering logic to prevent re-calculation on every render
   const filteredProjects = useMemo(() => {
     return projects.filter(p =>
@@ -71,146 +70,205 @@ function Projects() {
       p.location.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [projects, searchTerm]);
-
-  const renderSystemSize = (project) => {
-    const panel = project.panel_kw ? `${project.panel_kw} kWp` : 'N/A';
-    let inverter = 'N/A';
-    if (project.inverter_kva) {
-      inverter = typeof project.inverter_kva === 'object' && 'capacity' in project.inverter_kva
-        ? `${project.inverter_kva.capacity} kVA (x${project.inverter_kva.quantity})`
-        : `${project.inverter_kva} kVA`;
-    }
-    return `${panel} / ${inverter}`;
-  };
-
-  const renderBatterySize = (project) => {
-      if (project.system_type === 'grid' || !project.battery_kwh) return 'None';
-      return typeof project.battery_kwh === 'object' && 'capacity' in project.battery_kwh
-        ? `${project.battery_kwh.capacity} kWh (x${project.battery_kwh.quantity})`
-        : `${project.battery_kwh} kWh`;
-  };
-
   return (
-    <>
-      <div className="min-vh-100" style={{ backgroundColor: '#f3f4f6' }}>
-        <div className="container-fluid" style={{ maxWidth: '1000px', padding: '2rem 1rem' }}>
-          
-          {/* --- HEADER SECTION --- */}
-          {/* <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-5"> */}
-          <div className="bg-white p-4 p-md-5 rounded-xl shadow-sm mb-5">  
-            <div className="d-flex justify-content-between align-items-start mb-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800">Projects</h1>
-                <p className="text-muted d-none d-md-block">
-                  Search, view, and manage all your client projects.
-                </p>
+    <div className='min-vh-100' style={{ backgroundColor: '#f8f9fa' }}>
+      <Container fluid className="py-4 py-md-5">
+        <Row className="justify-content-center">
+          <Col lg={12} xl={10}>
+            <Card className="shadow-lg border-0 rounded-xl p-4 p-md-5">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                  <h2 className="text-3xl font-bold text-gray-800 mb-1">
+                    <i className="bi bi-folder-fill me-3"></i>Projects
+                  </h2>
+                  <p className="text-muted mb-0">Manage your solar design projects</p>
+                </div>
+                <Link
+                  to="/projects/add"
+                  className="btn btn-primary shadow-sm"
+                >
+                  <i className="bi bi-plus-lg me-2"></i>New Project
+                </Link>
               </div>
-              <Link
-                to="/projects/add"
-                className="btn btn-primary fw-semibold d-flex align-items-center shadow-sm flex-shrink-0"
-                style={{ backgroundColor: '#2563eb', borderColor: '#1d4ed8', padding: '0.6rem 1rem' }}
-              >
-                <i className="bi bi-plus-lg me-2"></i>
-                <span className="d-none d-sm-inline">New Project</span>
-              </Link>
-            </div>
 
-            {/* Bottom Row: Search Bar */}
-            <div className="position-relative">
-              <i className="bi bi-search position-absolute" style={{ top: '50%', transform: 'translateY(-50%)', left: '16px', color: '#6b7280', fontSize: '1.1rem' }}></i>
-              <input
-                type="text"
-                placeholder="Search projects by name, client, or location..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="form-control form-control-lg ps-5" // Use form-control-lg for a better feel
-                style={{ borderRadius: '0.75rem', borderColor: '#d1d5db' }}
-              />
-            </div>
-          </div>
+              {/* Search Bar */}
+              <div className="mb-4">
+                <div className="position-relative">
+                  <i className="bi bi-search position-absolute" style={{ top: '50%', transform: 'translateY(-50%)', left: '16px', color: '#6b7280', fontSize: '1.1rem' }}></i>
+                  <input
+                    type="text"
+                    placeholder="Search projects by name, client, or location..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="form-control form-control-lg ps-5 rounded-lg"
+                    style={{ borderColor: '#d1d5db' }}
+                  />
+                </div>
+              </div>
 
-          {/* --- ALERTS & LOADING --- */}
-          {loading && <div className="text-center p-5"><div className="spinner-border text-primary" role="status"><span className="visually-hidden">Loading...</span></div></div>}
-          {error && <div className="alert alert-danger shadow-sm"><i className="bi bi-exclamation-triangle-fill me-2"></i>{error}</div>}
-
-          {/* --- PROJECTS LIST --- */}
-          {!loading && !error && (
-            <div className="d-grid gap-4">
-              {filteredProjects.length > 0 ? (
-                filteredProjects.map((project) => (
-                  <div key={project.id} className="bg-white rounded-xl shadow-sm border border-gray-200 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-                    <div className="p-4 p-md-5 d-flex flex-column flex-md-row align-items-start">
-                      
-                      <div className="flex-grow-1">
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                          <div>
-                            <span className="badge bg-primary-subtle text-primary-emphasis rounded-pill mb-2 me-2">{project.project_type || 'Commercial'}</span>
-                            <span className="badge bg-secondary-subtle text-secondary-emphasis rounded-pill mb-2">{project.design_type || 'Detailed'}</span>
-                            <h4 className="card-title text-xl font-semibold text-gray-900 mb-1">{project.name}</h4>
-                            <p className="card-subtitle text-muted">
-                              <i className="bi bi-person-circle me-1"></i> {project.client_name}
-                              <span className="mx-2 text-gray-300">|</span>
-                              <i className="bi bi-geo-alt-fill me-1"></i> {project.location}
-                            </p>
-                          </div>
-                          {/* --- ACTION BUTTONS (DESKTOP) --- */}
-                          <div className="d-none d-md-flex align-items-center ms-4">
-                            <Link to={`/projects/edit/${project.id}`} className="btn btn-sm btn-outline-secondary me-2"><i className="bi bi-pencil-square"></i></Link>
-                            <Button variant="outline-danger" size="sm" onClick={() => handleDeleteRequest(project.id)}><i className="bi bi-trash-fill"></i></Button>
-                            <Link to={`/projects/${project.id}`} className="btn btn-dark btn-sm ms-3 fw-semibold">
-                                Open <i className="bi bi-arrow-right ms-1"></i>
-                            </Link>
-                          </div>
-                        </div>
-
-                        <div className="border-top my-4"></div>
-
-                        <div className="d-grid gap-4" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))'}}>
-                           <ProjectStat icon="bi-sun" label="System Size" value={renderSystemSize(project)} />
-                           <ProjectStat icon="bi-battery-half" label="Battery Storage" value={renderBatterySize(project)} />
-                           <ProjectStat icon="bi-building" label="System Type" value={project.system_type || 'Not Set'} />
-                        </div>
-                      </div>
-                    </div>
-                    {/* --- ACTION BUTTONS (MOBILE) --- */}
-                    <div className="d-md-none border-top bg-light p-3 d-flex justify-content-end rounded-bottom-xl">
-                        <Link to={`/projects/edit/${project.id}`} className="btn btn-sm btn-outline-secondary me-2">Edit</Link>
-                        <Button variant="outline-danger" size="sm" onClick={() => handleDeleteRequest(project.id)}>Delete</Button>
-                        <Link to={`/projects/${project.id}`} className="btn btn-dark btn-sm ms-2 fw-semibold">
-                            Open Project <i className="bi bi-arrow-right ms-1"></i>
-                        </Link>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-5 bg-white rounded-xl shadow-sm">
-                  <i className="bi bi-search" style={{fontSize: '3rem', color: '#9ca3af'}}></i>
-                  <h4 className="mt-3 text-gray-700">No Projects Found</h4>
-                  <p className="text-gray-500">
-                    {searchTerm ? `Your search for "${searchTerm}" did not return any results.` : 'Click "New" to create your first project.'}
-                  </p>
+              {loading && (
+                <div className="text-center py-5">
+                  <Spinner animation="border" className="text-primary" />
                 </div>
               )}
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* --- DELETE MODAL --- */}
+              {error && (
+                <Alert variant="danger" className="mb-4">
+                  <i className="bi bi-exclamation-triangle-fill me-2"></i>{error}
+                </Alert>
+              )}
+
+              {!loading && !error && (
+                <>
+                  {filteredProjects.length === 0 ? (
+                    <div className="text-center py-5">
+                      <i className="bi bi-folder-x" style={{fontSize: '4rem', color: '#9ca3af'}}></i>
+                      <h4 className="mt-3 text-gray-700">No Projects Found</h4>
+                      <p className="text-muted mb-4">
+                        {searchTerm ? `No projects match "${searchTerm}"` : 'Start creating your first solar project.'}
+                      </p>
+                      {!searchTerm && (
+                        <Link to="/projects/add" className="btn btn-primary">
+                          <i className="bi bi-plus-lg me-2"></i>Create Your First Project
+                        </Link>
+                      )}
+                    </div>
+                  ) : (
+                    <Row xs={1} md={2} lg={3} className="g-4">
+                      {filteredProjects.map((project) => (
+                        <Col key={project.id}>
+                          <Card className="h-100 shadow-sm border-light hover-shadow">
+                            <Card.Body className="p-4">                              {/* Header with badges */}
+                              <div className="d-flex align-items-start justify-content-between mb-3">
+                                <div className="d-flex flex-wrap gap-1">
+                                  <Badge bg="primary" className="mb-1">{project.project_type || 'Commercial'}</Badge>
+                                  <Badge bg="secondary" className="mb-1">{project.design_type || 'Detailed'}</Badge>
+                                  {project.system_type && (
+                                    <Badge bg="info" className="mb-1 text-capitalize">{project.system_type}</Badge>
+                                  )}
+                                </div>
+                                <Dropdown align="end">
+                                  <Dropdown.Toggle 
+                                    variant="link" 
+                                    className="p-0 text-muted border-0 shadow-none"
+                                    style={{ boxShadow: 'none !important' }}
+                                  >
+                                    <i className="bi bi-three-dots-vertical"></i>
+                                  </Dropdown.Toggle>
+
+                                  <Dropdown.Menu>
+                                    <Dropdown.Item as={Link} to={`/projects/${project.id}`}>
+                                      <i className="bi bi-eye me-2"></i>View Project
+                                    </Dropdown.Item>
+                                    <Dropdown.Item as={Link} to={`/projects/edit/${project.id}`}>
+                                      <i className="bi bi-pencil me-2"></i>Edit Project
+                                    </Dropdown.Item>
+                                    <Dropdown.Divider />
+                                    <Dropdown.Item 
+                                      className="text-danger" 
+                                      onClick={() => handleDeleteRequest(project.id)}
+                                    >
+                                      <i className="bi bi-trash me-2"></i>Delete Project
+                                    </Dropdown.Item>
+                                  </Dropdown.Menu>
+                                </Dropdown>
+                              </div>
+
+                              {/* Project name and client */}
+                              <Card.Title className="h5 mb-2 text-truncate">{project.name}</Card.Title>
+                              <div className="mb-3">
+                                <div className="d-flex align-items-center mb-1">
+                                  <i className="bi bi-person me-2 text-muted" style={{fontSize: '0.9rem'}}></i>
+                                  <small className="text-muted text-truncate">{project.client_name}</small>
+                                </div>
+                                <div className="d-flex align-items-center">
+                                  <i className="bi bi-geo-alt me-2 text-muted" style={{fontSize: '0.9rem'}}></i>
+                                  <small className="text-muted text-truncate">{project.location || 'No location'}</small>
+                                </div>
+                              </div>
+
+                              {/* System specs in compact format */}
+                              <div className="mb-3">
+                                <Row className="g-2">
+                                  <Col xs={6}>
+                                    <ProjectStat 
+                                      icon="bi-sun" 
+                                      label="Solar" 
+                                      value={project.panel_kw ? `${project.panel_kw}kWp` : 'N/A'}
+                                      variant="warning"
+                                    />
+                                  </Col>
+                                  <Col xs={6}>
+                                    <ProjectStat 
+                                      icon="bi-lightning" 
+                                      label="Inverter" 
+                                      value={project.inverter_kva ? `${project.inverter_kva}kVA` : 'N/A'}
+                                      variant="info"
+                                    />
+                                  </Col>
+                                  {project.system_type !== 'grid' && project.battery_kwh && (
+                                    <Col xs={12}>
+                                      <ProjectStat 
+                                        icon="bi-battery-half" 
+                                        label="Battery" 
+                                        value={`${project.battery_kwh}kWh`}
+                                        variant="success"
+                                      />
+                                    </Col>
+                                  )}
+                                </Row>
+                              </div>
+
+                              {/* Action button */}
+                              <Link 
+                                to={`/projects/${project.id}`} 
+                                className="btn btn-outline-primary btn-sm w-100"
+                              >
+                                <i className="bi bi-arrow-right-circle me-2"></i>
+                                Open Project
+                              </Link>
+                            </Card.Body>
+                          </Card>
+                        </Col>
+                      ))}
+                    </Row>
+                  )}
+                </>
+              )}
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+
+      {/* Delete Modal */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Confirm Deletion</Modal.Title>
+        <Modal.Header closeButton className="bg-light">
+          <Modal.Title>
+            <i className="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+            Confirm Deletion
+          </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
-          <p>Are you sure you want to delete this project? All associated data will be permanently removed.</p>
-          <p className="fw-bold text-danger">This action cannot be undone.</p>
+        <Modal.Body className="p-4">
+          <p className="mb-2">Are you sure you want to delete this project?</p>
+          <p className="text-muted mb-3">All associated data will be permanently removed.</p>
+          <div className="bg-danger bg-opacity-10 border border-danger border-opacity-25 rounded p-3">
+            <p className="fw-bold text-danger mb-0">
+              <i className="bi bi-exclamation-circle me-2"></i>
+              This action cannot be undone.
+            </p>
+          </div>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
-          <Button variant="danger" onClick={handleConfirmDelete}>Delete Project</Button>
+        <Modal.Footer className="bg-light">
+          <Button variant="outline-secondary" onClick={() => setShowDeleteModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={handleConfirmDelete}>
+            <i className="bi bi-trash-fill me-2"></i>
+            Delete Project
+          </Button>
         </Modal.Footer>
       </Modal>
-    </>
+    </div>
   );
 }
 
