@@ -35,6 +35,23 @@ def process_profile_file(file_stream, interval_hours=0.5):
         if len(df) != 17520:
              return {"error": f"Invalid data length. The file must contain exactly 17520 rows for a full year of 30-minute intervals, but found {len(df)}."}
 
+        # Normalization logic
+        #1. Calculate the actual total annual consumption from the file
+        actual_annual_kwh = float(df[demand_col].sum() * interval_hours)
+
+        #2. Handle case where consumption is zero to avoid division by zero
+        if actual_annual_kwh == 0:
+            return {"error": "The total annual consumption is zero. Please check the data."}
+        
+        #3. Define the target annual consumption (1 kWh/month * 12 months)
+        target_annual_kwh = 12.0
+
+        #4. Calculate the normalization factor
+        normalization_factor = target_annual_kwh / actual_annual_kwh
+
+        #5. Apply the factor to the demand column to normalize the data
+        df[demand_col] = df[demand_col] * normalization_factor
+        # --- Normalization complete ---
 
         # Standardize column names for saving
         df.rename(columns={timestamp_col: 'timestamp', demand_col: 'demand_kw'}, inplace=True)
@@ -42,13 +59,13 @@ def process_profile_file(file_stream, interval_hours=0.5):
         # Format timestamp for JSON compatibility
         df['timestamp'] = df['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S')
 
-        # Calculate annual kWh
-        annual_kwh = float(df['demand_kw'].sum() * interval_hours)
+        # New annual kwh for the profile is our normalized target value
+        normalized_annual_kwh = target_annual_kwh
 
         # Prepare JSONB data
         profile_data_json = df[['timestamp', 'demand_kw']].to_dict(orient='records')
         
-        return {"annual_kwh": annual_kwh, "profile_data": profile_data_json, "error": None}
+        return {"annual_kwh": normalized_annual_kwh, "profile_data": profile_data_json, "error": None}
 
     except Exception as e:
         return {"error": str(e)}

@@ -224,7 +224,11 @@ function LoadProfileManager() {
                                                 <p className="fw-bold mb-1">{profile.name}</p>
                                                 <p className="text-muted text-sm mb-2">{profile.description}</p>
                                                 <Badge pill bg={profile.profile_type === 'Residential' ? 'success' : 'info'}>{profile.profile_type}</Badge>
-                                                <Badge pill bg="secondary" className="ms-2">{profile.annual_kwh?.toLocaleString(undefined, {maximumFractionDigits: 0})} kWh/yr</Badge>
+                                                {profile.annual_kwh > 0 && (
+                                                    <Badge pill bg="secondary" className='ms-2'>
+                                                        {Math.round(profile.annual_kwh/12).toLocaleString()} kWh/month
+                                                    </Badge>
+                                                )}
                                             </Col>
                                             <Col xs={12} md={4} className="d-flex flex-column justify-content-center align-items-md-end">
                                                 <ProfileMiniChart profileData={profile.profile_data} />
