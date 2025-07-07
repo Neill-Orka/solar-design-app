@@ -77,10 +77,14 @@ def run_quick_financials(sim_response, system_cost, tariff):
         potential_generation_kwh = sum(pg * time_interval_hours for pg in potential_generation)
         total_import_kwh = sum(imp * time_interval_hours for imp in imports)
         total_export_kwh = 0 # Hardcoded to zero
-        pv_used_on_site_kwh = total_generation_kwh - total_export_kwh
+        pv_used_on_site_kwh = total_generation_kwh - total_import_kwh
         yield_incl_losses = total_generation_kwh / panel_kw / 365
         yield_excl_losses = potential_generation_kwh / panel_kw / 365
+
+        self_consumption_rate = round((pv_used_on_site_kwh / total_generation_kwh) * 100, 1) if total_generation_kwh > 0 else 0
         
+        grid_independence_rate = round((pv_used_on_site_kwh / total_demand_kwh) * 100, 1) if total_demand_kwh > 0 else 0
+
         original_annual_cost = total_demand_kwh * tariff
         new_annual_cost = total_import_kwh * tariff
         annual_savings = original_annual_cost - new_annual_cost
@@ -107,8 +111,8 @@ def run_quick_financials(sim_response, system_cost, tariff):
             "pv_used_on_site_kwh": round(pv_used_on_site_kwh),
             "total_import_kwh": round(total_import_kwh),
             "total_export_kwh": round(total_export_kwh),
-            "self_consumption_rate": round((pv_used_on_site_kwh / total_generation_kwh) * 100, 1) if total_generation_kwh > 0 else 0,
-            "grid_independence_rate": round((pv_used_on_site_kwh / total_demand_kwh) * 100, 1) if total_demand_kwh > 0 else 0,
+            "self_consumption_rate": round(self_consumption_rate),
+            "grid_independence_rate": round(grid_independence_rate),
             "cost_comparison": cost_comparison_data,
             "yield_incl_losses": round(yield_incl_losses, 2),
             "yield_excl_losses": round(yield_excl_losses, 2),
