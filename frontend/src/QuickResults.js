@@ -47,6 +47,7 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
     const [error, setError] = useState('');
     const [startDate, setStartDate] = useState(null);
     const [endDate, setEndDate] = useState(null);
+    const [showLosses, setShowLosses] = useState(false)
 
     useEffect(() => {
         const runSimulation = async () => {
@@ -89,7 +90,7 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
         runSimulation();
     }, [basicInfo, selectedSystem]);
     
-    // Memoized chart data to prevent re-calculation on every render
+    // Memorized chart data to prevent re-calculation on every render
     const energyChartData = useMemo(() => {
         if (!data?.simulation || !startDate || !endDate) 
         {
@@ -106,16 +107,49 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
 
         const labels = sim.timestamps.slice(startIndex, endIndex).map(t => new Date(t));
 
-        return {
-            labels,
-            datasets: [
+        const datasets = [
                 { label: 'Demand (kW)', data: sim.demand.slice(startIndex, endIndex), borderColor: '#ff6384', backgroundColor: '#ff638420', tension: 0.3, pointRadius: 0, borderWidth: 2 },
-                { label: 'Solar Generation (kW)', data: sim.generation.slice(startIndex, endIndex), borderColor: '#ffce56', backgroundColor: '#ffce5620', tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                // { label: 'Solar Generation (kW)', data: sim.generation.slice(startIndex, endIndex), borderColor: '#ffce56', backgroundColor: '#ffce5620', tension: 0.3, pointRadius: 0, borderWidth: 2 },
                 { label: 'Grid Import (kW)', data: sim.import_from_grid.slice(startIndex, endIndex), borderColor: '#cc65fe', backgroundColor: '#cc65fe20', tension: 0.3, pointRadius: 0, borderWidth: 1.5, borderDash: [5, 5] },
                 { label: 'Battery SOC (%)', data: sim.battery_soc.slice(startIndex, endIndex), borderColor: '#4bc0c0', backgroundColor: '#4bc0c020', yAxisID: 'y1', tension: 0.3, pointRadius: 0, borderWidth: 2 }
-            ]
-        };
-    }, [data, startDate, endDate]);
+        ];
+
+        if (showLosses) {
+            datasets.push({
+                label: 'PV Generation (kW)',
+                data: sim.generation.slice(startIndex, endIndex),
+                borderColor: '#ffce56',
+                backgroundColor: '#ffce5620',
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2,
+                fill: true,              
+            },
+            {
+                label: 'Throttling Losses',
+                data: sim.potential_generation.slice(startIndex, endIndex),
+                borderColor: 'transparent',
+                backgroundColor: 'rgba(108, 117, 125, 0.3)',
+                pointRadius: 0,
+                fill: 3,
+            }
+        );
+        } 
+        else
+        {
+            datasets.push({
+                label: 'PV Generation (kW)',
+                data: sim.generation.slice(startIndex, endIndex),
+                borderColor: '#ffce56',
+                backgroundColor: '#ffce5620',
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2
+            });            
+        }
+
+        return { labels, datasets };
+    }, [data, startDate, endDate, showLosses]);
 
     const financialChartData = useMemo(() => {
         if (!data?.financials?.cost_comparison) return { labels: [], datasets: [] };
@@ -160,6 +194,18 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
             <Card className="shadow-sm my-4">
                 <Card.Header as="h5" className='d-flex justify-content-between align-items-center flex-wrap'>
                     <span><i className="bi bi-bar-chart-line-fill me-2"></i>Weekly Energy Flow (Sample)</span>
+                    <div className='d-flex align-items-center'>
+                        {/* {Button to toggle losses view} */}
+                        <Button
+                            variant={showLosses ? "primary" : "outline-secondary"}
+                            size="sm"
+                            className='me-3'
+                            onClick={() => setShowLosses(!showLosses)}
+                        >
+                            <i className={`bi ${showLosses ? "bi-eye-slash-fill" : "bi-eye-fill"} me-2`}></i>
+                            {showLosses ? "Hide Losses" : "Show Losses"}
+                        </Button>
+                    </div>
                     <div className='date-picker-container'>
                         <DatePicker
                             selected={startDate}
@@ -198,8 +244,9 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
                                 <tr><td>Energy Imported from Grid</td><td className="text-end fw-bold text-danger">{financials.total_import_kwh.toLocaleString()} kWh</td></tr>
                                 <tr><td>Self-Consumption Rate</td><td className="text-end fw-bold"><Badge bg="primary" className="fs-6">{financials.self_consumption_rate}%</Badge></td></tr>
                                 <tr><td>Grid Independence</td><td className="text-end fw-bold"><Badge bg="primary" className="fs-6">{financials.grid_independence_rate}%</Badge></td></tr>
-                                <tr><td>Yield (incl. throttling losses)</td><td className='text-end fw-bold'><Badge bg="secondary" className="fs-6">{financials.yield_incl_losses} kWp/kWh/day</Badge></td></tr>
-                                <tr><td>Yield (excl. throttling losses)</td><td className='text-end fw-bold'><Badge bg="secondary" className="fs-6">{financials.yield_excl_losses} kWp/kWh/day</Badge></td></tr>
+                                <tr><td>Throttling Losses</td><td className='text-end fw-bold'><Badge bg="warning" text='dark' className='fs-6'>{financials.throttling_loss_percent}%</Badge></td></tr>
+                                <tr><td>Yield (incl. throttling losses)</td><td className='text-end fw-bold'><Badge bg="secondary" className="fs-6">{financials.yield_incl_losses} kWh/kWp/day</Badge></td></tr>
+                                <tr><td>Yield (excl. throttling losses)</td><td className='text-end fw-bold'><Badge bg="secondary" className="fs-6">{financials.yield_excl_losses} kWh/kWp/day</Badge></td></tr>
                             </tbody>
                         </Table>
                     </Card>

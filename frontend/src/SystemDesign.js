@@ -51,6 +51,7 @@ function SystemDesign({ projectId }) {
   const [loading, setLoading] = useState(false);
   const [allowExport, setAllowExport] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
+  const [showLosses, setShowLosses] = useState(false);
 
   // New state variables for metrics
   const [totalPVGeneration, setTotalPVGeneration] = useState(0);
@@ -245,94 +246,73 @@ function SystemDesign({ projectId }) {
   useEffect(() => {
     if (!filtered || !filtered.timestamps.length) return;
 
-    // Determine day vs night
-    const dayData = filtered.timestamps.map((ts, i) => {
-      const hour = new Date(ts).getHours();
-      return { isDaytime: hour >= 6 && hour < 18, index: i };
-    });
+    const timeIntervalHours = 0.5;
 
-    // Total demand
-    const totalDemand = filtered.demand.reduce((sum, val) => sum + val, 0) * 0.5;
+    // 1. Calculate total kWh for the selected period
+    const totalDemandKwh = filtered.demand.reduce((sum, val) => sum + val, 0) * timeIntervalHours;
+    const totalPotentialGenKwh = filtered.potential_generation.reduce((sum, val) => sum + val, 0) * timeIntervalHours;
+    const totalUtilizedGenKwh = filtered.generation.reduce((sum, val) => sum + val, 0) * timeIntervalHours;
+    const totalImportKwh = filtered.import_from_grid.reduce((sum, val) => sum + val, 0) * timeIntervalHours;
+    const totalExportKwh = filtered.export_to_grid.reduce((sum, val) => sum + val, 0) * timeIntervalHours;
 
-    // Daytime demand
-    const daytimeDemand = dayData
-      .filter(d => d.isDaytime)
-      .reduce((sum, d) => sum + filtered.demand[d.index], 0) * 0.5;
+    const pvUsedOnSiteKwh = totalDemandKwh - totalImportKwh;
 
-    // 1. Daytime Consumption (%)
-    const daytimeConsumptionPct = totalDemand > 0 ? (daytimeDemand / totalDemand) * 100 : 0;
+    setTotalPVGeneration(totalPotentialGenKwh.toFixed(0));
+    setUtilizedPVGeneration(pvUsedOnSiteKwh.toFixed(0));
+    setGridImport(totalImportKwh.toFixed(0));
+    setGridExport(totalExportKwh.toFixed(0));
+
+    // --- 2. Calculate percentage-based metrics ---
+    const daytimeDemandKwh = filtered.timestamps.map((ts, i) => {
+        const hour = new Date(ts).getHours();
+        return (hour >= 6 && hour < 18) ? filtered.demand[i] : 0;
+    }).reduce((sum, val) => sum + val, 0) * timeIntervalHours;
+
+    const daytimeConsumptionPct = totalDemandKwh > 0 ? (daytimeDemandKwh / totalDemandKwh) * 100 : 0;
     setDaytimeConsumption(daytimeConsumptionPct.toFixed(0));
 
-    // Total PV Generation
-    const totalPotentialGen = filtered.potential_generation ? filtered.potential_generation.reduce((sum, val) => sum + val, 0) * 0.5 : 
-    filtered.generation.reduce((sum, val) => sum + val, 0) * 0.5;
-    setTotalPVGeneration(totalPotentialGen.toFixed(0));
-
-    // Grid metrics
-    const totalImport = filtered.import_from_grid.reduce((sum, val) => sum + val, 0) * 0.5;
-    setGridImport(totalImport.toFixed(0));
-
-    const totalExport = filtered.export_to_grid.reduce((sum, val) => sum + val, 0) * 0.5;
-    setGridExport(totalExport.toFixed(0));
-
-    // Utilized PV Generation
-    const utilizedGen = filtered.generation.map((gen, i) => {
-      const exportGrid = filtered.export_to_grid[i];
-      return Math.max(0, gen - exportGrid);
-    }).reduce((sum, val) => sum + val, 0) * 0.5;
-    setUtilizedPVGeneration(utilizedGen.toFixed(0));
-
-    // 2. PV Utilization (%)
-    const pvUtilizationPct = totalPotentialGen > 0 ? (utilizedGen / totalPotentialGen) * 100 : 0;
+    // PV Utilization (aka Self-Consumption Rate): Of all solar generated, what % was used on-site?
+    const pvUtilizationPct = totalUtilizedGenKwh > 0 ? (pvUsedOnSiteKwh / totalUtilizedGenKwh) * 100 : 0;
     setPvUtilization(pvUtilizationPct.toFixed(0));
 
-    // 3. Consumption from PV (%)
-    const consumptionFromPVPct = totalDemand > 0 ? (utilizedGen / totalDemand) * 100 : 0;
+    // Consumption from PV (aka Grid Independence Rate): Of all energy consumed, what % came from solar?
+    const consumptionFromPVPct = totalDemandKwh > 0 ? (pvUsedOnSiteKwh / totalDemandKwh) * 100 : 0;
     setConsumptionFromPV(consumptionFromPVPct.toFixed(0));
 
-    // Calculate days in data
+    // --- 3. Calculate daily and annual metrics ---
     const startDate = new Date(filtered.timestamps[0]);
     const endDate = new Date(filtered.timestamps[filtered.timestamps.length - 1]);
-    const daysDiff = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
+    const daysDiff = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24) + 1); // +1 to make it inclusive
 
-    // Daily metrics
-    const potentialGenDaily = totalPotentialGen / daysDiff;
-    setPotentialGenerationDaily(potentialGenDaily.toFixed(0));
-    
-    const utilizedGenDaily = utilizedGen / daysDiff;
-    setUtilizedGenerationDaily(utilizedGenDaily.toFixed(0));
-    
-    const throttlingLosses = totalPotentialGen - utilizedGen;
-    const throttlingLossesDaily = throttlingLosses / daysDiff;
-    setThrottlingLossesDaily(throttlingLossesDaily.toFixed(0));
-    
-    // Specific yield with throttling
-    let specYield = 0;
-    if (systemType === 'grid') {
-      specYield = safeParseFloat(panelKw) > 0 ? (utilizedGenDaily / safeParseFloat(panelKw)) : 0;
-    }
-    else
-    {
-      specYield = safeParseFloat(panelKw) > 0 ? (potentialGenDaily / safeParseFloat(panelKw)) : 0;
-    }
-    setSpecificYieldWithThrottling(specYield.toFixed(2));
-    
-    // Annual projections
+    // Daily
+    const potentialGenDaily = totalPotentialGenKwh / daysDiff;
+    setPotentialGenerationDaily(potentialGenDaily.toFixed(1));
+
+    const utilizedGenDaily = totalUtilizedGenKwh / daysDiff;
+    setUtilizedGenerationDaily(utilizedGenDaily.toFixed(1));
+
+    const throttlingLossesKwh = totalPotentialGenKwh - totalUtilizedGenKwh;
+    const throttlingLossesDaily = throttlingLossesKwh / daysDiff;
+    setThrottlingLossesDaily(throttlingLossesDaily.toFixed(1));
+
+    // Annual Projections
     const daysInYear = 365;
-    const potentialGenAnnual = potentialGenDaily * daysInYear;
-    setPotentialGenerationAnnual(potentialGenAnnual.toFixed(0));
-    
-    const utilizedGenAnnual = utilizedGenDaily * daysInYear;
-    setUtilizedGenerationAnnual(utilizedGenAnnual.toFixed(0));
-    
-    const throttlingLossesAnnual = throttlingLossesDaily * daysInYear;
-    setThrottlingLossesAnnual(throttlingLossesAnnual.toFixed(0));
-    
-    // Specific yield excluding throttling
-    const specificYieldExcl = safeParseFloat(panelKw) > 0 ? utilizedGenAnnual / safeParseFloat(panelKw) : 0;
-    setSpecificYieldExclThrottling(specificYieldExcl.toFixed(0));
-    
-    // Battery cycles calculation
+    setPotentialGenerationAnnual((potentialGenDaily * daysInYear).toFixed(0));
+    setUtilizedGenerationAnnual((utilizedGenDaily * daysInYear).toFixed(0));
+    setThrottlingLossesAnnual((throttlingLossesDaily * daysInYear).toFixed(0));
+
+    // --- 4. Corrected Specific Yield calculations ---
+    const panelKwFloat = safeParseFloat(panelKw);
+
+    // Yield including the effect of throttling (based on what was actually produced)
+    const specYieldInclThrottling = panelKwFloat > 0 ? (utilizedGenDaily / panelKwFloat) : 0;
+    setSpecificYieldWithThrottling(specYieldInclThrottling.toFixed(2));
+
+    // Potential yield excluding the effect of throttling (based on what could have been produced)
+    const specYieldExclThrottling = panelKwFloat > 0 ? (potentialGenDaily / panelKwFloat) : 0;
+    setSpecificYieldExclThrottling(specYieldExclThrottling.toFixed(2));
+
+    // --- 5. Battery cycle calculations (logic remains the same) ---
     if (filtered.battery_soc?.length > 1 && safeParseFloat(batteryKwh) > 0) {
       const totalBatteryCapacity = safeParseFloat(batteryKwh) * batteryQuantity;
       let totalChargeEnergy = 0;
@@ -344,10 +324,8 @@ function SystemDesign({ projectId }) {
         }
       }
       
-      // Daily cycles
-      const dailyCycles = totalBatteryCapacity > 0 ? totalChargeEnergy / totalBatteryCapacity : 0;
-      // Annual projection
-      const cyclesAnnual = (dailyCycles / daysDiff) * 365;
+      const dailyCycles = totalBatteryCapacity > 0 ? (totalChargeEnergy / totalBatteryCapacity) / daysDiff : 0;
+      const cyclesAnnual = dailyCycles * 365;
       setBatteryCyclesAnnual(cyclesAnnual.toFixed(1));
     } else {
       setBatteryCyclesAnnual('-');
@@ -365,7 +343,6 @@ function SystemDesign({ projectId }) {
     } else {
       setBatteryChargeDischarge(0);
     }
-    
   }, [filtered, batteryKwh, batteryQuantity, panelKw]);
 
   // Helper function so safely parse values
@@ -483,6 +460,17 @@ function SystemDesign({ projectId }) {
         <>
           <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
             <h5 className="mb-0">Simulation Results</h5>
+            <div className='d-flex align-items-center'>
+              <Button
+                variant={showLosses ? "primary" : "outline-secondary"}
+                size='sm'
+                className='me-3'
+                onClick={() => setShowLosses(!showLosses)}
+              >
+                <i className={`bi ${showLosses ? "bi-eye-slash-fill": "bi-eye-fill"} me-1`}></i>
+                {showLosses ? "Hide Losses" : "Show Losses"}
+              </Button>
+            </div>
             <div className="btn-group">
               <button className="btn btn-outline-secondary" onClick={() => {
                 const today = new Date();
@@ -523,20 +511,43 @@ function SystemDesign({ projectId }) {
                   tension: 0.3,
                   pointRadius: 0
                 },
-                {
-                  label: 'Generation (kW)',
-                  data: filtered.generation,
-                  borderColor: 'green',
-                  borderWidth: 2,
-                  tension: 0.3,
-                  pointRadius: 0
-                },
+                ...(showLosses
+                  ? [
+                    {
+                      label: 'Utilized Generation (kW)',
+                      data: filtered.generation,
+                      borderColor: 'green',
+                      backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                      fill: false, 
+                      borderWidth: 2,
+                      tension: 0.3,
+                      pointRadius: 0,                      
+                    },
+                    {
+                      label: 'Throttling Losses',
+                      data: filtered.potential_generation,
+                      borderColor: 'transparent',
+                      backgroundColor: 'rgba(108, 117, 125, 0.3)',
+                      pointRadius: 0,
+                      fill: '-1',                     
+                    },
+                  ]
+                : [
+                    {
+                      label: 'Generation (kW)',
+                      data: filtered.generation,
+                      borderColor: 'green',
+                      borderWidth: 2,
+                      tension: 0.3,
+                      pointRadius: 0,                    
+                    },
+                ]),
                 ...(safeParseFloat(batteryKwh)) > 0 ? [{
                   label: 'Battery SOC (%)',
                   data: filtered.battery_soc,
                   borderColor: 'orange',
                   backgroundColor: 'rgba(212, 162, 69, 0.15)',
-                  fill: true,
+                  fill: false,
                   borderWidth: 2,
                   tension: 0.3,
                   pointRadius: 0,
@@ -638,12 +649,12 @@ function SystemDesign({ projectId }) {
             <td>%</td>
           </tr>
           <tr>
-            <td>PV Utilization</td>
+            <td>PV Utilization (Self-Consumption)</td>
             <td>{pvUtilization}</td>
             <td>%</td>
           </tr>
           <tr>
-            <td>Overall Consumption from PV</td>
+            <td>Overall Consumption from PV (Grid Independence)</td>
             <td>{consumptionFromPV}</td>
             <td>%</td>
           </tr>
@@ -663,8 +674,13 @@ function SystemDesign({ projectId }) {
             <td>kWh</td>
           </tr>
           <tr>
-            <td>Specific Yield Including Throttling Losses</td>
+            <td>Specific Yield (incl. losses)</td>
             <td>{specificYieldWithThrottling}</td>
+            <td>kWh/kWp/day</td>
+          </tr>
+          <tr>
+            <td>Potential Yield (excl. losses)</td>
+            <td>{specificYieldExclThrottling}</td>
             <td>kWh/kWp/day</td>
           </tr>
           <tr>
@@ -681,11 +697,6 @@ function SystemDesign({ projectId }) {
             <td>Throttling Losses p.a.</td>
             <td>{throttlingLossesAnnual}</td>
             <td>kWh</td>
-          </tr>
-          <tr>
-            <td>Specific Yield Excl. Throttling Losses</td>
-            <td>{specificYieldExclThrottling}</td>
-            <td>kWh/kWp/y</td>
           </tr>
           <tr>
             <td>Battery cycles in 1 year</td>

@@ -77,7 +77,11 @@ def run_quick_financials(sim_response, system_cost, tariff):
         potential_generation_kwh = sum(pg * time_interval_hours for pg in potential_generation)
         total_import_kwh = sum(imp * time_interval_hours for imp in imports)
         total_export_kwh = 0 # Hardcoded to zero
-        pv_used_on_site_kwh = total_generation_kwh - total_import_kwh
+        pv_used_on_site_kwh = total_demand_kwh - total_import_kwh
+
+        throttled_kwh = potential_generation_kwh - total_generation_kwh
+        throttling_loss_percent = (throttled_kwh / potential_generation_kwh) * 100 if potential_generation_kwh > 0 else 0
+
         yield_incl_losses = total_generation_kwh / panel_kw / 365
         yield_excl_losses = potential_generation_kwh / panel_kw / 365
 
@@ -119,5 +123,6 @@ def run_quick_financials(sim_response, system_cost, tariff):
             "potential_generation_kwh": round(potential_generation_kwh),
             "original_annual_cost": round(original_annual_cost),
             "new_annual_cost": round(new_annual_cost),
+            "throttling_loss_percent": round(throttling_loss_percent, 1)
         }
     except Exception as e: return {"error": str(e)}
