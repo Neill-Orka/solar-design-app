@@ -1,0 +1,42 @@
+.tariff-manager-page {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+}
+
+.tariff-accordion-item {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+.tariff-accordion-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.accordion-header button {
+    background-color: #fff !important;
+    color: #212529 !important;
+    box-shadow: none !important;
+}
+
+.accordion-header button:not(.collapsed) {
+    background-color: #e7f1ff !important;
+    border-bottom: 1px solid #cce0ff;
+}
+
+.tariff-header-info {
+    flex-grow: 1;
+}
+
+.tariff-actions {
+    flex-shrink: 0;
+}
+
+.accordion-body {
+    background-color: #fdfdff;
+}
+
+.border-dashed {
+    border: 1px dashed #ced4da;
+}

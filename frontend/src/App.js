@@ -15,6 +15,7 @@ import Optimize from './Optimize';
 import SystemBuilder from './SystemBuilder';
 import ProposalPage from './ProposalPage';
 import LoadProfileManager from './LoadProfileManager';
+import TariffManager from './TariffManager';
 
 import logo from './assets/orka_logo_transparent_background.png';
 import './Navbar.css';
@@ -64,7 +65,8 @@ function App() {
                   { to: '/projects', label: 'Projects' },
                   { to: '/products-admin', label: 'Products' },
                   { to: '/system-builder', label: 'System Builder' },
-                  { to: '/load-profile-manager', label: 'Load Profile Manager' } 
+                  { to: '/load-profile-manager', label: 'Load Profile Manager' },
+                  { to: '/tariffs', label: 'Tariff Manager' },
                 ].map(link => (
                   <li className="nav-item" key={link.to}>
                     <NavLink
@@ -101,6 +103,7 @@ function App() {
           <Route path="/load-profile-manager" element={<LoadProfileManager />} />
           <Route path="/projects/:id/optimize" element={<Optimize />} />
           <Route path="/proposal/:id" element={<ProposalPage />} />
+          <Route path="/tariffs" element={<TariffManager />} />
         </Routes>
         </div>
     </Router>
