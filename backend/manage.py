@@ -49,7 +49,7 @@ def process_spu_file(filepath):
         # --- Business Rule 2: Handle Tiered or TOU rates if not a Flat Rate ---
         else:
             # Check for Tiered structure
-            block_1_rate = row.get('Energy Charge Block 1')
+            block_1_rate = row.get('Energy Charge Block 1 [c/kWh]')
             if block_1_rate and block_1_rate != 0:
                 new_tariff.structure = 'tiered'
                 db.session.add(new_tariff)
@@ -59,7 +59,7 @@ def process_spu_file(filepath):
                 db.session.add(TariffRates(tariff_id=new_tariff.id, charge_name='Energy Charge', charge_category='energy', rate_unit='c/kWh', rate_value=block_1_rate, block_threshold_kwh=600))
                 
                 # Add Block 2 Rate if it exists
-                block_2_rate = row.get('Energy Charge Block 2')
+                block_2_rate = row.get('Energy Charge Block 2 [c/kWh]')
                 if block_2_rate and block_2_rate != 0:
                     db.session.add(TariffRates(tariff_id=new_tariff.id, charge_name='Energy Charge', charge_category='energy', rate_unit='c/kWh', rate_value=block_2_rate))
 
