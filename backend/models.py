@@ -29,6 +29,7 @@ class Projects(db.Model):
     inverter_ids = db.Column(JSONB) # NEW COLUMN
     battery_ids = db.Column(JSONB) # NEW COLUMN
     project_value_excl_vat = db.Column(db.Float, nullable=True)
+    tariff_id = db.Column(db.Integer, db.ForeignKey('tariffs.id'), nullable=True)
     site_contact_person = db.Column(db.String(80), nullable=True)
     site_phone = db.Column(db.String(20), nullable=True)
     location = db.Column(db.String(120), nullable=True)
@@ -143,3 +144,42 @@ class SystemTemplateComponent(db.Model):
 
     def __repr__(self):
         return f'<{self.quantity}x of ProductID {self.product_id} for TemplateID {self.template_id}>'
+    
+class Tariffs(db.Model):
+    __tablename__ = 'tariffs'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    power_user_type = db.Column(db.String(50)) # 'SPU' or 'LPU'
+    tariff_category = db.Column(db.String(100), nullable=True) # e.g., 'Local Authority'
+    transmission_zone = db.Column(db.String(100), nullable=True)
+    supply_voltage = db.Column(db.String(100), nullable=True)
+    code = db.Column(db.String(50), nullable=True)
+    matrix_code = db.Column(db.String(50), nullable=True)
+    structure = db.Column(db.String(50), nullable=False) # 'flat_rate', 'time_of_use', 'block'
+    supplier = db.Column(db.String(100), nullable=True, default='Eskom')
+    year = db.Column(db.String(20), nullable=True)
+    
+    # This creates a one-to-many relationship. One tariff plan can have many rate components.
+    rates = db.relationship('TariffRates', backref='tariff', lazy='dynamic', cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f'<Tariff {self.id}: {self.name}>'
+    
+class TariffRates(db.Model):
+    __tablename__ = 'tariff_rates'
+    id = db.Column(db.Integer, primary_key=True)
+    tariff_id = db.Column(db.Integer, db.ForeignKey('tariffs.id'), nullable=False)
+    
+    charge_name = db.Column(db.String(150), nullable=False) # e.g., "Service and administration charge"
+    charge_category = db.Column(db.String(50), nullable=False, index=True) # Our internal logic group: 'energy', 'fixed', 'demand'
+    
+    season = db.Column(db.String(50), default='all') # 'high', 'low', 'all'
+    time_of_use = db.Column(db.String(50), default='all') # 'peak', 'standard', 'off_peak', 'all'
+    
+    rate_unit = db.Column(db.String(50), nullable=False) # 'c/kWh', 'R/POD/day', 'R/kVA/month'
+    rate_value = db.Column(db.Numeric(12, 6), nullable=False) # Using Numeric for precision with monetary values
+    
+    block_threshold_kwh = db.Column(db.Numeric(10, 2), nullable=True) # The upper limit for tiered rates
+
+    def __repr__(self):
+        return f'<TariffRate for TariffID {self.tariff_id}: {self.charge_name}>'
