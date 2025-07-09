@@ -58,9 +58,9 @@ def upgrade():
                 rates_to_insert.append({'charge_name': 'Energy Charge', 'charge_category': 'energy', 'season': 'all', 'time_of_use': 'all', 'rate_unit': 'c/kWh', 'rate_value': row['Energy Charge [c/kWh]']})
             elif row.get('Energy Charge Block 1 [c/kWh]', 0) != 0:
                 tariff_data['structure'] = 'tiered'
-                rates_to_insert.append({'charge_name': 'Energy Charge', 'charge_category': 'energy', 'rate_unit': 'c/kWh', 'rate_value': row['Energy Charge Block 1'], 'block_threshold_kwh': 600})
+                rates_to_insert.append({'charge_name': 'Energy Charge', 'charge_category': 'energy', 'rate_unit': 'c/kWh', 'rate_value': row['Energy Charge Block 1 [c/kWh]'], 'block_threshold_kwh': 600})
                 if row.get('Energy Charge Block 2 [c/kWh]', 0) != 0:
-                    rates_to_insert.append({'charge_name': 'Energy Charge', 'charge_category': 'energy', 'rate_unit': 'c/kWh', 'rate_value': row['Energy Charge Block 2'], 'block_threshold_kwh': None})
+                    rates_to_insert.append({'charge_name': 'Energy Charge', 'charge_category': 'energy', 'rate_unit': 'c/kWh', 'rate_value': row['Energy Charge Block 2 [c/kWh]'], 'block_threshold_kwh': None})
             else:
                 tariff_data['structure'] = 'time_of_use'
                 tou_map = {'High-Peak': ('high', 'peak'), 'High-Standard': ('high', 'standard'), 'High-Off Peak': ('high', 'off_peak'), 'Low-Peak': ('low', 'peak'), 'Low-Standard': ('low', 'standard'), 'Low-Off Peak': ('low', 'off_peak')}
@@ -112,7 +112,7 @@ def upgrade():
             rates_to_insert = []
             
             # LPU Demand Charges
-            demand_map = {'High Demand [R/kVA/month]': ('Demand Charge', 'high', 'R/kVA/month'), 'Low Demand [R/kVA/month]': ('Demand Charge', 'low', 'R/kVA/month'), 'Transmission Network Charges [R/kVA/month]': ('Transmission Network Charges', 'all', 'R/kVA/month'), 'Network Access Charges [R/kVA/month]': ('Network Access Charges', 'all', 'R/kVA/month')}
+            demand_map = {'High Demand [R/kVA/m]': ('Demand Charge', 'high', 'R/kVA/m'), 'Low Demand [R/kVA/m]': ('Demand Charge', 'low', 'R/kVA/m'), 'Transmission Network Charges [R/kVA/m]': ('Transmission Network Charges', 'all', 'R/kVA/m'), 'Network Access Charges [R/kVA/m]': ('Network Access Charges', 'all', 'R/kVA/m')}
             for col, (name, season, unit) in demand_map.items():
                 if row.get(col, 0) != 0:
                     rates_to_insert.append({'charge_name': name, 'charge_category': 'demand', 'season': season, 'rate_unit': unit, 'rate_value': row[col]})
