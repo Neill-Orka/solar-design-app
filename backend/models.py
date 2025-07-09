@@ -153,7 +153,7 @@ class Tariffs(db.Model):
     tariff_category = db.Column(db.String(100), nullable=True) # e.g., 'Local Authority'
     transmission_zone = db.Column(db.String(100), nullable=True)
     supply_voltage = db.Column(db.String(100), nullable=True)
-    code = db.Column(db.String(50), nullable=True)
+    code = db.Column(db.String(255), nullable=True)
     matrix_code = db.Column(db.String(50), nullable=True)
     structure = db.Column(db.String(50), nullable=False) # 'flat_rate', 'time_of_use', 'block'
     supplier = db.Column(db.String(100), nullable=True, default='Eskom')

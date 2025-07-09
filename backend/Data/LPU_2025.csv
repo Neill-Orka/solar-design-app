@@ -1,0 +1,193 @@
+﻿Tariff,Tariff Category,Transmission Zone,Supply Voltage,Code,Matrix Code,High-Peak [c/kWh],High-Standard [c/kWh],High-Off Peak [c/kWh],Low-Peak [c/kWh],Low-Standard [c/kWh],Low-Off Peak [c/kWh],High Demand [c/kWh],Low Demand [c/kWh],High Demand [R/kVA/m],Low Demand [R/kVA/m],Transmission Network Charges [R/kVA/m],Network Access Charges [R/kVA/m]
+Megaflex,Non-Local Authority,[0 - 300km],< 500V,Megaflex_Non-Local Authority_[0 - 300km]_< 500V,Me01N,689.901156,209.899332,114.611484,225.908412,155.874324,99.38031,0,0,0,0,19.740774,0
+Megaflex,Non-Local Authority,[0 - 300km],≥ 500V & < 66kV,Megaflex_Non-Local Authority_[0 - 300km]_≥ 500V & < 66kV,Me02N,679.078116,205.716678,111.736614,221.489004,152.469576,96.73092,0,0,0,0,18.0384,0
+Megaflex,Non-Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Megaflex_Non-Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,Me03N,657.567324,199.177758,108.185304,214.521672,147.599208,93.698214,0,0,0,0,17.553618,0
+Megaflex,Non-Local Authority,[0 - 300km],> 132kV,Megaflex_Non-Local Authority_[0 - 300km]_> 132kV,Me04N,619.73178,187.700826,101.962056,202.221738,139.143708,88.286694,0,0,0,0,22.20978,0
+Megaflex,Non-Local Authority,[301 - 600km],< 500V,Megaflex_Non-Local Authority_[301 - 600km]_< 500V,Me11N,695.515608,210.733608,114.419826,226.900524,156.223818,99.109734,0,0,0,0,19.876062,0
+Megaflex,Non-Local Authority,[301 - 600km],≥ 500V & < 66kV,Megaflex_Non-Local Authority_[301 - 600km]_≥ 500V & < 66kV,Me12N,685.85379,207.745998,112.818918,223.766352,153.969018,97.677936,0,0,0,0,18.196236,0
+Megaflex,Non-Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Megaflex_Non-Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,Me13N,664.027326,201.12816,109.18869,216.596088,149.076102,94.58886,0,0,0,0,17.688906,0
+Megaflex,Non-Local Authority,[301 - 600km],> 132kV,Megaflex_Non-Local Authority_[301 - 600km]_> 132kV,Me14N,625.943754,189.651228,102.920346,204.160866,140.485314,89.109696,0,0,0,0,22.390164,0
+Megaflex,Non-Local Authority,[601 - 900km],< 500V,Megaflex_Non-Local Authority_[601 - 900km]_< 500V,Me21N,702.449118,212.79675,115.524678,229.14405,157.734534,100.034202,0,0,0,0,20.112816,0
+Megaflex,Non-Local Authority,[601 - 900km],≥ 500V & < 66kV,Megaflex_Non-Local Authority_[601 - 900km]_≥ 500V & < 66kV,Me22N,692.742204,209.888058,113.957592,225.976056,155.547378,98.670048,0,0,0,0,18.365346,0
+Megaflex,Non-Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Megaflex_Non-Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,Me23N,670.814274,203.21385,110.327364,218.805792,150.631914,95.569698,0,0,0,0,17.790372,0
+Megaflex,Non-Local Authority,[601 - 900km],> 132kV,Megaflex_Non-Local Authority_[601 - 900km]_> 132kV,Me24N,632.24592,191.48889,104.05902,206.224008,141.928386,90.067986,0,0,0,0,22.728384,0
+Megaflex,Non-Local Authority,[> 900km],< 500V,Megaflex_Non-Local Authority_[> 900km]_< 500V,Me31N,709.517916,215.017728,116.697174,231.477768,159.290346,101.082684,0,0,0,0,20.23683,0
+Megaflex,Non-Local Authority,[> 900km],≥ 500V & < 66kV,Megaflex_Non-Local Authority_[> 900km]_≥ 500V & < 66kV,Me32N,699.630618,211.917378,115.039896,228.18576,157.024272,99.639612,0,0,0,0,18.579552,0
+Megaflex,Non-Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Megaflex_Non-Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,Me33N,677.533578,205.220622,111.432216,220.992948,152.108808,96.494166,0,0,0,0,17.959482,0
+Megaflex,Non-Local Authority,[> 900km],> 132kV,Megaflex_Non-Local Authority_[> 900km]_> 132kV,Me34N,638.401524,193.473114,105.118776,208.377342,143.472924,91.060098,0,0,0,0,22.88622,0
+Megaflex,Local Authority,[0 - 300km],< 500V,Megaflex_Local Authority_[0 - 300km]_< 500V,Me01Y,705.82446,214.780808,117.197696,231.066924,159.477032,101.646292,0,0,0,0,19.670244,0
+Megaflex,Local Authority,[0 - 300km],≥ 500V & < 66kV,Megaflex_Local Authority_[0 - 300km]_≥ 500V & < 66kV,Me02Y,694.69246,210.483856,114.32564,226.614124,155.95932,98.974612,0,0,0,0,17.944784,0
+Megaflex,Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Megaflex_Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,Me03Y,672.784684,203.804656,110.685476,219.478512,151.094636,95.824256,0,0,0,0,17.454976,0
+Megaflex,Local Authority,[0 - 300km],> 132kV,Megaflex_Local Authority_[0 - 300km]_> 132kV,Me04Y,634.045324,192.071528,104.295708,206.83256,142.344884,90.291652,0,0,0,0,22.108152,0
+Megaflex,Local Authority,[301 - 600km],< 500V,Megaflex_Local Authority_[301 - 600km]_< 500V,Me11Y,711.579704,215.548916,117.030716,232.124464,159.79986,101.390256,0,0,0,0,19.748168,0
+Megaflex,Local Authority,[301 - 600km],≥ 500V & < 66kV,Megaflex_Local Authority_[301 - 600km]_≥ 500V & < 66kV,Me12Y,701.64996,212.554408,115.416576,228.92958,157.540064,99.931964,0,0,0,0,18.156292,0
+Megaflex,Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Megaflex_Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,Me13Y,679.363696,205.786152,111.754148,221.626988,152.5084,96.73708,0,0,0,0,17.599692,0
+Megaflex,Local Authority,[301 - 600km],> 132kV,Megaflex_Local Authority_[301 - 600km]_> 132kV,Me14Y,640.379432,194.041892,105.342116,208.858584,143.803176,91.182212,0,0,0,0,22.31966,0
+Megaflex,Local Authority,[601 - 900km],< 500V,Megaflex_Local Authority_[601 - 900km]_< 500V,Me21Y,718.68192,217.719656,118.199576,234.406524,161.380604,102.381004,0,0,0,0,20.015336,0
+Megaflex,Local Authority,[601 - 900km],≥ 500V & < 66kV,Megaflex_Local Authority_[601 - 900km]_≥ 500V & < 66kV,Me22Y,708.71878,214.669488,116.596568,231.233904,159.042884,100.944976,0,0,0,0,18.25648,0
+Megaflex,Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Megaflex_Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,Me23Y,686.2878,207.856704,112.856216,223.797728,154.022352,97.6833,0,0,0,0,17.744408,0
+Megaflex,Local Authority,[601 - 900km],> 132kV,Megaflex_Local Authority_[601 - 900km]_> 132kV,Me24Y,646.802596,195.97886,106.399656,211.018192,145.21694,92.1173,0,0,0,0,22.620224,0
+Megaflex,Local Authority,[> 900km],< 500V,Megaflex_Local Authority_[> 900km]_< 500V,Me31Y,725.873192,219.923792,119.424096,236.822168,162.961348,103.405148,0,0,0,0,20.104392,0
+Megaflex,Local Authority,[> 900km],≥ 500V & < 66kV,Megaflex_Local Authority_[> 900km]_≥ 500V & < 66kV,Me32Y,715.798732,216.817964,117.765428,233.471436,160.69042,101.902328,0,0,0,0,18.467988,0
+Megaflex,Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Megaflex_Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,Me33Y,693.18964,210.00518,114.036208,226.113184,155.591964,98.707444,0,0,0,0,17.86686,0
+Megaflex,Local Authority,[> 900km],> 132kV,Megaflex_Local Authority_[> 900km]_> 132kV,Me34Y,653.1701,197.949224,107.59078,213.1778,146.730892,93.130312,0,0,0,0,22.76494,0
+Miniflex,Non-Local Authority,[0 - 300km],< 500V,Miniflex_Non-Local Authority_[0 - 300km]_< 500V,Mi01N,689.901156,209.899332,114.611484,225.908412,155.874324,99.38031,0,0,0,0,0,58.872828
+Miniflex,Non-Local Authority,[0 - 300km],≥ 500V & < 66kV,Miniflex_Non-Local Authority_[0 - 300km]_≥ 500V & < 66kV,Mi02N,679.078116,205.716678,111.736614,221.489004,152.469576,96.73092,0,0,0,0,0,53.968638
+Miniflex,Non-Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Miniflex_Non-Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,Mi03N,657.567324,199.177758,108.185304,214.521672,147.599208,93.698214,0,0,0,0,0,30.315786
+Miniflex,Non-Local Authority,[0 - 300km],> 132kV,Miniflex_Non-Local Authority_[0 - 300km]_> 132kV,Mi04N,619.73178,187.700826,101.962056,202.221738,139.143708,88.286694,0,0,0,0,0,22.085766
+Miniflex,Non-Local Authority,[301 - 600km],< 500V,Miniflex_Non-Local Authority_[301 - 600km]_< 500V,Mi11N,695.515608,210.733608,114.419826,226.900524,156.223818,99.109734,0,0,0,0,0,59.030664
+Miniflex,Non-Local Authority,[301 - 600km],≥ 500V & < 66kV,Miniflex_Non-Local Authority_[301 - 600km]_≥ 500V & < 66kV,Mi12N,685.85379,207.745998,112.818918,223.766352,153.969018,97.677936,0,0,0,0,0,54.149022
+Miniflex,Non-Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Miniflex_Non-Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,Mi13N,664.027326,201.12816,109.18869,216.596088,149.076102,94.58886,0,0,0,0,0,30.428526
+Miniflex,Non-Local Authority,[301 - 600km],> 132kV,Miniflex_Non-Local Authority_[301 - 600km]_> 132kV,Mi14N,625.943754,189.651228,102.920346,204.160866,140.485314,89.109696,0,0,0,0,0,22.333794
+Miniflex,Non-Local Authority,[601 - 900km],< 500V,Miniflex_Non-Local Authority_[601 - 900km]_< 500V,Mi21N,702.449118,212.79675,115.524678,229.14405,157.734534,100.034202,0,0,0,0,0,59.323788
+Miniflex,Non-Local Authority,[601 - 900km],≥ 500V & < 66kV,Miniflex_Non-Local Authority_[601 - 900km]_≥ 500V & < 66kV,Mi22N,692.742204,209.888058,113.957592,225.976056,155.547378,98.670048,0,0,0,0,0,54.306858
+Miniflex,Non-Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Miniflex_Non-Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,Mi23N,670.814274,203.21385,110.327364,218.805792,150.631914,95.569698,0,0,0,0,0,30.620184
+Miniflex,Non-Local Authority,[601 - 900km],> 132kV,Miniflex_Non-Local Authority_[601 - 900km]_> 132kV,Mi24N,632.24592,191.48889,104.05902,206.224008,141.928386,90.067986,0,0,0,0,0,22.649466
+Miniflex,Non-Local Authority,[> 900km],< 500V,Miniflex_Non-Local Authority_[> 900km]_< 500V,Mi31N,709.517916,215.017728,116.697174,231.477768,159.290346,101.082684,0,0,0,0,0,59.35761
+Miniflex,Non-Local Authority,[> 900km],≥ 500V & < 66kV,Miniflex_Non-Local Authority_[> 900km]_≥ 500V & < 66kV,Mi32N,699.630618,211.917378,115.039896,228.18576,157.024272,99.639612,0,0,0,0,0,54.487242
+Miniflex,Non-Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Miniflex_Non-Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,Mi33N,677.533578,205.220622,111.432216,220.992948,152.108808,96.494166,0,0,0,0,0,30.732924
+Miniflex,Non-Local Authority,[> 900km],> 132kV,Miniflex_Non-Local Authority_[> 900km]_> 132kV,Mi34N,638.401524,193.473114,105.118776,208.377342,143.472924,91.060098,0,0,0,0,0,22.818576
+Miniflex,Local Authority,[0 - 300km],< 500V,Miniflex_Local Authority_[0 - 300km]_< 500V,Mi01Y,705.82446,214.780808,117.197696,231.066924,159.477032,101.646292,0,0,0,0,0,58.866016
+Miniflex,Local Authority,[0 - 300km],≥ 500V & < 66kV,Miniflex_Local Authority_[0 - 300km]_≥ 500V & < 66kV,Mi02Y,694.69246,210.483856,114.32564,226.614124,155.95932,98.974612,0,0,0,0,0,53.890012
+Miniflex,Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Miniflex_Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,Mi03Y,672.784684,203.804656,110.685476,219.478512,151.094636,95.824256,0,0,0,0,0,30.267908
+Miniflex,Local Authority,[0 - 300km],> 132kV,Miniflex_Local Authority_[0 - 300km]_> 132kV,Mi04Y,634.045324,192.071528,104.295708,206.83256,142.344884,90.291652,0,0,0,0,0,22.108152
+Miniflex,Local Authority,[301 - 600km],< 500V,Miniflex_Local Authority_[301 - 600km]_< 500V,Mi11Y,711.579704,215.548916,117.030716,232.124464,159.79986,101.390256,0,0,0,0,0,58.966204
+Miniflex,Local Authority,[301 - 600km],≥ 500V & < 66kV,Miniflex_Local Authority_[301 - 600km]_≥ 500V & < 66kV,Mi12Y,701.64996,212.554408,115.416576,228.92958,157.540064,99.931964,0,0,0,0,0,54.123784
+Miniflex,Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Miniflex_Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,Mi13Y,679.363696,205.786152,111.754148,221.626988,152.5084,96.73708,0,0,0,0,0,30.423756
+Miniflex,Local Authority,[301 - 600km],> 132kV,Miniflex_Local Authority_[301 - 600km]_> 132kV,Mi14Y,640.379432,194.041892,105.342116,208.858584,143.803176,91.182212,0,0,0,0,0,22.31966
+Miniflex,Local Authority,[601 - 900km],< 500V,Miniflex_Local Authority_[601 - 900km]_< 500V,Mi21Y,718.68192,217.719656,118.199576,234.406524,161.380604,102.381004,0,0,0,0,0,59.2779
+Miniflex,Local Authority,[601 - 900km],≥ 500V & < 66kV,Miniflex_Local Authority_[601 - 900km]_≥ 500V & < 66kV,Mi22Y,708.71878,214.669488,116.596568,231.233904,159.042884,100.944976,0,0,0,0,0,54.257368
+Miniflex,Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Miniflex_Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,Mi23Y,686.2878,207.856704,112.856216,223.797728,154.022352,97.6833,0,0,0,0,0,30.579604
+Miniflex,Local Authority,[601 - 900km],> 132kV,Miniflex_Local Authority_[601 - 900km]_> 132kV,Mi24Y,646.802596,195.97886,106.399656,211.018192,145.21694,92.1173,0,0,0,0,0,22.620224
+Miniflex,Local Authority,[> 900km],< 500V,Miniflex_Local Authority_[> 900km]_< 500V,Mi31Y,725.873192,219.923792,119.424096,236.822168,162.961348,103.405148,0,0,0,0,0,59.300164
+Miniflex,Local Authority,[> 900km],≥ 500V & < 66kV,Miniflex_Local Authority_[> 900km]_≥ 500V & < 66kV,Mi32Y,715.798732,216.817964,117.765428,233.471436,160.69042,101.902328,0,0,0,0,0,54.49114
+Miniflex,Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Miniflex_Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,Mi33Y,693.18964,210.00518,114.036208,226.113184,155.591964,98.707444,0,0,0,0,0,30.690924
+Miniflex,Local Authority,[> 900km],> 132kV,Miniflex_Local Authority_[> 900km]_> 132kV,Mi34Y,653.1701,197.949224,107.59078,213.1778,146.730892,93.130312,0,0,0,0,0,22.76494
+Ruraflex,Non-Local Authority,[0 - 300km],< 500V,Ruraflex_Non-Local Authority_[0 - 300km]_< 500V,Ru01N,714.331914,216.40443,117.542724,233.03358,160.350102,101.736576,0,0,0,0,0,41.26284
+Ruraflex,Non-Local Authority,[0 - 300km],≥ 500V & < 66kV,Ruraflex_Non-Local Authority_[0 - 300km]_≥ 500V & < 66kV,Ru02N,707.27439,214.284918,116.336406,230.733684,158.760468,100.67682,0,0,0,0,0,37.812996
+Ruraflex,Non-Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Ruraflex_Non-Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,Ru03N,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Non-Local Authority,[0 - 300km],> 132kV,Ruraflex_Non-Local Authority_[0 - 300km]_> 132kV,Ru04N,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Non-Local Authority,[301 - 600km],< 500V,Ruraflex_Non-Local Authority_[301 - 600km]_< 500V,Ru11N,721.513452,218.580312,118.703946,235.356024,161.996106,102.785058,0,0,0,0,0,41.386854
+Ruraflex,Non-Local Authority,[301 - 600km],≥ 500V & < 66kV,Ruraflex_Non-Local Authority_[301 - 600km]_≥ 500V & < 66kV,Ru12N,714.32064,216.381882,117.542724,233.03358,160.338828,101.736576,0,0,0,0,0,38.027202
+Ruraflex,Non-Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Ruraflex_Non-Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,Ru13N,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Non-Local Authority,[301 - 600km],> 132kV,Ruraflex_Non-Local Authority_[301 - 600km]_> 132kV,Ru14N,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Non-Local Authority,[601 - 900km],< 500V,Ruraflex_Non-Local Authority_[601 - 900km]_< 500V,Ru21N,728.728812,220.778742,119.876442,237.723564,163.58574,103.822266,0,0,0,0,0,41.589786
+Ruraflex,Non-Local Authority,[601 - 900km],≥ 500V & < 66kV,Ruraflex_Non-Local Authority_[601 - 900km]_≥ 500V & < 66kV,Ru22N,721.457082,218.512668,118.703946,235.356024,161.996106,102.785058,0,0,0,0,0,38.21886
+Ruraflex,Non-Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Ruraflex_Non-Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,Ru23N,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Non-Local Authority,[601 - 900km],> 132kV,Ruraflex_Non-Local Authority_[601 - 900km]_> 132kV,Ru24N,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Non-Local Authority,[> 900km],< 500V,Ruraflex_Non-Local Authority_[> 900km]_< 500V,Ru31N,736.000542,222.954624,121.060212,240.000912,165.22047,104.825652,0,0,0,0,0,41.781444
+Ruraflex,Non-Local Authority,[> 900km],≥ 500V & < 66kV,Ruraflex_Non-Local Authority_[> 900km]_≥ 500V & < 66kV,Ru32N,728.706264,220.778742,119.876442,237.723564,163.58574,103.822266,0,0,0,0,0,38.230134
+Ruraflex,Non-Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Ruraflex_Non-Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,Ru33N,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Non-Local Authority,[> 900km],> 132kV,Ruraflex_Non-Local Authority_[> 900km]_> 132kV,Ru34N,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Local Authority,[0 - 300km],< 500V,Ruraflex_Local Authority_[0 - 300km]_< 500V,Ru01Y,730.860328,221.382084,120.236732,238.425176,164.074548,104.0842,0,0,0,0,0,41.566888
+Ruraflex,Local Authority,[0 - 300km],≥ 500V & < 66kV,Ruraflex_Local Authority_[0 - 300km]_≥ 500V & < 66kV,Ru02Y,723.591132,219.211344,119.034476,236.087456,162.41588,103.02666,0,0,0,0,0,38.138232
+Ruraflex,Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Ruraflex_Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,Ru03Y,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Local Authority,[0 - 300km],> 132kV,Ruraflex_Local Authority_[0 - 300km]_> 132kV,Ru04Y,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Local Authority,[301 - 600km],< 500V,Ruraflex_Local Authority_[301 - 600km]_< 500V,Ru11Y,738.118392,223.64188,121.372196,240.762896,165.733216,105.164004,0,0,0,0,0,41.745
+Ruraflex,Local Authority,[301 - 600km],≥ 500V & < 66kV,Ruraflex_Local Authority_[301 - 600km]_≥ 500V & < 66kV,Ru12Y,730.849196,221.337556,120.236732,238.425176,164.052284,104.0842,0,0,0,0,0,38.34974
+Ruraflex,Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Ruraflex_Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,Ru13Y,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Local Authority,[301 - 600km],> 132kV,Ruraflex_Local Authority_[301 - 600km]_> 132kV,Ru14Y,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Local Authority,[601 - 900km],< 500V,Ruraflex_Local Authority_[601 - 900km]_< 500V,Ru21Y,745.521172,225.81262,122.641244,243.145144,167.325092,106.210412,0,0,0,0,0,41.96764
+Ruraflex,Local Authority,[601 - 900km],≥ 500V & < 66kV,Ruraflex_Local Authority_[601 - 900km]_≥ 500V & < 66kV,Ru22Y,738.084996,223.597352,121.372196,240.762896,165.733216,105.164004,0,0,0,0,0,38.550116
+Ruraflex,Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Ruraflex_Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,Ru23Y,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Local Authority,[601 - 900km],> 132kV,Ruraflex_Local Authority_[601 - 900km]_> 132kV,Ru24Y,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Local Authority,[> 900km],< 500V,Ruraflex_Local Authority_[> 900km]_< 500V,Ru31Y,752.979612,228.161472,123.78784,245.549656,169.061684,107.25682,0,0,0,0,0,42.090092
+Ruraflex,Local Authority,[> 900km],≥ 500V & < 66kV,Ruraflex_Local Authority_[> 900km]_≥ 500V & < 66kV,Ru32Y,745.51004,225.81262,122.641244,243.145144,167.325092,106.210412,0,0,0,0,0,38.57238
+Ruraflex,Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Ruraflex_Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,Ru33Y,0,0,0,0,0,0,0,0,0,0,0,0
+Ruraflex,Local Authority,[> 900km],> 132kV,Ruraflex_Local Authority_[> 900km]_> 132kV,Ru34Y,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Small,Non-Local Authority,[0 - 300km],< 500V,Nightsave Small_Non-Local Authority_[0 - 300km]_< 500V,NS01N,0,0,0,0,0,0,170.395236,132.458226,364.116378,46.922388,19.740774,0
+Nightsave Small,Non-Local Authority,[0 - 300km],≥ 500V & < 66kV,Nightsave Small_Non-Local Authority_[0 - 300km]_≥ 500V & < 66kV,NS02N,0,0,0,0,0,0,161.342214,125.93058,352.391418,45.355302,18.0384,0
+Nightsave Small,Non-Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Nightsave Small_Non-Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,NS03N,0,0,0,0,0,0,160.158444,124.431138,339.426318,43.664202,17.553618,0
+Nightsave Small,Non-Local Authority,[0 - 300km],> 132kV,Nightsave Small_Non-Local Authority_[0 - 300km]_> 132kV,NS04N,0,0,0,0,0,0,149.820186,116.494242,327.554796,42.130938,22.20978,0
+Nightsave Small,Non-Local Authority,[301 - 600km],< 500V,Nightsave Small_Non-Local Authority_[301 - 600km]_< 500V,NS11N,0,0,0,0,0,0,172.672584,133.912572,367.848072,47.305704,19.876062,0
+Nightsave Small,Non-Local Authority,[301 - 600km],≥ 500V & < 66kV,Nightsave Small_Non-Local Authority_[301 - 600km]_≥ 500V & < 66kV,NS12N,0,0,0,0,0,0,164.735688,128.512326,355.931454,45.794988,18.196236,0
+Nightsave Small,Non-Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Nightsave Small_Non-Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,NS13N,0,0,0,0,0,0,163.518096,126.967788,342.921258,44.115162,17.688906,0
+Nightsave Small,Non-Local Authority,[301 - 600km],> 132kV,Nightsave Small_Non-Local Authority_[301 - 600km]_> 132kV,NS14N,0,0,0,0,0,0,152.976906,118.861782,330.824256,42.55935,22.390164,0
+Nightsave Small,Non-Local Authority,[601 - 900km],< 500V,Nightsave Small_Non-Local Authority_[601 - 900km]_< 500V,NS21N,0,0,0,0,0,0,174.273492,135.209082,371.433204,47.74539,20.112816,0
+Nightsave Small,Non-Local Authority,[601 - 900km],≥ 500V & < 66kV,Nightsave Small_Non-Local Authority_[601 - 900km]_≥ 500V & < 66kV,NS22N,0,0,0,0,0,0,166.370418,129.853932,359.572956,46.257222,18.365346,0
+Nightsave Small,Non-Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Nightsave Small_Non-Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,NS23N,0,0,0,0,0,0,165.10773,128.219202,346.39365,44.566122,17.790372,0
+Nightsave Small,Non-Local Authority,[601 - 900km],> 132kV,Nightsave Small_Non-Local Authority_[601 - 900km]_> 132kV,NS24N,0,0,0,0,0,0,154.465074,120.090648,334.093716,42.987762,22.728384,0
+Nightsave Small,Non-Local Authority,[> 900km],< 500V,Nightsave Small_Non-Local Authority_[> 900km]_< 500V,NS31N,0,0,0,0,0,0,176.144976,136.573236,375.25509,48.263994,20.23683,0
+Nightsave Small,Non-Local Authority,[> 900km],≥ 500V & < 66kV,Nightsave Small_Non-Local Authority_[> 900km]_≥ 500V & < 66kV,NS32N,0,0,0,0,0,0,167.9826,131.094072,363.090444,46.73073,18.579552,0
+Nightsave Small,Non-Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Nightsave Small_Non-Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,NS33N,0,0,0,0,0,0,166.821378,129.470616,349.899864,45.050904,17.959482,0
+Nightsave Small,Non-Local Authority,[> 900km],> 132kV,Nightsave Small_Non-Local Authority_[> 900km]_> 132kV,NS34N,0,0,0,0,0,0,156.122352,121.398432,337.59993,43.483818,22.88622,0
+Nightsave Small,Local Authority,[0 - 300km],< 500V,Nightsave Small_Local Authority_[0 - 300km]_< 500V,NS01Y,0,0,0,0,0,0,174.338252,135.554364,365.508088,47.132888,19.670244,0
+Nightsave Small,Local Authority,[0 - 300km],≥ 500V & < 66kV,Nightsave Small_Local Authority_[0 - 300km]_≥ 500V & < 66kV,NS02Y,0,0,0,0,0,0,165.076428,128.8529,353.741564,45.518748,17.944784,0
+Nightsave Small,Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Nightsave Small_Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,NS03Y,0,0,0,0,0,0,163.86304,127.272156,340.795048,43.815552,17.454976,0
+Nightsave Small,Local Authority,[0 - 300km],> 132kV,Nightsave Small_Local Authority_[0 - 300km]_> 132kV,NS04Y,0,0,0,0,0,0,153.298772,119.190324,328.828148,42.312732,22.108152,0
+Nightsave Small,Local Authority,[301 - 600km],< 500V,Nightsave Small_Local Authority_[301 - 600km]_< 500V,NS11Y,0,0,0,0,0,0,176.60918,137.023788,369.281836,47.522508,19.748168,0
+Nightsave Small,Local Authority,[301 - 600km],≥ 500V & < 66kV,Nightsave Small_Local Authority_[301 - 600km]_≥ 500V & < 66kV,NS12Y,0,0,0,0,0,0,168.527348,131.457788,357.403992,45.941764,18.156292,0
+Nightsave Small,Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Nightsave Small_Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,NS13Y,0,0,0,0,0,0,167.280564,129.932704,344.301628,44.2497,17.599692,0
+Nightsave Small,Local Authority,[301 - 600km],> 132kV,Nightsave Small_Local Authority_[301 - 600km]_> 132kV,NS14Y,0,0,0,0,0,0,156.449128,121.650496,332.134352,42.724616,22.31966,0
+Nightsave Small,Local Authority,[601 - 900km],< 500V,Nightsave Small_Local Authority_[601 - 900km]_< 500V,NS21Y,0,0,0,0,0,0,178.290112,138.303968,372.97766,47.956656,20.015336,0
+Nightsave Small,Local Authority,[601 - 900km],≥ 500V & < 66kV,Nightsave Small_Local Authority_[601 - 900km]_≥ 500V & < 66kV,NS22Y,0,0,0,0,0,0,170.230544,132.815892,360.9551,46.464968,18.25648,0
+Nightsave Small,Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Nightsave Small_Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,NS23Y,0,0,0,0,0,0,168.950364,131.224016,347.752548,44.706112,17.744408,0
+Nightsave Small,Local Authority,[601 - 900km],> 132kV,Nightsave Small_Local Authority_[601 - 900km]_> 132kV,NS24Y,0,0,0,0,0,0,158.029872,122.875016,335.418292,43.125368,22.620224,0
+Nightsave Small,Local Authority,[> 900km],< 500V,Nightsave Small_Local Authority_[> 900km]_< 500V,NS31Y,0,0,0,0,0,0,180.204816,139.7066,376.718012,48.413068,20.104392,0
+Nightsave Small,Local Authority,[> 900km],≥ 500V & < 66kV,Nightsave Small_Local Authority_[> 900km]_≥ 500V & < 66kV,NS32Y,0,0,0,0,0,0,171.922608,134.08494,364.528472,46.887984,18.467988,0
+Nightsave Small,Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Nightsave Small_Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,NS33Y,0,0,0,0,0,0,170.642428,132.481932,351.27026,45.184788,17.86686,0
+Nightsave Small,Local Authority,[> 900km],> 132kV,Nightsave Small_Local Authority_[> 900km]_> 132kV,NS34Y,0,0,0,0,0,0,159.766464,124.23312,338.947136,43.63744,22.76494,0
+Nightsave Large,Non-Local Authority,[0 - 300km],< 500V,Nightsave Large_Non-Local Authority_[0 - 300km]_< 500V,NL01N,0,0,0,0,0,0,170.395236,132.458226,518.468712,72.457998,19.740774,0
+Nightsave Large,Non-Local Authority,[0 - 300km],≥ 500V & < 66kV,Nightsave Large_Non-Local Authority_[0 - 300km]_≥ 500V & < 66kV,NL02N,0,0,0,0,0,0,161.342214,125.93058,501.80574,70.135554,18.0384,0
+Nightsave Large,Non-Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Nightsave Large_Non-Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,NL03N,0,0,0,0,0,0,160.158444,124.431138,483.54186,67.598904,17.553618,0
+Nightsave Large,Non-Local Authority,[0 - 300km],> 132kV,Nightsave Large_Non-Local Authority_[0 - 300km]_> 132kV,NL04N,0,0,0,0,0,0,149.820186,116.494242,466.427928,65.186268,22.20978,0
+Nightsave Large,Non-Local Authority,[301 - 600km],< 500V,Nightsave Large_Non-Local Authority_[301 - 600km]_< 500V,NL11N,0,0,0,0,0,0,172.672584,133.912572,523.801314,73.156986,19.876062,0
+Nightsave Large,Non-Local Authority,[301 - 600km],≥ 500V & < 66kV,Nightsave Large_Non-Local Authority_[301 - 600km]_≥ 500V & < 66kV,NL12N,0,0,0,0,0,0,164.735688,128.512326,506.912862,70.755624,18.196236,0
+Nightsave Large,Non-Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Nightsave Large_Non-Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,NL13N,0,0,0,0,0,0,163.518096,126.967788,488.322036,68.230248,17.688906,0
+Nightsave Large,Non-Local Authority,[301 - 600km],> 132kV,Nightsave Large_Non-Local Authority_[301 - 600km]_> 132kV,NL14N,0,0,0,0,0,0,152.976906,118.861782,471.185556,65.78379,22.390164,0
+Nightsave Large,Non-Local Authority,[601 - 900km],< 500V,Nightsave Large_Non-Local Authority_[601 - 900km]_< 500V,NL21N,0,0,0,0,0,0,174.273492,135.209082,529.167738,73.912344,20.112816,0
+Nightsave Large,Non-Local Authority,[601 - 900km],≥ 500V & < 66kV,Nightsave Large_Non-Local Authority_[601 - 900km]_≥ 500V & < 66kV,NL22N,0,0,0,0,0,0,166.370418,129.853932,511.997436,71.556078,18.365346,0
+Nightsave Large,Non-Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Nightsave Large_Non-Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,NL23N,0,0,0,0,0,0,165.10773,128.219202,493.248774,68.917962,17.790372,0
+Nightsave Large,Non-Local Authority,[601 - 900km],> 132kV,Nightsave Large_Non-Local Authority_[601 - 900km]_> 132kV,NL24N,0,0,0,0,0,0,154.465074,120.090648,475.886814,66.437682,22.728384,0
+Nightsave Large,Non-Local Authority,[> 900km],< 500V,Nightsave Large_Non-Local Authority_[> 900km]_< 500V,NL31N,0,0,0,0,0,0,176.144976,136.573236,534.308682,74.622606,20.23683,0
+Nightsave Large,Non-Local Authority,[> 900km],≥ 500V & < 66kV,Nightsave Large_Non-Local Authority_[> 900km]_≥ 500V & < 66kV,NL32N,0,0,0,0,0,0,167.9826,131.094072,517.115832,72.198696,18.579552,0
+Nightsave Large,Non-Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Nightsave Large_Non-Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,NL33N,0,0,0,0,0,0,166.821378,129.470616,498.265704,69.61695,17.959482,0
+Nightsave Large,Non-Local Authority,[> 900km],> 132kV,Nightsave Large_Non-Local Authority_[> 900km]_> 132kV,NL34N,0,0,0,0,0,0,156.122352,121.398432,480.712086,67.114122,22.88622,0
+Nightsave Large,Local Authority,[0 - 300km],< 500V,Nightsave Large_Local Authority_[0 - 300km]_< 500V,NL01Y,0,0,0,0,0,0,174.338252,135.554364,520.47666,72.714224,19.670244,0
+Nightsave Large,Local Authority,[0 - 300km],≥ 500V & < 66kV,Nightsave Large_Local Authority_[0 - 300km]_≥ 500V & < 66kV,NL02Y,0,0,0,0,0,0,165.076428,128.8529,503.767528,70.443296,17.944784,0
+Nightsave Large,Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Nightsave Large_Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,NL03Y,0,0,0,0,0,0,163.86304,127.272156,485.421992,67.84954,17.454976,0
+Nightsave Large,Local Authority,[0 - 300km],> 132kV,Nightsave Large_Local Authority_[0 - 300km]_> 132kV,NL04Y,0,0,0,0,0,0,153.298772,119.190324,468.278712,65.411632,22.108152,0
+Nightsave Large,Local Authority,[301 - 600km],< 500V,Nightsave Large_Local Authority_[301 - 600km]_< 500V,NL11Y,0,0,0,0,0,0,176.60918,137.023788,525.87568,73.41554,19.748168,0
+Nightsave Large,Local Authority,[301 - 600km],≥ 500V & < 66kV,Nightsave Large_Local Authority_[301 - 600km]_≥ 500V & < 66kV,NL12Y,0,0,0,0,0,0,168.527348,131.457788,508.84372,71.055556,18.156292,0
+Nightsave Large,Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Nightsave Large_Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,NL13Y,0,0,0,0,0,0,167.280564,129.932704,490.264412,68.495196,17.599692,0
+Nightsave Large,Local Authority,[301 - 600km],> 132kV,Nightsave Large_Local Authority_[301 - 600km]_> 132kV,NL14Y,0,0,0,0,0,0,156.449128,121.650496,473.020944,66.057288,22.31966,0
+Nightsave Large,Local Authority,[601 - 900km],< 500V,Nightsave Large_Local Authority_[601 - 900km]_< 500V,NL21Y,0,0,0,0,0,0,178.290112,138.303968,531.196776,74.205912,20.015336,0
+Nightsave Large,Local Authority,[601 - 900km],≥ 500V & < 66kV,Nightsave Large_Local Authority_[601 - 900km]_≥ 500V & < 66kV,NL22Y,0,0,0,0,0,0,170.230544,132.815892,514.031232,71.823664,18.25648,0
+Nightsave Large,Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Nightsave Large_Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,NL23Y,0,0,0,0,0,0,168.950364,131.224016,495.195888,69.163116,17.744408,0
+Nightsave Large,Local Authority,[601 - 900km],> 132kV,Nightsave Large_Local Authority_[601 - 900km]_> 132kV,NL24Y,0,0,0,0,0,0,158.029872,122.875016,477.807704,66.769736,22.620224,0
+Nightsave Large,Local Authority,[> 900km],< 500V,Nightsave Large_Local Authority_[> 900km]_< 500V,NL31Y,0,0,0,0,0,0,180.204816,139.7066,536.428816,74.940624,20.104392,0
+Nightsave Large,Local Authority,[> 900km],≥ 500V & < 66kV,Nightsave Large_Local Authority_[> 900km]_≥ 500V & < 66kV,NL32Y,0,0,0,0,0,0,171.922608,134.08494,519.163084,72.46932,18.467988,0
+Nightsave Large,Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Nightsave Large_Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,NL33Y,0,0,0,0,0,0,170.642428,132.481932,500.205288,69.90896,17.86686,0
+Nightsave Large,Local Authority,[> 900km],> 132kV,Nightsave Large_Local Authority_[> 900km]_> 132kV,NL34Y,0,0,0,0,0,0,159.766464,124.23312,482.605596,67.370864,22.76494,0
+Nightsave Rural,Non-Local Authority,[0 - 300km],< 500V,Nightsave Rural_Non-Local Authority_[0 - 300km]_< 500V,NR01N,0,0,0,0,0,0,174.250944,135.378192,583.812816,308.96397,0,29.526606
+Nightsave Rural,Non-Local Authority,[0 - 300km],≥ 500V & < 66kV,Nightsave Rural_Non-Local Authority_[0 - 300km]_≥ 500V & < 66kV,NR02N,0,0,0,0,0,0,172.176528,133.856202,565.706772,298.02819,0,27.136518
+Nightsave Rural,Non-Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Nightsave Rural_Non-Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,NR03N,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Non-Local Authority,[0 - 300km],> 132kV,Nightsave Rural_Non-Local Authority_[0 - 300km]_> 132kV,NR04N,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Non-Local Authority,[301 - 600km],< 500V,Nightsave Rural_Non-Local Authority_[301 - 600km]_< 500V,NR11N,0,0,0,0,0,0,175.953318,136.75362,590.836518,313.281912,0,29.571702
+Nightsave Rural,Non-Local Authority,[301 - 600km],≥ 500V & < 66kV,Nightsave Rural_Non-Local Authority_[301 - 600km]_≥ 500V & < 66kV,NR12N,0,0,0,0,0,0,173.935272,135.209082,572.60646,302.177022,0,27.22671
+Nightsave Rural,Non-Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Nightsave Rural_Non-Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,NR13N,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Non-Local Authority,[301 - 600km],> 132kV,Nightsave Rural_Non-Local Authority_[301 - 600km]_> 132kV,NR14N,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Non-Local Authority,[601 - 900km],< 500V,Nightsave Rural_Non-Local Authority_[601 - 900km]_< 500V,NR21N,0,0,0,0,0,0,177.712062,138.083952,597.939138,317.520936,0,29.853552
+Nightsave Rural,Non-Local Authority,[601 - 900km],≥ 500V & < 66kV,Nightsave Rural_Non-Local Authority_[601 - 900km]_≥ 500V & < 66kV,NR22N,0,0,0,0,0,0,175.660194,136.561962,579.472326,306.325854,0,27.407094
+Nightsave Rural,Non-Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Nightsave Rural_Non-Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,NR23N,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Non-Local Authority,[601 - 900km],> 132kV,Nightsave Rural_Non-Local Authority_[601 - 900km]_> 132kV,NR24N,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Non-Local Authority,[> 900km],< 500V,Nightsave Rural_Non-Local Authority_[> 900km]_< 500V,NR31N,0,0,0,0,0,0,179.48208,139.470654,605.18832,321.861426,0,29.93247
+Nightsave Rural,Non-Local Authority,[> 900km],≥ 500V & < 66kV,Nightsave Rural_Non-Local Authority_[> 900km]_≥ 500V & < 66kV,NR32N,0,0,0,0,0,0,177.351294,137.892294,586.563672,310.5987,0,27.463464
+Nightsave Rural,Non-Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Nightsave Rural_Non-Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,NR33N,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Non-Local Authority,[> 900km],> 132kV,Nightsave Rural_Non-Local Authority_[> 900km]_> 132kV,NR34N,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Local Authority,[0 - 300km],< 500V,Nightsave Rural_Local Authority_[0 - 300km]_< 500V,NR01Y,0,0,0,0,0,0,178.245584,138.526608,583.339064,308.757152,0,29.789232
+Nightsave Rural,Local Authority,[0 - 300km],≥ 500V & < 66kV,Nightsave Rural_Local Authority_[0 - 300km]_≥ 500V & < 66kV,NR02Y,0,0,0,0,0,0,176.152768,136.956996,565.28296,297.736472,0,27.351324
+Nightsave Rural,Local Authority,[0 - 300km],≥ 66kV & ≤ 132kV,Nightsave Rural_Local Authority_[0 - 300km]_≥ 66kV & ≤ 132kV,NR03Y,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Local Authority,[0 - 300km],> 132kV,Nightsave Rural_Local Authority_[0 - 300km]_> 132kV,NR04Y,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Local Authority,[301 - 600km],< 500V,Nightsave Rural_Local Authority_[301 - 600km]_< 500V,NR11Y,0,0,0,0,0,0,180.048968,139.918108,590.430148,313.020708,0,29.83376
+Nightsave Rural,Local Authority,[301 - 600km],≥ 500V & < 66kV,Nightsave Rural_Local Authority_[301 - 600km]_≥ 500V & < 66kV,NR12Y,0,0,0,0,0,0,177.922756,138.303968,572.195932,301.89984,0,27.451512
+Nightsave Rural,Local Authority,[301 - 600km],≥ 66kV & ≤ 132kV,Nightsave Rural_Local Authority_[301 - 600km]_≥ 66kV & ≤ 132kV,NR13Y,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Local Authority,[301 - 600km],> 132kV,Nightsave Rural_Local Authority_[301 - 600km]_> 132kV,NR14Y,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Local Authority,[601 - 900km],< 500V,Nightsave Rural_Local Authority_[601 - 900km]_< 500V,NR21Y,0,0,0,0,0,0,181.774428,141.26508,597.498968,317.250868,0,30.145456
+Nightsave Rural,Local Authority,[601 - 900km],≥ 500V & < 66kV,Nightsave Rural_Local Authority_[601 - 900km]_≥ 500V & < 66kV,NR22Y,0,0,0,0,0,0,179.659348,139.695468,579.08664,306.096604,0,27.640756
+Nightsave Rural,Local Authority,[601 - 900km],≥ 66kV & ≤ 132kV,Nightsave Rural_Local Authority_[601 - 900km]_≥ 66kV & ≤ 132kV,NR23Y,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Local Authority,[601 - 900km],> 132kV,Nightsave Rural_Local Authority_[601 - 900km]_> 132kV,NR24Y,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Local Authority,[> 900km],< 500V,Nightsave Rural_Local Authority_[> 900km]_< 500V,NR31Y,0,0,0,0,0,0,183.611208,142.65658,604.734768,321.60348,0,30.178852
+Nightsave Rural,Local Authority,[> 900km],≥ 500V & < 66kV,Nightsave Rural_Local Authority_[> 900km]_≥ 500V & < 66kV,NR32Y,0,0,0,0,0,0,181.429336,141.04244,586.133196,310.36016,0,27.651888
+Nightsave Rural,Local Authority,[> 900km],≥ 66kV & ≤ 132kV,Nightsave Rural_Local Authority_[> 900km]_≥ 66kV & ≤ 132kV,NR33Y,0,0,0,0,0,0,0,0,0,0,0,0
+Nightsave Rural,Local Authority,[> 900km],> 132kV,Nightsave Rural_Local Authority_[> 900km]_> 132kV,NR34Y,0,0,0,0,0,0,0,0,0,0,0,0
