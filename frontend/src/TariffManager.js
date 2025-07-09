@@ -1,43 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Modal, Form, InputGroup, Badge, Accordion, Table, Alert, Spinner } from 'react-bootstrap';
-import { FaTrash, FaEdit, FaPlus, FaFileAlt } from 'react-icons/fa';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Container, Row, Col, Card, Button, Modal, Form, InputGroup, Badge, Accordion, Table, Alert, Spinner, FormControl, Pagination } from 'react-bootstrap';
+import { FaTrash, FaEdit, FaPlus, FaFileAlt, FaSearch } from 'react-icons/fa';
+import axios from 'axios';
+import { API_URL } from './apiConfig';
 import './TariffManager.css';
-
-// --- Placeholder Data ---
-// This mimics the data structure we'll get from the API later.
-const PLACEHOLDER_TARIFFS = [
-    {
-        id: 1,
-        name: 'Homepower 4',
-        power_user_type: 'SPU',
-        tariff_category: 'Residential',
-        code: 'HP4',
-        matrix_code: 'ESK-HP4-R',
-        structure: 'tiered',
-        rates: [
-            { id: 101, charge_name: 'Service and administration charge', charge_category: 'fixed', season: 'all', time_of_use: 'all', rate_unit: 'R/POD/day', rate_value: 8.22 },
-            { id: 102, charge_name: 'Energy Charge', charge_category: 'energy', season: 'all', time_of_use: 'all', rate_unit: 'c/kWh', rate_value: 258.57, block_threshold_kwh: 600 },
-            { id: 103, charge_name: 'Energy Charge', charge_category: 'energy', season: 'all', time_of_use: 'all', rate_unit: 'c/kWh', rate_value: 301.21, block_threshold_kwh: null }
-        ]
-    },
-    {
-        id: 2,
-        name: 'Megaflex',
-        power_user_type: 'LPU',
-        tariff_category: 'Commercial',
-        transmission_zone: 'Urban',
-        supply_voltage: '> 1kV < 22kV',
-        code: 'MFX-U-1',
-        matrix_code: 'ESK-MFX-C-U1',
-        structure: 'time_of_use',
-        rates: [
-            { id: 201, charge_name: 'Network Access Charges', charge_category: 'demand', season: 'all', time_of_use: 'all', rate_unit: 'R/kVA/m', rate_value: 150.00 },
-            { id: 202, charge_name: 'Energy Charge', charge_category: 'energy', season: 'high', time_of_use: 'peak', rate_unit: 'c/kWh', rate_value: 410.30 },
-            { id: 203, charge_name: 'Energy Charge', charge_category: 'energy', season: 'high', time_of_use: 'standard', rate_unit: 'c/kWh', rate_value: 167.00 },
-            { id: 204, charge_name: 'Energy Charge', charge_category: 'energy', season: 'low', time_of_use: 'peak', rate_unit: 'c/kWh', rate_value: 134.11 },
-        ]
-    }
-];
 
 const EMPTY_TARIFF = {
     name: '', power_user_type: 'SPU', tariff_category: '', code: '',
@@ -53,14 +19,61 @@ export default function TariffManager() {
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [formState, setFormState] = useState(EMPTY_TARIFF);
-    
-    // Simulate fetching data on component mount
-    useEffect(() => {
-        setTimeout(() => {
-            setTariffs(PLACEHOLDER_TARIFFS);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // State for pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10)
+
+    // --- NEW: Function to fetch tariffs from the API ---
+    const fetchTariffs = async () => {
+        setLoading(true);
+        try {
+            const response = await axios.get(`${API_URL}/api/tariffs`);
+            setTariffs(response.data);
+            setError('');
+        } catch (err) {
+            setError('Failed to load tariffs. Please ensure the backend is running.');
+            console.error(err);
+        } finally {
             setLoading(false);
-        }, 1000); // Simulate network delay
+        }
+    };    
+
+    // --- UPDATED: useEffect to call fetchTariffs on component mount ---
+    useEffect(() => {
+        fetchTariffs();
     }, []);
+
+    const filteredTariffs = useMemo(() => {
+        const lowercasedSearchTerm = searchTerm.toLowerCase().trim();
+        if (!lowercasedSearchTerm) {
+            return tariffs;
+        }
+        return tariffs.filter(tariff =>
+            // Check every relevant field, trimming whitespace and handling potential null values
+            (tariff.name?.toLowerCase() || '').includes(lowercasedSearchTerm) ||
+            (tariff.tariff_category?.toLowerCase() || '').includes(lowercasedSearchTerm) ||
+            (tariff.power_user_type?.toLowerCase() || '').includes(lowercasedSearchTerm) ||
+            (tariff.transmission_zone?.trim().toLowerCase() || '').includes(lowercasedSearchTerm) ||
+            (tariff.code?.trim().toLowerCase() || '').includes(lowercasedSearchTerm) ||
+            (tariff.matrix_code?.trim().toLowerCase() || '').includes(lowercasedSearchTerm) ||
+            (tariff.structure?.toLowerCase() || '').includes(lowercasedSearchTerm) ||
+            (tariff.supply_voltage?.trim().toLowerCase() || '').includes(lowercasedSearchTerm)
+        );
+    }, [tariffs, searchTerm]);
+
+        // --- UPDATED: Reset to page 1 when filtering ---
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentTariffs = filteredTariffs.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredTariffs.length / itemsPerPage);
+
+    const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
     const handleOpenAddModal = () => {
         setIsEditing(false);
@@ -76,18 +89,31 @@ export default function TariffManager() {
 
     const handleCloseModal = () => setShowModal(false);
 
-    const handleSave = () => {
-        // This is where the API call to save the data will go.
-        // For now, we just update the local state.
-        console.log("Saving tariff:", formState);
-        handleCloseModal();
-        // Here you would refetch the tariffs list from the API.
+    // --- UPDATED: handleSave to use axios.post/put ---
+    const handleSave = async () => {
+        const url = isEditing ? `${API_URL}/api/tariffs/${formState.id}` : `${API_URL}/api/tariffs`;
+        const method = isEditing ? 'put' : 'post';
+
+        try {
+            await axios[method](url, formState);
+            handleCloseModal();
+            fetchTariffs(); // Refresh the list after saving
+        } catch (err) {
+            setError('Failed to save tariff.');
+            console.error(err);
+        }
     };
     
-    const handleDelete = (tariffId) => {
+    // --- UPDATED: handleDelete to use axios.delete ---
+    const handleDelete = async (tariffId) => {
         if (window.confirm('Are you sure you want to delete this tariff?')) {
-            console.log("Deleting tariff:", tariffId);
-            // API call to delete, then refetch.
+            try {
+                await axios.delete(`${API_URL}/api/tariffs/${tariffId}`);
+                fetchTariffs(); // Refresh the list
+            } catch (err) {
+                setError('Failed to delete tariff.');
+                console.error(err);
+            }
         }
     };
     
@@ -131,17 +157,30 @@ export default function TariffManager() {
                         </Button>
                     </div>
 
+                    {/* Search bar */}
+                    <div className='mb-4'>
+                        <InputGroup>
+                            <InputGroup.Text><FaSearch /></InputGroup.Text>
+                            <FormControl
+                                placeholder='Search by name, category or type..'
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </InputGroup>
+                    </div>
+
                     {loading && <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div>}
                     {error && <Alert variant="danger">{error}</Alert>}
 
                     {!loading && (
-                        <Accordion defaultActiveKey="0">
-                            {tariffs.map((tariff, index) => (
-                                <Accordion.Item eventKey={String(index)} key={tariff.id} className="mb-2 tariff-accordion-item">
+                    <>
+                        <Accordion>
+                            {currentTariffs.map((tariff) => (
+                                <Accordion.Item eventKey={String(tariff.id)} key={tariff.id} className="mb-2 tariff-accordion-item">
                                     <Accordion.Header>
                                         <div className="d-flex w-100 justify-content-between align-items-center pe-2">
                                             <div className="tariff-header-info">
-                                                <span className="fw-bold fs-5">{tariff.name}</span>
+                                                <span className="fw-bold fs-5">{tariff.name} ({tariff.matrix_code})</span>
                                                 <div className="d-flex gap-2 mt-1">
                                                     <Badge pill bg="primary">{tariff.power_user_type}</Badge>
                                                     <Badge pill bg="secondary">{tariff.tariff_category}</Badge>
@@ -154,37 +193,75 @@ export default function TariffManager() {
                                             </div>
                                         </div>
                                     </Accordion.Header>
-                                    <Accordion.Body>
-                                        <Table striped bordered hover responsive size="sm">
-                                            <thead>
-                                                <tr>
-                                                    <th>Charge Name</th>
-                                                    <th>Category</th>
-                                                    <th>Season</th>
-                                                    <th>Time of Use</th>
-                                                    <th>Rate</th>
-                                                    <th>Unit</th>
-                                                    <th>Block Limit (kWh)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {tariff.rates.map(rate => (
-                                                    <tr key={rate.id}>
-                                                        <td>{rate.charge_name}</td>
-                                                        <td><Badge bg="dark">{rate.charge_category}</Badge></td>
-                                                        <td>{rate.season}</td>
-                                                        <td>{rate.time_of_use}</td>
-                                                        <td className="fw-bold">{rate.rate_value}</td>
-                                                        <td>{rate.rate_unit}</td>
-                                                        <td>{rate.block_threshold_kwh || 'N/A'}</td>
+                                        <Accordion.Body>
+                                            {/* --- NEW: Conditionally display LPU-specific details --- */}
+                                            {tariff.power_user_type === 'LPU' && (
+                                                <div className="lpu-details mb-3">
+                                                    <Badge bg="light" text="dark" className="me-2">Zone: {tariff.transmission_zone}</Badge>
+                                                    <Badge bg="light" text="dark">Voltage: {tariff.supply_voltage}</Badge>
+                                                </div>
+                                            )}
+
+                                            <Table striped bordered hover responsive size="sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Charge Name</th>
+                                                        <th>Category</th>
+                                                        <th>Rate</th>
+                                                        <th>Unit</th>
+                                                        {/* --- NEW: Conditionally render table headers --- */}
+                                                        {tariff.structure === 'time_of_use' && (
+                                                            <>
+                                                                <th>Season</th>
+                                                                <th>Time of Use</th>
+                                                            </>
+                                                        )}
+                                                        {tariff.structure === 'tiered' && (
+                                                            <th>Block Limit (kWh)</th>
+                                                        )}
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </Table>
-                                    </Accordion.Body>
+                                                </thead>
+                                                <tbody>
+                                                    {tariff.rates.map(rate => (
+                                                        <tr key={rate.id}>
+                                                            <td>{rate.charge_name}</td>
+                                                            <td><Badge bg="dark">{rate.charge_category}</Badge></td>
+                                                            <td className="fw-bold">{rate.rate_value}</td>
+                                                            <td>{rate.rate_unit}</td>
+                                                            {/* --- NEW: Conditionally render table cells --- */}
+                                                            {tariff.structure === 'time_of_use' && (
+                                                                <>
+                                                                    <td>{rate.season}</td>
+                                                                    <td>{rate.time_of_use}</td>
+                                                                </>
+                                                            )}
+                                                            {tariff.structure === 'tiered' && (
+                                                                <td>{rate.block_threshold_kwh || 'N/A'}</td>
+                                                            )}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </Table>
+                                        </Accordion.Body>
                                 </Accordion.Item>
                             ))}
                         </Accordion>
+
+                        {/* New pagination component */}
+                        {totalPages > 1 && (
+                            <div className='d-flex justify-content-center mt-4'>
+                                <Pagination>
+                                    <Pagination.Prev onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} />
+                                    {[...Array(totalPages).keys()].map(number => (
+                                        <Pagination.Item key={number + 1} active={number + 1 === currentPage} onClick={() => paginate(number + 1)}>
+                                            {number + 1}
+                                        </Pagination.Item>
+                                    ))}
+                                    <Pagination.Next onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages} />
+                                </Pagination>
+                            </div>
+                        )}
+                    </>
                     )}
                 </Card>
             </Container>
