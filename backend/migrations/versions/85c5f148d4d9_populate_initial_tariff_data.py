@@ -73,10 +73,13 @@ def upgrade():
             tariff_id = result.fetchone()[0]
 
             # Add other charges
-            other_charges_map = {'Service and administration charge [R/POD/day]': ('Service and administration charge', 'fixed', 'R/POD/day'), 'Network Capacity charge [R/POD/day]': ('Network Capacity charge', 'fixed', 'R/POD/day'), 'Ancillary Service Charge [c/kWh]': ('Ancillary Service Charge', 'energy', 'c/kWh'), 'Network Demand Charge [c/kWh]': ('Network Demand Charge', 'energy', 'c/kWh')}
+            other_charges_map = {'Service and Administration Charge [R/POD/day]': ('Service and Administration Charge', 'fixed', 'R/POD/day'), 'Network Capacity Charge [R/POD/day]': ('Network Capacity Charge', 'fixed', 'R/POD/day'), 'Ancillary Service Charge [c/kWh]': ('Ancillary Service Charge', 'energy', 'c/kWh'), 'Network Demand Charge [c/kWh]': ('Network Demand Charge', 'energy', 'c/kWh')}
             for col, (name, cat, unit) in other_charges_map.items():
                 if row.get(col, 0) != 0:
-                    rates_to_insert.append({'charge_name': name, 'charge_category': cat, 'rate_unit': unit, 'rate_value': row[col]})
+                    rates_to_insert.append({
+                        'charge_name': name, 'charge_category': cat, 'rate_unit': unit, 'rate_value': row[col],
+                        'season': 'all', 'time_of_use': 'all'
+                    })
             
             # Set tariff_id for all rates and insert
             for rate in rates_to_insert:
