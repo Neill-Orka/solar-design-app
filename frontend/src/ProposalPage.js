@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Spinner, Alert, Button } from 'react-bootstrap';
 import axios from 'axios';
 import { Line, Bar, Pie } from 'react-chartjs-2';
@@ -38,6 +38,7 @@ const ChartHeaderWithDatePicker = ({ title, selectedDate, setSelectedDate, minDa
 function ProposalPage() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const loc = useLocation();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -46,24 +47,50 @@ function ProposalPage() {
 
     useEffect(() => {
         document.body.classList.add('proposal-body');
-        axios.get(`${API_URL}/api/proposal_data/${id}`)
-            .then(response => {
-                setData(response.data);
-                document.title = `Proposal for ${response.data.client_name}`;
+        
+        // Get the data passed from the QuickResults page
+        const proposalData = loc.state?.proposalData;
 
-                if (response.data?.simulation?.timestamps?.length > 0) {
-                    const firstDate = new Date(response.data.simulation.timestamps[0]);
-                    setSelectedDay(firstDate);
-                    setSelectedWeekStart(firstDate);
-                }
-            })
-            .catch(err => setError(err.response?.data?.error || 'Failed to load proposal data.'))
-            .finally(() => setLoading(false));
+        if (proposalData) {
+            setData(proposalData);
+            document.title = `Proposal for ${proposalData.client_name}`;
+            if (proposalData.simulation?.timestamps?.length > 0) {
+                const firstDate = new Date(proposalData.simulation.timestamps[0]);
+                setSelectedDay(firstDate);
+                setSelectedWeekStart(firstDate);
+            }
+        } else {
+            // Handle case where user navigates directly to this page
+            setError('Proposal data not found. Please generate it from the Quick Results page first.');
+        }
+
+        setLoading(false);
         
         return () => {
             document.body.classList.remove('proposal-body');
         };
-    }, [id]);
+    }, [loc.state]);    
+
+    // useEffect(() => {
+    //     document.body.classList.add('proposal-body');
+    //     axios.get(`${API_URL}/api/proposal_data/${id}`)
+    //         .then(response => {
+    //             setData(response.data);
+    //             document.title = `Proposal for ${response.data.client_name}`;
+
+    //             if (response.data?.simulation?.timestamps?.length > 0) {
+    //                 const firstDate = new Date(response.data.simulation.timestamps[0]);
+    //                 setSelectedDay(firstDate);
+    //                 setSelectedWeekStart(firstDate);
+    //             }
+    //         })
+    //         .catch(err => setError(err.response?.data?.error || 'Failed to load proposal data.'))
+    //         .finally(() => setLoading(false));
+        
+    //     return () => {
+    //         document.body.classList.remove('proposal-body');
+    //     };
+    // }, [id]);
 
     const dailyChartData = useMemo(() => {
         if (!data?.simulation || !selectedDay) return { labels: [], datasets: [] };

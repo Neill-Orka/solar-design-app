@@ -30,6 +30,8 @@ class Projects(db.Model):
     battery_ids = db.Column(JSONB) # NEW COLUMN
     project_value_excl_vat = db.Column(db.Float, nullable=True)
     tariff_id = db.Column(db.Integer, db.ForeignKey('tariffs.id'), nullable=True)
+    custom_flat_rate = db.Column(db.Numeric(10, 4), nullable=True)
+    tariff = db.relationship('Tariffs', backref='projects')
     site_contact_person = db.Column(db.String(80), nullable=True)
     site_phone = db.Column(db.String(20), nullable=True)
     location = db.Column(db.String(120), nullable=True)

@@ -64,7 +64,7 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
                 return;
             }
             try {
-                const payload = { basicInfo, selectedProfile, selectedSystem };
+                const payload = { projectId: projectId, basicInfo, selectedProfile, selectedSystem };
                 const response = await axios.post(`${API_URL}/api/quick_simulate`, payload);
                 setData(response.data);
 
@@ -266,7 +266,7 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
             <div className="text-center mt-5">
                  <Button variant="outline-secondary" onClick={onBack} className="me-3">Back to System Selection</Button>
                  {/* This is the new button to generate the proposal */}
-                  <Link to={`/proposal/${projectId}`} target="_blank" className="btn btn-primary btn-lg">
+                  <Link to={`/proposal/${projectId}`} state={{ proposalData: data, clientName: clientName }} target="_blank" className="btn btn-primary btn-lg">
                      <i className="bi bi-file-earmark-arrow-down-fill me-2"></i>Generate Client Proposal
                   </Link>
             </div>

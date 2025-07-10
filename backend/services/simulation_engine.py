@@ -17,16 +17,11 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         if not records:
             return {"error": "No energy data found for project"}
 
-        # --- 1. Generate a high-fidelity solar profile using pvlib ---
-        latitude, longitude = -29.636992, 24.355282  # HOPETOWN ROUX PECANS
+        latitude, longitude = -25.9895, 28.1284   # HOPETOWN ROUX PECANS
         
-        # Create a full-year date range for the simulation year
-        # This ensures we get a full weather dataset to map against
         sim_year = records[0].timestamp.year
         times = pd.date_range(start=f'{sim_year}-01-01', end=f'{sim_year}-12-31 23:59', freq='30min', tz='Africa/Johannesburg')
 
-        # Fetch Typical Meteorological Year weather data from PVGIS
-        # This is cached by pvlib for performance
         weather_data, _, _, _ = get_pvgis_tmy(latitude, longitude, outputformat='csv')
 
         if not isinstance(weather_data, pd.DataFrame):
@@ -57,8 +52,8 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
 
         # Define the PV system components
         system = PVSystem(
-            surface_tilt=15,
-            surface_azimuth=14,  # 0=North in Southern Hemisphere
+            surface_tilt=5,
+            surface_azimuth=0,  
             module_parameters={'pdc0': degraded_panel_kw * 1000, 'gamma_pdc': -0.004}, # kW to W
             inverter_parameters={'pdc0': inverter_kva * 1000}, # kVA to W
             temperature_model_parameters=temperature_params

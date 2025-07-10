@@ -1,6 +1,7 @@
 # routes/projects.py
 from flask import Blueprint, request, jsonify
 from models import db, Projects, Clients, LoadProfiles, QuickDesignData
+from .tariffs import serialize_tariff
 
 projects_bp = Blueprint('projects', __name__)
 
@@ -23,7 +24,10 @@ def get_projects():
                 'site_contact_person': p.site_contact_person,
                 'site_phone': p.site_phone,
                 'design_type': p.design_type,
-                'project_type': p.project_type
+                'project_type': p.project_type,
+                'tariff_id': p.tariff_id,
+                'custom_flat_rate': p.custom_flat_rate,
+                'tariff_details': serialize_tariff(p.tariff) if p.tariff else None,
             }
             for p in projects
         ])
@@ -67,7 +71,10 @@ def get_project_by_id(project_id):
             'site_phone': project.site_phone,
             'design_type': project.design_type,
             'project_type': project.project_type,
-            'quick_design_data': quick_design_data
+            'quick_design_data': quick_design_data,
+            'tariff_id': project.tariff_id,
+            'custom_flat_rate': project.custom_flat_rate,
+            'tariff_details': serialize_tariff(project.tariff) if project.tariff else None,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -93,6 +100,8 @@ def add_project():
             site_phone=data.get('site_phone'),
             design_type=data.get('design_type', 'Quick'),
             project_type=data.get('project_type', 'Residential'),
+            tariff_id=data.get('tariff_id'),
+            custom_flat_rate=data.get('custom_flat_rate')
         )
         db.session.add(new_project)
         db.session.commit()
@@ -130,6 +139,18 @@ def update_project(project_id):
         for key, value in data.items():
             if key not in ['inverter_kva', 'battery_kwh']:
                 setattr(project, key, value)
+
+        tariff_id = data.get('tariff_id')
+        custom_flat_rate = data.get('custom_flat_rate')
+
+        # Handle tariff fields with the clearing logic
+        if 'tariff_id' in data and data['tariff_id'] is not None:
+            project.tariff_id = data['tariff_id']
+            project.custom_flat_rate = None # Clear the other type
+        elif 'custom_flat_rate' in data and data['custom_flat_rate'] is not None:
+            project.custom_flat_rate = data['custom_flat_rate']
+            project.tariff_id = None # Clear the other type
+            
 
         db.session.commit()
         return jsonify({'message': 'Project updated successfully!'})

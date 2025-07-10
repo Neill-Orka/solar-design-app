@@ -20,12 +20,17 @@ export default function TariffManager() {
     const [isEditing, setIsEditing] = useState(false);
     const [formState, setFormState] = useState(EMPTY_TARIFF);
     const [searchTerm, setSearchTerm] = useState('');
-
-    // State for pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10)
 
-    // --- NEW: Function to fetch tariffs from the API ---
+    const [filters, setFilters] = useState({
+        power_user_type: 'all',
+        tariff_category: 'all',
+        structure: 'all',
+        supply_voltage: 'all',
+        transmission_zone: 'all',
+    });
+
     const fetchTariffs = async () => {
         setLoading(true);
         try {
@@ -45,28 +50,45 @@ export default function TariffManager() {
         fetchTariffs();
     }, []);
 
+    const availableOptions = useMemo(() => {
+        let optionsFiltered = tariffs;
+        if (filters.power_user_type !== 'all') {
+            optionsFiltered = optionsFiltered.filter(t => t.power_user_type === filters.power_user_type);
+        }
+        const powerUserTypes = [...new Set(tariffs.map(t => t.power_user_type))];
+        const categories = [...new Set(optionsFiltered.map(t => t.tariff_category))];
+        const structures = [...new Set(optionsFiltered.map(t => t.structure))];
+        const voltages = [...new Set(optionsFiltered.filter(t => t.supply_voltage).map(t => t.supply_voltage))];
+        const zones = [...new Set(optionsFiltered.filter(t => t.transmission_zone).map(t => t.transmission_zone))];
+        return { powerUserTypes, categories, structures, voltages, zones };
+    }, [tariffs, filters.power_user_type]);
+
     const filteredTariffs = useMemo(() => {
         const lowercasedSearchTerm = searchTerm.toLowerCase().trim();
-        if (!lowercasedSearchTerm) {
-            return tariffs;
-        }
-        return tariffs.filter(tariff =>
-            // Check every relevant field, trimming whitespace and handling potential null values
-            (tariff.name?.toLowerCase() || '').includes(lowercasedSearchTerm) ||
-            (tariff.tariff_category?.toLowerCase() || '').includes(lowercasedSearchTerm) ||
-            (tariff.power_user_type?.toLowerCase() || '').includes(lowercasedSearchTerm) ||
-            (tariff.transmission_zone?.trim().toLowerCase() || '').includes(lowercasedSearchTerm) ||
-            (tariff.code?.trim().toLowerCase() || '').includes(lowercasedSearchTerm) ||
-            (tariff.matrix_code?.trim().toLowerCase() || '').includes(lowercasedSearchTerm) ||
-            (tariff.structure?.toLowerCase() || '').includes(lowercasedSearchTerm) ||
-            (tariff.supply_voltage?.trim().toLowerCase() || '').includes(lowercasedSearchTerm)
-        );
-    }, [tariffs, searchTerm]);
-
-        // --- UPDATED: Reset to page 1 when filtering ---
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchTerm]);
+        return tariffs
+            .filter(t => filters.power_user_type === 'all' || t.power_user_type === filters.power_user_type)
+            .filter(t => filters.tariff_category === 'all' || t.tariff_category === filters.tariff_category)
+            .filter(t => filters.structure === 'all' || t.structure === filters.structure)
+            .filter(t => filters.supply_voltage === 'all' || t.supply_voltage === filters.supply_voltage)
+            .filter(t => filters.transmission_zone === 'all' || t.transmission_zone === filters.transmission_zone)
+            .filter(t => !lowercasedSearchTerm || t.name.toLowerCase().includes(lowercasedSearchTerm));
+    }, [tariffs, searchTerm, filters]);
+    
+    // --- NEW: Handler for filter changes ---
+    const handleFilterChange = (e) => {
+        const { name, value } = e.target;
+        setFilters(prev => {
+            const newFilters = { ...prev, [name]: value };
+            if (name === 'power_user_type') { // Reset dependent filters
+                newFilters.tariff_category = 'all';
+                newFilters.structure = 'all';
+                newFilters.supply_voltage = 'all';
+                newFilters.transmission_zone = 'all';
+            }
+            return newFilters;
+        });
+        setCurrentPage(1); // Reset to first page on any filter change
+    };
 
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -156,6 +178,21 @@ export default function TariffManager() {
                             <FaPlus className="me-2" />Add New Tariff
                         </Button>
                     </div>
+                    <Card className='border-light bg-light mb-4'>
+                        <Card.Body>
+                            <Row className="g-2">
+                                <Col md={4}><Form.Select size="sm" name="power_user_type" value={filters.power_user_type} onChange={handleFilterChange}><option value="all">All Power User Types</option>{availableOptions.powerUserTypes.map(opt => <option key={opt} value={opt}>{opt}</option>)}</Form.Select></Col>
+                                <Col md={4}><Form.Select size="sm" name="tariff_category" value={filters.tariff_category} onChange={handleFilterChange}><option value="all">All Categories</option>{availableOptions.categories.map(opt => <option key={opt} value={opt}>{opt}</option>)}</Form.Select></Col>
+                                <Col md={4}><Form.Select size="sm" name="structure" value={filters.structure} onChange={handleFilterChange}><option value="all">All Structures</option>{availableOptions.structures.map(opt => <option key={opt} value={opt}>{opt}</option>)}</Form.Select></Col>
+                                {filters.power_user_type === 'LPU' && (
+                                    <>
+                                        <Col md={6} className="mt-2"><Form.Select size="sm" name="supply_voltage" value={filters.supply_voltage} onChange={handleFilterChange}><option value="all">All Voltages</option>{availableOptions.voltages.map(opt => <option key={opt} value={opt}>{opt}</option>)}</Form.Select></Col>
+                                        <Col md={6} className="mt-2"><Form.Select size="sm" name="transmission_zone" value={filters.transmission_zone} onChange={handleFilterChange}><option value="all">All Zones</option>{availableOptions.zones.map(opt => <option key={opt} value={opt}>{opt}</option>)}</Form.Select></Col>
+                                    </>
+                                )}
+                            </Row>
+                        </Card.Body>                        
+                    </Card>
 
                     {/* Search bar */}
                     <div className='mb-4'>
