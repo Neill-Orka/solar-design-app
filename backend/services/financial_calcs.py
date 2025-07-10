@@ -65,17 +65,14 @@ def calculate_financial_model(project, sim_response, eskom_tariff, export_enable
 
 def run_quick_financials(sim_response, system_cost, project):
     try:
-        effective_rate = 0
+        effective_rate_in_rands = 0
         if project.custom_flat_rate is not None:
-            effective_rate = project.custom_flat_rate
+            effective_rate_in_rands = float(project.custom_flat_rate)
         elif project.tariff_id is not None:
             # CURRENTLY ONLY USES THE FIRST ENERGY RATE IN THE TARIFF
             rate_entry = TariffRates.query.filter_by(tariff_id=project.tariff_id, charge_category='energy').first()
             if rate_entry:
-                effective_rate = rate_entry.rate_value
-
-        # CONVERT CENT TO RAND
-        effective_rate_in_rands = float(effective_rate) / 100
+                effective_rate_in_rands = float(rate_entry.rate_value) / 100
 
         demand, imports, exports = sim_response["demand"], sim_response["import_from_grid"], sim_response["export_to_grid"]
         generation = sim_response["generation"]

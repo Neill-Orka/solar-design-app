@@ -54,6 +54,10 @@ def handle_quick_simulation():
             if 'error' in financial_results: return jsonify(financial_results), 500
             
             final_response = {
+                "client_name": project.client.client_name,
+                "project_name": project.name,
+                "location": project.location,
+                "selected_system": selected_system,
                 "simulation": sim_response,
                 "financials": financial_results
             }
