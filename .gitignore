@@ -10,3 +10,4 @@ build/
 .DS_Store
 
 backend/client_onboarding.backup
+backend/utils/hopetown_pvgis_profile_1.csv
