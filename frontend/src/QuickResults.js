@@ -64,7 +64,7 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
                 return;
             }
             try {
-                const payload = { basicInfo, selectedProfile, selectedSystem };
+                const payload = { projectId: projectId, basicInfo, selectedProfile, selectedSystem };
                 const response = await axios.post(`${API_URL}/api/quick_simulate`, payload);
                 setData(response.data);
 

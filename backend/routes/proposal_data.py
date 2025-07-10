@@ -44,7 +44,7 @@ def get_proposal_data(project_id):
         financial_params = {
             "sim_response": sim_response,
             "system_cost": system_config.get('total_cost', 0),
-            "tariff": quick_design.tariff
+            "project": project
         }
         financial_results = run_quick_financials(**financial_params)
         if 'error' in financial_results: return jsonify(financial_results), 500

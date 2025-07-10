@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Form, Button, Alert, Row, Col } from 'react-bootstrap'; // Added Row, Col
+import TariffSelector from './TariffSelector';
+import TariffSummary from './TariffSummary';
 
-function BasicInfoForm({ projectId, savedData, onSubmit }) {
+function BasicInfoForm({ projectId, savedData, onSubmit, currentTariffId, currentCustomRate, onTariffChange, tariffDetails }) {
   const [consumption, setConsumption] = useState('');
-  const [tariff, setTariff] = useState('');
   const [consumerType, setConsumerType] = useState('Residential'); // Default value
   const [transformerSize, setTransformerSize] = useState('');
   const [error, setError] = useState('');
@@ -11,7 +12,6 @@ function BasicInfoForm({ projectId, savedData, onSubmit }) {
   useEffect(() => {
     if (savedData) {
       setConsumption(savedData.consumption || '');
-      setTariff(savedData.tariff || '');
       setConsumerType(savedData.consumerType || 'Residential');
       setTransformerSize(savedData.transformerSize || '');
     }
@@ -19,27 +19,26 @@ function BasicInfoForm({ projectId, savedData, onSubmit }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!consumption || !tariff || !consumerType || !transformerSize) {
+    if (!consumption || !consumerType || !transformerSize) {
       setError('Please fill in all fields.');
       return;
     }
     // Convert to numbers for validation and submission
     const numConsumption = parseFloat(consumption);
-    const numTariff = parseFloat(tariff);
     const numTransformerSize = parseFloat(transformerSize);
 
-    if (isNaN(numConsumption) || isNaN(numTariff) || isNaN(numTransformerSize)) {
-      setError('Consumption, tariff, and transformer/max demand size must be valid numbers.');
+    if (isNaN(numConsumption) || isNaN(numTransformerSize)) {
+      setError('Consumption, and transformer/max demand size must be valid numbers.');
       return;
     }
-    if (numConsumption <= 0 || numTariff <= 0 || numTransformerSize <= 0) {
+    if (numConsumption <= 0 || numTransformerSize <= 0) {
       setError('All numerical values must be positive.');
       return;
     }
     setError('');
+
     onSubmit({
       consumption: numConsumption,
-      tariff: numTariff,
       consumerType,
       transformerSize: numTransformerSize,
     });
@@ -73,21 +72,6 @@ function BasicInfoForm({ projectId, savedData, onSubmit }) {
               />
             </Form.Group>
           </Col>
-
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label className="text-sm font-medium text-gray-700">Average Tariff (R/kWh)</Form.Label>
-              <Form.Control
-                type="number"
-                step="0.01"
-                value={tariff}
-                onChange={(e) => setTariff(e.target.value)}
-                placeholder="e.g., 2.50"
-                className={commonFormControlClasses}
-                required
-              />
-            </Form.Group>
-          </Col>
         
           <Col md={6}>
             <Form.Group className="mb-3">
@@ -101,7 +85,6 @@ function BasicInfoForm({ projectId, savedData, onSubmit }) {
                 <option value="" disabled>Select type...</option> {/* Added a disabled default option */}
                 <option value="Residential">Residential</option>
                 <option value="Commercial">Commercial</option>
-                {/* Add more options if needed, e.g., Industrial */}
               </Form.Select>
             </Form.Group>
           </Col>
@@ -120,6 +103,19 @@ function BasicInfoForm({ projectId, savedData, onSubmit }) {
             </Form.Group>
           </Col>
         </Row>
+
+        <hr className='my-4' />
+
+        <TariffSummary
+          tariff={tariffDetails}
+          customRate={currentCustomRate}
+        />
+
+        <TariffSelector 
+          currentTariffId={currentTariffId}
+          currentCustomRate={currentCustomRate}
+          onChange={onTariffChange}
+        />
 
         <div className="mt-4 pt-2 text-end"> {/* Aligned button to the right */}
           <Button

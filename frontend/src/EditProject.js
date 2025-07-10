@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Container, Row, Col, Card, Button, Form, Spinner, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Form, Spinner, Table, Alert, Badge } from 'react-bootstrap';
 import { API_URL } from "./apiConfig";
+import TariffSelector from "./TariffSelector";
 
 function EditProject() {
   const { id } = useParams();
@@ -32,6 +33,14 @@ function EditProject() {
       [e.target.name]: e.target.value
     });
   };
+
+  const handleTariffUpdate = (tariffData) => {
+    setProject(prevProject => ({
+      ...prevProject,
+      tariff_id: tariffData.tariff_id,
+      custom_flat_rate: tariffData.custom_flat_rate
+    }));
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -91,7 +100,8 @@ function EditProject() {
                     <h5 className="mb-0 fw-semibold">
                       <i className="bi bi-clipboard-data me-2"></i>Project Information
                     </h5>
-                  </Card.Header>                  <Card.Body className="p-4">
+                  </Card.Header>                  
+                  <Card.Body className="p-4">
                     <Row>
                       <Col md={6}>
                         <Form.Group className="mb-3">
@@ -166,6 +176,50 @@ function EditProject() {
                         </Form.Group>
                       </Col>
                     </Row>
+                    <hr />
+                    <Form.Group>
+                      <Form.Label className="fw-semibold">Current Tariff</Form.Label>
+                      <Card bg='light' text='dark' className="p-3 border">
+                          {project.tariff_details ? (
+                              // --- UPDATED: Richer summary view ---
+                              <div>
+                                  <h5 className="mb-1">{project.tariff_details.name} <span className="text-muted">({project.tariff_details.matrix_code})</span></h5>
+                                  <div className="mb-2">
+                                      <Badge pill bg="primary" className="me-1">{project.tariff_details.power_user_type}</Badge>
+                                      <Badge pill bg="info" text="dark">{project.tariff_details.structure}</Badge>
+                                  </div>
+                                  <Table striped bordered size="sm" className="mb-0">
+                                      <thead>
+                                          <tr>
+                                              <th>Charge Name</th>
+                                              <th>Rate</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody>
+                                          {project.tariff_details.rates.slice(0, 3).map((rate, index) => (
+                                              <tr key={index}>
+                                                  <td>{rate.charge_name}</td>
+                                                  <td><strong>{rate.rate_value}</strong> {rate.rate_unit}</td>
+                                              </tr>
+                                          ))}
+                                      </tbody>
+                                  </Table>
+                                  {project.tariff_details.rates.length > 3 && (
+                                      <small className="text-muted">...and {project.tariff_details.rates.length - 3} more rates.</small>
+                                  )}
+                              </div>
+                          ) : project.custom_flat_rate ? (
+                              // Display custom flat rate (no change here)
+                              <div>
+                                  <h5 className="mb-1">Custom Flat Rate</h5>
+                                  <Badge pill bg="success">{project.custom_flat_rate} c/kWh</Badge>
+                              </div>
+                          ) : (
+                              // Display if no tariff is set (no change here)
+                              <p className="mb-0 text-muted">No tariff selected for this project.</p> 
+                          )}
+                      </Card>
+                    </Form.Group>
                   </Card.Body>
                 </Card>
 
@@ -280,6 +334,21 @@ function EditProject() {
                         </Form.Group>
                       </Col>
                     </Row>
+                  </Card.Body>
+                </Card>
+
+                <Card className="border-light mb-4">
+                  <Card.Header>
+                    <h5 className="mb-0 fw-semibold">
+                      <i className="bi bi-receipt-cutoff me-2"></i>Tariff Configuration
+                    </h5>
+                  </Card.Header>
+                  <Card.Body className="p-4">
+                    <TariffSelector 
+                      onChange={handleTariffUpdate} 
+                      currentTariffId={project.tariff_id}
+                      currentCustomRate={project.custom_flat_rate}
+                    />
                   </Card.Body>
                 </Card>
 

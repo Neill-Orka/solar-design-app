@@ -11,12 +11,15 @@ import BasicInfoForm from './BasicInfoForm';
 import ProfileSelection from './ProfileSelection';
 import SystemSelection from './SystemSelection';
 import QuickResults from './QuickResults';
+import TariffSelector from './TariffSelector';
+import TariffSummary from './TariffSummary';
 import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
 import { Spinner, Alert } from 'react-bootstrap'; // Import Spinner and Alert for loading/error states
 
 function ProjectDashboard() {
   const { id: projectId } = useParams();  // project_id from URL
-  const [project, setProject] = useState(null);  const [activeTab, setActiveTab] = useState('upload');
+  const [project, setProject] = useState(null);
+  const [activeTab, setActiveTab] = useState('upload');
   const [currentStep, setCurrentStep] = useState(1); // Tracks quick design step
   const [quickDesignData, setQuickDesignData] = useState({
     consumption: '',
@@ -29,38 +32,64 @@ function ProjectDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const fetchProject = async () => {
+    setLoading(true);
+    try {
+      const projectRes = await axios.get(`${API_URL}/api/projects/${projectId}`);
+      setProject(projectRes.data);
+      // Set the consumerType based on project_type from the project
+      setQuickDesignData(prevData => ({
+          ...prevData,
+          consumerType: projectRes.data.project_type || 'Residential'
+      }));
+      
+      // Fetch existing quick design data
+      const quickDesignRes = await axios.get(`${API_URL}/api/projects/${projectId}/quick_design`);
+      if (quickDesignRes.data) {
+          // If data exists, update our state with it
+          setQuickDesignData(prevData => ({
+              ...prevData,
+              ...quickDesignRes.data,
+              selectedSystem: quickDesignRes.data.selectedSystemConfigJson // map backend name to frontend name
+          }));
+      }
+    } catch (err) {
+      setError('Failed to load project data. Please try again.');
+      console.error("Data loading error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-        try {
-            // Fetch project details (client name, etc.)
-            const projectRes = await axios.get(`${API_URL}/api/projects/${projectId}`);
-            setProject(projectRes.data);
-            
-            // Set the consumerType based on project_type from the project
-            setQuickDesignData(prevData => ({
-                ...prevData,
-                consumerType: projectRes.data.project_type || 'Residential'
-            }));
-            
-            // Fetch existing quick design data
-            const quickDesignRes = await axios.get(`${API_URL}/api/projects/${projectId}/quick_design`);
-            if (quickDesignRes.data) {
-                // If data exists, update our state with it
-                setQuickDesignData(prevData => ({
-                    ...prevData,
-                    ...quickDesignRes.data,
-                    selectedSystem: quickDesignRes.data.selectedSystemConfigJson // map backend name to frontend name
-                }));
-            }
-        } catch (err) {
-            setError('Failed to load project data. Please try again.');
-            console.error("Data loading error:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
-    fetchData();
+    fetchProject();
   }, [projectId]);
+
+  const handleTariffSave = async (tariffData) => {
+      try {
+          // Use the generic project update endpoint
+          await axios.put(`${API_URL}/api/projects/${projectId}`, {
+              tariff_id: tariffData.tariff_id,
+              custom_flat_rate: tariffData.custom_flat_rate,
+          });
+          // Refresh the project data to get the latest state
+          fetchProject();
+          alert('Tariff updated successfully!');
+      } catch (err) {
+          alert('Failed to save tariff selection.');
+          console.error(err);
+      }
+  };
+
+  const handleQuickDesignTariffUpdate = (tariffData) => {
+    setProject(prevProject => ({
+      ...prevProject,
+      tariff_id: tariffData.tariff_id,
+      custom_flat_rate: tariffData.custom_flat_rate
+    }));
+  }
+
 
   const handleSaveAndNext = async (dataToSave, nextStep) => {
     try {
@@ -78,8 +107,14 @@ function ProjectDashboard() {
     }
   };
 
-  const handleBasicInfoSubmit = (data) => {
-    handleSaveAndNext(data, 2);
+  const handleBasicInfoSubmit = async (data) => {
+    try {
+      await axios.put(`${API_URL}/api/projects/${projectId}`, project);
+      handleSaveAndNext(data, 2); // Move to next step after saving basic info
+    } catch (err) {
+      setError("Failed to save basic info. " + (err.response?.data?.error || err.message));
+      console.error("Error saving basic info:", err);
+    }
   }
 
   const handleProfileSelect = (profileWithScaler) => {
@@ -139,6 +174,11 @@ function ProjectDashboard() {
             projectId={projectId} // Pass projectId
             savedData={quickDesignData} // Pass saved data
             onSubmit={handleBasicInfoSubmit}
+
+            currentTariffId={project.tariff_id}
+            currentCustomRate={project.custom_flat_rate}
+            onTariffChange={handleQuickDesignTariffUpdate}
+            tariffDetails={project.tariff_details}
             />
         )}
         {currentStep === 2 && (
@@ -209,6 +249,9 @@ function ProjectDashboard() {
           <button className={`nav-link ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => setActiveTab('finance')}>Financial Modeling</button>
         </li>
         <li className="nav-item">
+          <button className={`nav-link ${activeTab === 'tariff' ? 'active' : ''}`} onClick={() => setActiveTab('tariff')}>Tariff</button>
+        </li>
+        <li className="nav-item">
           <button className={`nav-link ${activeTab === 'report' ? 'active' : ''}`} onClick={() => setActiveTab('report')}>Reporting</button>
         </li>
       </ul>
@@ -218,6 +261,20 @@ function ProjectDashboard() {
         {activeTab === 'analysis' && <EnergyAnalysis projectId={projectId} />}
         {activeTab === 'design' && <SystemDesign projectId={projectId} />}
         {activeTab === 'finance' && <FinancialModeling projectId={projectId} />}
+        {activeTab === 'tariff' && (
+          <div>
+            <TariffSummary
+              tariff={project.tariff_details}
+              customRate={project.custom_flat_rate}
+            />
+            
+            <TariffSelector 
+              currentTariffId={project.tarrif_id}
+              currentCustomRate={project.custom_flat_rate}
+              onChange={handleTariffSave} // Pass the save handler
+            />
+          </div>
+        )}
         {activeTab === 'optimize' && <Optimize projectId={projectId} />}
         {activeTab === 'report' && <Reporting projectId={projectId} />}
       </div>

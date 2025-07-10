@@ -1,5 +1,6 @@
 # services/financial_calcs.py
 from datetime import datetime
+from models import db, Tariffs, TariffRates
 import logging
 
 def calculate_financial_model(project, sim_response, eskom_tariff, export_enabled, feed_in_tariff):
@@ -62,8 +63,17 @@ def calculate_financial_model(project, sim_response, eskom_tariff, export_enable
         return {"error": str(e)}
 
 
-def run_quick_financials(sim_response, system_cost, tariff):
+def run_quick_financials(sim_response, system_cost, project):
     try:
+        effective_rate_in_rands = 0
+        if project.custom_flat_rate is not None:
+            effective_rate_in_rands = float(project.custom_flat_rate)
+        elif project.tariff_id is not None:
+            # CURRENTLY ONLY USES THE FIRST ENERGY RATE IN THE TARIFF
+            rate_entry = TariffRates.query.filter_by(tariff_id=project.tariff_id, charge_category='energy').first()
+            if rate_entry:
+                effective_rate_in_rands = float(rate_entry.rate_value) / 100
+
         demand, imports, exports = sim_response["demand"], sim_response["import_from_grid"], sim_response["export_to_grid"]
         generation = sim_response["generation"]
         timestamps = [datetime.fromisoformat(ts) for ts in sim_response["timestamps"]]
@@ -89,8 +99,8 @@ def run_quick_financials(sim_response, system_cost, tariff):
         
         grid_independence_rate = round((pv_used_on_site_kwh / total_demand_kwh) * 100, 1) if total_demand_kwh > 0 else 0
 
-        original_annual_cost = total_demand_kwh * tariff
-        new_annual_cost = total_import_kwh * tariff
+        original_annual_cost = total_demand_kwh * effective_rate_in_rands
+        new_annual_cost = total_import_kwh * effective_rate_in_rands
         annual_savings = original_annual_cost - new_annual_cost
 
         total_20yr_saving = sum(annual_savings * ((1 - degradation_rate) ** i) for i in range(20))
@@ -101,8 +111,8 @@ def run_quick_financials(sim_response, system_cost, tariff):
         for i, ts in enumerate(timestamps):
             month_key = ts.strftime('%Y-%m')
             if month_key not in monthly_costs: monthly_costs[month_key] = {"old_cost": 0, "new_cost": 0}
-            monthly_costs[month_key]["old_cost"] += demand[i] * time_interval_hours * tariff
-            monthly_costs[month_key]["new_cost"] += (imports[i] * time_interval_hours * tariff)
+            monthly_costs[month_key]["old_cost"] += demand[i] * time_interval_hours * effective_rate_in_rands
+            monthly_costs[month_key]["new_cost"] += (imports[i] * time_interval_hours * effective_rate_in_rands)
         
         cost_comparison_data = [{"month": key, **value} for key, value in sorted(monthly_costs.items())]
 

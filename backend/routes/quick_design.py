@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
-# We use print statements for debugging
+from models import db, Projects, LoadProfiles, QuickDesignData
+
 try:
     from services.simulation_engine import run_quick_simulation
     from services.financial_calcs import run_quick_financials
@@ -23,6 +24,12 @@ def handle_quick_simulation():
     if request.method == 'POST':
         try:
             data = request.get_json()
+
+            project_id = data.get('projectId')
+            project = Projects.query.get(project_id)
+            if not project:
+                return jsonify({"error": "Project not found"}), 404
+
             basic_info, selected_system, selected_profile = data.get('basicInfo'), data.get('selectedSystem'), data.get('selectedProfile')
 
             if not all([basic_info, selected_system, selected_profile]): return jsonify({"error": "Missing required fields"}), 400
@@ -41,19 +48,31 @@ def handle_quick_simulation():
             if 'error' in sim_response: return jsonify(sim_response), 500
                 
             # The 'export_enabled' parameter has been removed from the call
-            financial_params = {"sim_response": sim_response, "system_cost": selected_system.get('total_cost', 0), "tariff": basic_info.get('tariff', 0)}
+            financial_params = {"sim_response": sim_response, "system_cost": selected_system.get('total_cost', 0), "project": project}
             financial_results = run_quick_financials(**financial_params)
             
             if 'error' in financial_results: return jsonify(financial_results), 500
             
             final_response = {
+                "client_name": project.client.client_name,
+                "project_name": project.name,
+                "location": project.location,
+                "selected_system": selected_system,
                 "simulation": sim_response,
                 "financials": financial_results
             }
+
+            quick_data_entry = QuickDesignData.query.filter_by(project_id=project_id).first()
+            if not quick_data_entry:
+                quick_data_entry = QuickDesignData(project_id=project_id)
+                db.session.add(quick_data_entry)
+
             return jsonify(final_response), 200
+
         
         except Exception as e:
             print(f"--- FATAL ERROR inside handle_quick_simulation: {e}")
             return jsonify({"error": "An unexpected server error occurred."}), 500
 
     return jsonify({"error": "Method Not Allowed"}), 405
+

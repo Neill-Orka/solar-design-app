@@ -44,6 +44,7 @@ function ProposalPage() {
     const [selectedDay, setSelectedDay] = useState(null);
     const [selectedWeekStart, setSelectedWeekStart] = useState(null);
 
+
     useEffect(() => {
         document.body.classList.add('proposal-body');
         axios.get(`${API_URL}/api/proposal_data/${id}`)

@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { Container, Row, Col, Card, Button, Form, Spinner, Alert } from 'react-bootstrap';
 import { API_URL } from "./apiConfig";
+import TariffSelector from "./TariffSelector";
 
 function AddProject() {
   const [showToast, setShowToast] = useState(false);
@@ -15,7 +16,7 @@ function AddProject() {
   const [projectData, setProjectData] = useState({
     name: '',
     description: '',
-    system_type: '',
+    system_type: 'grid',
     panel_kw: '0',
     inverter_kva: '0',
     battery_kwh: '0',
@@ -24,7 +25,10 @@ function AddProject() {
     site_contact_person: '',
     site_phone: '0',
     design_type: '',
-    project_type: ''
+    project_type: 'Commercial',
+    tariff_id: null,
+    custom_flat_rate: null
+
   });
 
   const navigate = useNavigate();
@@ -48,6 +52,15 @@ function AddProject() {
       [e.target.name]: e.target.value
     });
   };
+
+  const handleTariffUpdate = (tariffData) => {
+    setProjectData(prevData => ({
+      ...prevData,
+      tariff_id: tariffData.tariff_id,
+      custom_flat_rate: tariffData.custom_flat_rate
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -329,6 +342,15 @@ function AddProject() {
                         </Form.Group>
                       </Col>
                     </Row>
+
+                    {/* Tariff Selector */}
+                    <hr className="my-4"/>
+                    <Form.Group>
+                      <Form.Label as='h5' className="fw-semibold mb-3">
+                        <i className="bi bi-receipt-cutoff me-2"></i>Tariff Configuration
+                      </Form.Label>
+                      <TariffSelector onChange={handleTariffUpdate} />
+                    </Form.Group>
                   </Card.Body>
                 </Card>
 
