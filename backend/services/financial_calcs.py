@@ -2,6 +2,26 @@
 from datetime import datetime
 from models import db, Tariffs, TariffRates
 import logging
+from datetime import datetime
+from calendar import monthrange
+from .tariff_engine import TariffEngine
+from decimal import Decimal
+
+def _serialize_tariff_for_engine(tariff: Tariffs) -> dict:
+    if not tariff:
+        return {'rates': []}
+    return {
+        'name': tariff.name,
+        'rates': [
+            {
+                'charge_category': rate.charge_category,
+                'rate_value': str(rate.rate_value),
+                'rate_unit': rate.rate_unit,
+                'season': rate.season,
+                'time_of_use': rate.time_of_use,
+            } for rate in tariff.rates.all()
+        ]
+    }
 
 def calculate_financial_model(project, sim_response, eskom_tariff, export_enabled, feed_in_tariff):
     try:
@@ -62,77 +82,264 @@ def calculate_financial_model(project, sim_response, eskom_tariff, export_enable
     except Exception as e:
         return {"error": str(e)}
 
-
-def run_quick_financials(sim_response, system_cost, project):
+def run_quick_financials(sim_response: dict, system_cost: float, project: 'Projects') -> dict:
     try:
-        effective_rate_in_rands = 0
+        # 1 Initiliaze the tariff engine
+        tariff_data = {}
         if project.custom_flat_rate is not None:
-            effective_rate_in_rands = float(project.custom_flat_rate)
-        elif project.tariff_id is not None:
-            # CURRENTLY ONLY USES THE FIRST ENERGY RATE IN THE TARIFF
-            rate_entry = TariffRates.query.filter_by(tariff_id=project.tariff_id, charge_category='energy').first()
-            if rate_entry:
-                effective_rate_in_rands = float(rate_entry.rate_value) / 100
+            tariff_data = {
+                'name': 'Custom Flat Rate',
+                'rates': [{
+                    'charge_category': 'energy', 'rate_value': str(project.custom_flat_rate * 100),
+                    'rate_unit': 'c/kWh', 'season': 'all', 'time_of_use': 'all'
+                }]
+            }
+        elif project.tariff_id is not None and project.tariff:
+            tariff_data = _serialize_tariff_for_engine(project.tariff)
 
-        demand, imports, exports = sim_response["demand"], sim_response["import_from_grid"], sim_response["export_to_grid"]
-        generation = sim_response["generation"]
-        timestamps = [datetime.fromisoformat(ts) for ts in sim_response["timestamps"]]
-        panel_kw = sim_response.get("panel_kw", 1)
-        potential_generation = sim_response["potential_generation"]
+        if not tariff_data.get('rates'):
+            return {"error": "No valid tariff data available for financial calculations."}
         
-        time_interval_hours, degradation_rate = 0.5, 0.005
+        engine = TariffEngine(tariff_data)
 
-        total_demand_kwh = sum(d * time_interval_hours for d in demand)
-        total_generation_kwh = sum(g * time_interval_hours for g in generation)
-        potential_generation_kwh = sum(pg * time_interval_hours for pg in potential_generation)
-        total_import_kwh = sum(imp * time_interval_hours for imp in imports)
-        total_export_kwh = 0 # Hardcoded to zero
+        # 2 Prepare for loop
+        imports = sim_response["import_from_grid"]
+        demand = sim_response["demand"]
+        generation = sim_response["generation"]
+        potential_generation = sim_response["potential_generation"]
+        panel_kw = sim_response.get("panel_kw", 1)
+        timestamps = [datetime.fromisoformat(ts) for ts in sim_response["timestamps"]]
+
+        time_interval_hours = Decimal('0.5')
+        degradation_rate = Decimal('0.005')
+
+        # Dictionaries to store monthly aggregated data
+        monthly_costs = {}
+        monthly_max_demand = {}
+        tariff_sample = []
+
+        # 3 Loop through simulation & calculate dynamic costs
+        for i, ts in enumerate(timestamps):
+            month_key = ts.strftime('%Y-%m')
+
+            if month_key not in monthly_costs:
+                monthly_costs[month_key] = {
+                    'old_energy_cost': Decimal(0), 'new_energy_cost': Decimal(0),
+                    'old_demand_cost': Decimal(0), 'new_demand_cost': Decimal(0),
+                    'old_fixed_cost': Decimal(0), 'new_fixed_cost': Decimal(0),
+                    'total_old_bill': Decimal(0), 'total_new_bill': Decimal(0)
+                }
+            if month_key not in monthly_max_demand:
+                monthly_max_demand[month_key] = {'old': Decimal(0), 'new': Decimal(0)}
+
+            # Get the correct energy rate for the timestamp (ts)
+            energy_rate_r_kwh = engine.get_energy_rate_r_per_kwh(ts)
+
+            ## TESTING -> Populate the tariff sample for the first week (366 half-hours)
+            if i < 366:
+                tariff_sample.append({'timestamp': ts.isoformat(), 'rate': float(round(energy_rate_r_kwh, 4))})
+
+            # Calculate energy costs for this interval
+            monthly_costs[month_key]['old_energy_cost'] += Decimal(demand[i]) * (time_interval_hours) * energy_rate_r_kwh
+            monthly_costs[month_key]['new_energy_cost'] += Decimal(imports[i]) * (time_interval_hours) * energy_rate_r_kwh
+
+            # Check if a demand charge applies in this ts and update the monthly max demand
+            demand_rate_r_kva = engine.get_demand_rate_r_per_kva_per_month(ts)
+            if demand_rate_r_kva > 0:
+                monthly_max_demand[month_key]['old'] = max(monthly_max_demand[month_key]['old'], Decimal(demand[i]))
+                monthly_max_demand[month_key]['new'] = max(monthly_max_demand[month_key]['new'], Decimal(imports[i]))
+
+        # 4 Calculate monthly fixed and demand charges 
+        daily_fixed_rate = engine.get_fixed_rate_r_per_day()
+
+        for month_key, values in monthly_costs.items():
+            year, month = int(month_key.split('-')[0]), int(month_key.split('-')[1])
+            days_in_month = monthrange(year, month)[1]
+
+            # Calculate fixed costs for the month
+            monthly_fixed_cost = Decimal(days_in_month) * daily_fixed_rate
+            values['old_fixed_cost'] = monthly_fixed_cost
+            values['new_fixed_cost'] = monthly_fixed_cost
+
+            # Calculate demand costs for the month
+            demand_ts = datetime(year, month, 15, 18, 30)
+            demand_rate = engine.get_demand_rate_r_per_kva_per_month(demand_ts)
+
+            values['old_demand_cost'] = monthly_max_demand[month_key]['old'] * demand_rate
+            values['new_demand_cost'] = monthly_max_demand[month_key]['new'] * demand_rate
+
+            # Calculate total monthly bills
+            values['total_old_bill'] = values['old_energy_cost'] + values['old_demand_cost'] + values['old_fixed_cost']
+            values['total_new_bill'] = values['new_energy_cost'] + values['new_demand_cost'] + values['new_fixed_cost']
+
+        # 5 Calculate annual savings and ROI
+        original_annual_cost = sum(v['total_old_bill'] for v in monthly_costs.values())
+        new_annual_cost = sum(v['total_new_bill'] for v in monthly_costs.values())
+        annual_savings = original_annual_cost - new_annual_cost
+
+        payback_years = Decimal(system_cost) / annual_savings if annual_savings > 0 else Decimal('inf')
+
+        # Add 20-Year ROI calculation
+        total_20yr_saving = sum(annual_savings * ((1 - degradation_rate) ** i) for i in range(20))
+        roi_20yr = ((total_20yr_saving - Decimal(system_cost)) / Decimal(system_cost)) * 100 if system_cost > 0 else Decimal('inf')
+
+        # 6 Other values from sim response for meer metrics
+        total_demand_kwh = sum(d * float(time_interval_hours) for d in demand)
+        total_import_kwh = sum(imp * float(time_interval_hours) for imp in imports)
+        total_generation_kwh = sum(g * float(time_interval_hours) for g in generation)
+        potential_generation_kwh = sum(pg * float(time_interval_hours) for pg in potential_generation)
+        
         pv_used_on_site_kwh = total_demand_kwh - total_import_kwh
-
+        
         throttled_kwh = potential_generation_kwh - total_generation_kwh
         throttling_loss_percent = (throttled_kwh / potential_generation_kwh) * 100 if potential_generation_kwh > 0 else 0
 
-        yield_incl_losses = total_generation_kwh / panel_kw / 365
-        yield_excl_losses = potential_generation_kwh / panel_kw / 365
+        yield_incl_losses = total_generation_kwh / panel_kw / 365 if panel_kw > 0 else 0
+        yield_excl_losses = potential_generation_kwh / panel_kw / 365 if panel_kw > 0 else 0
 
-        self_consumption_rate = round((pv_used_on_site_kwh / total_generation_kwh) * 100, 1) if total_generation_kwh > 0 else 0
-        
-        grid_independence_rate = round((pv_used_on_site_kwh / total_demand_kwh) * 100, 1) if total_demand_kwh > 0 else 0
+        self_consumption_rate = (pv_used_on_site_kwh / total_generation_kwh) * 100 if total_generation_kwh > 0 else 0
+        grid_independence_rate = (pv_used_on_site_kwh / total_demand_kwh) * 100 if total_demand_kwh > 0 else 0
 
-        original_annual_cost = total_demand_kwh * effective_rate_in_rands
-        new_annual_cost = total_import_kwh * effective_rate_in_rands
-        annual_savings = original_annual_cost - new_annual_cost
+        maintenance_rate = Decimal('0.01') # 1% of system cost per year
+        total_lifetime_cost = Decimal(system_cost) + (Decimal(system_cost) * maintenance_rate * 20) # 20 years of maintenance
+        total_lifetime_generation = sum(Decimal(total_generation_kwh) * ((1 - degradation_rate) ** i) for i in range(20))
+        lcoe = (total_lifetime_cost / total_lifetime_generation) if total_lifetime_generation > 0 else Decimal('0')
 
-        total_20yr_saving = sum(annual_savings * ((1 - degradation_rate) ** i) for i in range(20))
-        payback_years = system_cost / annual_savings if annual_savings > 0 else float('inf')
-        roi_20yr = ((total_20yr_saving - system_cost) / system_cost) * 100 if system_cost > 0 else float('inf')
+        # Bill fluctuation analysis
+        worst_month = max(monthly_costs.items(), key=lambda item: item[1]['total_new_bill'])
+        best_month = min(monthly_costs.items(), key=lambda item: item[1]['total_new_bill'])
+        bill_fluctuation = {
+            'worst': {'month': worst_month[0], 'cost': float(round(worst_month[1]['total_new_bill'], 2))},
+            'best': {'month': best_month[0], 'cost': float(round(best_month[1]['total_new_bill'], 2))}
+        }
 
-        monthly_costs = {}
-        for i, ts in enumerate(timestamps):
-            month_key = ts.strftime('%Y-%m')
-            if month_key not in monthly_costs: monthly_costs[month_key] = {"old_cost": 0, "new_cost": 0}
-            monthly_costs[month_key]["old_cost"] += demand[i] * time_interval_hours * effective_rate_in_rands
-            monthly_costs[month_key]["new_cost"] += (imports[i] * time_interval_hours * effective_rate_in_rands)
-        
-        cost_comparison_data = [{"month": key, **value} for key, value in sorted(monthly_costs.items())]
+        # Cashflow analysis
+        lifetime_cashflow = [{'year': 0, 'cashflow': -float(system_cost)}]
+        cumulative_cashflow = -Decimal(system_cost)
+        for year in range(1, 21):
+            degraded_savings = annual_savings * ((1 - degradation_rate) ** (year - 1))
+            cumulative_cashflow += degraded_savings
+            lifetime_cashflow.append({'year': year, 'cashflow': float(round(cumulative_cashflow, 2))})
+
+        cost_comparison_data = [
+            {
+                "month": key,
+                "old_cost": float(round(value['total_old_bill'], 2)),
+                "new_cost": float(round(value['total_new_bill'], 2)),
+                "old_bill_breakdown": {
+                    "energy": float(round(value['old_energy_cost'], 2)),
+                    "fixed": float(round(value['old_fixed_cost'], 2)),
+                    "demand": float(round(value['old_demand_cost'], 2)),
+                },
+                "new_bill_breakdown": {
+                    "energy": float(round(value['new_energy_cost'], 2)),
+                    "fixed": float(round(value['new_fixed_cost'], 2)),
+                    "demand": float(round(value['new_demand_cost'], 2)),
+                }
+            } for key, value in sorted(monthly_costs.items())
+        ]
 
         return {
-            "annual_savings": round(annual_savings),
-            "payback_period": round(payback_years, 1),
-            "roi": round(roi_20yr, 1),
+            # Financial KPIs
+            "annual_savings": float(round(annual_savings, 2)),
+            "payback_period": float(round(payback_years, 1)) if payback_years != Decimal('inf') else 'N/A',
+            "roi": float(round(roi_20yr, 1)) if roi_20yr != Decimal('inf') else 'N/A',
+            "original_annual_cost": float(round(original_annual_cost, 2)),
+            "new_annual_cost": float(round(new_annual_cost, 2)),
+            "cost_comparison": cost_comparison_data,
+            "tariff_sample": tariff_sample,
+            "roi": float(round(roi_20yr, 1)) if roi_20yr != Decimal('inf') else 'N/A',
+            "lcoe": float(round(lcoe, 2)),
+            "bill_fluctuation": bill_fluctuation,
+            "lifetime_cashflow": lifetime_cashflow,
+
+            # Technical KPIs
             "total_demand_kwh": round(total_demand_kwh),
             "total_generation_kwh": round(total_generation_kwh),
-            "pv_used_on_site_kwh": round(pv_used_on_site_kwh),
+            "potential_generation_kwh": round(potential_generation_kwh),
             "total_import_kwh": round(total_import_kwh),
-            "total_export_kwh": round(total_export_kwh),
-            "self_consumption_rate": round(self_consumption_rate),
-            "grid_independence_rate": round(grid_independence_rate),
-            "cost_comparison": cost_comparison_data,
+            "self_consumption_rate": round(self_consumption_rate, 1),
+            "grid_independence_rate": round(grid_independence_rate, 1),
+            "throttling_loss_percent": round(throttling_loss_percent, 1),
             "yield_incl_losses": round(yield_incl_losses, 2),
             "yield_excl_losses": round(yield_excl_losses, 2),
-            "potential_generation_kwh": round(potential_generation_kwh),
-            "original_annual_cost": round(original_annual_cost),
-            "new_annual_cost": round(new_annual_cost),
-            "throttling_loss_percent": round(throttling_loss_percent, 1)
         }
-    except Exception as e: return {"error": str(e)}
+    except Exception as e:
+        print(f"--- EROROR in run quick financials: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"error": "An unexpected error occurred during financial calculation."}
+
+# def run_quick_financials(sim_response, system_cost, project):
+#     try:
+#         effective_rate_in_rands = 0
+#         if project.custom_flat_rate is not None:
+#             effective_rate_in_rands = float(project.custom_flat_rate)
+#         elif project.tariff_id is not None:
+#             # CURRENTLY ONLY USES THE FIRST ENERGY RATE IN THE TARIFF
+#             rate_entry = TariffRates.query.filter_by(tariff_id=project.tariff_id, charge_category='energy').first()
+#             if rate_entry:
+#                 effective_rate_in_rands = float(rate_entry.rate_value) / 100
+
+#         demand, imports, exports = sim_response["demand"], sim_response["import_from_grid"], sim_response["export_to_grid"]
+#         generation = sim_response["generation"]
+#         timestamps = [datetime.fromisoformat(ts) for ts in sim_response["timestamps"]]
+#         panel_kw = sim_response.get("panel_kw", 1)
+#         potential_generation = sim_response["potential_generation"]
+        
+#         time_interval_hours, degradation_rate = 0.5, 0.005
+
+#         total_demand_kwh = sum(d * time_interval_hours for d in demand)
+#         total_generation_kwh = sum(g * time_interval_hours for g in generation)
+#         potential_generation_kwh = sum(pg * time_interval_hours for pg in potential_generation)
+#         total_import_kwh = sum(imp * time_interval_hours for imp in imports)
+#         total_export_kwh = 0 # Hardcoded to zero
+#         pv_used_on_site_kwh = total_demand_kwh - total_import_kwh
+
+#         throttled_kwh = potential_generation_kwh - total_generation_kwh
+#         throttling_loss_percent = (throttled_kwh / potential_generation_kwh) * 100 if potential_generation_kwh > 0 else 0
+
+#         yield_incl_losses = total_generation_kwh / panel_kw / 365
+#         yield_excl_losses = potential_generation_kwh / panel_kw / 365
+
+#         self_consumption_rate = round((pv_used_on_site_kwh / total_generation_kwh) * 100, 1) if total_generation_kwh > 0 else 0
+        
+#         grid_independence_rate = round((pv_used_on_site_kwh / total_demand_kwh) * 100, 1) if total_demand_kwh > 0 else 0
+
+#         original_annual_cost = total_demand_kwh * effective_rate_in_rands
+#         new_annual_cost = total_import_kwh * effective_rate_in_rands
+#         annual_savings = original_annual_cost - new_annual_cost
+
+#         total_20yr_saving = sum(annual_savings * ((1 - degradation_rate) ** i) for i in range(20))
+#         payback_years = system_cost / annual_savings if annual_savings > 0 else float('inf')
+#         roi_20yr = ((total_20yr_saving - system_cost) / system_cost) * 100 if system_cost > 0 else float('inf')
+
+#         monthly_costs = {}
+#         for i, ts in enumerate(timestamps):
+#             month_key = ts.strftime('%Y-%m')
+#             if month_key not in monthly_costs: monthly_costs[month_key] = {"old_cost": 0, "new_cost": 0}
+#             monthly_costs[month_key]["old_cost"] += demand[i] * time_interval_hours * effective_rate_in_rands
+#             monthly_costs[month_key]["new_cost"] += (imports[i] * time_interval_hours * effective_rate_in_rands)
+        
+#         cost_comparison_data = [{"month": key, **value} for key, value in sorted(monthly_costs.items())]
+
+#         return {
+#             "annual_savings": round(annual_savings),
+#             "payback_period": round(payback_years, 1),
+#             "roi": round(roi_20yr, 1),
+#             "total_demand_kwh": round(total_demand_kwh),
+#             "total_generation_kwh": round(total_generation_kwh),
+#             "pv_used_on_site_kwh": round(pv_used_on_site_kwh),
+#             "total_import_kwh": round(total_import_kwh),
+#             "total_export_kwh": round(total_export_kwh),
+#             "self_consumption_rate": round(self_consumption_rate),
+#             "grid_independence_rate": round(grid_independence_rate),
+#             "cost_comparison": cost_comparison_data,
+#             "yield_incl_losses": round(yield_incl_losses, 2),
+#             "yield_excl_losses": round(yield_excl_losses, 2),
+#             "potential_generation_kwh": round(potential_generation_kwh),
+#             "original_annual_cost": round(original_annual_cost),
+#             "new_annual_cost": round(new_annual_cost),
+#             "throttling_loss_percent": round(throttling_loss_percent, 1)
+#         }
+#     except Exception as e: return {"error": str(e)}

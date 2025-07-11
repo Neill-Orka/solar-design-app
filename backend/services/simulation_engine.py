@@ -47,7 +47,7 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         site = Location(latitude, longitude, tz='Africa/Johannesburg')
         temperature_params = TEMPERATURE_MODEL_PARAMETERS['sapm']['open_rack_glass_glass']
         
-        panel_degrading_factor = 0.9
+        panel_degrading_factor = 1
         degraded_panel_kw = panel_kw * panel_degrading_factor
 
         # Define the PV system components
@@ -77,9 +77,10 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
                 specific_yield_profile = (raw_dc_kw / degraded_panel_kw) * 100
 
                 # define export path
-                export_dir = os.path.join(os.path.dirname(__file__), '..', 'utils')
+                export_dir = "C:/Users/OrkaSolarEngineer/Documents/DesignWebApp/Load Profiles/PVlib Generation Profiles"
                 os.makedirs(export_dir, exist_ok=True)
                 export_path = os.path.join(export_dir, f'hopetown_pvgis_profile_{project_id}.csv')
+
 
                 # save profile
                 specific_yield_profile.to_csv(export_path, index=False, header=False)
@@ -201,7 +202,7 @@ def run_quick_simulation(scaled_load_profile, panel_kw, battery_kwh, system_type
 
         if len(percentages) != len(demand_kw): return {"error": f"Profile length mismatch."}
         
-        panel_degrading_factor = 0.9
+        panel_degrading_factor = 1
         real_panel_kw = panel_degrading_factor * panel_kw
 
         # inverter limiting
