@@ -4,6 +4,7 @@ import { Button, Row, Col, Card, Alert, Spinner, Table, Badge } from 'react-boot
 import axios from 'axios';
 import { Line, Bar } from 'react-chartjs-2';
 import { Link } from 'react-router-dom';
+import annotationPlugin from 'chartjs-plugin-annotation';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -32,7 +33,8 @@ ChartJS.register(
     Title,
     Tooltip,
     Legend,
-    TimeScale
+    TimeScale,
+    annotationPlugin
 );
 
 // Helper to format currency
@@ -111,15 +113,15 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
                 { label: 'Demand (kW)', data: sim.demand.slice(startIndex, endIndex), borderColor: '#ff6384', backgroundColor: '#ff638420', tension: 0.3, pointRadius: 0, borderWidth: 2 },
                 // { label: 'Solar Generation (kW)', data: sim.generation.slice(startIndex, endIndex), borderColor: '#ffce56', backgroundColor: '#ffce5620', tension: 0.3, pointRadius: 0, borderWidth: 2 },
                 { label: 'Grid Import (kW)', data: sim.import_from_grid.slice(startIndex, endIndex), borderColor: '#cc65fe', backgroundColor: '#cc65fe20', tension: 0.3, pointRadius: 0, borderWidth: 1.5, borderDash: [5, 5] },
-                { label: 'Battery SOC (%)', data: sim.battery_soc.slice(startIndex, endIndex), borderColor: '#4bc0c0', backgroundColor: '#4bc0c020', yAxisID: 'y1', tension: 0.3, pointRadius: 0, borderWidth: 2 }
+                { label: 'Battery SOC (%)', data: sim.battery_soc.slice(startIndex, endIndex), borderColor: '#ffce56', backgroundColor: '#ffce5620', yAxisID: 'y1', tension: 0.3, pointRadius: 0, borderWidth: 2 }
         ];
 
         if (showLosses) {
             datasets.push({
                 label: 'PV Generation (kW)',
                 data: sim.generation.slice(startIndex, endIndex),
-                borderColor: '#ffce56',
-                backgroundColor: '#ffce5620',
+                borderColor: '#4bc0c0',
+                backgroundColor: '#4bc0c020',
                 tension: 0.3,
                 pointRadius: 0,
                 borderWidth: 2,
@@ -140,8 +142,8 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
             datasets.push({
                 label: 'PV Generation (kW)',
                 data: sim.generation.slice(startIndex, endIndex),
-                borderColor: '#ffce56',
-                backgroundColor: '#ffce5620',
+                borderColor: '#4bc0c0',
+                backgroundColor: '#4bc0c020',
                 tension: 0.3,
                 pointRadius: 0,
                 borderWidth: 2
@@ -164,6 +166,78 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
         };
     }, [data]);
 
+    const costBreakdownChartData = useMemo(() => {
+        if (!data?.financials?.cost_comparison) return { labels: [], datasets: [] };
+        const fin = data.financials;
+        const labels = fin.cost_comparison.map(item => new Date(item.month).toLocaleString('default', { month: 'short', year: '2-digit' }));
+
+        const allDatasets = [
+            {
+                label: 'Old Bill - Energy',
+                data: fin.cost_comparison.map(item => item.old_bill_breakdown.energy),
+                backgroundColor: '#f87171',
+                stack: 'Stack 0',
+            },
+            {
+                label: 'Old Bill - Fixed',
+                data: fin.cost_comparison.map(item => item.old_bill_breakdown.fixed),
+                backgroundColor: '#9ca3af',
+                stack: 'Stack 0',
+            },
+            {
+                label: 'Old Bill - Demand',
+                data: fin.cost_comparison.map(item => item.old_bill_breakdown.demand),
+                backgroundColor: '#b91c1c',
+                stack: 'Stack 0',
+            },
+            {
+                label: 'New Bill - Energy',
+                data: fin.cost_comparison.map(item => item.new_bill_breakdown.energy),
+                backgroundColor: '#60a5fa',
+                stack: 'Stack 1',
+            },
+            {
+                label: 'New Bill - Fixed',
+                data: fin.cost_comparison.map(item => item.new_bill_breakdown.fixed),
+                backgroundColor: '#6b7280',
+                stack: 'Stack 1',
+            },
+            {
+                label: 'New Bill - Demand',
+                data: fin.cost_comparison.map(item => item.new_bill_breakdown.demand),
+                backgroundColor: '#1d4ed8',
+                stack: 'Stack 1',
+            }
+        ];
+
+        return {
+            labels,
+            datasets: allDatasets.filter(ds => ds.data.some(val => val !== 0 && val !== null))
+        }; 
+    }, [data]); 
+
+    const lifetimeCashflowChartData = useMemo(() => {
+        if (!data?.financials?.lifetime_cashflow) return { labels: [], datasets: [] };
+        const fin = data.financials;
+        return {
+            labels: fin.lifetime_cashflow.map(item => `Year ${item.year}`),
+            datasets: [{
+                label: 'Cumulative Cashflow (R)',
+                data: fin.lifetime_cashflow.map(item => item.cashflow),
+                borderColor: '#27ae60',
+                backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                fill: true,
+                tension: 0.3,
+            }]
+        };
+    }, [data]);
+
+    const paybackYear = useMemo(() => {
+        if (!data?.financials?.lifetime_cashflow) return null;
+        const paybackIndex = data.financials.lifetime_cashflow.findIndex(item => item.cashflow >= 0);
+        return paybackIndex !== -1 ? `Year ${data.financials.lifetime_cashflow[paybackIndex].year}` : null;
+    }, [data]);
+
     const chartOptions = {
         responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
         scales: { 
@@ -181,13 +255,14 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
     const { financials } = data;
 
     return (
-        <div className="p-lg-4" style={{ backgroundColor: '#f8f9fa' }}>
+        <div className="p-lg-4" style={{ backgroundColor: '#f8f9fa' }}>  
             <h2 className="text-3xl font-bold text-gray-800 mb-4 text-center">Quick Design Report</h2>
             
             <Row> {/* KPI Cards */}
-                <Col md={4} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-success"><i className="bi bi-wallet2"></i></div><h5>Annual Savings</h5><h3 className="fw-bold">{formatCurrency(financials.annual_savings)}</h3></Card.Body></Card></Col>
-                <Col md={4} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-info"><i className="bi bi-calendar-check"></i></div><h5>Payback Period</h5><h3 className="fw-bold">{financials.payback_period} Years</h3></Card.Body></Card></Col>
-                <Col md={4} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-warning"><i className="bi bi-graph-up-arrow"></i></div><h5>20-Year ROI</h5><h3 className="fw-bold">{financials.roi}%</h3></Card.Body></Card></Col>
+                <Col md={3} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-success"><i className="bi bi-wallet2"></i></div><h5>Annual Savings</h5><h3 className="fw-bold">{formatCurrency(financials.annual_savings)}</h3></Card.Body></Card></Col>
+                <Col md={3} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-primary"><i className="bi bi-lightning-charge-fill"></i></div><h5>LCOE</h5><h3 className="fw-bold">R {financials.lcoe}/kWh</h3></Card.Body></Card></Col>
+                <Col md={3} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-info"><i className="bi bi-calendar-check"></i></div><h5>Payback Period</h5><h3 className="fw-bold">{financials.payback_period} Years</h3></Card.Body></Card></Col>
+                <Col md={3} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-warning"><i className="bi bi-graph-up-arrow"></i></div><h5>20-Year ROI</h5><h3 className="fw-bold">{financials.roi}%</h3></Card.Body></Card></Col>
             </Row>
 
             {/* Energy Flow Chart */}
@@ -263,6 +338,124 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
                 </Col>
             </Row>
 
+            <hr className="my-5" />
+            <h2 className="text-2xl font-bold text-gray-700 mb-4 text-center">Tariff & Cost Analysis</h2>
+            <Row>
+                {/* Tariff Verification Table */}
+                <Col lg={4} className="mb-4">
+                    <Card className="shadow-sm h-100">
+                        <Card.Header as="h5">
+                            <i className="bi bi-clock-history me-2"></i>Tariff Rate Sample (First Week)
+                        </Card.Header>
+                        <Card.Body style={{ height: '450px', overflowY: 'auto' }}>
+                            <Table striped hover size="sm">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th className="text-end">Rate (R/kWh)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {financials.tariff_sample?.map((item, index) => (
+                                        <tr key={index}>
+                                            <td>{new Date(item.timestamp).toLocaleString('en-ZA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                                            <td className="text-end fw-bold">{item.rate.toFixed(2)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </Table>
+                        </Card.Body>
+                    </Card>
+                </Col>
+
+                {/* Cost Breakdown Chart */}
+                <Col lg={8} className="mb-4">
+                    <Card className="shadow-sm h-100">
+                        <Card.Header as="h5"><i className="bi bi-pie-chart-fill me-2"></i>Monthly Bill Composition (New Bill)</Card.Header>
+                        <Card.Body style={{ height: '450px' }}>
+                            <Bar 
+                                options={{ 
+                                    responsive: true, 
+                                    maintainAspectRatio: false, 
+                                    scales: { 
+                                        x: { stacked: true }, 
+                                        y: { stacked: true, title: {display: true, text: 'Cost (R)'} } 
+                                    } 
+                                }} 
+                                data={costBreakdownChartData} 
+                            />
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+
+            <hr className="my-5" />
+            <h2 className="text-2xl font-bold text-gray-700 mb-4 text-center">Advanced Financial Analysis</h2>
+            <Row>
+                {/* Bill Fluctuation Analysis */}
+                <Col lg={5} className="mb-4">
+                    <Card className="shadow-sm h-100">
+                        <Card.Header as="h5"><i className="bi bi-calendar-range-fill me-2"></i>Bill Fluctuation Analysis</Card.Header>
+                        <Card.Body className="d-flex flex-column justify-content-center">
+                            <p className="text-muted">An estimate of the highest and lowest monthly bills you can expect after installing solar.</p>
+                            <Table borderless className="text-center mt-3">
+                                <thead>
+                                    <tr>
+                                        <th><Badge bg="danger" className="fs-6 px-3 py-2">Highest Bill</Badge></th>
+                                        <th><Badge bg="success" className="fs-6 px-3 py-2">Lowest Bill</Badge></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr className="align-middle">
+                                        <td className="py-3"><h4 className="fw-bold mb-0">{formatCurrency(financials.bill_fluctuation.worst.cost)}</h4><span className="text-muted small">({new Date(financials.bill_fluctuation.worst.month).toLocaleString('default', { month: 'long' })})</span></td>
+                                        <td className="py-3"><h4 className="fw-bold mb-0">{formatCurrency(financials.bill_fluctuation.best.cost)}</h4><span className="text-muted small">({new Date(financials.bill_fluctuation.best.month).toLocaleString('default', { month: 'long' })})</span></td>
+                                    </tr>
+                                </tbody>
+                            </Table>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                {/* Lifetime Cashflow Chart */}
+                <Col lg={7} className="mb-4">
+                     <Card className="shadow-sm h-100">
+                        <Card.Header as="h5"><i className="bi bi-cash-stack me-2"></i>Lifetime Financial Performance (20 Years)</Card.Header>
+                        <Card.Body style={{ height: '350px' }}>
+                             <Line 
+                                options={{ 
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        annotation: paybackYear ? {
+                                            annotations: {
+                                                paybackLine: {
+                                                    type: 'line',
+                                                    xMin: paybackYear,
+                                                    xMax: paybackYear,
+                                                    borderColor: 'red',
+                                                    borderWidth: 2,
+                                                    label: {
+                                                        content: 'Payback',
+                                                        enabled: true,
+                                                        position: 'start',
+                                                        backgroundColor: 'red',
+                                                        color: 'white',
+                                                    }
+                                                }
+                                            }
+                                        } : {}
+                                    },
+                                    scales: {
+                                        y: { title: { display: true, text: 'Cumulative Savings (R)' } }
+                                    } 
+                                }} 
+                                data={lifetimeCashflowChartData} 
+                            />
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>                   
+
+            
             <div className="text-center mt-5">
                  <Button variant="outline-secondary" onClick={onBack} className="me-3">Back to System Selection</Button>
                  {/* This is the new button to generate the proposal */}
