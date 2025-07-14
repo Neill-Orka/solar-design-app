@@ -17,16 +17,13 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 function FinancialModeling({ projectId }) {
   const [projectValue, setProjectValue] = useState('');
-  const [eskomTariff, setEskomTariff] = useState(2.2);
   const [feedInTariff, setFeedInTariff] = useState(1.0);
   const [allowExport, setAllowExport] = useState(false);
-  const [result, setResult] = useState(null);
+  const [financialResult, setFinancialResult] = useState(null);
+  const [simulationData, setSimulationData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    console.log("Received projectID: ", projectId);
-  }, [projectId]);
-
+  // Load project value and financial settings from previous sessions
   useEffect(() => {
     axios.get(`${API_URL}/api/projects/${projectId}`)
       .then(res => {
@@ -35,67 +32,69 @@ function FinancialModeling({ projectId }) {
           setProjectValue(p.project_value_excl_vat);
         }
       })
-      .catch(err => {
-        console.error("Error loading project value:", err);
-      });
-  }, [projectId]);
+      .catch(err => console.error("Error loading project value:", err));
 
-
-  useEffect(() => {
-    const cached = sessionStorage.getItem(`financialResult_${projectId}`);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (parsed && parsed.yearly_savings) {
-          setResult(parsed);
+      // Load simulation data from session storage
+      const cachedSimData = sessionStorage.getItem(`simulationData_${projectId}`);
+      if (cachedSimData) {
+        try {
+          const parsedData = JSON.parse(cachedSimData);
+          if (parsedData && parsedData.timestamps) {
+            setSimulationData(parsedData);
+            console.log("Successfully loaded simulation data from session storage.");
+          }
+        } catch (e) {
+          alert("Failed to parse cached simulation data.", e);
         }
-      } catch (e) {
-        console.error("Error parsing cached financial result:", e);
+      } else {
+        alert("No simulation data found in session storage. Please run a simulation first.");
       }
-    }
+
+        // Load previously cached financial results and settings
+        const cachedFinResults = sessionStorage.getItem(`financialResult_${projectId}`);
+        if (cachedFinResults) {
+          setFinancialResult(JSON.parse(cachedFinResults));
+        }
+        const f = sessionStorage.getItem(`feedInTariff_${projectId}`);
+        const ex = sessionStorage.getItem(`allowExport_${projectId}`);
+        if (f) setFeedInTariff(f);
+        if (ex) setAllowExport(ex === 'true');
+  
   }, [projectId]);
-
-  useEffect(() => {
-    const t = sessionStorage.getItem(`eskomTariff_${projectId}`);
-    const f = sessionStorage.getItem(`feedInTariff_${projectId}`);
-    const ex = sessionStorage.getItem(`allowExport_${projectId}`);
-
-    if (t) setEskomTariff(t);
-    if (f) setFeedInTariff(f);
-    if (ex) setAllowExport(ex === 'true');
-
-  }, [projectId]);
-
 
   const handleCalculate = () => {
+    if (!simulationData) {
+      alert("Please run a simulation first to generate the required data.");
+      return;
+    }
+
     setLoading(true);
     axios.post(`${API_URL}/api/financial_model`, {
       project_id: projectId,
-      tariff: parseFloat(eskomTariff),
       export_enabled: allowExport,
-      feed_in_tariff: parseFloat(feedInTariff)
+      feed_in_tariff: parseFloat(feedInTariff),
+      simulation_data: simulationData
     })
-      .then(res => {
-        setResult(res.data);
-        sessionStorage.setItem(`financialResult_${projectId}`, JSON.stringify(res.data));
-        setLoading(false);
-      })
-      .catch(err => {
-        const msg = err.response?.data?.error || err.message;
-        console.error('Error calculating financials:', msg);
-        alert('Calculation failed: ' + msg + 
-              '\n(Hint: did you click "Save System" first?)');
-        setLoading(false);
-      });      
+    .then(res => {
+      setFinancialResult(res.data);
+      sessionStorage.setItem(`financialResult_${projectId}`, JSON.stringify(res.data));
+      setLoading(false);
+    })
+    .catch(err => {
+      const msg = err.response?.data?.error || err.message;
+      console.error("Error calculating financial model:", msg);
+      alert(`Error calculating financial model: ${msg}`);
+      setLoading(false);
+    });
   };
 
   // Summation for 2025
-  const costComparison = result?.cost_comparison || [];
+  const costComparison = financialResult?.cost_comparison || [];
   const oldCost2025 = costComparison
-    .filter(item => item.period.startsWith('2025-'))
+    .filter(item => item.month.startsWith('2025-'))
     .reduce((acc, val) => acc + val.old_cost, 0);
   const newCost2025 = costComparison
-    .filter(item => item.period.startsWith('2025-'))
+    .filter(item => item.month.startsWith('2025-'))
     .reduce((acc, val) => acc + val.new_cost, 0);
 
   const savings2025 = oldCost2025 - newCost2025;
@@ -153,19 +152,19 @@ function FinancialModeling({ projectId }) {
         </div>
       </div>
 
-      {result && (
+      {financialResult && (
         <div className="mt-4">
           <h5>Results</h5>
-          <p><strong>Estimated Annual Savings (2025):</strong> R{result.annual_savings.toFixed(0)}</p>
-          <p><strong>Payback Period:</strong> {result.payback_years.toFixed(1)} years</p>
-          <p><strong>20-Year ROI:</strong> {result.roi_20yr.toFixed(1)}%</p>
+          <p><strong>Estimated Annual Savings (2025):</strong> R{financialResult.annual_savings.toFixed(0)}</p>
+          <p><strong>Payback Period:</strong> {typeof financialResult.payback_period === 'number' ? financialResult.payback_period.toFixed(1) : financialResult.payback_period} years</p>
+          <p><strong>20-Year ROI:</strong> {typeof financialResult.roi === 'number' ? financialResult.roi.toFixed(1) : financialResult.roi}%</p>
 
           <Bar
             data={{
-              labels: result.yearly_savings.map(r => r.year),
+              labels: financialResult.yearly_savings.map(r => r.year),
               datasets: [{
                 label: 'Annual Savings (R)',
-                data: result.yearly_savings.map(r => r.savings),
+                data: financialResult.yearly_savings.map(r => r.savings),
                 backgroundColor: 'rgba(75, 192, 192, 0.6)'
               }]
             }}
@@ -187,7 +186,7 @@ function FinancialModeling({ projectId }) {
           <div className="mt-5">
             <Bar
               data={{
-                labels: costComparison.map(e => e.period),
+                labels: costComparison.map(e => e.month),
                 datasets: [
                   {
                     label: 'Cost Without Solar (R)',

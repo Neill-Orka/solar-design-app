@@ -221,6 +221,12 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             cumulative_cashflow += degraded_savings
             lifetime_cashflow.append({'year': year, 'cashflow': float(round(cumulative_cashflow, 2))})
 
+        yearly_savings = [
+            {"year": 2025 + i,
+             "savings": float(round(annual_savings * ((1 - degradation_rate) ** i), 2))}
+             for i in range(20)
+        ]
+
         cost_comparison_data = [
             {
                 "month": key,
@@ -247,6 +253,7 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             "original_annual_cost": float(round(original_annual_cost, 2)),
             "new_annual_cost": float(round(new_annual_cost, 2)),
             "cost_comparison": cost_comparison_data,
+            "yearly_savings": yearly_savings,
             "tariff_sample": tariff_sample,
             "roi": float(round(roi_20yr, 1)) if roi_20yr != Decimal('inf') else 'N/A',
             "lcoe": float(round(lcoe, 2)),
