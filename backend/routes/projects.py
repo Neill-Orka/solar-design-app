@@ -79,6 +79,8 @@ def get_project_by_id(project_id):
             'tariff_id': project.tariff_id,
             'custom_flat_rate': project.custom_flat_rate,
             'tariff_details': serialize_tariff(project.tariff) if project.tariff else None,
+            'surface_tilt': project.surface_tilt,
+            'surface_azimuth': project.surface_azimuth,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
