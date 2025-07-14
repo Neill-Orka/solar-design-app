@@ -103,7 +103,7 @@ function EditProject() {
                   </Card.Header>                  
                   <Card.Body className="p-4">
                     <Row>
-                      <Col md={6}>
+                      <Col md={12}>
                         <Form.Group className="mb-3">
                           <Form.Label className="fw-semibold">Project Name</Form.Label>
                           <Form.Control 
@@ -117,18 +117,52 @@ function EditProject() {
                           />
                         </Form.Group>
                       </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
+                      
+                      {/* MODIFIED: Put Location and Coordinates in one row */}
+                      <Col md={4}>
+                          <Form.Group className="mb-3">
                           <Form.Label className="fw-semibold">Location</Form.Label>
                           <Form.Control 
-                            type="text" 
-                            name="location" 
-                            value={project.location || ''} 
-                            onChange={handleChange} 
-                            size="lg"
-                            className="rounded-lg"
+                              type="text" 
+                              name="location" 
+                              value={project.location || ''} 
+                              onChange={handleChange} 
+                              size="lg"
+                              className="rounded-lg"
                           />
-                        </Form.Group>
+                          </Form.Group>
+                      </Col>
+
+                      {/* NEW: Latitude input */}
+                      <Col md={4}>
+                          <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Latitude</Form.Label>
+                          <Form.Control
+                              type="number"
+                              name="latitude"
+                              value={project.latitude || ''}
+                              onChange={handleChange}
+                              step="any"
+                              size="lg"
+                              className="rounded-lg"
+                          />
+                          </Form.Group>
+                      </Col>
+
+                      {/* NEW: Longitude input */}
+                      <Col md={4}>
+                          <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Longitude</Form.Label>
+                          <Form.Control
+                              type="number"
+                              name="longitude"
+                              value={project.longitude || ''}
+                              onChange={handleChange}
+                              step="any"
+                              size="lg"
+                              className="rounded-lg"
+                          />
+                          </Form.Group>
                       </Col>
                       <Col md={6}>
                         <Form.Group className="mb-3">

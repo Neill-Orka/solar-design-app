@@ -37,6 +37,8 @@ class Projects(db.Model):
     location = db.Column(db.String(120), nullable=True)
     latitude = db.Column(db.Float)
     longitude = db.Column(db.Float)
+    surface_tilt = db.Column(db.Float, default=15.0)
+    surface_azimuth = db.Column(db.Float, default=0.0)  # Default to North
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     design_type = db.Column(db.String(20), nullable=False) # 'detailed', 'quick'
     project_type = db.Column(db.String(50), nullable=False) # 'residential', 'commercial'

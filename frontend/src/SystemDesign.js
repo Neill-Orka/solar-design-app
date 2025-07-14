@@ -19,10 +19,13 @@ import { API_URL } from './apiConfig';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
+const PANEL_WATTAGE = 565; // JA SOLAR 72S30-565/GR
+
 function SystemDesign({ projectId }) {
   // ---- state ---------------------------------------------------
   const [systemType, setSystemType] = useState('grid');
   const [panelKw, setPanelKw] = useState('');
+  const [numPanels, setNumPanels] = useState('');
   const [inverterKva, setInverterKva] = useState('');
   const [selectedInvOpt, setSelectedInvOpt] = useState(null);
   const [inverters, setInverters] = useState([]);
@@ -83,7 +86,16 @@ function SystemDesign({ projectId }) {
       if (!p) return;
 
       setSystemType(p.system_type || 'grid');
-      setPanelKw(p.panel_kw ?? '');
+
+      // Load panel data and synchronize both states
+      const savedKw = p.panel_kw || '';
+      setPanelKw(savedKw);
+      if (savedKw) {
+        const calculatedPanels = Math.ceil((savedKw * 1000) / PANEL_WATTAGE);
+        setNumPanels(calculatedPanels);
+      } else {
+        setNumPanels('');
+      }
 
       // Handle inverter data (old and new formats)
 
@@ -132,6 +144,32 @@ function SystemDesign({ projectId }) {
 
 
   // --- helpers ---------------------------------------------------
+
+  //helper to synchronize panel inputs
+  const handleTargetKwChange = (e) => {
+    const kw = e.target.value;
+    setPanelKw(kw);
+
+    if (kw && parseFloat(kw) > 0) {
+      const calculatedPanels = Math.ceil((parseFloat(kw) * 1000) / PANEL_WATTAGE);
+      setNumPanels(calculatedPanels);
+    } else {
+      setNumPanels('');
+    }
+  };
+
+  const handleNumPanelsChange = (e) => {
+    const panels = e.target.value;
+    setNumPanels(panels);
+
+    if (panels && parseInt(panels) > 0) {
+      const calculatedKw = (parseInt(panels) * PANEL_WATTAGE) / 1000;
+      setPanelKw(calculatedKw.toFixed(2));
+    } else {
+      setPanelKw('');
+    }
+  }
+
   const saveProject = () => {
     axios.put(`${API_URL}/api/projects/${projectId}`, {
       system_type: systemType,
@@ -385,9 +423,22 @@ function SystemDesign({ projectId }) {
 
         {/* kWp, kVA, kWh */}
         <div className="col-md-3">
-          <label className="form-label">Panel Size (kWp)</label>
-          <input type="number" className="form-control"
-                 value={panelKw} onChange={e => setPanelKw(e.target.value)} />
+            <label className="form-label">Target Size (kWp)</label>
+            <input 
+                type="number" 
+                className="form-control"
+                value={panelKw} 
+                onChange={handleTargetKwChange}
+                placeholder="e.g., 200"
+            />
+            <label className="form-label mt-2">Number of Panels</label>
+            <input 
+                type="number" 
+                className="form-control"
+                value={numPanels} 
+                onChange={handleNumPanelsChange}
+                placeholder="e.g., 354"
+            />
         </div>
 
         <div className="col-md-3">
