@@ -17,6 +17,8 @@ def simulate_system():
         data = request.get_json()
         project_id = data.get("project_id")
         panel_kw = data["system"]["panel_kw"]
+        tilt = data["system"]["tilt"]
+        azimuth = data["system"]["azimuth"]
         system_type = data["system"]["system_type"]
         inverter_kva = data["system"].get("inverter_kva")
         battery_kwh = data["system"].get("battery_kwh", 0)
@@ -35,7 +37,7 @@ def simulate_system():
         if inverter_kva is None:
             return jsonify({"error": "Inverter size (kVA) is required"}), 400
 
-        result = simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export)
+        result = simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export, tilt, azimuth)
         return jsonify(result)
 
     except Exception as e:

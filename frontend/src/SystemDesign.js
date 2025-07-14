@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Line } from 'react-chartjs-2';
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
+import { Row, Col, Card } from 'react-bootstrap';
 import Select from 'react-select'
 import {
   Chart as ChartJS,
@@ -26,6 +27,8 @@ function SystemDesign({ projectId }) {
   const [systemType, setSystemType] = useState('grid');
   const [panelKw, setPanelKw] = useState('');
   const [numPanels, setNumPanels] = useState('');
+  const [tilt, setTilt] = useState('15');
+  const [azimuth, setAzimuth] = useState('0');
   const [inverterKva, setInverterKva] = useState('');
   const [selectedInvOpt, setSelectedInvOpt] = useState(null);
   const [inverters, setInverters] = useState([]);
@@ -96,6 +99,9 @@ function SystemDesign({ projectId }) {
       } else {
         setNumPanels('');
       }
+
+      setTilt(p.surface_tilt ?? '15');
+      setAzimuth(p.surface_azimuth ?? '0');
 
       // Handle inverter data (old and new formats)
 
@@ -174,6 +180,8 @@ function SystemDesign({ projectId }) {
     axios.put(`${API_URL}/api/projects/${projectId}`, {
       system_type: systemType,
       panel_kw : parseFloat(panelKw),
+      surface_tilt: parseFloat(tilt),
+      surface_azimuth: parseFloat(azimuth),
       battery_kwh: systemType === 'grid' ? null : {
         capacity: parseFloat(batteryKwh),
         quantity: batteryQuantity
@@ -202,6 +210,8 @@ function SystemDesign({ projectId }) {
       project_id: projectId,
       system: {
         panel_kw: parseFloat(panelKw),
+        tilt: parseFloat(tilt),
+        azimuth: parseFloat(azimuth),
         system_type: systemType,
         battery_kwh: totalBatteryKwh,
         inverter_kva: totalInverterKva,
@@ -393,118 +403,197 @@ function SystemDesign({ projectId }) {
     return 0;
   }
 
-    return (
-    <div className="container">
-      <h4>System Design</h4>
+  return (
+    <>
+      <div className="container">
+        <h4>System Design</h4>
 
-      <div className="row g-3 mb-3">
-        {/* system type */}
-        <div className="col-md-3">
-          <label className="form-label">System Type</label>
-          <select className="form-select" value={systemType}
-                  onChange={e => setSystemType(e.target.value)}>
-            <option value="grid">Grid‑tied</option>
-            <option value="hybrid">Hybrid</option>
-            <option value="off-grid">Off‑grid</option>
-          </select>
-          <div className='form-check mt-2'>
-            <input
-              className="form-check-input"
-              type="checkbox"
-              checked={allowExport}
-              onChange={e => setAllowExport(e.target.checked)}
-              id="allow_export"
-            />
-            <label className="form-check-label" htmlFor="allow_export">
-              Allow export to grid
-            </label>
-          </div>
-        </div>
+        {/* --- Card Layout for Form --- */}
+        <div className="row g-4 mb-4">
 
-        {/* kWp, kVA, kWh */}
-        <div className="col-md-3">
-            <label className="form-label">Target Size (kWp)</label>
-            <input 
-                type="number" 
-                className="form-control"
-                value={panelKw} 
-                onChange={handleTargetKwChange}
-                placeholder="e.g., 200"
-            />
-            <label className="form-label mt-2">Number of Panels</label>
-            <input 
-                type="number" 
-                className="form-control"
-                value={numPanels} 
-                onChange={handleNumPanelsChange}
-                placeholder="e.g., 354"
-            />
-        </div>
+            {/* --- Card 1: Core Configuration --- */}
+            <div className="col-lg-6">
+                <Card className="h-100 shadow-sm">
+                    <Card.Body className="d-flex flex-column">
+                        <Card.Title as="h5" className="fw-semibold mb-3">
+                            <i className="bi bi-gear-fill me-2 text-primary"></i>
+                            Core Configuration
+                        </Card.Title>
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>System Type</Form.Label>
+                                    <Form.Select value={systemType} onChange={e => setSystemType(e.target.value)}>
+                                        <option value="grid">Grid‑tied</option>
+                                        <option value="hybrid">Hybrid</option>
+                                        <option value="off-grid">Off‑grid</option>
+                                    </Form.Select>
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Form.Group>
+                                    <Form.Label>Grid Export</Form.Label>
+                                    <Form.Check
+                                        type="switch"
+                                        id="allow_export_switch"
+                                        label={allowExport ? "Allowed" : "Not Allowed"}
+                                        checked={allowExport}
+                                        onChange={e => setAllowExport(e.target.checked)}
+                                    />
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Panel Tilt (°)</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        value={tilt}
+                                        onChange={e => setTilt(e.target.value)}
+                                        placeholder="e.g., 15"
+                                    />
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Panel Azimuth (°)</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        value={azimuth}
+                                        onChange={e => setAzimuth(e.target.value)}
+                                        placeholder="0=N, 180=S"
+                                    />
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                    </Card.Body>
+                </Card>
+            </div>
 
-        <div className="col-md-3">
-          <Form.Label>Inverter</Form.Label>
-          <Select
-            options={inverters.map(inv => ({
-              value: inv.rating_kva,
-              label: `${inv.brand} ${inv.model} (${inv.rating_kva} kVA)`
-            }))}
-            value={selectedInvOpt}
-            onChange={opt => {
-              setSelectedInvOpt(opt);
-              setInverterKva(opt ? opt.value : '');
-            }}
-            isClearable
-          />
-          <div className='mt-2'>
-            <label className='form-label'>Quantity</label>
-            <input
-              type="number"
-              min="1"
-              className="form-control"
-              value={inverterQuantity}
-              onChange={e => setInverterQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-              />
-          </div>
-        </div>
+            {/* --- Card 2: PV Array --- */}
+            <div className="col-lg-6">
+                <Card className="h-100 shadow-sm">
+                    <Card.Body className="d-flex flex-column">
+                        <Card.Title as="h5" className="fw-semibold mb-3">
+                            <i className="bi bi-box-seam me-2 text-primary"></i>
+                            PV Array (Solar Panels)
+                        </Card.Title>
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Target Size (kWp)</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        value={panelKw}
+                                        onChange={handleTargetKwChange}
+                                        placeholder="e.g., 200"
+                                    />
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Number of Panels</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        value={numPanels}
+                                        onChange={handleNumPanelsChange}
+                                        placeholder="e.g., 354"
+                                    />
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                        <div className="mt-auto">
+                            <p className="text-muted small mb-0">
+                                Using {PANEL_WATTAGE}W panels. Entering a value in one box will automatically calculate the other.
+                            </p>
+                        </div>
+                    </Card.Body>
+                </Card>
+            </div>
 
-        <div className="col-md-3">
-          <label className="form-label">Battery (kWh)</label>
-            <Select
-              isDisabled={systemType === 'grid'}
-              options={batteries.map(bat => ({
-                value: bat.capacity_kwh,
-                label: `${bat.brand} ${bat.model} (${bat.capacity_kwh} kWh)`
-              }))}
-              value={selectedBatteryOpt}
-              onChange={opt => {
-                setSelectedBatteryOpt(opt);
-                setBatteryKwh(opt ? opt.value : '');
-              }}
-              isClearable
-            />
-            <div className="mt-2">
-              <label className="form-label">Quantity</label>
-              <input 
-                type="number"
-                min="1"
-                className="form-control"
-                value={batteryQuantity}
-                onChange={e => setBatteryQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                disabled={systemType === 'grid'}
-              /> 
+            {/* --- Card 3: Equipment --- */}
+            <div className="col-12">
+                <Card className="shadow-sm">
+                    <Card.Body>
+                        <Card.Title as="h5" className="fw-semibold mb-3">
+                            <i className="bi bi-cpu-fill me-2 text-primary"></i>
+                            Equipment Selection
+                        </Card.Title>
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group>
+                                    <Form.Label>Inverter</Form.Label>
+                                    <Select
+                                        options={inverters.map(inv => ({
+                                            value: inv.rating_kva,
+                                            label: `${inv.brand} ${inv.model} (${inv.rating_kva} kVA)`
+                                        }))}
+                                        value={selectedInvOpt}
+                                        onChange={opt => {
+                                            setSelectedInvOpt(opt);
+                                            setInverterKva(opt ? opt.value : '');
+                                        }}
+                                        isClearable
+                                    />
+                                </Form.Group>
+                                <Form.Group className="mt-2">
+                                    <Form.Label className="small">Inverter Quantity</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        size="sm"
+                                        min="1"
+                                        value={inverterQuantity}
+                                        onChange={e => setInverterQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                                    />
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Form.Group>
+                                    <Form.Label>Battery</Form.Label>
+                                    <Select
+                                        isDisabled={systemType === 'grid'}
+                                        options={batteries.map(bat => ({
+                                            value: bat.capacity_kwh,
+                                            label: `${bat.brand} ${bat.model} (${bat.capacity_kwh} kWh)`
+                                        }))}
+                                        value={selectedBatteryOpt}
+                                        onChange={opt => {
+                                            setSelectedBatteryOpt(opt);
+                                            setBatteryKwh(opt ? opt.value : '');
+                                        }}
+                                        isClearable
+                                    />
+                                </Form.Group>
+                                <Form.Group className="mt-2">
+                                    <Form.Label className="small">Battery Quantity</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        size="sm"
+                                        min="1"
+                                        value={batteryQuantity}
+                                        onChange={e => setBatteryQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                                        disabled={systemType === 'grid'}
+                                    />
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                    </Card.Body>
+                </Card>
             </div>
         </div>
 
-        {/* buttons */}
-        <div className="col-md-6 d-flex align-items-end gap-2">
-          <button className="btn btn-secondary" onClick={saveProject}>
-            Save System
-          </button>
-          <button className="btn btn-primary" onClick={handleSimulate} disabled={loading}>
-            {loading ? 'Simulating…' : 'Simulate'}
-          </button>
+        {/* --- Buttons Row --- */}
+        <div className="row g-3 mb-3">
+            <div className="col-12 d-flex gap-2">
+                <button className="btn btn-secondary" onClick={saveProject}>
+                    <i className="bi bi-floppy-fill me-2"></i>Save System
+                </button>
+                <button className="btn btn-primary" onClick={handleSimulate} disabled={loading}>
+                    {loading ? 'Simulating…' : <><i className="bi bi-play-fill me-2"></i>Simulate</>}
+                </button>
+            </div>
         </div>
-      </div>
 
       {/* -------- Simulation Chart + Zoom Buttons -------- */}
       {filtered && (
@@ -783,6 +872,7 @@ function SystemDesign({ projectId }) {
         </>
       )}
     </div>
+    </>
   );
 }
 

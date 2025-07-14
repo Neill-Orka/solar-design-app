@@ -11,7 +11,7 @@ import math
 import os
 
 
-def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export):
+def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export, tilt, azimuth):
     try:
         project = Projects.query.get(project_id)
         if not project:
@@ -25,8 +25,6 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
             return {"error": "No energy data found for project"}
 
         latitude, longitude = project.latitude, project.longitude
-        azimuth = 0
-        tilt = 15
         
         sim_year = records[0].timestamp.year
         times = pd.date_range(start=f'{sim_year}-01-01', end=f'{sim_year}-12-31 23:59', freq='30min', tz='Africa/Johannesburg')
