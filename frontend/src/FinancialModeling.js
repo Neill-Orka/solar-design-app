@@ -135,10 +135,6 @@ function FinancialModeling({ projectId }) {
       </div>
 
       <div className="row g-3 mb-3">
-        <div className="col-md-4">
-          <label className="form-label">Eskom Tariff (R/kWh)</label>
-          <input type="number" className="form-control" value={eskomTariff} onChange={(e) => {setEskomTariff(e.target.value); sessionStorage.setItem(`eskomTariff_${projectId}`, e.target.value);}} step="0.01" />
-        </div>
 
         <div className="col-md-4">
           <label className="form-label">Allow Export to Grid?</label><br />
