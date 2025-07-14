@@ -6,18 +6,27 @@ from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
 from pvlib.iotools import get_pvgis_tmy
 import pandas as pd
 import numpy as np
-from models import EnergyData
-import logging
+from models import EnergyData, Projects
+import math
 import os
 
 
 def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export):
     try:
+        project = Projects.query.get(project_id)
+        if not project:
+            return {"error": "Project not found"}
+        
+        if not project.latitude or not project.longitude:
+            return {"error": "Project location (latitude/longitude) is required for simulation"}
+
         records = EnergyData.query.filter_by(project_id=project_id).order_by(EnergyData.timestamp).all()
         if not records:
             return {"error": "No energy data found for project"}
 
-        latitude, longitude = -25.9895, 28.1284   # HOPETOWN ROUX PECANS
+        latitude, longitude = project.latitude, project.longitude
+        azimuth = 0
+        tilt = 15
         
         sim_year = records[0].timestamp.year
         times = pd.date_range(start=f'{sim_year}-01-01', end=f'{sim_year}-12-31 23:59', freq='30min', tz='Africa/Johannesburg')
@@ -49,29 +58,40 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         
         panel_degrading_factor = 1
         degraded_panel_kw = panel_kw * panel_degrading_factor
+        PANEL_WATTAGE_W = 565 # JA SOLAR 72S30-565/GR
+        num_panels = math.ceil((degraded_panel_kw * 1000) / PANEL_WATTAGE_W)
 
-        # PV Parameters (module paramaters) from datasheet for JA Solar JAM72S30-565/GR
-        module_parameters = {
-            'V_mp_ref': 42.42, # Maximum Power Voltage (V)
-            'I_mp_ref': 13.32, # Maximum Power Current (A)
-            'V_oc_ref': 50.28, # Open Circuit Voltage (V)
-            'I_sc_ref': 14.21, # Short Circuit Current (A)
+        ### THIS IS FOR CEC MODEL BUT IT NEEDS MORE PARAMETERS THAT WE DO NOT HAVE
+        # # PV Parameters (module paramaters) from datasheet for JA Solar JAM72S30-565/GR
+        # module_parameters = {
+        #     'V_mp_ref': 42.42, # Maximum Power Voltage (V)
+        #     'I_mp_ref': 13.32, # Maximum Power Current (A)
+        #     'V_oc_ref': 50.28, # Open Circuit Voltage (V)
+        #     'I_sc_ref': 14.21, # Short Circuit Current (A)
 
-            'alpha_sc': (0.045 / 100) * 14.21, # Temperature coefficient of short-circuit current (A/°C)
-            'beta_voc': (-0.275 / 100) * 50.28, # Temperature coefficient of open-circuit voltage (V/°C)
+        #     'alpha_sc': (0.045 / 100) * 14.21, # Temperature coefficient of short-circuit current (A/°C)
+        #     'beta_voc': (-0.275 / 100) * 50.28, # Temperature coefficient of open-circuit voltage (V/°C)
 
-            'gamma_pmp': -0.350 / 100, # Temperature coefficient of maximum power (Pmax) (%/°C)
-            'cells_in_series': 144, # Number of cells in series
-            'temp_ref': 25, # Reference temperature for STC
+        #     'gamma_pmp': -0.350 / 100, # Temperature coefficient of maximum power (Pmax) (%/°C)
+        #     'cells_in_series': 144, # Number of cells in series
+        #     'temp_ref': 25, # Reference temperature for STC
+        # }
+
+        pvwatts_module_parameters = {
+            # Total DC power of the array at reference conditions
+            'pdc0': degraded_panel_kw * 1000,  # Convert kW to W
+            'gamma_pdc': -0.350 / 100,  # Temperature coefficient of DC power (%/°C)
         }
 
         # Define the PV system components
         system = PVSystem(
-            surface_tilt=5,
-            surface_azimuth=0,  
-            module_parameters={'pdc0': degraded_panel_kw * 1000, 'gamma_pdc': -0.004}, # kW to W
+            surface_tilt=tilt,
+            surface_azimuth=azimuth,  
+            module_parameters=pvwatts_module_parameters,  # kW to W
             inverter_parameters={'pdc0': inverter_kva * 1000}, # kVA to W
-            temperature_model_parameters=temperature_params
+            temperature_model_parameters=temperature_params,
+            # modules_per_string=num_panels, ONLY IF USING CEC MODEL
+            # strings_per_inverter=1
         )
         mc = ModelChain(system, site, aoi_model="no_loss")
         
@@ -94,7 +114,10 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
                 # define export path
                 export_dir = "C:/Users/OrkaSolarEngineer/Documents/DesignWebApp/Load Profiles/PVlib Generation Profiles"
                 os.makedirs(export_dir, exist_ok=True)
-                export_path = os.path.join(export_dir, f'hopetown_pvgis_profile_{project_id}.csv')
+
+                sanitized_location = project.location.replace(' ', '_').replace(',', '')
+                file_name = f'{sanitized_location}_gen_profile_{project_id}_azimuth_{azimuth}_tilt_{tilt}.csv'
+                export_path = os.path.join(export_dir, file_name)
 
 
                 # save profile

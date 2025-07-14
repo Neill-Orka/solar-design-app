@@ -21,6 +21,8 @@ function AddProject() {
     inverter_kva: '0',
     battery_kwh: '0',
     location: '',
+    latitude: '',
+    longitude: '',
     project_value_excl_vat: '0',
     site_contact_person: '',
     site_phone: '0',
@@ -126,6 +128,8 @@ function AddProject() {
     try {
       await axios.post(`${API_URL}/api/projects`, {
         ...projectData,
+        latitude: parseFloat(projectData.latitude) || null,
+        longitude: parseFloat(projectData.longitude) || null,
         client_id: clientId
       });
       setShowToast(true);
@@ -259,7 +263,7 @@ function AddProject() {
                   </Card.Header>
                   <Card.Body className="p-4">
                     <Row>
-                      <Col md={6}>
+                      <Col md={12}>
                         <Form.Group className="mb-3">
                           <Form.Label className="fw-semibold">Project Name</Form.Label>
                           <Form.Control 
@@ -275,7 +279,8 @@ function AddProject() {
                         </Form.Group>
                       </Col>
 
-                      <Col md={6}>
+                      {/* MODIFIED: Put Location and Coordinates in one row */}
+                      <Col md={4}>
                         <Form.Group className="mb-3">
                           <Form.Label className="fw-semibold">Location</Form.Label>
                           <Form.Control 
@@ -285,9 +290,43 @@ function AddProject() {
                             onChange={handleInputChange} 
                             size="lg"
                             className="rounded-lg"
-                            placeholder="City, Province"
+                            placeholder="e.g., City, Province"
                           />
                         </Form.Group>
+                      </Col>
+                          
+                      {/* NEW: Latitude input */}
+                      <Col md={4}>
+                          <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Latitude</Form.Label>
+                          <Form.Control
+                              type="number"
+                              name="latitude"
+                              value={projectData.latitude}
+                              onChange={handleInputChange}
+                              step="any"
+                              size="lg"
+                              className="rounded-lg"
+                              placeholder="-25.9895"
+                          />
+                          </Form.Group>
+                      </Col>
+                          
+                      {/* NEW: Longitude input */}
+                      <Col md={4}>
+                          <Form.Group className="mb-3">
+                          <Form.Label className="fw-semibold">Longitude</Form.Label>
+                          <Form.Control
+                              type="number"
+                              name="longitude"
+                              value={projectData.longitude}
+                              onChange={handleInputChange}
+                              step="any"
+                              size="lg"
+                              className="rounded-lg"
+                              placeholder="28.1284"
+                          />
+                          </Form.Group>
                       </Col>
 
                       <Col md={12}>
