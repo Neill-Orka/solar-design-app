@@ -50,6 +50,21 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         panel_degrading_factor = 1
         degraded_panel_kw = panel_kw * panel_degrading_factor
 
+        # PV Parameters (module paramaters) from datasheet for JA Solar JAM72S30-565/GR
+        module_parameters = {
+            'V_mp_ref': 42.42, # Maximum Power Voltage (V)
+            'I_mp_ref': 13.32, # Maximum Power Current (A)
+            'V_oc_ref': 50.28, # Open Circuit Voltage (V)
+            'I_sc_ref': 14.21, # Short Circuit Current (A)
+
+            'alpha_sc': (0.045 / 100) * 14.21, # Temperature coefficient of short-circuit current (A/°C)
+            'beta_voc': (-0.275 / 100) * 50.28, # Temperature coefficient of open-circuit voltage (V/°C)
+
+            'gamma_pmp': -0.350 / 100, # Temperature coefficient of maximum power (Pmax) (%/°C)
+            'cells_in_series': 144, # Number of cells in series
+            'temp_ref': 25, # Reference temperature for STC
+        }
+
         # Define the PV system components
         system = PVSystem(
             surface_tilt=5,
