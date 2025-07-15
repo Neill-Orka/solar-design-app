@@ -67,12 +67,24 @@ class Product(db.Model):
     price       = db.Column(db.Float,  nullable=True)   # selling price
     warranty_y  = db.Column(db.Integer, nullable=True)
     notes       = db.Column(db.String(250))
+    properties  = db.Column(JSONB, nullable=True)
 
     def as_dict(self):
         "Return a plain-dict representation of the Product instance (handy for JSON)."
         from sqlalchemy.inspection import inspect as sqlalchemy_inspect
         return {c.key: getattr(self, c.key) for c in sqlalchemy_inspect(self).mapper.column_attrs}
     
+class ComponentRule(db.Model):
+    __tablename__ = 'component_rules'
+    id = db.Column(db.Integer, primary_key=True)
+    subject_product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    rule_type = db.Column(db.String(50), nullable=False) # e.g. 'REQUIRES', 'EXCLUDES'
+    object_category = db.Column(db.String(50), nullable=False) # e.g. 'panel', 'inverter', 'battery', 'fuse'
+    constraints = db.Column(JSONB, nullable=True) # {"voltage": 48, "min_amp_rating": 25}
+    quantity_formula = db.Column(db.String(255), nullable=True) # e.g., "num_panels * 4"
+    description = db.Column(db.String(255))
+    subject_product = db.relationship('Product', backref='rules')
+
 class OptimizationRun(db.Model):
     __tablename__ = "optimization_runs"
     id = db.Column(db.Integer, primary_key=True)
