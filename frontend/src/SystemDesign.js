@@ -17,12 +17,14 @@ import {
 } from 'chart.js';
 import Form from 'react-bootstrap/Form';
 import { API_URL } from './apiConfig';
+import { useNotification } from './NotificationContext';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 const PANEL_WATTAGE = 565; // JA SOLAR 72S30-565/GR
 
 function SystemDesign({ projectId }) {
+  const { showNotification } = useNotification();
   // ---- state ---------------------------------------------------
   const [systemType, setSystemType] = useState('grid');
   const [panelKw, setPanelKw] = useState('');
@@ -191,10 +193,13 @@ function SystemDesign({ projectId }) {
         quantity: inverterQuantity
       }
     })
-    .then(() => alert('System saved to project 👍'))
+    .then(() => {
+      showNotification('System saved to project 👍', 'success');
+    })
     .catch(err => {
-      console.error('Save error:', err.response?.data || err.message);
-      alert('Could not save the system.');
+      console.error('Save error:', err);
+      const errorMessage = err.response?.data?.error || 'Could not save the system.';
+      showNotification(errorMessage, 'danger');
     });
   };
 
@@ -221,7 +226,8 @@ function SystemDesign({ projectId }) {
     .then(res => {
       console.log('RAW simulate response:', res.data);
       if (!res.data.timestamps) {
-        alert('Simulation did not return expected data');
+        const errorMessage = 'Simulation failed. No timestamps returned.';
+        showNotification(errorMessage, 'danger');
         return;
       }
       setSimulationData(res.data);
@@ -229,7 +235,9 @@ function SystemDesign({ projectId }) {
     })
     .catch(err => {
       console.error('Simulation error: ', err);
-      alert('Simulation failed. See console for details');
+      // MODIFIED: Show the DESCRIPTIVE error message from the backend
+      const errorMessage = err.response?.data?.error || 'Simulation failed. See console for details.';
+      showNotification(errorMessage, 'danger');
     })
     .finally(() => setLoading(false));
   };

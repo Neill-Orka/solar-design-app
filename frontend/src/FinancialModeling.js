@@ -12,10 +12,12 @@ import {
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { API_URL } from './apiConfig';
+import { useNotification } from './NotificationContext';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 function FinancialModeling({ projectId }) {
+  const { showNotification } = useNotification();
   const [projectValue, setProjectValue] = useState('');
   const [feedInTariff, setFeedInTariff] = useState(1.0);
   const [allowExport, setAllowExport] = useState(false);
@@ -44,10 +46,10 @@ function FinancialModeling({ projectId }) {
             console.log("Successfully loaded simulation data from session storage.");
           }
         } catch (e) {
-          alert("Failed to parse cached simulation data.", e);
+          showNotification("Failed to parse cached simulation data.", 'danger');
         }
       } else {
-        alert("No simulation data found in session storage. Please run a simulation first.");
+        showNotification("No simulation data found in session storage. Please run a simulation first.", 'danger');
       }
 
         // Load previously cached financial results and settings
@@ -64,7 +66,7 @@ function FinancialModeling({ projectId }) {
 
   const handleCalculate = () => {
     if (!simulationData) {
-      alert("Please run a simulation first to generate the required data.");
+      showNotification("Please run a simulation first to generate the required data.", 'danger');
       return;
     }
 
@@ -83,7 +85,7 @@ function FinancialModeling({ projectId }) {
     .catch(err => {
       const msg = err.response?.data?.error || err.message;
       console.error("Error calculating financial model:", msg);
-      alert(`Error calculating financial model: ${msg}`);
+      showNotification(`Error calculating financial model: ${msg}`, 'danger');
       setLoading(false);
     });
   };
@@ -127,7 +129,7 @@ function FinancialModeling({ projectId }) {
             .then(() => console.log('Project value updated'))
             .catch(err => {
               console.error("Error saving project value:", err);
-              alert("Could not save project value.");
+              showNotification("Could not save project value.", 'danger');
             });
           }}
         />

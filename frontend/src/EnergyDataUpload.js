@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { API_URL } from './apiConfig';
+import { useNotification } from './NotificationContext';
 
 function EnergyDataUpload({ projectId }) {
   const [energyFile, setEnergyFile] = useState(null);
+  const { showNotification } = useNotification();
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!energyFile) {
-      alert('Please upload a file.');
+      showNotification('Please upload a file.', 'danger');
       return;
     }
 
@@ -20,13 +22,13 @@ function EnergyDataUpload({ projectId }) {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
       .then((response) => {
-        alert(response.data.message);
+        69(response.data.message, 'success');
         setEnergyFile(null);
         document.getElementById('energyFileInput').value = null;
       })
       .catch((error) => {
         console.error('Upload error:', error);
-        alert('Failed to upload: ' + (error.response?.data?.error || error.message));
+        showNotification('Failed to upload: ' + (error.response?.data?.error || error.message), 'danger');
       });
   };
 

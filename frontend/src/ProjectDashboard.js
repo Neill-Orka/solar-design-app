@@ -15,9 +15,11 @@ import TariffSelector from './TariffSelector';
 import TariffSummary from './TariffSummary';
 import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
 import { Spinner, Alert } from 'react-bootstrap'; // Import Spinner and Alert for loading/error states
+import { useNotification } from './NotificationContext'; // Import notification context for user feedback
 
 function ProjectDashboard() {
   const { id: projectId } = useParams();  // project_id from URL
+  const { showNotification } = useNotification();
   const [project, setProject] = useState(null);
   const [activeTab, setActiveTab] = useState('upload');
   const [currentStep, setCurrentStep] = useState(1); // Tracks quick design step
@@ -75,9 +77,9 @@ function ProjectDashboard() {
           });
           // Refresh the project data to get the latest state
           fetchProject();
-          alert('Tariff updated successfully!');
+          showNotification('Tariff updated successfully!', 'success');
       } catch (err) {
-          alert('Failed to save tariff selection.');
+          showNotification('Failed to save tariff selection.', 'danger');
           console.error(err);
       }
   };

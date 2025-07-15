@@ -7,10 +7,12 @@ import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import HeatMap from '@uiw/react-heat-map';
 import { API_URL } from './apiConfig';
+import { useNotification } from './NotificationContext';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 function EnergyAnalysis({ projectId }) {
+  const { showNotification } = useNotification();
   const [consumptionData, setConsumptionData] = useState([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -53,9 +55,9 @@ function EnergyAnalysis({ projectId }) {
     .then(res => setConsumptionData(res.data))
     .catch(err => {
       console.error('Error loading data:', err);
-      alert('Failed to fetch consumption data');
+      showNotification('Failed to fetch consumption data', 'danger');
     });
-  }, [projectId, startDate, endDate]);
+  }, [projectId, startDate, endDate, showNotification]);
 
   const chartData = {
     labels: consumptionData.map(d => new Date(d.timestamp).toLocaleString()),
@@ -95,6 +97,14 @@ function EnergyAnalysis({ projectId }) {
   const minDemand = Math.min(...consumptionData.map(row => row.demand_kw)).toFixed(1);
   const avgDemand = (consumptionData.reduce((sum, row) => sum + row.demand_kw, 0) / consumptionData.length).toFixed(1);
   const loadFactor = (avgDemand / peakDemand).toFixed(2);
+  const totalNocturnalLoad = consumptionData.reduce((sum, row) => {
+    const hour = new Date(row.timestamp).getHours();
+    if (hour >= 17 || hour < 7) {
+      return sum + row.demand_kw;
+    }
+    return sum
+  }, 0) * 0.5;
+  const avgDailyNocturnalLoad = (dates.size > 0 ? (totalNocturnalLoad / dates.size): 0).toFixed(0);
 
   const hourlySums = Array(24).fill(0);
   const hourlyCounts = Array(24).fill(0);
@@ -280,8 +290,8 @@ function EnergyAnalysis({ projectId }) {
         <div className="row mb-4 g-3">
           <div className="col-md-4">
             <div className="border-start border-4 border-warning bg-white shadow-sm rounded p-3 h-100">
-              <div className="text-muted small">Maak die average nocturnal load (7-5 is dag)</div>
-              <div className="fs-4 fw-bold">{minDemand} kW</div>
+              <div className="text-muted small">Avg. Daily Nocturnal Load</div>
+              <div className="fs-4 fw-bold">{avgDailyNocturnalLoad} kWh</div>
             </div>
           </div>
           <div className="col-md-4">

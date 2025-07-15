@@ -5,7 +5,7 @@ import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, Filler } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
-
+import { useNotification } from './NotificationContext';
 // Register Chart.js components (important!)
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, Filler);
 
@@ -47,6 +47,7 @@ function LoadProfileManager() {
     const [profiles, setProfiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const { showNotification } = useNotification();
 
     // State for the creation/editing form
     const [editingProfile, setEditingProfile] = useState(null); // null for new, or profile object for editing
@@ -100,7 +101,7 @@ function LoadProfileManager() {
         if (window.confirm("Are you sure you want to delete this load profile? This action cannot be undone.")) {
             axios.delete(`${API_URL}/api/load_profiles/${profileId}`)
                 .then(() => {
-                    alert('Profile deleted successfully!');
+                    showNotification('Profile deleted successfully!', 'success');
                     fetchProfiles(); // Refresh the list
                 })
                 .catch(err => alert("Error deleting profile: " + (err.response?.data?.error || err.message)));
