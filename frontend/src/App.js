@@ -18,6 +18,7 @@ import SystemBuilder from './SystemBuilder';
 import ProposalPage from './ProposalPage';
 import LoadProfileManager from './LoadProfileManager';
 import TariffManager from './TariffManager';
+import RuleEditor from './RuleEditor';
 
 import logo from './assets/orka_logo_transparent_background.png';
 import './Navbar.css';
@@ -71,6 +72,7 @@ function App() {
                     { to: '/system-builder', label: 'System Builder' },
                     { to: '/load-profile-manager', label: 'Load Profile Manager' },
                     { to: '/tariffs', label: 'Tariff Manager' },
+                    { to: '/rules', label: 'Engine Rules' },
                   ].map(link => (
                     <li className="nav-item" key={link.to}>
                       <NavLink
@@ -108,6 +110,7 @@ function App() {
             <Route path="/projects/:id/optimize" element={<Optimize />} />
             <Route path="/proposal/:id" element={<ProposalPage />} />
             <Route path="/tariffs" element={<TariffManager />} />
+            <Route path="/rules" element={<RuleEditor />} />
           </Routes>
           </div>
       </Router>

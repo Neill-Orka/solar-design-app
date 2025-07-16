@@ -1,6 +1,6 @@
 # routes/projects.py
 from flask import Blueprint, request, jsonify
-from models import db, Projects, Clients, LoadProfiles, QuickDesignData
+from models import db, Projects, Clients, LoadProfiles, QuickDesignData, Product, ComponentRule
 from .tariffs import serialize_tariff
 
 projects_bp = Blueprint('projects', __name__)
@@ -180,6 +180,35 @@ def delete_project(project_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+    
+# Endpoint to find compatible products based on rules
+@projects_bp.route('/compatible_products', methods=['GET'])
+def get_compatible_products():
+    subject_id = request.args.get('subject_id', type=int)
+    object_category = request.args.get('category', type=str)
+
+    if not subject_id or not object_category:
+        return jsonify({"error": "subject_id and category are required parameters"}), 400
+
+    # Base query for the category of products we want
+    query = Product.query.filter_by(category=object_category)
+
+    # Get all exclusion rules for the subject product
+    exclusion_rules = ComponentRule.query.filter_by(
+        subject_product_id=subject_id,
+        rule_type='EXCLUDES',
+        object_category=object_category
+    ).all()
+
+    # Apply exclusion rules to the query
+    for rule in exclusion_rules:
+        if rule.constraints:
+            for key, value in rule.constraints.items():
+                # This filters the JSONB 'properties' column
+                query = query.filter(Product.properties[key].astext != str(value))
+    
+    compatible_products = query.all()
+    return jsonify([p.as_dict() for p in compatible_products])
 
 @projects_bp.route('/load_profiles', methods=['GET'])
 def get_load_profiles():
