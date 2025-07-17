@@ -3,24 +3,38 @@ import axios from 'axios';
 import { Container, Row, Col, Card, Button, Form, Spinner, Alert, InputGroup, Badge, ListGroup, Stack } from 'react-bootstrap';
 import { API_URL } from './apiConfig';
 
+const CATEGORIES = [
+    { key: 'panel', name: 'Panels', icon: 'bi-grid-3x3-gap-fill', color: 'warning' },
+    { key: 'inverter', name: 'Inverters', icon: 'bi-box-seam', color: 'info' },
+    { key: 'battery', name: 'Batteries', icon: 'bi-battery-full', color: 'success' },
+    { key: 'breaker', name: 'Circuit Breakers', icon: 'bi-lightning-charge-fill', color: 'danger' },
+    { key: 'fuse', name: 'Fuses', icon: 'bi-shield-slash-fill', color: 'danger' },
+    { key: 'isolator', name: 'Isolators', icon: 'bi-plugin-fill', color: 'secondary' },
+    { key: 'inverter_aux', name: 'Inverter Aux', icon: 'bi-hdd-stack-fill', color: 'secondary' },
+    { key: 'dc_cable', name: 'DC Cables', icon: 'bi-plug-fill', color: 'dark' },
+    { key: 'accessory', name: 'Accessories', icon: 'bi-gear-fill', color: 'secondary' },
+];
+
 const ProductList = ({ category, products, searchFilter, onSearchChange, onAddComponent }) => {
     const searchTerm = searchFilter.toLowerCase();
+    const categoryInfo = CATEGORIES.find(c => c.key === category) || {};
+
     const filteredProducts = products.filter(p => 
         p.category === category &&
-        `${p.brand} ${p.mode} ${p.power_w || ''} ${p.rating_kva || ''} ${p.capacity_kwh || ''}`.toLowerCase().includes(searchTerm)
+        `${p.brand || ''} ${p.model || ''} ${p.power_w || ''} ${p.rating_kva || ''} ${p.capacity_kwh || ''}`.toLowerCase().includes(searchTerm)
     );
 
     return (
         <>
             <h4 className="text-xl font-semibold text-gray-700 mt-4 mb-2 ps-1 d-flex justify-content-between align-items-center">
                 <span>
-                    <i className={`bi ${category === 'panel' ? 'bi-grid-3x3-gap-fill' : category === 'inverter' ? 'bi-box-seam' : 'bi-battery-full'} me-2`}></i>
-                    {category.charAt(0).toUpperCase() + category.slice(1)}s
+                    <i className={`bi ${categoryInfo.icon} me-2`}></i>
+                    {categoryInfo.name || category}
                 </span>
                 <Form.Control
                     size="sm"
                     style={{ width: '200px' }}
-                    placeholder={`Search ${category}s...`}
+                    placeholder={`Search ${categoryInfo.name}...`}
                     value={searchFilter}
                     onChange={e => onSearchChange(category, e.target.value)} // Use prop for change handler
                 />
@@ -32,6 +46,7 @@ const ProductList = ({ category, products, searchFilter, onSearchChange, onAddCo
                             <Col key={product.id}>
                                 <Card className="h-100 shadow-sm border-light">
                                     <Card.Body className="p-3">
+                                        <Badge bg={categoryInfo.color} className='text-capitalize mb-2'>{product.category.replace('_', ' ')}</Badge>
                                         <Card.Title className="text-md font-bold text-gray-800">{product.brand} {product.model}</Card.Title>
                                         <Card.Text className="text-xs text-muted mb-2">
                                             {category === 'panel' && `${product.power_w}W`}
@@ -79,7 +94,7 @@ function SystemBuilder() {
     const [editingTemplate, setEditingTemplate] = useState(null); // Holds the template being edited
 
     // --- NEW: State for search filters ---
-    const [searchFilters, setSearchFilters] = useState({ panel: '', inverter: '', battery: '' });
+    const [searchFilters, setSearchFilters] = useState({});
 
     // Fetch all initial data on component mount
     useEffect(() => {
@@ -219,27 +234,21 @@ function SystemBuilder() {
 
                             <hr className="my-4" />
 
-                            <ProductList 
-                                category="panel"
-                                products={products}
-                                searchFilter={searchFilters.panel}
-                                onSearchChange={handleSearchChange}
-                                onAddComponent={addComponent}
-                            />
-                            <ProductList
-                                category="inverter"
-                                products={products}
-                                searchFilter={searchFilters.inverter}
-                                onSearchChange={handleSearchChange}
-                                onAddComponent={addComponent}
-                            />
-                            <ProductList
-                                category="battery"
-                                products={products}
-                                searchFilter={searchFilters.battery}
-                                onSearchChange={handleSearchChange}
-                                onAddComponent={addComponent}
-                            />
+                            {CATEGORIES.map(cat => {
+                                const productsInCategory = products.some(p => p.category === cat.key);
+                                if (!productsInCategory) return null; // Skip categories with no products
+
+                                return (
+                                    <ProductList 
+                                        key={cat.key}
+                                        category={cat.key}
+                                        products={products}
+                                        searchFilter={searchFilters[cat.key] || ''}
+                                        onSearchChange={handleSearchChange}
+                                        onAddComponent={addComponent}
+                                    />
+                                )
+                            })}
                         </Card>
                     </Col>
 
