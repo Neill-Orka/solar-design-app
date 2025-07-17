@@ -1,0 +1,12 @@
+Component Type,Nominal Voltage (V),Nominal Current (A),Number of Poles,Mounting Type,Description,Notes,Supplier,Updated,Unit Cost
+Isolator,400,60,2,Unspecified,60A 2P ISOLATOR,,CBI,21 August 2024,R467.73
+Isolator,400,63,2,Unspecified,63A 2P Isolator,,CBI,21 August 2024,R310.75
+Isolator,1000,32,4,Panel Mount,32A 1000V 4P DC Isolator switch - Panel Mount,,Onesto,13 June 2025,R450.00
+Isolator,1000,32,4,Rail Mount,32A 1000V 4P DC Isolator switch - Rail mount,,Onesto,06 June 2025,R584.78
+Isolator,1000,32,4,Surface Mount,32A 1000V 4P DC Isolator switch - Surface Mount,,Onesto,09 January 2025,R767.00
+Isolator,400,63,3,Unspecified,63A 3P ABB,,,07 October 2024,R252.00
+Isolator,400,80,3,Unspecified,80A 3P,,Schneider,18 June 2024,R1 385.00
+Isolator,400,100,2,Unspecified,100A 2P 6kA,,CBI,08 January 2025,R545.00
+Isolator,400,160,3,Unspecified,160A 3P,,Schneider,18 June 2024,R1 481.16
+Isolator,400,160,4,Unspecified,160A 4P,,ARB,11 February 2025,R2 200.00
+Isolator,400,250,3,Unspecified,250A 3P Isolator,,ARB,16 April 2025,R3 100.00

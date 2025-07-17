@@ -1,0 +1,67 @@
+Component Type,Nominal Amperage (A),Poles,Interrupting Capacity (kA),Brandname,Description,Notes,Supplier,Updated,Unit Cost
+Circuit Breaker,10,1,,,10A 1P,,Lear,10 June 2025,R65.00
+Circuit Breaker,10,1,,,10A 1P,,CBI,30 May 2025,R146.00
+Circuit Breaker,10,3,,,10A 3P,,ABB,10 February 2025,R113.33
+Circuit Breaker,15,1,3,,15A 1P 3kA CB,,CBI,30 May 2025,R150.00
+Circuit Breaker,16,1,,,16A 1P,,Lear,10 June 2025,R65.00
+Circuit Breaker,20,1,,,20A 1P,,Lear,11 June 2025,R65.00
+Circuit Breaker,20,1,,,20A 1P,,CBI,30 May 2025,R150.00
+Circuit Breaker,25,1,,,25A 1P,,CBI,05 March 2025,R162.50
+Circuit Breaker,30,1,,,30A 1P,,Schneider,05 March 2025,R163.00
+Circuit Breaker,30,2,3,,30A 1P+N 3kA CB,,CBI,30 May 2025,R410.00
+Circuit Breaker,30,3,,,30A 3P,,Vescotech,24 July 2024,R799.00
+Circuit Breaker,32,1,,,32A 1P ,,Lear,10 June 2025,R65.00
+Circuit Breaker,35,1,,,35A 1P ,,CBI,30 May 2025,R165.00
+Circuit Breaker,40,1,3,,40A 1P 3kA ,,CBI,01 July 2024,R159.00
+Circuit Breaker,40,1,6,,40A 1P 6kA,,ARB,01 August 2024,R109.96
+Circuit Breaker,40,2,3,,40A 2P 3kA,,Schneider,14 May 2025,R85.00
+Circuit Breaker,40,2,6,,40A 2P 6kA,,ARB,29 April 2024,R745.21
+Circuit Breaker,40,2,15,,40A 2P 15kA,,,12 April 2024,R686.45
+Circuit Breaker,40,3,,,40A 3P,,ARB,24 July 2024,R799.00
+Circuit Breaker,40,3,3,,40A 3P 3kA,,ARB,07 October 2024,R81.00
+Circuit Breaker,40,4,6,,40A 4P 6kA,,ARB,10 August 2024,R325.00
+Circuit Breaker,50,1,,,50A 1P,,Schneider,08 January 2025,R45.00
+Circuit Breaker,50,1,6,,50a 1P 6kA,,Hager - ARB,24 August 2024,R129.80
+Circuit Breaker,50,2,,,50A 2P ,,CBI - Vescotech,21 August 2024,R485.00
+Circuit Breaker,50,2,10,,50A 2P 10kA ,,,21 August 2024,R603.00
+Circuit Breaker,50,3,3,,50A 3P 3kA,,Schneider,27 March 2025,R130.00
+Circuit Breaker,50,3,6,,50A 3P 6kA,,,21 August 2024,R796.00
+Circuit Breaker,60,1,,,60A 1P,,,21 August 2024,R205.35
+Circuit Breaker,60,2,3,,60A 1P+N 3KA 13MM  CB,,CBI,30 May 2025,R420.00
+Circuit Breaker,60,2,3,,60A 2P 3kA,,CBI,10 April 2025,R420.00
+Circuit Breaker,63,1,,,63A 1P,,,21 August 2024,R48.84
+Circuit Breaker,63,1,6,,63A 1P 6kA CBI,,Vescotech,11 February 2025,R179.00
+Circuit Breaker,63,2,,,63A 2P ,,Schneider,14 May 2025,R95.00
+Circuit Breaker,63,2,3,,63A 2P 3ka CBI,,ARB,21 August 2024,R789.91
+Circuit Breaker,63,2,6,,63A 2P 6kA,,,21 August 2024,R433.33
+Circuit Breaker,63,3,3,,63A 3P 3kA,,,21 August 2024,R316.80
+Circuit Breaker,63,3,4.5,,63A 3P 4.5kA ,,,21 August 2024,R282.75
+Circuit Breaker,63,3,6,,63A 3P 6kA CBI,,Vescotech,24 July 2024,R799.00
+Circuit Breaker,63,3,10,,63 3P 10kA,,,21 August 2024,R876.34
+Circuit Breaker,80,1,,,80A 1P,,CBI,16 January 2025,R302.87
+Circuit Breaker,80,2,,,80A 2P,,,13 September 2024,R1 053.00
+Circuit Breaker,80,3,,,80A 3P,,Schneider,16 April 2025,R1 079.00
+Circuit Breaker,80,3,6,,80A 3P 6kA ,,,07 April 2025,R1 305.00
+Circuit Breaker,80,4,6,,80A 4P 6kA,,,07 April 2025,R2 718.16
+Circuit Breaker,80,4,10,,80A 4P 10kA ,,Hager,12 April 2024,R3 484.35
+Circuit Breaker,80,4,16,,80A 4P 16kA,,Hager,12 April 2024,R4 095.65
+Circuit Breaker,100,1,,,100A 1P,,Hager,17 May 2024,R975.00
+Circuit Breaker,100,2,6,,100A 2P 6kA,,ACDC,14 January 2025,R181.80
+Circuit Breaker,100,3,6,,100A 3P 6kA,,CBI,08 January 2025,R550.00
+Circuit Breaker,100,3,10,,100A 3P 10kA Hagar,,Hager,12 April 2024,R1 638.26
+Circuit Breaker,100,3,16,,100A 3P 16kA ,,Hager,,R3 003.48
+Circuit Breaker,100,3,50,,100A 3P 50kA,,ABB,16 July 2024,R2 553.00
+Circuit Breaker,160,1,,,125-160A 1P,,,,
+Circuit Breaker,160,2,,,125-160A 2P,,,,
+Circuit Breaker,160,3,,,125-160A 3P,,,,
+Circuit Breaker,160,1,,,160A 1P,,ARB - ABB Moulded Adjustable,,R1 415.00
+Circuit Breaker,160,3,,,160A 3P ,,ABB,07 October 2024,R3 703.38
+Circuit Breaker,160,3,25,,160A 3P 25kA,,Hager,24 October 2024,R2 031.37
+Circuit Breaker,160,3,36,,160A 3P 36kA,,Schneider,28 August 2024,R3 703.38
+Circuit Breaker,250,4,40,,160-250A 4P 40kA Hagar,,ARB,26 November 2024,R5 866.00
+Circuit Breaker,160,3,,,160A 3P Moulded Case Hagar,,Hager,12 April 2024,R2 246.96
+Circuit Breaker,200,3,,,200A 3P ,,CBI  ,07 February 2024,R4 779.13
+Circuit Breaker,250,3,25,,250A 3P 25kA fixed Hagar,,ARB - Hager ,07 February 2024,R3 484.00
+Circuit Breaker,250,3,36,,250A 3P 36kA MCCB,,Chint,05 February 2025,R1 325.33
+Circuit Breaker,320,3,50,,202-320A 3P 50kA Hagar ,,ARB - Hager ,07 February 2024,R7 244.00
+Circuit Breaker,350,3,50,,350A 3P MCCB 50kA,,35kA - R 3465,05 December 2024,R12 333.00

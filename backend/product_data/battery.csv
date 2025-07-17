@@ -1,0 +1,32 @@
+Component Type,Nominal Rating (kWh),Usable Rating (kWh),Nominal Voltage (V),Brand Name,Description,Notes,Supplier,Updated,Unit Cost
+Battery,5.12,,,Deye,"Deye - BOS-GM5.1 - 5.12Kwh Battery
+module ( H/V BATTERY)",,Solar Energy,28 May 2025,R14 250.00
+Battery,,,,FreedomWon,"FreedomWon LiFePO4 12V 7,5Ah",12V Battery,ARB,07 May 2025,R539.60
+Battery,,,,FreedomWon,FreedomWon LiFePO4 12V 100Ah,12V Battery,ARB,07 May 2025,R4 256.00
+Battery,,,,Freedom Won,Freedom Won ETower e5000 Inc Acc 5kw 52v,,12650,02 July 2025,R14 820.00
+Battery,10,8,,Freedom Won,Freedom Won Lite Home 10/8 LifePO4,,35500,02 July 2025,R35 948.00
+Battery,15,12,,Freedom Won,Freedom Won Lite Home 15/12 LifePO4,,51350,02 July 2025,R51 376.00
+Battery,20,16,,Freedom Won,Freedom Won Lite Home 20/16 LifePO4,,65350,02 July 2025,R65 436.00
+Battery,30,24,,Freedom Won,Freedom Won Lite Home 30/24 LifePO4,,94250,02 July 2025,R94 240.00
+Battery,30,24,,Freedom Won,Freedom Won Lite Home 30/24 HV LiFePo4,,ARB,02 July 2025,R102 220.00
+Battery,40,32,,FreedomWon,FreedomWon Lite Business 40/32 LifePO4,,128500,02 July 2025,R124 488.00
+Battery,40,32,,FreedomWon,FreedomWon Lite Business 40/32 (HV),,ARB,02 July 2025,R133 456.00
+Battery,60,48,,Freedom Won,Freedom Won Lite Business 60/48 Battery,,ARB,02 July 2025,R186 352.00
+Battery,60,48,,Freedom Won,Freedom Lite Business 60/48 (HV),,ARB,02 July 2025,R205 200.00
+Battery,80,64,,Freedom Won,Freedom Won Lite Business 80/64 Battery,,ARB,02 July 2025,R233 624.00
+Battery,100,80,,Freedom Won,Freedom Won Lite Business 100/80 Battery ,,ARB - Discontinued,17 June 2025,R0.00
+Battery,100,80,,Freedom Won,Freedom Lite Commercial 100/80 (HV),,No price,02 July 2025,R313 880.00
+Battery,200,160,,Freedom Won,Freedom Lite Commercial 200/160 (HV),,ARB,02 July 2025,R570 000.00
+Battery,230,184,,Freedom Won,Freedom Lite Commercial 230/184 (HV),,ARB,02 July 2025,R665 000.00
+Battery,300,240,,Freedom Won,Freedom Lite Commercial 300/240 (HV),,ARB,02 July 2025,R921 880.00
+Battery,400,320,,Freedom Won,Freedom Lite Commercial 400/320 (HV),,ARB,02 July 2025,R1 032 080.00
+Battery,500,400,,Freedom Won,Freedom Lite Commercial 500/400 (HV),,ARB,02 July 2025,R1 292 000.00
+Battery,700,560,,Freedom Won,Freedom Lite Commercial 700/560 (HV),,Innomatic Solar/Menlo,13 May 2025,R2 181 131.10
+Battery,800,640,,Freedom Won,Freedom Lite Commercial 800/640 (HV),,Innomatic Solar/Menlo,13 May 2025,R2 472 482.70
+Battery,6.02,5.84,,SigenStor,"SigenStor Battery 6,02kWh (5,84kWh Usable)",,Heroldts,12 June 2025,R25 700.00
+Battery,8.06,7.8,,SigenStor,"SigenStor Battery 8,06kWh (7,80kWh Usable)",,Heroldts,12 June 2025,R33 510.00
+Battery,9.04,8.76,,SigenStor,"SigenStor Battery 9,04kWh (8,76kWh Usable)",,Heroldts,12 June 2025,R36 130.00
+Battery,12,,,SigenStack,SigenStack Battery 12kWh,,Heroldts,07 July 2025,R42 780.00
+Battery,8,,,SigenStor,SigenStor Battery 8kWh,,HERHOLDTS,19 May 2025,R34 220.00
+Battery,3.3,,,WEST,WEST Supercap 3.3 kWh,,PSC Power Super Conductors,31 October 2023,R53 247.36
+Battery,6.5,,,WEST,WEST Supercap 6.5 kWh,,PSC Power Super Conductors,31 October 2023,R100 494.62
