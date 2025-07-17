@@ -5,7 +5,7 @@ import requests
 import json
 
 # The URL of your running Flask application
-API_URL = 'http://localhost:5000'
+API_URL = 'https://orka-solar-api.onrender.com/'
 
 def clean_value(value):
     """Handles various data types and cleans them for the database."""
