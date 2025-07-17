@@ -1,0 +1,4 @@
+Component Type,Power Rating (W),Isc (A),Max Voc (V),Imp (A),Vmp,Brand Name,Description,Notes,Supplier,Updated,Unit Cost
+PV,550,,,,,Trina,"Trina 550W PV Module (Tier 1, 25y warranty) ",Trina 550W Mono,,07-May-25,R1 327.78
+PV,555,14.12,49.72,13.54,40.99,Jinko,"Jinko 555W PV Module (Tier 1, 25y warranty)",,,07-May-25,R1 327.78
+PV,565,14.31,50.5,13.56,41.68,JA Solar,"JA Solar 565W PV Module (Tier 1, 25y warranty)",,,,

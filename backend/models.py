@@ -94,6 +94,22 @@ class OptimizationRun(db.Model):
     best_json = db.Column(db.JSON)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+# NEW: A temporary model for testing the import process
+class ProductTest(db.Model):
+    __tablename__ = 'products_test' # Points to a new table
+    id          = db.Column(db.Integer, primary_key=True)
+    category    = db.Column(db.String(50), index=True)
+    brand       = db.Column(db.String(80))
+    model       = db.Column(db.String(120))
+    power_w     = db.Column(db.Float,  nullable=True)
+    rating_kva  = db.Column(db.Float,  nullable=True)
+    capacity_kwh= db.Column(db.Float,  nullable=True)
+    cost        = db.Column(db.Float,  nullable=True)
+    price       = db.Column(db.Float,  nullable=True)
+    warranty_y  = db.Column(db.Integer, nullable=True)
+    notes       = db.Column(db.String(250))
+    properties  = db.Column(JSONB, nullable=True)
+
 class LoadProfiles(db.Model):
     __tablename__ = 'load_profiles'
     id = db.Column(db.Integer, primary_key=True)
