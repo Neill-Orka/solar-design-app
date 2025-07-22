@@ -1,16 +1,18 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, useMemo} from "react";
 import axios from "axios";
 import { Table, Button, Modal, Form, Row, Col, Alert, InputGroup } from 'react-bootstrap';
 import { API_URL } from "./apiConfig";
 import { useNotification } from "./NotificationContext";
 
 const CATEGORY_PROPERTIES ={
-    'battery': ['capacity', 'voltage', 'type'],
+    'battery': ['voltage', 'type'],
     'fuse': ['amp_rating'],
-    'inverter': ['power_rating', 'voltage', 'max_dc_voltage'],
+    'inverter': ['voltage', 'max_dc_voltage'],
     'cable': ['length', 'gauge'],
-    'panel': ['power_rating', 'voltage', 'current'],
-
+    'panel': ['voltage', 'current'],
+    'breaker': ['poles', 'amp_rating', 'interrupt_capacity_ka'],
+    'inverter_aux': ['voltage', 'type'],
+    'isolator': ['voltage', 'amp_rating', 'poles'],
 }
 
 function RuleEditor() {
@@ -20,6 +22,13 @@ function RuleEditor() {
     const [editingRule, setEditingRule] = useState(null);
     const [error, setError] = useState('');
     const { showNotification } = useNotification();
+
+    // Dynamically generate list of unique categories
+    const allCategories = useMemo(() => {
+        if (!products || products.length === 0) return [];
+        const categories = new Set(products.map(p => p.category));
+        return Array.from(categories).sort();
+    }, [products]);
 
     useEffect(() => {
         fetchRules();
@@ -159,7 +168,7 @@ function RuleEditor() {
                                         <Form.Label>This Product...</Form.Label>
                                         <Form.Select name="subject_product_id" value={editingRule.subject_product_id} onChange={handleChange}>
                                             <option value="">-- Select Product --</option>
-                                            {products.map(p => <option key={p.id} value={p.id}>{p.brand} {p.model}</option>)}
+                                            {products.map(p => <option key={p.id} value={p.id}>{p.model}</option>)}
                                         </Form.Select>
                                     </Form.Group>
                                 </Col>
@@ -184,12 +193,12 @@ function RuleEditor() {
                                         <Form.Label>Category of Product</Form.Label>
                                         <Form.Select name="object_category" value={editingRule.object_category} onChange={handleChange}>
                                             <option value="">-- Select Category --</option>
-                                            {Object.keys(CATEGORY_PROPERTIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                            {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                                         </Form.Select>
                                     </Form.Group>
                                 </Col>
                             </Row>
-                            {editingRule.object_category && (
+                            {editingRule.object_category && CATEGORY_PROPERTIES[editingRule.object_category] && (
                                 <Row>
                                     <p className="text-muted small">...with these specific properties (optional):</p>
                                     {CATEGORY_PROPERTIES[editingRule.object_category].map(prop => (

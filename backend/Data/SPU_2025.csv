@@ -1,47 +1,47 @@
-Tariff,Tariff Category,Code,Matrix Code,High-Peak,High-Standard,High-Off Peak,Low-Peak,Low-Standard,Low-Off Peak,Energy Charge Block 1 [c/kWh],Energy Charge Block 2 [c/kWh],Energy Charge [c/kWh],Ancillary Service Charge [c/kWh],Network Demand Charge [c/kWh],"Network demand charge, Ancillary service charge and retail [c/kWh]",Network Capacity Charge [R/POD/day],Service and Administration Charge [R/POD/day]
-Businessrate 1,Non-Local Authority,Businessrate 1_Non-Local Authority,B101N,236.1903,236.1903,236.1903,236.1903,236.1903,236.1903,0,0,236.1903,0.90192,33.337218,0,47.880678,41.386854
-Businessrate 2,Non-Local Authority,Businessrate 2_Non-Local Authority,B201N,236.1903,236.1903,236.1903,236.1903,236.1903,236.1903,0,0,236.1903,0.90192,33.337218,0,80.688018,41.386854
-Businessrate 3,Non-Local Authority,Businessrate 3_Non-Local Authority,B301N,236.1903,236.1903,236.1903,236.1903,236.1903,236.1903,0,0,236.1903,0.90192,33.337218,0,139.391736,41.386854
-Businessrate 4,Non-Local Authority,Businessrate 4_Non-Local Authority,B401N,635.639394,635.639394,635.639394,635.639394,635.639394,635.639394,0,0,635.639394,0.90192,33.337218,0,0,0
-Homepower Bulk,Non-Local Authority,Homepower Bulk_Non-Local Authority,HB01N,363.462486,363.462486,363.462486,363.462486,363.462486,363.462486,0,0,363.462486,0,0,0,75.220128,0
-Homepower 1,Non-Local Authority,Homepower 1_Non-Local Authority,H101N,0,0,0,0,0,0,276.821796,437.115528,0,0,0,0,11.860248,0
-Homepower 2,Non-Local Authority,Homepower 2_Non-Local Authority,H201N,0,0,0,0,0,0,276.821796,426.21357,0,0,0,0,22.221054,0
-Homepower 3,Non-Local Authority,Homepower 3_Non-Local Authority,H301N,0,0,0,0,0,0,276.821796,426.21357,0,0,0,0,45.873906,0
-Homepower 4,Non-Local Authority,Homepower 4_Non-Local Authority,H401N,0,0,0,0,0,0,276.821796,445.165164,0,0,0,0,7.249182,0
-Homelight 20A,Non-Local Authority,Homelight 20A_Non-Local Authority,HL2001N,0,0,0,0,0,0,214.521672,243.089988,0,0,0,0,0,0
-Homelight 60A,Non-Local Authority,Homelight 60A_Non-Local Authority,HL6001N,0,0,0,0,0,0,261.906294,445.165164,0,0,0,0,0,0
-Landrate 1,Non-Local Authority,Landrate 1_Non-Local Authority,L101N,235.040352,235.040352,235.040352,235.040352,235.040352,235.040352,0,0,235.040352,0.90192,58.726266,0,62.773632,52.14225
-Landrate 2,Non-Local Authority,Landrate 2_Non-Local Authority,L201N,235.040352,235.040352,235.040352,235.040352,235.040352,235.040352,0,0,235.040352,0.90192,58.726266,0,96.494166,52.14225
-Landrate 3,Non-Local Authority,Landrate 3_Non-Local Authority,L301N,235.040352,235.040352,235.040352,235.040352,235.040352,235.040352,0,0,235.040352,0.90192,58.726266,0,154.273416,52.14225
-Landrate 4,Non-Local Authority,Landrate 4_Non-Local Authority,L401N,507.656946,507.656946,507.656946,507.656946,507.656946,507.656946,0,0,507.656946,0.90192,58.726266,0,49.988916,0
-Landrate Dx,Non-Local Authority,Landrate Dx_Non-Local Authority,Ld01N,0,0,0,0,0,0,0,0,0,0,0,0,0,111.815532
-Landlight 20A,Non-Local Authority,Landlight 20A_Non-Local Authority,Lt2001N,675.853752,675.853752,675.853752,675.853752,675.853752,675.853752,0,0,675.853752,0,0,0,0,0
-Landlight 60A,Non-Local Authority,Landlight 60A_Non-Local Authority,Lt6001N,871.265994,871.265994,871.265994,871.265994,871.265994,871.265994,0,0,871.265994,0,0,0,0,0
-Public Lighting 24 Hours,Non-Local Authority,Public Lighting 24 Hours_Non-Local Authority,Pu01N,251.680776,251.680776,251.680776,251.680776,251.680776,251.680776,0,0,251.680776,0,0,0,0,0
-Public Lighting All Night,Non-Local Authority,Public Lighting All Night_Non-Local Authority,Pa01N,187.971402,187.971402,187.971402,187.971402,187.971402,187.971402,0,0,187.971402,0,0,0,0,0
-Public Lighting Urban Fixed,Non-Local Authority,Public Lighting Urban Fixed_Non-Local Authority,Pt01N,0,0,0,0,0,0,0,0,0,0,0,0,0,12.356304
-Homeflex 1,Non-Local Authority,Homeflex 1_Non-Local Authority,HF101N,689.901156,209.899332,114.611484,225.908412,155.874324,99.38031,n/a,n/a,n/a,0.90192,108.309318,108.309318,11.860248,9.447612
-Homeflex 2,Non-Local Authority,Homeflex 2_Non-Local Authority,HF201N,689.901156,209.899332,114.611484,225.908412,155.874324,99.38031,n/a,n/a,n/a,0.90192,108.309318,108.309318,22.221054,9.447612
-Homeflex 3,Non-Local Authority,Homeflex 3_Non-Local Authority,HF301N,689.901156,209.899332,114.611484,225.908412,155.874324,99.38031,n/a,n/a,n/a,0.90192,108.309318,108.309318,45.873906,9.447612
-Homeflex 4,Non-Local Authority,Homeflex 4_Non-Local Authority,HF401N,689.901156,209.899332,114.611484,225.908412,155.874324,99.38031,n/a,n/a,n/a,0.90192,108.309318,108.309318,7.249182,9.447612
-Businessrate 1,Local Authority,Businessrate 1_Local Authority,B101Y,0,0,0,0,0,0,0,0,241.653456,0.912824,33.50732,0,48.023448,41.121608
-Businessrate 2,Local Authority,Businessrate 2_Local Authority,B201Y,0,0,0,0,0,0,0,0,241.653456,0.912824,33.50732,0,80.996432,41.121608
-Businessrate 3,Local Authority,Businessrate 3_Local Authority,B301Y,0,0,0,0,0,0,0,0,241.653456,0.912824,33.50732,0,139.962636,41.121608
-Businessrate 4,Local Authority,Businessrate 4_Local Authority,B401Y,0,0,0,0,0,0,0,0,650.298044,0.912824,33.50732,0,0,0
-Homepower Bulk,Local Authority,Homepower Bulk_Local Authority,HB01Y,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-Homepower 1,Local Authority,Homepower 1_Local Authority,H101Y,0,0,0,0,0,0,276.641332,436.808548,0,0,0,0,11.833316,0
-Homepower 2,Local Authority,Homepower 2_Local Authority,H201Y,0,0,0,0,0,0,276.641332,425.85466,0,0,0,0,22.197208,0
-Homepower 3,Local Authority,Homepower 3_Local Authority,H301Y,0,0,0,0,0,0,276.641332,425.85466,0,0,0,0,45.86384,0
-Homepower 4,Local Authority,Homepower 4_Local Authority,H401Y,0,0,0,0,0,0,276.641332,444.845852,0,0,0,0,7.258064,0
-Homelight 20A,Local Authority,Homelight 20A_Local Authority,HL2001Y,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-Homelight 60A,Local Authority,Homelight 60A_Local Authority,HL6001Y,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-Landrate 1,Local Authority,Landrate 1_Local Authority,L101Y,0,0,0,0,0,0,0,0,240.462332,0.912824,59.2779,0,63.307684,51.808328
-Landrate 2,Local Authority,Landrate 2_Local Authority,L201Y,0,0,0,0,0,0,0,0,240.462332,0.912824,59.2779,0,97.29368,51.808328
-Landrate 3,Local Authority,Landrate 3_Local Authority,L301Y,0,0,0,0,0,0,0,0,240.462332,0.912824,59.2779,0,155.591964,51.808328
-Landrate 4,Local Authority,Landrate 4_Local Authority,L401Y,0,0,0,0,0,0,0,0,519.36346,0.912824,59.2779,0,50.416828,0
-Landrate Dx,Local Authority,Landrate Dx_Local Authority,Ld01Y,0,0,0,0,0,0,0,0,0,0,0,0,0,112.110372
-Landlight 20A,Local Authority,Landlight 20A_Local Authority,Lt2001Y,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-Landlight 60A,Local Authority,Landlight 60A_Local Authority,Lt6001Y,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-Public Lighting 24 Hours,Local Authority,Public Lighting 24 Hours_Local Authority,Pu01Y,0,0,0,0,0,0,0,0,261.201248,0,0,0,0,0
-Public Lighting All Night,Local Authority,Public Lighting All Night_Local Authority,Pa01Y,0,0,0,0,0,0,0,0,195.066036,0,0,0,0,0
-Public Lighting Urban Fixed,Local Authority,Public Lighting Urban Fixed_Local Authority,Pt01Y,0,0,0,0,0,0,0,0,0,0,0,0,0,12.824064
+Tariff,Tariff Category,Code,Matrix Code,High-Peak,High-Standard,High-Off Peak,Low-Peak,Low-Standard,Low-Off Peak,Energy Charge Block 1 [c/kWh],Energy Charge Block 2 [c/kWh],Energy Charge [c/kWh],Ancillary Service Charge [c/kWh],Network Demand Charge [c/kWh],"Network demand charge, Ancillary service charge and retail [c/kWh]",Network Capacity Charge [R/POD/day],Service and Administration Charge [R/POD/day],Electrification and Rural Subsidy [c/kWh],Generation Capacity Charge [R/POD/day],Legacy Charge [c/kWh]
+Businessrate 1,Non-Local Authority,Businessrate 1_Non-Local Authority,B101N,236.1903,236.1903,236.1903,236.1903,236.1903,236.1903,0,0,236.1903,0.90192,33.337218,0,47.880678,41.386854,,,
+Businessrate 2,Non-Local Authority,Businessrate 2_Non-Local Authority,B201N,236.1903,236.1903,236.1903,236.1903,236.1903,236.1903,0,0,236.1903,0.90192,33.337218,0,80.688018,41.386854,,,
+Businessrate 3,Non-Local Authority,Businessrate 3_Non-Local Authority,B301N,236.1903,236.1903,236.1903,236.1903,236.1903,236.1903,0,0,236.1903,0.90192,33.337218,0,139.391736,41.386854,,,
+Businessrate 4,Non-Local Authority,Businessrate 4_Non-Local Authority,B401N,635.639394,635.639394,635.639394,635.639394,635.639394,635.639394,0,0,635.639394,0.90192,33.337218,0,0,0,,,
+Homepower Bulk,Non-Local Authority,Homepower Bulk_Non-Local Authority,HB01N,363.462486,363.462486,363.462486,363.462486,363.462486,363.462486,0,0,363.462486,0,0,0,75.220128,0,,,
+Homepower 1,Non-Local Authority,Homepower 1_Non-Local Authority,H101N,0,0,0,0,0,0,276.821796,437.115528,0,0,0,0,11.860248,0,,,
+Homepower 2,Non-Local Authority,Homepower 2_Non-Local Authority,H201N,0,0,0,0,0,0,276.821796,426.21357,0,0,0,0,22.221054,0,,,
+Homepower 3,Non-Local Authority,Homepower 3_Non-Local Authority,H301N,0,0,0,0,0,0,276.821796,426.21357,0,0,0,0,45.873906,0,,,
+Homepower 4,Non-Local Authority,Homepower 4_Non-Local Authority,H401N,0,0,0,0,0,0,276.821796,445.165164,0,0,0,0,7.249182,0,,,
+Homelight 20A,Non-Local Authority,Homelight 20A_Non-Local Authority,HL2001N,0,0,0,0,0,0,214.521672,243.089988,0,0,0,0,0,0,,,
+Homelight 60A,Non-Local Authority,Homelight 60A_Non-Local Authority,HL6001N,0,0,0,0,0,0,261.906294,445.165164,0,0,0,0,0,0,,,
+Landrate 1,Non-Local Authority,Landrate 1_Non-Local Authority,L101N,235.040352,235.040352,235.040352,235.040352,235.040352,235.040352,0,0,235.040352,0.90192,58.726266,0,62.773632,52.14225,,,
+Landrate 2,Non-Local Authority,Landrate 2_Non-Local Authority,L201N,235.040352,235.040352,235.040352,235.040352,235.040352,235.040352,0,0,235.040352,0.90192,58.726266,0,96.494166,52.14225,,,
+Landrate 3,Non-Local Authority,Landrate 3_Non-Local Authority,L301N,235.040352,235.040352,235.040352,235.040352,235.040352,235.040352,0,0,235.040352,0.90192,58.726266,0,154.273416,52.14225,,,
+Landrate 4,Non-Local Authority,Landrate 4_Non-Local Authority,L401N,507.656946,507.656946,507.656946,507.656946,507.656946,507.656946,0,0,507.656946,0.90192,58.726266,0,49.988916,0,,,
+Landrate Dx,Non-Local Authority,Landrate Dx_Non-Local Authority,Ld01N,0,0,0,0,0,0,0,0,0,0,0,0,0,111.815532,,,
+Landlight 20A,Non-Local Authority,Landlight 20A_Non-Local Authority,Lt2001N,675.853752,675.853752,675.853752,675.853752,675.853752,675.853752,0,0,675.853752,0,0,0,0,0,,,
+Landlight 60A,Non-Local Authority,Landlight 60A_Non-Local Authority,Lt6001N,871.265994,871.265994,871.265994,871.265994,871.265994,871.265994,0,0,871.265994,0,0,0,0,0,,,
+Public Lighting 24 Hours,Non-Local Authority,Public Lighting 24 Hours_Non-Local Authority,Pu01N,251.680776,251.680776,251.680776,251.680776,251.680776,251.680776,0,0,251.680776,0,0,0,0,0,,,
+Public Lighting All Night,Non-Local Authority,Public Lighting All Night_Non-Local Authority,Pa01N,187.971402,187.971402,187.971402,187.971402,187.971402,187.971402,0,0,187.971402,0,0,0,0,0,,,
+Public Lighting Urban Fixed,Non-Local Authority,Public Lighting Urban Fixed_Non-Local Authority,Pt01N,0,0,0,0,0,0,0,0,0,0,0,0,0,12.356304,,,
+Homeflex 1,Non-Local Authority,Homeflex 1_Non-Local Authority,HF101N,689.901156,209.899332,114.611484,225.908412,155.874324,99.38031,n/a,n/a,n/a,0.90192,108.309318,108.309318,11.860248,9.447612,,,
+Homeflex 2,Non-Local Authority,Homeflex 2_Non-Local Authority,HF201N,689.901156,209.899332,114.611484,225.908412,155.874324,99.38031,n/a,n/a,n/a,0.90192,108.309318,108.309318,22.221054,9.447612,,,
+Homeflex 3,Non-Local Authority,Homeflex 3_Non-Local Authority,HF301N,689.901156,209.899332,114.611484,225.908412,155.874324,99.38031,n/a,n/a,n/a,0.90192,108.309318,108.309318,45.873906,9.447612,,,
+Homeflex 4,Non-Local Authority,Homeflex 4_Non-Local Authority,HF401N,689.901156,209.899332,114.611484,225.908412,155.874324,99.38031,n/a,n/a,n/a,0.90192,108.309318,108.309318,7.249182,9.447612,,,
+Businessrate 1,Local Authority,Businessrate 1_Local Authority,B101Y,0,0,0,0,0,0,0,0,241.653456,0.912824,33.50732,0,48.023448,41.121608,,,
+Businessrate 2,Local Authority,Businessrate 2_Local Authority,B201Y,0,0,0,0,0,0,0,0,241.653456,0.912824,33.50732,0,80.996432,41.121608,,,
+Businessrate 3,Local Authority,Businessrate 3_Local Authority,B301Y,0,0,0,0,0,0,0,0,241.653456,0.912824,33.50732,0,139.962636,41.121608,,,
+Businessrate 4,Local Authority,Businessrate 4_Local Authority,B401Y,0,0,0,0,0,0,0,0,650.298044,0.912824,33.50732,0,0,0,,,
+Homepower Bulk,Local Authority,Homepower Bulk_Local Authority,HB01Y,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,,
+Homepower 1,Local Authority,Homepower 1_Local Authority,H101Y,0,0,0,0,0,0,276.641332,436.808548,0,0,0,0,11.833316,0,,,
+Homepower 2,Local Authority,Homepower 2_Local Authority,H201Y,0,0,0,0,0,0,276.641332,425.85466,0,0,0,0,22.197208,0,,,
+Homepower 3,Local Authority,Homepower 3_Local Authority,H301Y,0,0,0,0,0,0,276.641332,425.85466,0,0,0,0,45.86384,0,,,
+Homepower 4,Local Authority,Homepower 4_Local Authority,H401Y,0,0,0,0,0,0,276.641332,444.845852,0,0,0,0,7.258064,0,,,
+Homelight 20A,Local Authority,Homelight 20A_Local Authority,HL2001Y,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,,
+Homelight 60A,Local Authority,Homelight 60A_Local Authority,HL6001Y,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,,
+Landrate 1,Local Authority,Landrate 1_Local Authority,L101Y,0,0,0,0,0,0,0,0,240.462332,0.912824,59.2779,0,63.307684,51.808328,,,
+Landrate 2,Local Authority,Landrate 2_Local Authority,L201Y,0,0,0,0,0,0,0,0,240.462332,0.912824,59.2779,0,97.29368,51.808328,,,
+Landrate 3,Local Authority,Landrate 3_Local Authority,L301Y,0,0,0,0,0,0,0,0,240.462332,0.912824,59.2779,0,155.591964,51.808328,,,
+Landrate 4,Local Authority,Landrate 4_Local Authority,L401Y,0,0,0,0,0,0,0,0,519.36346,0.912824,59.2779,0,50.416828,0,,,
+Landrate Dx,Local Authority,Landrate Dx_Local Authority,Ld01Y,0,0,0,0,0,0,0,0,0,0,0,0,0,112.110372,,,
+Landlight 20A,Local Authority,Landlight 20A_Local Authority,Lt2001Y,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,,
+Landlight 60A,Local Authority,Landlight 60A_Local Authority,Lt6001Y,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,,
+Public Lighting 24 Hours,Local Authority,Public Lighting 24 Hours_Local Authority,Pu01Y,0,0,0,0,0,0,0,0,261.201248,0,0,0,0,0,,,
+Public Lighting All Night,Local Authority,Public Lighting All Night_Local Authority,Pa01Y,0,0,0,0,0,0,0,0,195.066036,0,0,0,0,0,,,
+Public Lighting Urban Fixed,Local Authority,Public Lighting Urban Fixed_Local Authority,Pt01Y,0,0,0,0,0,0,0,0,0,0,0,0,0,12.824064,,,

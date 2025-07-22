@@ -7,7 +7,7 @@ import { API_URL } from "./apiConfig";
 const EMPTY_PRODUCT = {
     category: 'panel', brand: '', model: '',
     power_w: '', rating_kva: '', capacity_kwh: '',
-    cost: '', price: '', warranty_y: '', notes: ''
+    cost: '', price: '', warranty_y: '', notes: '', properties: ''
 };
 
 const getCategoryIcon = (category) => {
@@ -65,6 +65,20 @@ export default function ProductsAdmin() {
     // ------ save (add or update) ---------------------
     const handleSave = () => {
         setLoading(true);
+
+        const payload = { ...form };
+
+        try {
+            if (typeof payload.properties === 'string' && payload.properties.trim()) {
+                payload.properties = JSON.parse(payload.properties);
+            } else if (!payload.properties) {
+                payload.properties = [];
+            }
+        } catch (e) {
+            setError('The format of the Properties field is not valid JSON');
+            setLoading(false);
+            return;
+        }
         const req = editId ? axios.put(`${API_URL}/api/products/${editId}`, form) :
             axios.post(`${API_URL}/api/products`, form);
         req.then(() => {
@@ -226,6 +240,10 @@ export default function ProductsAdmin() {
                                         <option value="panel">Panel</option>
                                         <option value="inverter">Inverter</option>
                                         <option value="battery">Battery</option>
+                                        <option value="fuse">Fuse</option>
+                                        <option value="cable">Cable</option>
+                                        <option value="breaker">Breaker</option>
+                                        <option value="isolator">Isolator</option>
                                     </Form.Select>
                                 </Form.Group>
                             </Col>
@@ -329,6 +347,22 @@ export default function ProductsAdmin() {
                                 </Form.Group>
                             </Col>
                         </Row>
+
+                        <Form.Group className="mb-3">
+                            <Form.Label className="fw-semibold">Properties (JSON format)</Form.Label>
+                            <Form.Control 
+                                as="textarea"
+                                rows={7}
+                                value={
+                                    typeof form.properties === 'object' && form.properties !== null
+                                    ? JSON.stringify(form.properties, null, 2)
+                                    : form.properties || ''
+                                }
+                                onChange={e => handleChange('properties', e.target.value)}
+                                className="rounded-lg font-monospace"
+                                placeholder='{ "voltage": "48", "type": "lithium" }'
+                            />
+                        </Form.Group>
 
                         <Form.Group className="mb-3">
                             <Form.Label className="fw-semibold">Notes</Form.Label>

@@ -193,6 +193,17 @@ def get_compatible_products():
     # Base query for the category of products we want
     query = Product.query.filter_by(category=object_category)
 
+    # Handle REQUIRE rules
+    require_rule = ComponentRule.query.filter_by(
+        subject_product_id=subject_id,
+        rule_type='REQUIRES_ONE',
+        object_category=object_category
+    ).first()
+
+    if require_rule and require_rule.constraints:
+        for key, value in require_rule.constraints.items():
+            query = query.filter(Product.properties[key].astext == str(value))
+
     # Get all exclusion rules for the subject product
     exclusion_rules = ComponentRule.query.filter_by(
         subject_product_id=subject_id,
