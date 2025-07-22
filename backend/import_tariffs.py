@@ -16,7 +16,7 @@ def import_tariffs():
     database_uri = os.getenv("DATABASE_URI")
     if not database_uri:
         raise ValueError("DATABASE_URI not found in environment variables. Please set it in your .env file.")
-    
+
     engine = create_engine(database_uri)
 
     # 2. --- Define Table Schemas ---
@@ -26,9 +26,13 @@ def import_tariffs():
         sa.column('name', sa.String),
         sa.column('power_user_type', sa.String),
         sa.column('tariff_category', sa.String),
+        sa.column('transmission_zone', sa.String),
+        sa.column('supply_voltage', sa.String),
         sa.column('code', sa.String),
         sa.column('matrix_code', sa.String),
         sa.column('structure', sa.String),
+        sa.column('supplier', sa.String),
+        sa.column('year', sa.String),
         # TODO: Add your new columns here, for example:
         # sa.column('new_column_name', sa.String),
     )
@@ -45,18 +49,26 @@ def import_tariffs():
         sa.column('block_threshold_kwh', sa.Integer),
     )
 
+    # Define projects table
+    projects_table = sa.table('projects',
+        sa.column('id', sa.Integer),
+        sa.column('tariff_id', sa.Integer)
+    )
+
     # Use a transaction to ensure the operation is atomic (all or nothing)
     with engine.connect() as conn:
         with conn.begin() as transaction:
             try:
                 print("Clearing existing tariff data...")
+                # Clear tariff from project first
+                conn.execute(projects_table.update().values(tariff_id=None))
                 # Clear existing data before import
                 conn.execute(tariff_rates_table.delete())
                 conn.execute(tariffs_table.delete())
 
                 # 3. --- SPU Data Import Logic ---
                 print("Processing SPU tariffs...")
-                spu_filepath = os.path.join(os.path.dirname(__file__), 'Data/SPU_2025.csv')
+                spu_filepath = os.path.join(os.path.dirname(__file__), 'Data/SPU_2026.csv')
                 df_spu = pd.read_csv(spu_filepath)
                 df_spu.fillna(0, inplace=True)
 
@@ -95,9 +107,10 @@ def import_tariffs():
                         'Network Capacity Charge [R/POD/day]': ('Network Capacity Charge', 'fixed', 'R/POD/day'),
                         'Ancillary Service Charge [c/kWh]': ('Ancillary Service Charge', 'energy', 'c/kWh'),
                         'Network Demand Charge [c/kWh]': ('Network Demand Charge', 'energy', 'c/kWh'),
-                        'Electrification and rural subsidy [c/kWh]': ('Electrification and Rural Subsidy', 'energy', 'c/kWh'),
-                        'Generation capacity charge [R/POD/day]': ('Generation Capacity Charge', 'fixed', 'R/POD/day'),
-                        'Legacy charge [c/kWh]': ('Legacy Charge', 'energy', 'c/kWh'),
+                        'Network demand charge, Ancillary service charge and retail [c/kWh]': ('Network, Ancillary and Retail Charge', 'energy', 'c/kWh'),
+                        'Electrification and Rural Subsidy [c/kWh]': ('Electrification and Rural Subsidy', 'energy', 'c/kWh'),
+                        'Generation Capacity Charge [R/POD/day]': ('Generation Capacity Charge', 'fixed', 'R/POD/day'),
+                        'Legacy Charge [c/kWh]': ('Legacy Charge', 'energy', 'c/kWh'),
                     }
                     for col, (name, cat, unit) in other_charges_map.items():
                         if row.get(col, 0) != 0:
@@ -115,7 +128,7 @@ def import_tariffs():
 
                 # 4. --- LPU Data Import Logic ---
                 print("Processing LPU tariffs...")
-                lpu_filepath = os.path.join(os.path.dirname(__file__), 'Data/LPU_2025.csv')
+                lpu_filepath = os.path.join(os.path.dirname(__file__), 'Data/LPU_2026.csv')
                 df_lpu = pd.read_csv(lpu_filepath)
                 df_lpu.fillna(0, inplace=True)
 
@@ -127,18 +140,17 @@ def import_tariffs():
                         'code': row['Code'],
                         'matrix_code': row['Matrix Code'],
                         'structure': 'time_of_use_demand' # LPU tariffs are demand-based
-                        # TODO: Add values for your new columns here
                     }
 
                     rates_to_insert = []
                     
                     # LPU Demand Charges
                     demand_map = {
-                        'High Demand [R/kVA/month]': ('Demand Charge', 'high', 'R/kVA/month'),
-                        'Low Demand [R/kVA/month]': ('Demand Charge', 'low', 'R/kVA/month'),
-                        'Transmission Network Charges [R/kVA/month]': ('Transmission Network Charges', 'all', 'R/kVA/month'),
-                        'Network Access Charges [R/kVA/month]': ('Network Access Charges', 'all', 'R/kVA/month'),
-                        'Generation Capacity Charge [R/kVA]': ('Generation Capacity Charge', 'all', 'R/kVA/month'),
+                        'High Demand [R/kVA/m]': ('Demand Charge', 'high', 'R/kVA/m'),
+                        'Low Demand [R/kVA/m]': ('Demand Charge', 'low', 'R/kVA/m'),
+                        'Transmission Network Charges [R/kVA/m]': ('Transmission Network Charges', 'all', 'R/kVA/m'),
+                        'Network Access Charges [R/kVA/m]': ('Network Access Charges', 'all', 'R/kVA/m'),
+                        'Generation Capacity Charge [R/kVA]': ('Generation Capacity Charge', 'all', 'R/kVA/m'),
                     }
                     for col, (name, season, unit) in demand_map.items():
                         if row.get(col, 0) != 0:
@@ -153,6 +165,10 @@ def import_tariffs():
                         'Low-Standard': ('Energy Charge', 'low', 'standard'),
                         'Low-Off Peak': ('Energy Charge', 'low', 'off_peak')
                     }
+
+                    if row.get('Legacy Charge [c/kWh]', 0) != 0:
+                        rates_to_insert.append({'charge_name': 'Legacy Charge', 'charge_category': 'energy', 'season': 'all', 'time_of_use': 'all', 'rate_unit': 'c/kWh', 'rate_value': row['Legacy Charge [c/kWh]'], 'block_threshold_kwh': None})
+
                     for col, (name, season, tou) in energy_map.items():
                         if row.get(col, 0) != 0:
                             rates_to_insert.append({'charge_name': name, 'charge_category': 'energy', 'season': season, 'time_of_use': tou, 'rate_unit': 'c/kWh', 'rate_value': row[col], 'block_threshold_kwh': None})
