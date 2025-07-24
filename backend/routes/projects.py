@@ -29,6 +29,7 @@ def get_projects():
                 'project_type': p.project_type,
                 'tariff_id': p.tariff_id,
                 'custom_flat_rate': p.custom_flat_rate,
+                'created_at': p.created_at.isoformat() if p.created_at else None,
                 'tariff_details': serialize_tariff(p.tariff) if p.tariff else None,
             }
             for p in projects

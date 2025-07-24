@@ -22,7 +22,7 @@ function EnergyDataUpload({ projectId }) {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
       .then((response) => {
-        69(response.data.message, 'success');
+        showNotification(response.data.message, 'success');
         setEnergyFile(null);
         document.getElementById('energyFileInput').value = null;
       })

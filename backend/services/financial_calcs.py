@@ -177,10 +177,23 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
         new_annual_cost = sum(v['total_new_bill'] for v in monthly_costs.values())
         annual_savings = original_annual_cost - new_annual_cost
 
+        TARIFF_ESCALATION_RATE = Decimal('0.12') # Hardcoded 12% increase every year
+        yearly_savings = []
+        total_20yr_saving = Decimal(0)
+
         payback_years = Decimal(system_cost) / annual_savings if annual_savings > 0 else Decimal('inf')
 
-        # Add 20-Year ROI calculation
-        total_20yr_saving = sum(annual_savings * ((1 - degradation_rate) ** i) for i in range(20))
+        # Loop for 20 years
+        for i in range(20):
+            escalated_savings = annual_savings * ((1 + TARIFF_ESCALATION_RATE) ** i)
+            degraded_savings = escalated_savings * ((1 - degradation_rate) ** i)
+            
+            total_20yr_saving += degraded_savings
+            yearly_savings.append({
+                "year": 2025 + i,
+                "savings": float(round(degraded_savings, 2))
+            })
+            
         roi_20yr = ((total_20yr_saving - Decimal(system_cost)) / Decimal(system_cost)) * 100 if system_cost > 0 else Decimal('inf')
 
         # 6 Other values from sim response for meer metrics

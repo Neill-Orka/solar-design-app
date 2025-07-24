@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { Container, Row, Col, Card, Button, Modal, Badge, Spinner, Alert, Dropdown } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Modal, Badge, Spinner, Alert, Dropdown, Table, InputGroup, ButtonGroup, Form } from 'react-bootstrap';
 import { API_URL } from './apiConfig';
 
 // A compact styled component for key project metrics
@@ -22,6 +22,13 @@ function Projects() {
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState('grid');
+  const [activeFilters, setActiveFilters] = useState({
+    status: 'all',
+    designType: 'all',
+    systemType: 'all',
+    projectType: 'all'
+  });
 
   useEffect(() => {
     loadProjects();
@@ -64,12 +71,28 @@ function Projects() {
   };
   // Memoize the filtering logic to prevent re-calculation on every render
   const filteredProjects = useMemo(() => {
-    return projects.filter(p =>
+    let filtered = projects.filter(p =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.location.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [projects, searchTerm]);
+
+    // Apply additional filters
+    if (activeFilters.status !== 'all') {
+      filtered = filtered.filter(p => (p.status || 'active').toLowerCase() === activeFilters.status);
+    }
+    if (activeFilters.designType !== 'all') {
+      filtered = filtered.filter(p => (p.design_type || '').toLowerCase() === activeFilters.designType);
+    }
+    if (activeFilters.systemType !== 'all') {
+      filtered = filtered.filter(p => (p.system_type || '').toLowerCase() === activeFilters.systemType);
+    }
+    if (activeFilters.projectType !== 'all') {
+      filtered = filtered.filter(p => (p.project_type || '').toLowerCase() === activeFilters.projectType);
+    }
+
+    return filtered;
+  }, [projects, searchTerm, activeFilters]);
   return (
     <div className='min-vh-100' style={{ backgroundColor: '#f8f9fa' }}>
       <Container fluid className="py-4 py-md-5">
@@ -91,26 +114,148 @@ function Projects() {
                 </Link>
               </div>
 
-              {/* Search Bar */}
-              <div className="mb-4">
-                <div className="position-relative">
-                  <i className="bi bi-search position-absolute" style={{ top: '50%', transform: 'translateY(-50%)', left: '16px', color: '#6b7280', fontSize: '1.1rem' }}></i>
-                  <input
-                    type="text"
-                    placeholder="Search projects by name, client, or location..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="form-control form-control-lg ps-5 rounded-lg"
-                    style={{ borderColor: '#d1d5db' }}
-                  />
-                </div>
-              </div>
+              {/* Search and View Controls */}
+              <Card className='shadow-sm border-0 rounded-xl p-3 mb-4'>
+                <Row className='g-3 align-items-center'>
+                  <Col md={8}>
+                    <InputGroup>
+                      <InputGroup.Text className='bg-light border-end-0'>
+                        <i className="bi bi-search" style={{ color: '#6b7280', fontSize: '1.1rem' }}></i>
+                      </InputGroup.Text>
+                      <Form.Control 
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        placeholder="Search by project or client name.."
+                        className='border-start-0 border-light rounded-lg'
+                      />
+                    </InputGroup>
+                  </Col> 
+                  <Col md={4} className="d-flex justify-content-end">
+                    <ButtonGroup>
+                      <Button variant={viewMode === 'card' ? 'primary' : 'outline-secondary'} onClick={() => setViewMode('card')} title='Card View'>
+                        <i className="bi bi-grid-3x3-gap-fill"></i>
+                      </Button>
+                      <Button variant={viewMode === 'list' ? 'primary' : 'outline-secondary'} onClick={() => setViewMode('list')} title='List View'>
+                        <i className="bi bi-list-ul"></i>
+                      </Button>
+                    </ButtonGroup>
+                  </Col>
+                  {loading && (
+                    <div className="text-center py-5">
+                      <Spinner animation="border" className="text-primary" />
+                    </div>
+                  )}
+                </Row>
+              </Card>
 
-              {loading && (
-                <div className="text-center py-5">
-                  <Spinner animation="border" className="text-primary" />
-                </div>
-              )}
+              {/* Filter Controls */}
+              <Card className='shadow-sm border-0 rounded-xl p-3 mb-4'>
+                <Row className='g-3'>
+                  <Col lg={3} md={6}>
+                    <div className="mb-2">
+                      <small className="text-muted fw-bold">Design Type</small>
+                    </div>
+                    <ButtonGroup size="sm" className="w-100">
+                      <Button 
+                        variant={activeFilters.designType === 'all' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, designType: 'all'}))}
+                      >
+                        All
+                      </Button>
+                      <Button 
+                        variant={activeFilters.designType === 'quick' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, designType: 'quick'}))}
+                      >
+                        Quick
+                      </Button>
+                      <Button 
+                        variant={activeFilters.designType === 'detailed' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, designType: 'detailed'}))}
+                      >
+                        Detailed
+                      </Button>
+                    </ButtonGroup>
+                  </Col>
+                  
+                  <Col lg={3} md={6}>
+                    <div className="mb-2">
+                      <small className="text-muted fw-bold">System Type</small>
+                    </div>
+                    <ButtonGroup size="sm" className="w-100">
+                      <Button 
+                        variant={activeFilters.systemType === 'all' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, systemType: 'all'}))}
+                      >
+                        All
+                      </Button>
+                      <Button 
+                        variant={activeFilters.systemType === 'grid' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, systemType: 'grid'}))}
+                      >
+                        Grid-Tied
+                      </Button>
+                      <Button 
+                        variant={activeFilters.systemType === 'hybrid' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, systemType: 'hybrid'}))}
+                      >
+                        Hybrid
+                      </Button>
+                    </ButtonGroup>
+                  </Col>
+
+                  <Col lg={3} md={6}>
+                    <div className="mb-2">
+                      <small className="text-muted fw-bold">Project Type</small>
+                    </div>
+                    <ButtonGroup size="sm" className="w-100">
+                      <Button 
+                        variant={activeFilters.projectType === 'all' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, projectType: 'all'}))}
+                      >
+                        All
+                      </Button>
+                      <Button 
+                        variant={activeFilters.projectType === 'residential' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, projectType: 'residential'}))}
+                      >
+                        Residential
+                      </Button>
+                      <Button 
+                        variant={activeFilters.projectType === 'commercial' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, projectType: 'commercial'}))}
+                      >
+                        Commercial
+                      </Button>
+                    </ButtonGroup>
+                  </Col>
+
+                  <Col lg={3} md={6}>
+                    <div className="mb-2">
+                      <small className="text-muted fw-bold">Status</small>
+                    </div>
+                    <ButtonGroup size="sm" className="w-100">
+                      <Button 
+                        variant={activeFilters.status === 'all' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, status: 'all'}))}
+                      >
+                        All
+                      </Button>
+                      <Button 
+                        variant={activeFilters.status === 'active' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, status: 'active'}))}
+                      >
+                        Active
+                      </Button>
+                      <Button 
+                        variant={activeFilters.status === 'completed' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, status: 'completed'}))}
+                      >
+                        Completed
+                      </Button>
+                    </ButtonGroup>
+                  </Col>
+                </Row>
+              </Card>
 
               {error && (
                 <Alert variant="danger" className="mb-4">
@@ -133,7 +278,7 @@ function Projects() {
                         </Link>
                       )}
                     </div>
-                  ) : (
+                  ) : viewMode === 'card' ? (
                     <Row xs={1} md={2} lg={3} className="g-4">
                       {filteredProjects.map((project) => (
                         <Col key={project.id}>
@@ -232,6 +377,47 @@ function Projects() {
                         </Col>
                       ))}
                     </Row>
+                  ) : (
+                    <Card className="shadow-sm border-0 rounded-xl">
+                      <Table hover responsive className="mb-0">
+                        <thead className="table-light">
+                          <tr>
+                            <th className="ps-4">Project Name</th>
+                            <th>Client</th>
+                            <th>Status</th>
+                            <th>Design Type</th>
+                            <th>Created</th>
+                            <th className="text-end pe-4">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredProjects.map(project => (
+                            <tr key={project.id} style={{ verticalAlign: 'middle' }}>
+                              <td className="ps-4">
+                                <span className="fw-bold">{project.name}</span>
+                              </td>
+                              <td>{project.client_name || 'N/A'}</td>
+                              <td><Badge bg="success" pill>{project.status || 'N/A'}</Badge></td>
+                              <td><Badge bg="info" pill>{project.design_type || 'N/A'}</Badge></td>
+                              <td>
+                                {project.created_at ? new Date(project.created_at).toLocaleDateString() : 'N/A'}
+                              </td>
+                              <td className="text-end pe-3">
+                                <Link to={`/projects/${project.id}`} className="btn btn-primary btn-sm me-2">
+                                  <i className="bi bi-folder-fill me-1"></i> Open
+                                </Link>
+                                <Link to={`/projects/edit/${project.id}`} className="btn btn-outline-secondary btn-sm me-2">
+                                  <i className="bi bi-pencil-fill me-1"></i> Edit
+                                </Link>
+                                <Button variant="outline-danger" size="sm" onClick={() => handleDeleteRequest(project.id)}>
+                                  <i className="bi bi-trash-fill"></i>
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </Card>                    
                   )}
                 </>
               )}
