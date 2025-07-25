@@ -2,16 +2,39 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Spinner, Alert, Button } from 'react-bootstrap';
 import axios from 'axios';
-import { Line, Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler } from 'chart.js';
+import { Line, Bar, Pie } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler, TimeScale } from 'chart.js';
 import logo from './assets/orka_logo_transparent_background.png';
 import './ProposalPage.css';
 import { API_URL } from './apiConfig';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
+import 'chartjs-adapter-date-fns';
+import 'react-datepicker/dist/react-datepicker.css';
+import { enZA } from 'date-fns/locale';
+import DatePicker from 'react-datepicker';
 
 // Register Chart.js components including the 'Filler' plugin for area charts
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler, ChartDataLabels);
 
 const formatCurrency = (value, decimals = 0) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: decimals }).format(value || 0);
+
+const ChartHeaderWithDatePicker = ({ title, selectedDate, setSelectedDate, minDate, maxDate }) => (
+    <div className='chart-header'>
+        <h3>{title}</h3>
+        <div className='no-print date-picker-wrapper'>
+            <DatePicker 
+                selected={selectedDate}
+                onChange={(date) => setSelectedDate(date)}
+                dateFormat="MMM d, yyyy"
+                className='form-control form-control-sm'
+                popperPlacement='bottom-end'
+                minDate={minDate}
+                maxDate={maxDate}
+            />
+        </div>
+
+    </div>
+)
 
 function ProposalPage() {
     const { id } = useParams();
@@ -19,6 +42,8 @@ function ProposalPage() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [selectedDay, setSelectedDay] = useState(null);
+    const [selectedWeekStart, setSelectedWeekStart] = useState(null);
     
     // Mock data structure based on PDF - replace with your actual API response structure
     const proposalDetails = useMemo(() => {
@@ -67,53 +92,182 @@ function ProposalPage() {
 
     // Chart data setup
     const performanceChartData = useMemo(() => {
-        // This uses random data for visuals. Replace with your actual simulation data.
-        const labels = ['0:00', '1:00', '2:00', '3:00', '4:00', '5:00', '6:00', '7:00', '8:00', '9:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
+        // // This uses sample data to match the visual style.
+        // // You should replace this with your actual simulation data arrays.
+        // const labels = ['0:00', '1:00', '2:00', '3:00', '4:00', '5:00', '6:00', '7:00', '8:00', '9:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
+        // return {
+        //     labels,
+        //     datasets: [
+        //         {
+        //             label: 'Energy Requirement [kWh]',
+        //             data: [26, 26, 26, 26, 26, 26.5, 27, 33, 34, 34, 35, 35, 35.5, 35, 34, 34, 33, 29, 26, 26, 26, 26, 26, 26], // Replace with your data
+        //             borderColor: 'transparent',
+        //             backgroundColor: 'rgba(217, 217, 217, 0.7)', // Light Grey Fill
+        //             fill: 'origin',
+        //             tension: 0.4,
+        //             pointRadius: 0,
+        //         },
+        //         {
+        //             label: 'Potential Energy Generation [kWh]',
+        //             data: [0,0,0,0,0,0,0,13,20,23,24,25,25.5,25,24,23,22,15,0,0,0,0,0,0], // Replace with your data
+        //             borderColor: 'transparent',
+        //             backgroundColor: 'rgba(169, 209, 142, 0.7)', // Light Green Fill
+        //             fill: 'origin',
+        //             tension: 0.4,
+        //             pointRadius: 0,
+        //         }
+        //     ]
+        // };
+
+        if (!data?.simulation || !selectedDay) return { labels: [], datasets: [] };
+
+        const sim = data.simulation;
+        const targetDateStr = selectedDay.toDateString();
+
+        const startIndex = sim.timestamps.findIndex(t => new Date(t).toDateString() === targetDateStr);
+        if (startIndex === -1) return { labels: [], datasets: [] };
+
+        const endIndex = startIndex + 48;
+        const labels = sim.timestamps.slice(startIndex, endIndex).map(t => new Date(t));
+
         return {
             labels,
             datasets: [
                 {
-                    label: 'Energy Requirement [kWh]',
-                    data: labels.map(() => 25 + Math.random() * 2), // Replace with your data
-                    borderColor: 'rgb(128, 128, 128)',
-                    backgroundColor: 'rgba(128, 128, 128, 0.2)',
+                    label: 'Energy Requirement (kWh)',
+                    data: sim.demand
+                        .slice(startIndex, endIndex)
+                        .map(d => d * 0.5),         // convert 30 min kW readings into kWh
+                    borderColor: '#ef4444',
+                    backgroundColor: '#fee2e2',
                     fill: 'origin',
-                    tension: 0.4,
+                    tension: 0.3,
+                    pointRadius: 0
                 },
                 {
-                    label: 'Potential Energy Generation [kWh]',
-                    data: [0,0,0,0,0,0,2.5,12,19,23,24,25,24.5,24,23,22,15,5,0.5,0,0,0,0,0], // Replace with your data
-                    borderColor: 'rgb(5, 150, 150)',
-                    backgroundColor: 'rgba(5, 150, 150, 0.3)',
+                    label: 'Potential Energy Generation (kWh)',
+                    data: sim.generation
+                        .slice(startIndex, endIndex)
+                        .map(d => d * 0.5),         // convert 30 min kW readings into kWh
+                    borderColor: '#4ade80',
+                    backgroundColor: '#bbf7d0',
                     fill: 'origin',
-                    tension: 0.4,
+                    tension: 0.3,
+                    pointRadius: 0
+                },
+                {
+                    label: 'Energy From Grid (kWh)',
+                    data: sim.import_from_grid
+                        .slice(startIndex, endIndex)
+                        .map(d => d * 0.5),         // convert 30 min kW readings into kWh
+                    borderColor: '#f97316',
+                    backgroundColor: '#fee2e2',
+                    fill: 'origin',
+                    tension: 0.3,
+                    pointRadius: 0
+                },
+                {
+                    label: 'Battery SOC (%)',
+                    data: sim.battery_soc
+                        .slice(startIndex, endIndex),
+                    borderColor: '#22c55e',
+                    backgroundColor: '#bbf7d0',
+                    fill: 'origin',
+                    tension: 0.3,
+                    pointRadius: 0
                 }
+
+
             ]
         };
-    }, []);
 
-    const benefitChartData = useMemo(() => ({
-        labels: ['Current', 'New'],
-        datasets: [{
-            label: 'Monthly Utility Cost',
-            data: [proposalDetails.monthlyCostCurrent, proposalDetails.monthlyCostNew],
-            backgroundColor: ['rgba(255, 99, 132, 0.5)', 'rgba(75, 192, 192, 0.5)'],
-            borderColor: ['rgb(255, 99, 132)', 'rgb(75, 192, 192)'],
-            borderWidth: 1
-        }]
-    }), [proposalDetails]);
+    }, [data, selectedDay]);
+
+    const benefitChartData = useMemo(() => {
+        // This function creates the gradient for the chart bars
+        const createGradient = (ctx, area, color1, color2) => {
+            const gradient = ctx.createLinearGradient(0, area.bottom, 0, area.top);
+            gradient.addColorStop(0, color1);
+            gradient.addColorStop(1, color2);
+            return gradient;
+        };
+
+        return {
+            labels: ['Current', 'New'],
+            datasets: [{
+                label: 'Monthly Utility Cost',
+                data: [proposalDetails.monthlyCostCurrent, proposalDetails.monthlyCostNew],
+                backgroundColor: (context) => {
+                    const { chart } = context;
+                    const { ctx, chartArea } = chart;
+                    if (!chartArea) { return null; } // Return if chart area is not ready
+
+                    if (context.dataIndex === 0) { // 'Current' bar
+                        return createGradient(ctx, chartArea, 'rgba(217, 217, 217, 0.8)', 'rgba(237, 125, 49, 0.8)'); // Grey to Red/Orange
+                    }
+                    // 'New' bar
+                    return createGradient(ctx, chartArea, 'rgba(217, 217, 217, 0.8)', 'rgba(112, 173, 71, 0.8)'); // Grey to Green
+                },
+                borderWidth: 0,
+                barPercentage: 0.5,
+            }]
+        };
+    }, [proposalDetails]);
 
     const performanceChartOptions = {
         maintainAspectRatio: false,
-        scales: { x: { grid: { display: false } }, y: { beginAtZero: true, suggestedMax: 40 } },
-        plugins: { legend: { position: 'top' } },
-        elements: { point: { radius: 0 } }
+        scales: {
+            x: { grid: { display: false } },
+            y: {
+                beginAtZero: true,
+                suggestedMax: 40,
+                ticks: { stepSize: 5 }
+            }
+        },
+        plugins: {
+            title: {
+                display: true,
+                text: 'Consumption with supply from Grid, PV and Battery',
+                align: 'start',
+                font: { size: 14, weight: 'normal' }
+            },
+            legend: {
+                position: 'right', // Moves legend to the right side
+                align: 'start',
+                labels: { boxWidth: 12, font: { size: 10 } }
+            }
+        },
     };
 
     const benefitChartOptions = {
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
+        plugins: {
+            legend: { display: false },
+            title: {
+                display: true,
+                text: 'Monthly Utility Cost',
+                font: { size: 14 },
+                color: '#595959',
+                padding: { bottom: 20 }
+            },
+            // This part adds the labels (e.g., R 303,088) on top of the bars.
+            // It requires the 'chartjs-plugin-datalabels' package.
+            // If not installed, run: npm install chartjs-plugin-datalabels
+            // Then, register it at the top of your file:
+            // import ChartDataLabels from 'chartjs-plugin-datalabels';
+            // ChartJS.register(..., ChartDataLabels);
+            datalabels: {
+                anchor: 'end',
+                align: 'end',
+                formatter: (value) => formatCurrency(value),
+                font: { weight: 'bold' },
+                color: '#595959'
+            }
+        },
+        scales: {
+            x: { grid: { display: false } },
+            y: { display: false, beginAtZero: true } // Hide the Y-axis
+        }
     };
 
     useEffect(() => {
@@ -122,6 +276,12 @@ function ProposalPage() {
             .then(response => {
                 setData(response.data);
                 document.title = `Proposal for ${response.data.client_name}`;
+
+                if (response.data?.simulation?.timestamps?.length > 0) {
+                    const firstDate = new Date(response.data.simulation.timestamps[0]);
+                    setSelectedDay(firstDate);
+                    setSelectedWeekStart(firstDate);
+                }
             })
             .catch(err => setError(err.response?.data?.error || 'Failed to load proposal data.'))
             .finally(() => setLoading(false));
@@ -173,125 +333,214 @@ function ProposalPage() {
                     </div>
                 </section>
 
-                {/* Page 2: Design */}
-                <section className="page">
-                    <div className="page-header">Orka Solar - {proposalDetails.projectDescription} - Project Proposal</div>
-                    <h2 className="section-title">DESIGN</h2>
-                    <div className="row g-4 mt-4 text-center">
-                        <div className="col-6"><div className="metric-card"><h3>{proposalDetails.inverterCapacity} kW</h3><p>INVERTER CAPACITY</p></div></div>
-                        <div className="col-6"><div className="metric-card"><h3>{proposalDetails.inverterCapacityVA} kVA</h3><p>INVERTER CAPACITY</p></div></div>
-                        <div className="col-6"><div className="metric-card"><h3>{proposalDetails.pvSize} kWp</h3><p>SOLAR PV SIZE</p></div></div>
-                        <div className="col-6"><div className="metric-card"><h3>{proposalDetails.storageCapacity} kWh</h3><p>STORAGE CAPACITY</p></div></div>
+                {/* Page 2: Design - NEW VERSION */}
+                <section className="page page-2">
+                    <div className="page-header">Orka Solar -- {proposalDetails.projectName || '110kW Sigenenergy'} -- Project Proposal</div>
+
+                    <div className="page-2-content d-flex">
+                        {/* Left Column: Metrics */}
+                        <div className="metrics-column">
+                            <div className="metric-item">
+                                <p className="metric-label">INVERTER CAPACITY</p>
+                                <div className="metric-value-card">
+                                    {proposalDetails.inverterCapacityVA} kVA
+                                </div>
+                            </div>
+                            <div className="metric-item">
+                                <p className="metric-label">SOLAR PV SIZE</p>
+                                <div className="metric-value-card">
+                                    {proposalDetails.pvSize} kWp
+                                </div>
+                            </div>
+                            <div className="metric-item">
+                                <p className="metric-label">STORAGE CAPACITY</p>
+                                <div className="metric-value-card">
+                                    {proposalDetails.storageCapacity} kWh
+                                </div>
+                            </div>
+                            <div className="metric-item">
+                                <p className="metric-label">COST</p>
+                                <div className="metric-value-card">
+                                    {formatCurrency(proposalDetails.totalCostExclVat)} <span className="vat-label">(excl. VAT)</span>
+                                </div>
+                            </div>
+                            <div className="metric-item">
+                                <p className="metric-label">ESKOM SAVINGS (P.M.)</p>
+                                <div className="metric-value-card">
+                                    {formatCurrency(proposalDetails.monthlySavings)}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column: Design Title */}
+                        <div className="design-title-column">
+                            <h2 className="design-title-kw">{proposalDetails.inverterCapacity} kW</h2>
+                            <h2 className="design-title-text">DESIGN</h2>
+                        </div>
                     </div>
-                     <h2 className="section-title mt-5">COST</h2>
-                     <div className="row g-4 mt-4 text-center">
-                        <div className="col-6"><div className="metric-card cost"><h3>{formatCurrency(proposalDetails.totalCostExclVat)}</h3><p>(excl. VAT)</p></div></div>
-                        <div className="col-6"><div className="metric-card savings"><h3>{formatCurrency(proposalDetails.monthlySavings)}</h3><p>ESKOM SAVINGS (P.M.)</p></div></div>
-                    </div>
+
+                    <div className="background-logo-graphic" />
                     <div className="page-footer">Page 2 of 5</div>
                 </section>
 
                 {/* Page 3: Performance */}
-                <section className="page">
-                    <div className="page-header">Orka Solar - {proposalDetails.projectDescription} - Project Proposal</div>
-                    <h2 className="section-title">PERFORMANCE</h2>
-                    <p>Orka Solar prepared the design using simulation software with actual weather data of the client's location. The data below shows the energy flow from the different sources per day:</p>
-                    <table className="table table-bordered text-center performance-summary-table">
-                        <thead><tr><th>CONSUMPTION</th><th>FROM GRID</th><th>FROM SOLAR</th><th>FROM BATTERY</th></tr></thead>
-                        <tbody><tr>
-                            <td>{proposalDetails.totalConsumption.toLocaleString()} kWh</td>
-                            <td>{proposalDetails.fromGrid.toLocaleString()} kWh</td>
-                            <td>{proposalDetails.fromSolar.toLocaleString()} kWh</td>
-                            <td>{proposalDetails.fromBattery.toLocaleString()} kWh</td>
-                        </tr></tbody>
-                    </table>
-                    <p className='mt-3'>The graph below shows the client's simulated load profile with the solar generation for a typical day.</p>
-                    <div className="chart-wrapper performance-chart">
+                <section className="page page-3">
+                    <div className="page-header">Orka Solar -- {proposalDetails.projectName || '110kW Sigenenergy'} -- Project Proposal</div>
+
+                    <h2 className="performance-title">
+                        <span>PERFORM</span>ANCE
+                    </h2>
+
+                    <p className="performance-intro-text">
+                        Orka Solar prepared the design using simulation software with actual weather data of the client's location.
+                    </p>
+                    <p className="performance-intro-text">
+                        The data below shows the energy flow from the different sources per day:
+                    </p>
+
+                    <div className="performance-metrics-container d-flex justify-content-around my-4">
+                        <div className="performance-metric">
+                            <i className="bi bi-lightbulb icon"></i>
+                            <p className="value">{proposalDetails.totalConsumption.toLocaleString()} kWh</p>
+                            <p className="label">CONSUMPTION</p>
+                        </div>
+                        <div className="performance-metric">
+                            <i className="bi bi-reception-4 icon"></i>
+                            <p className="value">{proposalDetails.fromGrid.toLocaleString()} kWh</p>
+                            <p className="label">FROM GRID</p>
+                        </div>
+                        <div className="performance-metric">
+                            <i className="bi bi-sun icon"></i>
+                            <p className="value">{proposalDetails.fromSolar.toLocaleString()} kWh</p>
+                            <p className="label">FROM SOLAR</p>
+                        </div>
+                        <div className="performance-metric">
+                            <i className="bi bi-battery-half icon"></i>
+                            <p className="value">{proposalDetails.fromBattery.toLocaleString()} kWh</p>
+                            <p className="label">FROM BATTERY</p>
+                        </div>
+                    </div>
+
+                    <p className="performance-intro-text">
+                        The graph below shows the client's simulated load profile with the solar generation for a typical day.
+                    </p>
+
+                    <div className="chart-wrapper performance-chart-wrapper">
                         <Line options={performanceChartOptions} data={performanceChartData} />
                     </div>
+
+                    <div className="background-logo-graphic" />
                     <div className="page-footer">Page 3 of 5</div>
                 </section>
                 
                 {/* Page 4: Benefit */}
-                <section className="page">
-                    <div className="page-header">Orka Solar - {proposalDetails.projectDescription} - Project Proposal</div>
-                    <h2 className="section-title">BENEFIT</h2>
-                    <p>The goal of the project is to provide:</p>
-                    <ul>
+                <section className="page page-4">
+                    <div className="page-header">Orka Solar -- {proposalDetails.projectName || '110kW Sigenenergy'} -- Project Proposal</div>
+
+                    <h2 className="benefit-title">
+                        <span>BENE</span>FIT
+                    </h2>
+
+                    <p className="benefit-intro-text">The goal of the project is to provide:</p>
+                    <ul className="benefit-list">
                         <li>Cost savings on grid electricity</li>
                         <li>Less dependence on the Utilities</li>
                         <li>Reduction carbon emissions from fossil-based fuels</li>
                     </ul>
-                    <h3 className='text-center sub-title'>Monthly Utility Cost</h3>
-                    <div className="chart-wrapper benefit-chart">
+
+                    <div className="chart-wrapper benefit-chart-wrapper">
                         <Bar options={benefitChartOptions} data={benefitChartData} />
                     </div>
-                    <p className='mt-3'>Following the successful installation the client's monthly cost of electricity, for the energy portion, will change as shown in the graph above.</p>
-                    <p className='mt-4'>The total savings achieved over the next 10 years is:</p>
-                    <div className="savings-highlight text-center">{formatCurrency(proposalDetails.savings10Year)}</div>
+
+                    <p className="benefit-chart-footer">
+                        Following the successful installation the client's monthly cost of electricity, for the energy portion, will change as shown in the graph above.
+                    </p>
+
+                    <div className="savings-highlight-box">
+                        <p className="label">The total savings achieved over the next 10 years is:</p>
+                        <p className="value">{formatCurrency(proposalDetails.savings10Year)}</p>
+                    </div>
+
                     <div className="page-footer">Page 4 of 5</div>
-                </section>
+                </section>                  
 
-                {/* Page 5: Quotation */}
-                <section className="page">
-                    <div className="page-header">Orka Solar - {proposalDetails.projectDescription} - Project Proposal</div>
-                    <h2 className="section-title">QUOTATION</h2>
-                    <table className="table table-bordered quotation-table">
-                        <tbody>
-                            {proposalDetails.quotation.map((item, index) => (
-                                <tr key={index}>
-                                    <td className='col-item'>{item.item}</td>
-                                    <td className='col-qty'>{item.qty}</td>
-                                    <td className='col-desc'>{item.desc}</td>
-                                    <td className='col-price text-end'>{typeof item.price === 'number' ? formatCurrency(item.price) : item.price}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <td colSpan="3" className="text-end fw-bold">Subtotal</td>
-                                <td className="text-end fw-bold">{formatCurrency(proposalDetails.totalExclVat)}</td>
-                            </tr>
-                            <tr>
-                                <td colSpan="3" className="text-end">VAT @ 15%</td>
-                                <td className="text-end">{formatCurrency(proposalDetails.vatAmount, 2)}</td>
-                            </tr>
-                            <tr>
-                                <td colSpan="3" className="text-end fw-bold">Total</td>
-                                <td className="text-end fw-bold">{formatCurrency(proposalDetails.totalInclVat, 2)}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
+                {/* Page 5: Quotation - NEW VERSION */}
+                <section className="page page-5">
+                    <div className="page-header">Orka Solar -- {proposalDetails.projectName || '110kW Sigenenergy'} -- Project Proposal</div>
                     
-                    <div className="row mt-4">
-                        <div className="col-6">
-                            <p className="fw-bold">Representing the Client:</p>
-                            <p className='mb-0'>{proposalDetails.clientName}</p>
-                            <p className='mb-0'>Tel: {data.client?.phone || '082 923 2878'}</p>
-                            <p className='mb-0'>Mail: {data.client?.email || 'Alphie@brandfs.co.za'}</p>
-                        </div>
-                        <div className="col-6">
-                             <p className="fw-bold">Banking details:</p>
-                            <p className='mb-0'>Company: Orka Solar (pty) ltd.</p>
-                            <p className='mb-0'>Branch: ABSA Mooirivier Mall</p>
-                             <p className='mb-0'>Account number: 409 240 5135</p>
-                        </div>
-                    </div>
-
-                    <div className="row signature-area">
-                        <div className="col-6">
-                            <div className="signature-box">
-                                <p>Signed for acceptance:</p>
-                                <div className="signature-line"></div>
-                                <p className="signature-label">Signature and date</p>
+                    <h2 className="quotation-title">
+                        <span>QUOT</span>ATION
+                    </h2>
+                    
+                    <h3 className="quotation-subtitle">Sigen Energy System</h3>
+                    
+                    <div className="quotation-list">
+                        {proposalDetails.quotation.map((item, index) => (
+                            <div key={index} className="quotation-item d-flex justify-content-between align-items-start">
+                                <div className="quotation-details">
+                                    <p className="item-name">{item.item}</p>
+                                    <p className="item-spec">{item.qty}</p>
+                                    <p className="item-desc">{item.desc}</p>
+                                </div>
+                                <div className="quotation-price">
+                                    {typeof item.price === 'number' ? formatCurrency(item.price) : item.price}
+                                </div>
                             </div>
+                        ))}
+                    </div>
+                    
+                    <div className="totals-section">
+                        <div className="total-row d-flex justify-content-end">
+                            <span className="label">Excl VAT</span>
+                            <span className="value">{formatCurrency(proposalDetails.totalExclVat)}</span>
                         </div>
-                         <div className="col-6 text-end">
-                            <p className="fw-bold">Orka Solar (Pty) Ltd.</p>
-                             <p className='mb-0'>Reg No. 2017/141572/07</p>
-                             <p className='mb-0'>VAT No. 463 028 1337</p>
+                        <div className="total-row d-flex justify-content-end">
+                            <span className="label">VAT</span>
+                            <span className="value">{formatCurrency(proposalDetails.vatAmount, 2)}</span>
+                        </div>
+                        <div className="total-row d-flex justify-content-end total">
+                            <span className="label">Total <small>Including VAT</small></span>
+                            <span className="value">{formatCurrency(proposalDetails.totalInclVat, 2)}</span>
                         </div>
                     </div>
+                    
+                    <div className="info-footer row mt-4">
+                        <div className="col-6">
+                            <p className="mb-2"><strong>Alfie Brand</strong></p>
+                            <p className="mb-0">Tel: {data.client?.phone || '082 923 2878'}</p>
+                            <p className="mb-3">Mail: {data.client?.email || 'Alphie@brandfs.co.za'}</p>
+                    
+                            <p className="mb-2"><strong>Banking details:</strong></p>
+                            <p className="mb-0">Company: Orka Solar (pty) ltd.</p>
+                            <p className="mb-0">Branch: ABSA Mooirivier Mall</p>
+                            <p className="mb-0">Account number: 409 240 5135</p>
+                        </div>
+                        <div className="col-6 text-end">
+                            <p className="mb-2"><strong>Orka Solar (Pty) Ltd</strong></p>
+                            <p className="mb-0">Reg No. 2017/141572/07</p>
+                            <p className="mb-0">VAT No. 463 028 1337</p>
+                            <p className="mb-0">3 Retief Street</p>
+                            <p className="mb-0">The Square, Unit 13</p>
+                            <p className="mb-0">Potchefstroom</p>
+                            <p className="mb-0">2531</p>
+                        </div>
+                    </div>
+                    
+                    <div className="signature-footer row mt-auto">
+                         <div className="col-6">
+                            <p className="mb-2">Quote valid for 30days unless specified otherwise.</p>
+                            <p className="mb-2"><strong>Representing the Client:</strong></p>
+                            <p className="mb-0">{proposalDetails.clientName}</p>
+                            <p className="mb-0">Tel: {data.client?.phone || '082 923 2878'}</p>
+                            <p className="mb-0">Mail: {data.client?.email || 'Alphie@brandfs.co.za'}</p>
+                        </div>
+                         <div className="col-6">
+                            <p className="mb-2"><strong>Signed for acceptance:</strong></p>
+                            <div className="signature-line-box"></div>
+                            <p className="signature-under-text">Signature and date</p>
+                        </div>
+                    </div>
+                    
                     <div className="page-footer">Page 5 of 5</div>
                 </section>
             </main>
