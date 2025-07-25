@@ -27,7 +27,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const PANEL_WATTAGE = 565; // JA SOLAR 72S30-565/GR
 
 // Sub Component for Stage 1: Sizing Mode
-const SizingView = ({ design, onDesignChange, onPromote, products }) => {
+const SizingView = ({ design, onDesignChange, onPromote, products, usePvgis, setUsePvgis }) => {
   
   const handleTargetKwChange = (e) => {
     const kw = e.target.value;
@@ -70,6 +70,17 @@ const SizingView = ({ design, onDesignChange, onPromote, products }) => {
                             <i className="bi bi-gear-fill me-2 text-primary"></i>
                             Core Configuration
                         </Card.Title>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Generation Data Source</Form.Label>
+                            <Form.Check
+                                type="switch"
+                                id="pvgis-switch"
+                                label={usePvgis ? "Live PVGIS Data (Slow)" : "Standard Profile (Fast)"}
+                                checked={usePvgis}
+                                onChange={e => setUsePvgis(e.target.checked)}
+                            />
+                        </Form.Group>
+
                         <Row>
                             <Col md={6}>
                                 <Form.Group className="mb-3">
@@ -496,6 +507,7 @@ function SystemDesign({ projectId }) {
     // Data State
     const [products, setProducts] = useState({ panels: [], inverters: [], batteries: [] });
     const [project, setProject] = useState(null); // Will hold the loaded project details
+    const [usePvgis, setUsePvgis] = useState(false);
 
     // The single, unified state object for the entire design
     const [design, setDesign] = useState({
@@ -791,6 +803,7 @@ function SystemDesign({ projectId }) {
         // Build the payload from the 'design' state object
         const payload = {
             project_id: projectId,
+            use_pvgis: usePvgis,
             system: {
                 panel_kw: parseFloat(design.panelKw),
                 tilt: parseFloat(design.tilt),
@@ -948,6 +961,8 @@ function SystemDesign({ projectId }) {
                     onDesignChange={setDesign}
                     onPromote={() => setDesignStage('bom')}
                     products={products}
+                    usePvgis={usePvgis}
+                    setUsePvgis={setUsePvgis}
                 />
             ) : (
                 <BomBuilderView

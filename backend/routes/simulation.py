@@ -16,6 +16,7 @@ def simulate_system():
     try:
         data = request.get_json()
         project_id = data.get("project_id")
+        use_pvgis = data.get("use_pvgis", False)
         panel_kw = data["system"]["panel_kw"]
         tilt = data["system"]["tilt"]
         azimuth = data["system"]["azimuth"]
@@ -37,7 +38,7 @@ def simulate_system():
         if inverter_kva is None:
             return jsonify({"error": "Inverter size (kVA) is required"}), 400
 
-        result = simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export, tilt, azimuth)
+        result = simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export, tilt, azimuth, use_pvgis)
         return jsonify(result)
 
     except Exception as e:
