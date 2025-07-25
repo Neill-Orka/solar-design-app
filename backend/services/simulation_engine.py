@@ -11,7 +11,7 @@ import math
 import os
 
 
-def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export, tilt, azimuth, use_pvgis=False):
+def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export, tilt, azimuth, use_pvgis=False, profile_name='Midrand Azth:east-west Tilt:5'):
     try:
         project = Projects.query.get(project_id)
         if not project:
@@ -153,10 +153,13 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
             if GENERATION_PROFILE_DF.empty:
                 return {"error": "Generation profile CSV could not be loaded on server startup."}
             
+            if profile_name not in GENERATION_PROFILE_DF.columns:
+                return {"error": f"Profile '{profile_name}' not found in generation profile data."}
+            
             panel_degrading_factor = 1
             real_panel_kw = panel_degrading_factor * panel_kw
             degraded_panel_kw = real_panel_kw
-            percentages = GENERATION_PROFILE_DF.iloc[:, 0].tolist()
+            percentages = GENERATION_PROFILE_DF[profile_name].tolist()
 
             if len(percentages) != len(full_30min_index):
                 return {"error": f"Profile length mismatch. Expected {len(full_30min_index)} entries, got {len(percentages)}."}
@@ -244,7 +247,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '..'))
 csv_path = os.path.join(project_root, 'utils', 'generation_profile.csv')
 try:
-    GENERATION_PROFILE_DF = pd.read_csv(csv_path, header=None)
+    GENERATION_PROFILE_DF = pd.read_csv(csv_path)
     print(f"--- SUCCESS: Loaded generation profile from: {csv_path} ---")
 except FileNotFoundError:
     print(f"--- FATAL STARTUP ERROR: Could not find 'generation_profile.csv'. Searched at path: {csv_path} ---")

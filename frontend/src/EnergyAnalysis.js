@@ -132,6 +132,7 @@ function EnergyAnalysis({ projectId }) {
 
   const avgHourlyOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       title: { display: true, text: 'Average Daily Load Profle (Hourly)' },
       legend: { display: false },
@@ -173,6 +174,7 @@ function EnergyAnalysis({ projectId }) {
 
   const dailyBarOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       title: { display: true, text: 'Daily Energy Use (kWh/day)' },
       legend: { display: false },
@@ -310,60 +312,16 @@ function EnergyAnalysis({ projectId }) {
         </>
       )} 
 
-      <h5>
         {consumptionData.length > 0 && (
-          <div className='mb-5'>
+          <div className='mb-5 chart-container'>
             <Line data={avgHourlyChart} options={avgHourlyOptions} />
           </div>
         )}
         {consumptionData.length > 0 && (
-          <div className='mb-5'>
+          <div className='mb-5 chart-container'>
             <Bar data={dailyBarChart} options={dailyBarOptions} />
           </div>
         )}
-      {consumptionData.length > 0 && (
-        <div className="mb-5">
-          <h5>Calendar Heatmap of Daily Usage</h5>
-          <HeatMap
-            startDate={new Date('2025-01-01')}
-            endDate={new Date('2025-12-31')}
-            value={[]}
-            data={heatmapData}
-            rectSize={20}
-            rectProps={{rx: 2}}
-            weekLabels={['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']}
-            monthLabels={[
-              'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-            ]}
-            cellStyle={(_background, value) => {
-              const numeric = parseFloat(value);
-              if (!numeric) return { background: '#f0f0f0', color: '#000' };
-
-              const sorted = [...heatmapData.map(d => d.count)].sort((a, b) => a - b);
-              const p90 = sorted[Math.floor(sorted.length * 0.9)] || 1;
-              const intensity = Math.min(numeric / p90, 1);
-
-              return {
-                background: `hsl(207, 100%, ${100 - intensity * 50}%)`,
-                color: intensity > 0.6 ? '#fff' : '#000',
-                fontSize: '0.7rem',
-              };
-            }}
-            cellRender = {(value, x, y) => {
-              const date = new Date('2025-01-01');
-              date.setDate(date.getDate() + x);
-              const formattedDate = date.toISOString().split('T')[0];
-              return (
-                <div title={`${formattedDate}: ${value.count || 0} kWh`}>
-                  {value}
-                </div>
-              );
-            }}
-          />
-        </div>
-      )}
-      </h5>     
 
       {consumptionData.length === 0 && (
         <p>No data available for the selected period.</p>

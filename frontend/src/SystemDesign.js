@@ -27,7 +27,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const PANEL_WATTAGE = 565; // JA SOLAR 72S30-565/GR
 
 // Sub Component for Stage 1: Sizing Mode
-const SizingView = ({ design, onDesignChange, onPromote, products, usePvgis, setUsePvgis }) => {
+const SizingView = ({ design, onDesignChange, onPromote, products, usePvgis, setUsePvgis, profileName, setProfileName }) => {
   
   const handleTargetKwChange = (e) => {
     const kw = e.target.value;
@@ -80,15 +80,31 @@ const SizingView = ({ design, onDesignChange, onPromote, products, usePvgis, set
                                 onChange={e => setUsePvgis(e.target.checked)}
                             />
                         </Form.Group>
+                        
+                        {/* ONLY show profile dropdown if NOT using PVGIS */}
+                        {!usePvgis && (
+                            <Form.Group className="mb-3">
+                                <Form.Label>Standard Profile Type</Form.Label>
+                                <Form.Select
+                                    value={profileName}
+                                    onChange={e => setProfileName(e.target.value)}
+                                >
+                                    <option value="hopetown_14_15">Hopetown Azth:14 Tilt:15</option>
+                                    <option value="midrand_ew_5">Midrand Azth:east-west Tilt:5</option>
+                                    <option value="pvlib_hopetown_0_15">Pvlib Hopetown Azth:0 Tilt:15</option>
+                                    <option value="pvlib_hopetown_0_15_0.9">Pvlib Hopetown (x0.9) Azth:0 Tilt:15</option>
+                                </Form.Select>
+                            </Form.Group>
+                        )}
 
                         <Row>
                             <Col md={6}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>System Type</Form.Label>
                                     <Form.Select value={design.systemType} onChange={e => onDesignChange({ ...design, systemType: e.target.value })}>
-                                        <option value="grid">Grid‑tied</option>
+                                        <option value="grid">Grid-tied</option>
                                         <option value="hybrid">Hybrid</option>
-                                        <option value="off-grid">Off‑grid</option>
+                                        <option value="off-grid">Off-grid</option>
                                     </Form.Select>
                                 </Form.Group>
                             </Col>
@@ -105,30 +121,32 @@ const SizingView = ({ design, onDesignChange, onPromote, products, usePvgis, set
                                 </Form.Group>
                             </Col>
                         </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Panel Tilt (°)</Form.Label>
-                                    <Form.Control
-                                        type="number"
-                                        value={design.tilt}
-                                        onChange={e => onDesignChange({ ...design, tilt: e.target.value })}
-                                        placeholder="e.g., 15"
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Panel Azimuth (°)</Form.Label>
-                                    <Form.Control
-                                        type="number"
-                                        value={design.azimuth}
-                                        onChange={e => onDesignChange({ ...design, azimuth: e.target.value })}
-                                        placeholder="0=N, 180=S"
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
+                        {usePvgis && (
+                            <Row>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Panel Tilt (°)</Form.Label>
+                                        <Form.Control
+                                            type="number"
+                                            value={design.tilt}
+                                            onChange={e => onDesignChange({ ...design, tilt: e.target.value })}
+                                            placeholder="e.g., 15"
+                                        />
+                                    </Form.Group>
+                                </Col>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Panel Azimuth (°)</Form.Label>
+                                        <Form.Control
+                                            type="number"
+                                            value={design.azimuth}
+                                            onChange={e => onDesignChange({ ...design, azimuth: e.target.value })}
+                                            placeholder="0=N, 180=S"
+                                        />
+                                    </Form.Group>
+                                </Col>
+                            </Row>
+                        )}
                     </Card.Body>
                 </Card>
             </div>
@@ -508,6 +526,7 @@ function SystemDesign({ projectId }) {
     const [products, setProducts] = useState({ panels: [], inverters: [], batteries: [] });
     const [project, setProject] = useState(null); // Will hold the loaded project details
     const [usePvgis, setUsePvgis] = useState(false);
+    const [profileName, setProfileName] = useState('midrand_ew_5'); // Default profile for non-PVGIS mode
 
     // The single, unified state object for the entire design
     const [design, setDesign] = useState({
@@ -804,6 +823,7 @@ function SystemDesign({ projectId }) {
         const payload = {
             project_id: projectId,
             use_pvgis: usePvgis,
+            profile_name: profileName,
             system: {
                 panel_kw: parseFloat(design.panelKw),
                 tilt: parseFloat(design.tilt),
@@ -963,6 +983,8 @@ function SystemDesign({ projectId }) {
                     products={products}
                     usePvgis={usePvgis}
                     setUsePvgis={setUsePvgis}
+                    profileName={profileName}
+                    setProfileName={setProfileName}
                 />
             ) : (
                 <BomBuilderView

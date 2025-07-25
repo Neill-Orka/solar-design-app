@@ -258,7 +258,7 @@ function EditProject() {
                 </Card>
 
                 {/* System Configuration */}
-                <Card className="border-light mb-4">
+                {/* <Card className="border-light mb-4">
                   <Card.Header className="bg-light border-0">
                     <h5 className="mb-0 fw-semibold">
                       <i className="bi bi-tools me-2"></i>System Configuration
@@ -369,7 +369,7 @@ function EditProject() {
                       </Col>
                     </Row>
                   </Card.Body>
-                </Card>
+                </Card> */}
 
                 <Card className="border-light mb-4">
                   <Card.Header>

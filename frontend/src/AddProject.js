@@ -394,7 +394,7 @@ function AddProject() {
                 </Card>
 
                 {/* Detailed Design Section */}
-                {projectData.design_type === 'Detailed' && (
+                {/* {projectData.design_type === 'Detailed' && (
                   <Card className="border-light mb-4">
                     <Card.Header className="bg-light border-0">
                       <h5 className="mb-0 fw-semibold">
@@ -495,7 +495,7 @@ function AddProject() {
                       </Row>
                     </Card.Body>
                   </Card>
-                )}
+                )} */}
 
                 {/* Submit Buttons */}
                 <div className="d-flex gap-3 mt-5">

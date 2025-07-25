@@ -25,6 +25,12 @@ code {
   transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
 }
 
+.chart-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2/1;
+}
+
 .date-picker-container .react-datepicker__input-container input:focus {
   color: #212529;
   background-color: #fff;
