@@ -29,7 +29,7 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
         sim_year = records[0].timestamp.year
         times = pd.date_range(start=f'{sim_year}-01-01', end=f'{sim_year}-12-31 23:59', freq='30min', tz='Africa/Johannesburg')
 
-        weather_data, _, _, _ = get_pvgis_tmy(latitude, longitude, outputformat='csv')
+        weather_data, _, _, _ = get_pvgis_tmy(latitude, longitude, outputformat='csv', timeout=90)
 
         if not isinstance(weather_data, pd.DataFrame):
             raise TypeError("Failed to fetch weather data as a pandas DataFrame.")
