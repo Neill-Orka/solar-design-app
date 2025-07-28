@@ -175,7 +175,8 @@ function FinancialModeling({ projectId }) {
                 title: {
                   display: true,
                   text: 'Projected Savings Over 20 Years'
-                }
+                },
+                datalabels: {display: false}
               },
               responsive: true,
               scales: {

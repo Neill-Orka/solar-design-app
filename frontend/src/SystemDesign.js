@@ -756,6 +756,9 @@ function SystemDesign({ projectId }) {
         responsive: true, 
         maintainAspectRatio: false, 
         interaction: { mode: 'index', intersect: false },
+        plugins: {
+            datalabels: {display: false}
+        },
         scales: { 
             x: { 
                 type: 'time', 
