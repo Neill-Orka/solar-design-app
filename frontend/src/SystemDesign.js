@@ -633,6 +633,9 @@ function SystemDesign({ projectId }) {
             const batteryInfo = p.battery_kwh && typeof p.battery_kwh === 'object' ? p.battery_kwh : { model: null, capacity: p.battery_kwh, quantity: 1 };
             const currentBattery = products.batteries.find(bat => bat.model === batteryInfo.model);
 
+            setUsePvgis(p.use_pvgis || false);
+            setProfileName(p.generation_profile_name || 'midrand_ew_5'); // Default to
+
             // Update the master 'design' state with all the loaded data
             setDesign({
                 systemType: p.system_type || 'grid',
@@ -804,6 +807,8 @@ function SystemDesign({ projectId }) {
                 capacity: design.selectedBattery.product.capacity_kwh,
                 quantity: design.batteryQuantity
             } : null,
+            use_pvgis: usePvgis,
+            generation_profile_name: profileName
         };
 
         axios.put(`${API_URL}/api/projects/${projectId}`, payload)

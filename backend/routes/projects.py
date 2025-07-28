@@ -82,6 +82,8 @@ def get_project_by_id(project_id):
             'tariff_details': serialize_tariff(project.tariff) if project.tariff else None,
             'surface_tilt': project.surface_tilt,
             'surface_azimuth': project.surface_azimuth,
+            'use_pvgis': project.use_pvgis,
+            'generation_profile_name': project.generation_profile_name,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -148,6 +150,11 @@ def update_project(project_id):
         for key, value in data.items():
             if key not in ['inverter_kva', 'battery_kwh']:
                 setattr(project, key, value)
+
+        if 'use_pvgis' in data:
+            project.use_pvgis = data['use_pvgis']
+        if 'generation_profile_name' in data:
+            project.generation_profile_name = data['generation_profile_name']
 
         tariff_id = data.get('tariff_id')
         custom_flat_rate = data.get('custom_flat_rate')

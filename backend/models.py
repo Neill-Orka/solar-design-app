@@ -42,6 +42,8 @@ class Projects(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     design_type = db.Column(db.String(20), nullable=False) # 'detailed', 'quick'
     project_type = db.Column(db.String(50), nullable=False) # 'residential', 'commercial'
+    use_pvgis = db.Column(db.Boolean, nullable=False, default=False)  # Whether to use PVGIS for generation profiles
+    generation_profile_name = db.Column(db.String(100), nullable=True, default='midrand_ew_5')
 
     energy_data = db.relationship('EnergyData', backref='project', lazy=True)
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")
