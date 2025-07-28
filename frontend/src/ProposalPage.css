@@ -1,228 +1,503 @@
-/* --- Base Styling --- */
+/* --- Base and Page Setup --- */
 .proposal-body {
-  background-color: #e5e7eb; /* Light, neutral gray background */
-}
-
-.loading-container {
-    display: flex; justify-content: center; align-items: center; height: 100vh;
-}
-
-.proposal-container {
-  margin: 0 auto;
-  padding: 3rem 0;
+    background-color: #525659;
 }
 
 .page {
-  background: white; display: flex; flex-direction: column;
-  margin: 0 auto 3rem auto; padding: 2.5cm;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  width: 21cm; height: 29.7cm;
-  position: relative; box-sizing: border-box;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto 2rem auto;
+    padding: 2cm; /* Standard A4 padding */
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    width: 21cm;
+    height: 29.7cm;
+    position: relative;
+    font-family: Calibri, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 }
-
-/* --- Controls --- */
-.print-controls {
-  position: fixed; top: 5rem; right: 1.5rem; z-index: 100;
-  display: flex; gap: 1rem;
-}
-.print-controls button { box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-
-/* --- Cover Page --- */
-.cover-page {
-    text-align: center; justify-content: space-between;
-    background: linear-gradient(rgba(255, 255, 255, 0.8), white), url('https://www.transparenttextures.com/patterns/az-subtle.png');
-}
-.cover-page .logo { width: 360px; margin: 0 auto; }
-.cover-page .main-title { font-size: 3rem; font-weight: 800; color: #1e3a8a; line-height: 1.1; }
-.cover-page .subtitle { font-size: 1.5rem; color: #4b5563; margin-top: 0.5rem; }
-.cover-page .client-info h2 { font-size: 2.5rem; font-weight: 700; color: #111827; }
-.cover-page .location-info { font-size: 1.1rem; color: #6b7280; margin-top: 1rem; }
-.cover-page .footer-info { font-size: 0.8rem; color: #9ca3af; }
-
-/* --- General Content --- */
-.section-title {
-    font-size: 2.5rem; font-weight: 800; color: #1e3a8a;
-    border-bottom: 3px solid #3b82f6;
-    padding-bottom: 0.5rem; margin-bottom: 2rem;
-}
-.intro-text { font-size: 1.1rem; line-height: 1.7; color: #374151; }
-
-/* --- KPI Grid (Executive Summary) --- */
-.kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin: 2rem 0; }
-.kpi-card { border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 1.5rem; text-align: center; transition: all 0.3s ease; }
-.kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-.kpi-icon { font-size: 2.5rem; margin-bottom: 0.75rem; display: inline-block; }
-.kpi-icon.savings { color: #16a34a; }
-.kpi-icon.payback { color: #2563eb; }
-.kpi-icon.independence { color: #f59e0b; }
-.kpi-card h3 { font-size: 1.1rem; font-weight: 600; color: #4b5563; }
-.kpi-value { font-size: 2.5rem; font-weight: 800; margin-top: 0.5rem; }
-.kpi-value .kpi-unit { font-size: 1.5rem; font-weight: 600; color: #6b7280; }
-.kpi-value.savings-value { color: #16a34a; }
-.kpi-value.payback-value { color: #2563eb; }
-.kpi-value.independence-value { color: #f59e0b; }
-
-.chart-container { display: flex; flex-direction: column; }
-.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.chart-header h3 { margin-bottom: 0; font-size: 1.25rem; font-weight: 600; }
-.date-picker-wrapper .form-control-sm { max-width: 150px; text-align: center; font-weight: 500; }
-.chart-wrapper { position: relative; }
-.half-page { width: 100%; margin-bottom: 2rem; }
-.analysis-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: center; }
-.table-container table { width: 100%; border-collapse: collapse; }
-.table-container td { padding: 0.75rem 1rem; border-bottom: 1px solid #e5e7eb; }
-.table-container tr:last-child td { border-bottom: none; }
-.table-container td:last-child { text-align: right; font-weight: 700; font-size: 1.1rem; }
-.table-container .import-row td { color: #dc2626; }
-.table-container .highlight-row { background-color: #eff6ff; font-weight: 700; }
-
-.investment-card {
-    background-color: #1f2937; color: white; border-radius: 0.75rem;
-    padding: 1.5rem; text-align: center; margin-top: 2rem;
-}
-.investment-card h3 { font-size: 1.25rem; font-weight: 600; }
-.investment-card p { font-size: 2.5rem; font-weight: 800; margin-top: 0.5rem; }
-.investment-card span { font-size: 0.8rem; color: #9ca3af; }
-
-/* --- System Details --- */
-.system-grid { display: flex; flex-direction: column; gap: 1rem; }
-.component-card { display: flex; align-items: center; background: #f9fafb; padding: 1rem; border-radius: 0.5rem; border: 1px solid #e5e7eb; }
-.component-icon { font-size: 2rem; color: #3b82f6; margin-right: 1.5rem; }
-.component-details h4 { font-weight: 700; color: #111827; }
-.component-details p { font-size: 0.9rem; color: #6b7280; }
-
-/* --- Charts and Tables --- */
-.chart-container { display: flex; flex-direction: column; }
-.chart-container h3 { text-align: center; font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; }
-/* .chart-wrapper { position: relative; } */
-.half-page { width: 100%; margin-bottom: 2rem; }
-.analysis-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: center; }
-.table-container table { width: 100%; border-collapse: collapse; }
-.table-container td { padding: 0.75rem 1rem; border-bottom: 1px solid #e5e7eb; }
-.table-container tr:last-child td { border-bottom: none; }
-.table-container td:last-child { text-align: right; font-weight: 700; font-size: 1.1rem; }
-.table-container .import-row td { color: #dc2626; }
-.table-container .highlight-row { background-color: #eff6ff; font-weight: 700; }
-
-/* --- Timeline --- */
-/* --- Timeline --- */
-.timeline { 
-  list-style: none; 
-  padding: 0; 
-  counter-reset: custom-timeline-counter; /* 1. Add counter-reset with a NEW, UNIQUE name */
-}
-.timeline li { 
-  padding-left: 2rem; 
-  position: relative; 
-  margin-bottom: 1.5rem; 
-  border-left: 3px solid #dbeafe; 
-}
-.timeline li::before {
-    content: counter(custom-timeline-counter); /* 2. Use the NEW counter name here */
-    counter-increment: custom-timeline-counter; /* 3. Increment the NEW counter name (default is by 1) */
-    position: absolute; left: -1.2rem; top: -0.1rem;
-    background: #3b82f6; color: white; width: 2.2rem; height: 2.2rem;
-    border-radius: 50%; font-weight: 700; display: flex;
-    align-items: center; justify-content: center;
-}
-
-/* --- Signature --- */
-.signature-area { margin-top: auto; padding-top: 2rem; border-top: 1px solid #e5e7eb; }
-.signature-boxes { display: flex; margin-top: 2rem; gap: 2rem; }
-.signature-boxes .box { flex: 1; }
-.signature-boxes .line { border-bottom: 1px solid #6b7280; height: 3rem; margin-bottom: 0.5rem; }
 
 /* --- Print Styles --- */
 @media print {
-  body.proposal-body { 
-    background-color: white; 
-    margin: 0;
-  }
-  .no-print, .print-controls { display: none !important; }
-  .proposal-container { margin: 0; padding: 0cm;}
-  .page { 
-    margin: 0; 
-    padding: 2.0cm 3.0cm; 
-    box-shadow: none; 
-    width: 100%; 
-    height: auto; 
-    min-height: 26.7cm; 
-    page-break-after: always; 
-  }
+    html, body {
+      width: 21cm;
+      height: 29.7cm;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: white;
+    }
 
-  .investment-card {
-    background-color: #1f2937 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  
-  /* Ensures text inside the card is also visible */
-  .investment-card, .investment-card h3, .investment-card p, .investment-card span {
-    color: white !important;
-  }
-
-  .cover-page {
-    overflow: hidden !important;
-  }
-
+    .proposal-body { background-color: white; }
+    .no-print, .print-controls { display: none !important; }
+    .proposal-container { margin: 0; padding: 0; }
+    .page { margin: 0; box-shadow: none; page-break-after: always; width: 100%; height: 100%; }
+    
+    /* Keep cover page layout consistent with screen view */
+    .cover-page { 
+        padding: 0; /* Keep same as screen - no padding to allow full background */
+        height: 29.7cm; /* Ensure proper A4 height */
+        justify-content: space-between;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    .cover-page header {
+        padding: 2cm 2cm 0 2cm; /* Keep same as screen */
+        height: 33%; /* Keep same as screen */
+    }
+    .cover-content {
+        height: 50%; /* Keep same as screen */
+        min-height: 400px;
+        background-image: url('assets/report_background.png'); /* Keep background image */
+        background-size: auto; /* Keep same as screen */
+        background-position: left 50%; /* Move the background up */
+        background-repeat: no-repeat; /* Keep same as screen */
+    }
+    .content-box {
+        padding: 0 2cm; /* Keep same as screen */
+    }
 }
 @page { size: A4; margin: 0; }
 
-/* Add these new rules to the end of ProposalPage.css */
-
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+/* --- Cover Page (Page 1) - NEW STYLES --- */
+.cover-page {
+    padding: 0; /* Remove padding to allow full-page background */
+    justify-content: space-between;
 }
 
-.summary-card {
-    background-color: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 1.5rem;
+.cover-page header {
+    padding: 2cm 2cm 0 2cm; /* Re-apply padding to the header */
+    height: 33%; /* Give the top section a third of the page */
+}
+
+.cover-page .logo {
+    max-width: 250px;
+}
+
+.cover-content {
+    height: 50%;
+    min-height: 400px;
+    background-image: url('assets/report_background.png');
+    background-size: auto;
+    background-position: left 50%;
+    background-repeat: no-repeat;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* White gradient overlay */
+.cover-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* background: linear-gradient(to top, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.7) 70%); */
+}
+
+.content-box {
+    position: relative; /* Ensure text is above the gradient overlay */
+    padding: 0 2cm; /* Match page padding */
+    width: 100%;
+}
+
+.proposal-title {
+    font-size: 1.5rem;
+    font-weight: normal;
+    margin-bottom: 1.5rem;
+}
+
+.project-name-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    border-bottom: 1px solid #000;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.detail-line {
+    border-bottom: 1px solid #000;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.detail-line .label {
+    display: inline-block;
+    width: 200px; /* Adjust width as needed for alignment */
+}
+
+.date-info {
+    font-size: 1.1rem;
+}
+
+.compiler-info span {
+    display: block;
+    font-size: 0.9rem;
+    color: #333;
+}
+
+/* --- Additional Print Styles --- */
+@media print {
+  /* don’t force a new sheet after the cover */
+  .cover-page {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  /* shrink and lift the bg image so it never overflows */
+  .cover-content {
+    /* a hair less than 50% to guarantee no overflow */
+    height: 48%;
+    /* move image up higher on the page */
+    background-position: left  FortyFivePercent; /* literally: left 45% */
+    /* remove the screen‐only min-height which can push things over */
+    min-height: 0;
+  }
+}
+
+/* --- Page 2: Design --- */
+
+/* Add a specific class to the page for easier targeting */
+.page-2 {
+    padding-top: 4cm; /* Add more space at the top */
+    overflow: hidden; /* Prevents background graphic from spilling out */
+}
+
+/* Ensure the generic header for page 2 has an underline */
+.page-2 .page-header {
+    border-bottom: 1px solid #bfbfbf;
+    padding-bottom: 0.5rem;
+    width: calc(100% - 4cm);
+}
+
+/* Position the footer in the center for page 2 */
+.page-2 .page-footer {
+    width: 100%;
+    left: 0;
     text-align: center;
 }
 
-.summary-icon {
-    font-size: 2.5rem;
-    margin-bottom: 0.75rem;
-    display: inline-block;
+.metrics-column {
+    width: 60%; /* Takes up the left side of the page */
 }
 
-.summary-icon.solar { color: #f59e0b; }
-.summary-icon.inverter { color: #6366f1; }
-.summary-icon.battery { color: #22c55e; }
+.metric-item {
+    margin-bottom: 1rem;
+}
 
-.summary-card h3 {
+.metric-label {
     font-size: 1rem;
-    font-weight: 600;
-    color: #4b5563;
+    font-weight: bold;
+    color: #595959;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+}
+
+.metric-value-card {
+    border: 4px double #33d5a2; /* Light green double border */
+    border-radius: 50px; /* Pill shape */
+    padding: 0.5rem 1rem;
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #0bce8d; /* Darker green text */
+    max-width: 250px; /* Constrain width */
+}
+
+.vat-label {
+    font-size: 0.8rem;
+    font-weight: normal;
+    color: #595959;
+}
+
+.design-title-column {
+    width: 40%;
+    text-align: right;
+}
+
+.design-title-kw {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #70ad47; /* Bright green */
+    margin: 0;
+    line-height: 1;
+}
+
+.design-title-text {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #c5e0b3; /* Lighter olive green */
+    margin: 0;
+    line-height: 1;
+}
+
+.background-logo-graphic {
+    position: absolute;
+    bottom: -100px;
+    right: -150px;
+    width: 600px;
+    height: 600px;
+    background-image: url('assets/orka_logo_transparent_background.png'); /* Ensure this path is correct */
+    background-size: contain;
+    background-repeat: no-repeat;
+    opacity: 0.1;
+    z-index: -1;
+}
+
+/* --- Page 3: Performance --- */
+.page-3 .page-header {
+    border-bottom: 1px solid #bfbfbf;
+    padding-bottom: 0.5rem;
+    width: calc(100% - 4cm);
+}
+
+.page-3 .page-footer {
+    width: 100%;
+    left: 0;
+    text-align: center;
+}
+
+.performance-title {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #c5e0b3; /* Lighter olive green */
+    line-height: 1;
+    margin-bottom: 1.5rem;
+}
+
+.performance-title span {
+    color: #70ad47; /* Bright green */
+    border-bottom: 5px solid #70ad47;
+    padding-bottom: 0.25rem;
+}
+
+.performance-intro-text {
+    font-size: 0.9rem;
+    color: #595959;
     margin-bottom: 0.5rem;
 }
 
-.summary-value {
-    font-size: 2rem;
-    font-weight: 800;
-    color: #111827;
-    line-height: 1;
+.performance-metric {
+    text-align: center;
+}
+
+.performance-metric .icon {
+    font-size: 2.5rem;
+    color: #a9d18e; /* Light green from page 2 cards */
+}
+
+.performance-metric .value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #548235; /* Darker green */
+    margin: 0.5rem 0 0.25rem 0;
+}
+
+.performance-metric .label {
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: #595959;
     margin: 0;
 }
 
-.summary-value .summary-unit {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #6b7280;
-    margin-left: 0.25rem;
+.performance-chart-wrapper {
+    height: 350px; /* Give the chart a fixed height */
+    margin-top: 1rem;
 }
 
-.component-list-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #1e3a8a;
+/* --- Page 4: Benefit --- */
+.page-4 {
+    padding-top: 4cm;
+}
+
+.page-4 .page-header {
+    border-bottom: 1px solid #bfbfbf;
     padding-bottom: 0.5rem;
-    margin-top: 2rem;
+    width: calc(100% - 4cm);
+}
+
+.page-4 .page-footer {
+    width: 100%;
+    left: 0;
+    text-align: center;
+}
+
+.benefit-title {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #c5e0b3; /* Lighter olive green */
+    line-height: 1;
     margin-bottom: 1.5rem;
-    border-bottom: 2px solid #e5e7eb;
+}
+
+.benefit-title span {
+    color: #70ad47; /* Bright green */
+    border-bottom: 5px solid #70ad47;
+    padding-bottom: 0.25rem;
+}
+
+.benefit-intro-text {
+    font-size: 0.9rem;
+    color: #595959;
+}
+
+.benefit-list {
+    list-style-type: none;
+    padding-left: 1rem;
+    margin: 0.5rem 0 2rem 0;
+    font-size: 0.9rem;
+    color: #595959;
+}
+
+.benefit-list li::before {
+    content: '-';
+    display: inline-block;
+    width: 1rem;
+    margin-left: -1rem;
+}
+
+.benefit-chart-wrapper {
+    height: 300px;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.benefit-chart-footer {
+    font-size: 0.9rem;
+    color: #595959;
+    text-align: center;
+    margin-top: 2rem;
+    padding: 0 3rem;
+}
+
+.savings-highlight-box {
+    text-align: center;
+    margin-top: auto; /* Pushes this to the bottom of the flex content area */
+    padding-bottom: 3rem;
+}
+
+.savings-highlight-box .label {
+    font-size: 1rem;
+    color: #548235; /* Darker green */
+    margin-bottom: 0.5rem;
+}
+
+.savings-highlight-box .value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #548235;
+    margin: 0;
+}
+
+/* --- Page 5: Quotation --- */
+.page-5 {
+    padding-top: 4cm;
+    font-size: 0.8rem;
+    color: #595959;
+}
+
+.page-5 .page-header {
+    border-bottom: 1px solid #bfbfbf;
+    padding-bottom: 0.5rem;
+    width: calc(100% - 4cm);
+}
+
+.page-5 .page-footer {
+    width: 100%;
+    left: 0;
+    text-align: center;
+}
+
+.quotation-title {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #c5e0b3; /* Lighter olive green */
+    line-height: 1;
+}
+
+.quotation-title span {
+    color: #70ad47; /* Bright green */
+}
+
+.quotation-subtitle {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #000;
+    margin: 1.5rem 0;
+}
+
+.quotation-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #bfbfbf;
+}
+
+.quotation-details .item-name {
+    font-weight: bold;
+    color: #000;
+    font-size: 1rem;
+    margin-bottom: 0.1rem;
+}
+.quotation-details .item-spec {
+    font-size: 0.8rem;
+    color: #595959;
+    margin-bottom: 0.25rem;
+}
+.quotation-details .item-desc {
+    font-size: 0.8rem;
+    color: #595959;
+    margin-bottom: 0;
+}
+
+.quotation-price {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #000;
+    white-space: nowrap;
+    margin-left: 2rem;
+}
+
+.totals-section {
+    width: 50%;
+    margin-left: auto; /* Pushes it to the right */
+    margin-top: 1rem;
+    font-size: 1rem;
+}
+.total-row .label {
+    width: 60%;
+    text-align: right;
+    padding-right: 1rem;
+}
+.total-row .value {
+    width: 40%;
+    text-align: right;
+    font-weight: bold;
+}
+.total-row.total {
+    border-top: 1px solid #000;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+}
+.total-row.total .label small {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: normal;
+}
+
+.info-footer {
+    font-size: 0.8rem;
+}
+
+.signature-footer {
+    font-size: 0.8rem;
+}
+.signature-line-box {
+    border-bottom: 1px solid #000;
+    height: 3rem;
+    margin-top: 1rem;
+}
+.signature-under-text {
+    font-size: 0.8rem;
+    color: #595959;
+    margin-top: 0.25rem;
 }
