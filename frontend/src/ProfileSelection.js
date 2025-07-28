@@ -112,7 +112,8 @@ const chartOptions = {
       bodyFont: { size: 12 },
       padding: 10,
       cornerRadius: 4,
-    }
+    },
+    datalabels: { display: false } // Hide data labels
   },
   scales: {
     x: {

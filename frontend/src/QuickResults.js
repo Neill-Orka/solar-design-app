@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import ReactDOM from 'react-dom';
 import { Button, Row, Col, Card, Alert, Spinner, Table, Badge } from 'react-bootstrap';
 import axios from 'axios';
@@ -20,6 +20,7 @@ import {
 import 'chartjs-adapter-date-fns';
 import { enZA } from 'date-fns/locale';
 import { API_URL } from './apiConfig';
+import { EscalationContext } from './TariffEscalationContext';
 
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -50,6 +51,8 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
     const [startDate, setStartDate] = useState(null);
     const [endDate, setEndDate] = useState(null);
     const [showLosses, setShowLosses] = useState(false)
+
+    const { schedule } = useContext(EscalationContext);
 
     useEffect(() => {
         const runSimulation = async () => {
@@ -92,7 +95,24 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
         runSimulation();
     }, [basicInfo, selectedSystem]);
     
-    // Memorized chart data to prevent re-calculation on every render
+    // Recompute lifetime cashflow series using escalation schedule and degradation
+    const recomputedLifetime = useMemo(() => {
+        if (!data?.financials?.lifetime_cashflow) return [];
+        const orig = data.financials.lifetime_cashflow;
+        const systemCost = Math.abs(orig[0].cashflow);
+        const annualSavings = data.financials.annual_savings;
+        const degradationRate = 0.005;
+        let cumulative = -systemCost;
+        const rows = [{ year: orig[0].year, cashflow: -systemCost, cumulative }];
+        for (let i = 1; i < orig.length; i++) {
+            const esc = schedule[i - 1] ?? schedule[schedule.length - 1] ?? 0.09;
+            const escalated = annualSavings * Math.pow(1 + esc, i - 1);
+            const net = escalated * Math.pow(1 - degradationRate, i - 1);
+            cumulative += net;
+            rows.push({ year: orig[i].year, cashflow: net, cumulative });
+        }
+        return rows;
+    }, [data, schedule]);
     const energyChartData = useMemo(() => {
         if (!data?.simulation || !startDate || !endDate) 
         {
@@ -217,26 +237,46 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
     }, [data]); 
 
     const lifetimeCashflowChartData = useMemo(() => {
-        if (!data?.financials?.lifetime_cashflow) return { labels: [], datasets: [] };
-        const fin = data.financials;
+        if (!recomputedLifetime.length) return { labels: [], datasets: [] };
         return {
-            labels: fin.lifetime_cashflow.map(item => `Year ${item.year}`),
+            labels: recomputedLifetime.map(item => `Year ${item.year}`),
             datasets: [{
                 label: 'Cumulative Cashflow (R)',
-                data: fin.lifetime_cashflow.map(item => item.cashflow),
+                data: recomputedLifetime.map(item => item.cumulative),
                 borderColor: '#27ae60',
                 backgroundColor: 'rgba(39, 174, 96, 0.1)',
                 fill: true,
                 tension: 0.3,
             }]
         };
-    }, [data]);
+    }, [recomputedLifetime]);
 
-    const paybackYear = useMemo(() => {
-        if (!data?.financials?.lifetime_cashflow) return null;
-        const paybackIndex = data.financials.lifetime_cashflow.findIndex(item => item.cashflow >= 0);
-        return paybackIndex !== -1 ? `Year ${data.financials.lifetime_cashflow[paybackIndex].year}` : null;
-    }, [data]);
+    // Determine the fractional payback index and label for payback period
+    const paybackPoint = useMemo(() => {
+        if (!recomputedLifetime.length) return null;
+        const idx = recomputedLifetime.findIndex(item => item.cumulative >= 0);
+        if (idx === -1) return null;
+        if (idx === 0) return 0;
+        const cumPrev = recomputedLifetime[idx - 1].cumulative;
+        const cumCurr = recomputedLifetime[idx].cumulative;
+        if (cumCurr === cumPrev) return idx;
+        const fraction = -cumPrev / (cumCurr - cumPrev);
+        return idx - 1 + fraction;
+    }, [recomputedLifetime]);
+    const paybackLabel = paybackPoint !== null
+        ? `Year ${paybackPoint.toFixed(1)}`
+        : null;
+
+    const avgTariffSchedule = useMemo(() => {
+        if (!data?.financials?.tariff_sample) return [];
+        const baseAvg = data.financials.tariff_sample.reduce((sum, item) => sum + item.rate, 0) / data.financials.tariff_sample.length;
+        let growth = 1;
+        return Array.from({ length: 20 }, (_, i) => {
+            const esc = schedule[i] ?? schedule[schedule.length - 1] ?? 0;
+            growth *= (1 + esc);
+            return { year: i + 1, tariff: baseAvg * growth };
+        });
+    }, [data, schedule]);
 
     const chartOptions = {
         responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
@@ -244,6 +284,9 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
             x: { type: 'time', time: { unit: 'day', tooltipFormat: 'MMM dd, HH:mm' }, adapters: { date: { locale: enZA } } },
             y: { beginAtZero: true, title: { display: true, text: 'Power (kW)'} },
             y1: { type: 'linear', display: true, position: 'right', beginAtZero: true, max: 100, title: { display: true, text: 'Battery SOC (%)'}, grid: { drawOnChartArea: false } }
+        },
+        plugins: {
+            datalabels: { display: false },
         }
     };
     
@@ -260,8 +303,18 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
             
             <Row> {/* KPI Cards */}
                 <Col md={3} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-success"><i className="bi bi-wallet2"></i></div><h5>Annual Savings</h5><h3 className="fw-bold">{formatCurrency(financials.annual_savings)}</h3></Card.Body></Card></Col>
-                <Col md={3} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-primary"><i className="bi bi-lightning-charge-fill"></i></div><h5>LCOE</h5><h3 className="fw-bold">R {financials.lcoe}/kWh</h3></Card.Body></Card></Col>
-                <Col md={3} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-info"><i className="bi bi-calendar-check"></i></div><h5>Payback Period</h5><h3 className="fw-bold">{financials.payback_period} Years</h3></Card.Body></Card></Col>
+                <Col md={3} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-primary"><i className="bi bi-lightning-charge-fill"></i></div><h5>LCOE</h5><h3 className="fw-bold">R {(() => {
+                            const systemCost = Math.abs((data.financials.lifetime_cashflow || [])[0]?.cashflow || 0);
+                            const annualGen = data.financials?.total_generation_kwh || 0;
+                            const degradationRate = 0.005;
+                            const maintenanceRate = 0.01;
+                            const totalCost = systemCost * (1 + maintenanceRate * 20);
+                            const genSum = Array.from({ length: 20 }, (_, i) => Math.pow(1 - degradationRate, i)).reduce((a, b) => a + b, 0) * annualGen;
+                            return genSum > 0 ? (totalCost / genSum).toFixed(2) : '0.00';
+                        })()}/kWh</h3></Card.Body></Card></Col>
+                <Col md={3} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-info"><i className="bi bi-calendar-check"></i></div><h5>Payback Period</h5>
+<h3 className="fw-bold">{paybackPoint !== null ? paybackPoint.toFixed(1) : financials.payback_period} Years</h3>
+        </Card.Body></Card></Col>
                 <Col md={3} className="mb-3"><Card className="text-center shadow-sm h-100"><Card.Body><div className="fs-1 text-warning"><i className="bi bi-graph-up-arrow"></i></div><h5>20-Year ROI</h5><h3 className="fw-bold">{financials.roi}%</h3></Card.Body></Card></Col>
             </Row>
 
@@ -332,7 +385,7 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
                     <Card className="shadow-sm h-100">
                         <Card.Header as="h5"><i className="bi bi-calendar-month-fill me-2"></i>Monthly Bill Comparison</Card.Header>
                         <Card.Body style={{ height: '350px' }}>
-                           <Bar options={{ responsive: true, maintainAspectRatio: false, scales: { x: { stacked: false }, y: { stacked: false, title: {display: true, text: 'Cost (R)'} } } }} data={financialChartData} />
+                           <Bar options={{ responsive: true, maintainAspectRatio: false, plugins: { datalabels: { display: false } }, scales: { x: { stacked: false }, y: { stacked: false, title: {display: true, text: 'Cost (R)'} } } }} data={financialChartData} />
                         </Card.Body>
                     </Card>
                 </Col>
@@ -377,6 +430,9 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
                                 options={{ 
                                     responsive: true, 
                                     maintainAspectRatio: false, 
+                                    plugins: {
+                                        datalabels: { display: false },
+                                    },
                                     scales: { 
                                         x: { stacked: true }, 
                                         y: { stacked: true, title: {display: true, text: 'Cost (R)'} } 
@@ -425,16 +481,16 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     plugins: {
-                                        annotation: paybackYear ? {
+                                        annotation: paybackPoint !== null ? {
                                             annotations: {
                                                 paybackLine: {
                                                     type: 'line',
-                                                    xMin: paybackYear,
-                                                    xMax: paybackYear,
+                                                    xMin: paybackPoint,
+                                                    xMax: paybackPoint,
                                                     borderColor: 'red',
                                                     borderWidth: 2,
                                                     label: {
-                                                        content: 'Payback',
+                                                        content: paybackLabel || 'Payback',
                                                         enabled: true,
                                                         position: 'start',
                                                         backgroundColor: 'red',
@@ -442,7 +498,8 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
                                                     }
                                                 }
                                             }
-                                        } : {}
+                                        } : {},
+                                        datalabels: { display: false }
                                     },
                                     scales: {
                                         y: { title: { display: true, text: 'Cumulative Savings (R)' } }
@@ -458,10 +515,23 @@ function QuickResults({ projectId, basicInfo, selectedSystem, onBack, clientName
             
             <div className="text-center mt-5">
                  <Button variant="outline-secondary" onClick={onBack} className="me-3">Back to System Selection</Button>
-                 {/* This is the new button to generate the proposal */}
                   <Link to={`/proposal/${projectId}`} target="_blank" className="btn btn-primary btn-lg">
                      <i className="bi bi-file-earmark-arrow-down-fill me-2"></i>Generate Client Proposal
                   </Link>
+                {/* Debug: Average tariff escalation schedule table */}
+                <Table striped bordered size="sm" className="mt-4 mx-auto" style={{ maxWidth: '400px' }}>
+                    <thead>
+                        <tr><th>Year</th><th>Avg Tariff (R/kWh)</th></tr>
+                    </thead>
+                    <tbody>
+                        {avgTariffSchedule.map(item => (
+                            <tr key={item.year}>
+                                <td>{item.year}</td>
+                                <td className="text-end">{item.tariff.toFixed(2)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </Table>
             </div>
         </div>
     );
