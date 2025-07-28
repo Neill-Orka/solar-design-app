@@ -34,8 +34,14 @@ const ProfileMiniChart = ({ profileData }) => {
     }, [profileData]);
 
     const options = {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { mode: 'index', intersect: false },
+          datalabels: { display: false }
+        },
         scales: { x: { display: false }, y: { display: false } }
     };
 
@@ -138,7 +144,8 @@ function LoadProfileManager() {
         } else {
             // This is a CREATE action (sends form data)
             const formData = new FormData();
-            formData.append('profile_file', profileFile);
+            const sanitizedFileName = profileFile.name.replace(/\s+/g, '_'); // Sanitize file name
+            formData.append('profile_file', profileFile, sanitizedFileName);
             formData.append('name', profileName);
             formData.append('description', profileDesc);
             formData.append('profile_type', profileType);
@@ -191,7 +198,7 @@ function LoadProfileManager() {
                                         </Form.Group>
                                         <Form.Group className="mb-4">
                                             <Form.Label>{editingProfile ? 'Replace Profile Data (Optional)' : 'Profile Data File'}</Form.Label>
-                                            <Form.Control type="file" accept=".csv, .xlsx, .xls" onChange={handleFileChange} disabled={!!editingProfile}/>
+                                            <Form.Control type="file" accept=".csv,.CSV,.xls,.XLS,.xlsx,.XLSX,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleFileChange} disabled={!!editingProfile}/>
                                             <Form.Text muted>
                                                 {editingProfile ? 'File upload is disabled during edit.' : 'CSV/XLSX with "Timestamp" and "Demand_kW" columns.'}
                                             </Form.Text>

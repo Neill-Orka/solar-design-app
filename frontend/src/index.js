@@ -5,11 +5,14 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import 'bootstrap-icons/font/bootstrap-icons.css'; // Add this
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { EscalationProvider } from './TariffEscalationContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <App />
+    <EscalationProvider>
+      <App />
+    </EscalationProvider>
   </React.StrictMode>
 );
 

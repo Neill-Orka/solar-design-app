@@ -37,13 +37,22 @@ const ChartHeaderWithDatePicker = ({ title, selectedDate, setSelectedDate, minDa
 )
 
 function ProposalPage() {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [selectedDay, setSelectedDay] = useState(null);
-    const [selectedWeekStart, setSelectedWeekStart] = useState(null);
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [selectedWeekStart, setSelectedWeekStart] = useState(null);
+
+  // guard against data===null before accessing simulation.timestamps
+  const timestamps = data?.simulation?.timestamps ?? [];
+  const minDate = timestamps.length
+    ? new Date(timestamps[0])
+    : new Date();
+  const maxDate = timestamps.length
+    ? new Date(timestamps[timestamps.length - 1])
+    : new Date();
     
     // Mock data structure based on PDF - replace with your actual API response structure
     const proposalDetails = useMemo(() => {
@@ -134,27 +143,28 @@ function ProposalPage() {
             labels,
             datasets: [
                 {
-                    label: 'Energy Requirement (kWh)',
-                    data: sim.demand
-                        .slice(startIndex, endIndex)
-                        .map(d => d * 0.5),         // convert 30 min kW readings into kWh
-                    borderColor: '#ef4444',
-                    backgroundColor: '#fee2e2',
-                    fill: 'origin',
-                    tension: 0.3,
-                    pointRadius: 0
-                },
-                {
                     label: 'Potential Energy Generation (kWh)',
                     data: sim.generation
                         .slice(startIndex, endIndex)
                         .map(d => d * 0.5),         // convert 30 min kW readings into kWh
                     borderColor: '#4ade80',
                     backgroundColor: '#bbf7d0',
-                    fill: 'origin',
+                    fill: 'false',
                     tension: 0.3,
                     pointRadius: 0
                 },
+                {
+                    label: 'Energy Requirement (kWh)',
+                    data: sim.demand
+                        .slice(startIndex, endIndex)
+                        .map(d => d * 0.5),         // convert 30 min kW readings into kWh
+                    borderColor: '#ef4444',
+                    backgroundColor: '#fee2e2',
+                    fill: 'false',
+                    tension: 0.3,
+                    pointRadius: 0
+                },
+
                 {
                     label: 'Energy From Grid (kWh)',
                     data: sim.import_from_grid
@@ -170,9 +180,9 @@ function ProposalPage() {
                     label: 'Battery SOC (%)',
                     data: sim.battery_soc
                         .slice(startIndex, endIndex),
-                    borderColor: '#22c55e',
-                    backgroundColor: '#bbf7d0',
-                    fill: 'origin',
+                    borderColor: '#2235c5ff',
+                    backgroundColor: '#bbd2f7ff',
+                    fill: 'false',
                     tension: 0.3,
                     pointRadius: 0
                 }
@@ -215,28 +225,39 @@ function ProposalPage() {
     }, [proposalDetails]);
 
     const performanceChartOptions = {
-        maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
         scales: {
-            x: { grid: { display: false } },
+            x: {
+                type: 'time',
+                time: { unit: 'hour', tooltipFormat: 'HH:mm' },
+                adapters: { date: { locale: enZA } },
+                grid: { color: '#e0e0e0' }
+            },
             y: {
                 beginAtZero: true,
-                suggestedMax: 40,
-                ticks: { stepSize: 5 }
+                title: { display: true, text: 'Energy (kWh)' },
+                grid: { color: '#e0e0e0' }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                beginAtZero: true,
+                max: 100,
+                title: { display: true, text: 'Battery SOC (%)' },
+                grid: { drawOnChartArea: false }
             }
         },
         plugins: {
-            title: {
-                display: true,
-                text: 'Consumption with supply from Grid, PV and Battery',
-                align: 'start',
-                font: { size: 14, weight: 'normal' }
-            },
-            legend: {
-                position: 'right', // Moves legend to the right side
-                align: 'start',
-                labels: { boxWidth: 12, font: { size: 10 } }
-            }
+            legend: { position: 'top', labels: { font: { size: 10 } } },
+            tooltip: { mode: 'index', intersect: false },
+            datalabels: { display: false },
         },
+        elements: {
+            line: { tension: 0.2 },
+            point: { radius: 2 }
+        }
     };
 
     const benefitChartOptions = {
@@ -424,6 +445,14 @@ function ProposalPage() {
                     <p className="performance-intro-text">
                         The graph below shows the client's simulated load profile with the solar generation for a typical day.
                     </p>
+
+                    <ChartHeaderWithDatePicker 
+                        title="Daily Performance Overview"
+                        selectedDate={selectedDay}
+                        setSelectedDate={setSelectedDay}
+                        minDate={minDate}
+                        maxDate={maxDate}
+                    />
 
                     <div className="chart-wrapper performance-chart-wrapper">
                         <Line options={performanceChartOptions} data={performanceChartData} />
@@ -712,8 +741,8 @@ export default ProposalPage;
 //     if (!data) return <div className="loading-container"><Alert variant="info">No data found for this proposal.</Alert></div>;
 
 //     const { client_name, location, selected_system, financials } = data;
-//     const minDate = data?.simulation?.timestamps ? new Date(data.simulation.timestamps[0]) : new Date();
-//     const maxDate = data?.simulation?.timestamps ? new Date(data.simulation.timestamps[data.simulation.timestamps.length - 1]) : new Date();
+    // const minDate = data?.simulation?.timestamps ? new Date(data.simulation.timestamps[0]) : new Date();
+    // const maxDate = data?.simulation?.timestamps ? new Date(data.simulation.timestamps[data.simulation.timestamps.length - 1]) : new Date();
 
 //     return (
 //         <>

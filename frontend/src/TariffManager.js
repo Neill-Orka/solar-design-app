@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { Container, Row, Col, Card, Button, Modal, Form, InputGroup, Badge, Accordion, Table, Alert, Spinner, FormControl, Pagination } from 'react-bootstrap';
 import { FaTrash, FaEdit, FaPlus, FaFileAlt, FaSearch } from 'react-icons/fa';
 import axios from 'axios';
 import { API_URL } from './apiConfig';
+import { EscalationContext } from './TariffEscalationContext';
 import './TariffManager.css';
 
 const EMPTY_TARIFF = {
@@ -13,6 +14,7 @@ const EMPTY_TARIFF = {
 };
 
 export default function TariffManager() {
+    const { schedule, setSchedule } = useContext(EscalationContext);
     const [tariffs, setTariffs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -349,6 +351,33 @@ export default function TariffManager() {
                     <Button variant="primary" onClick={handleSave}>Save Changes</Button>
                 </Modal.Footer>
             </Modal>
+
+            {/* --- Global Tariff Escalation Schedule --- */}
+            <Container fluid className="py-4">
+                <Card className="shadow-sm border-0 rounded-xl">
+                    <Card.Body>
+                        <h5 className="mb-3">Global Tariff Escalation Schedule</h5>
+                        <div className="row g-2">
+                            {schedule.map((rate, i) => (
+                                <div key={i} className="col-2">
+                                    <label>Year {2025 + i}</label>
+                                    <input
+                                        type="number"
+                                        step="0.001"
+                                        className="form-control form-control-sm"
+                                        value={rate}
+                                        onChange={e => {
+                                            const copy = [...schedule];
+                                            copy[i] = parseFloat(e.target.value);
+                                            setSchedule(copy);
+                                        }}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </Card.Body>
+                </Card>
+            </Container>
         </div>
     );
 }

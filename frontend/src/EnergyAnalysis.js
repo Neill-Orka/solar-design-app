@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Line, Bar} from 'react-chartjs-2';
+import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
-import HeatMap from '@uiw/react-heat-map';
+// import HeatMap if you need heat map support
+// import HeatMap from '@uiw/react-heat-map';
 import { API_URL } from './apiConfig';
 import { useNotification } from './NotificationContext';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+ChartJS.unregister(ChartDataLabels);
+
+// helper to format numbers with spaces as thousand separators
+const formatWithSpaces = num => num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 function EnergyAnalysis({ projectId }) {
   const { showNotification } = useNotification();
@@ -74,14 +80,23 @@ function EnergyAnalysis({ projectId }) {
 
   const chartOptions = {
     responsive: true,
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
     plugins: {
+      tooltip: {
+        mode: 'index',
+        intersect: false
+      },
       legend: { position: 'top' },
       title: { display: true, text: 'Energy Consumption (kW)' },
       decimation: {
         enabled: true,
         algorithm: 'lttb',
         samples: Math.min(2000, consumptionData.length)
-      }
+      },
+      datalabels: {display: false}
     },
     scales: {
       x: { title: { display: true, text: 'Timestamp' }, ticks: { autoSkip: true } },
@@ -94,7 +109,6 @@ function EnergyAnalysis({ projectId }) {
   const dates = new Set(consumptionData.map(row => row.timestamp.split('T')[0]));
   const avgDailyKwh = (totalKwh / dates.size).toFixed(0);
   const peakDemand = Math.max(...consumptionData.map(row => row.demand_kw)).toFixed(1);
-  const minDemand = Math.min(...consumptionData.map(row => row.demand_kw)).toFixed(1);
   const avgDemand = (consumptionData.reduce((sum, row) => sum + row.demand_kw, 0) / consumptionData.length).toFixed(1);
   const loadFactor = (avgDemand / peakDemand).toFixed(2);
   const totalNocturnalLoad = consumptionData.reduce((sum, row) => {
@@ -133,9 +147,15 @@ function EnergyAnalysis({ projectId }) {
   const avgHourlyOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
     plugins: {
+      tooltip: { mode: 'index', intersect: false },
       title: { display: true, text: 'Average Daily Load Profle (Hourly)' },
       legend: { display: false },
+      datalabels: { display: false }
     },
     scales: {
       x: {
@@ -144,7 +164,8 @@ function EnergyAnalysis({ projectId }) {
       y: {
         beginAtZero: true,
         title: { display: true, text: 'Avg Demand (kW)' },
-      }
+      },
+      
     }
   };
 
@@ -175,7 +196,12 @@ function EnergyAnalysis({ projectId }) {
   const dailyBarOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
     plugins: {
+      tooltip: { mode: 'index', intersect: false },
       title: { display: true, text: 'Daily Energy Use (kWh/day)' },
       legend: { display: false },
       decimation: {
@@ -195,11 +221,6 @@ function EnergyAnalysis({ projectId }) {
       }
     }
   };
-
-  const heatmapData = Object.entries(dailyEnergyMap).map(([date, value]) => ({
-    date,
-    count: Math.round(value),
-  }))
 
   const heatmapMatrix = Array.from({ length: 24 }, () => Array(365).fill(0));
   const heatmapCounts = Array.from({ length: 24 }, () => Array(365).fill(0));
@@ -272,19 +293,19 @@ function EnergyAnalysis({ projectId }) {
           <div className="col-md-4">
             <div className="border-start border-4 border-primary bg-white shadow-sm rounded p-3 h-100">
               <div className="text-muted small">Total Consumption</div>
-              <div className="fs-4 fw-bold">{totalKwh} kWh</div>
+              <div className="fs-4 fw-bold">{formatWithSpaces(totalKwh)} kWh</div>
             </div>
           </div>
           <div className="col-md-4">
             <div className="border-start border-4 border-success bg-white shadow-sm rounded p-3 h-100">
               <div className="text-muted small">Average Daily Usage</div>
-              <div className="fs-4 fw-bold">{avgDailyKwh} kWh/day</div>
+              <div className="fs-4 fw-bold">{formatWithSpaces(avgDailyKwh)} kWh/day</div>
             </div>
           </div>
           <div className="col-md-4">
             <div className="border-start border-4 border-danger bg-white shadow-sm rounded p-3 h-100">
               <div className="text-muted small">Peak Demand</div>
-              <div className="fs-4 fw-bold">{peakDemand} kW</div>
+              <div className="fs-4 fw-bold">{formatWithSpaces(peakDemand)} kW</div>
             </div>
           </div>
         </div>
@@ -293,13 +314,13 @@ function EnergyAnalysis({ projectId }) {
           <div className="col-md-4">
             <div className="border-start border-4 border-warning bg-white shadow-sm rounded p-3 h-100">
               <div className="text-muted small">Avg. Daily Nocturnal Load</div>
-              <div className="fs-4 fw-bold">{avgDailyNocturnalLoad} kWh</div>
+              <div className="fs-4 fw-bold">{formatWithSpaces(avgDailyNocturnalLoad)} kWh</div>
             </div>
           </div>
           <div className="col-md-4">
             <div className="border-start border-4 border-info bg-white shadow-sm rounded p-3 h-100">
               <div className="text-muted small">Average Demand</div>
-              <div className="fs-4 fw-bold">{avgDemand} kW</div>
+              <div className="fs-4 fw-bold">{formatWithSpaces(avgDemand)} kW</div>
             </div>
           </div>
           <div className="col-md-4">

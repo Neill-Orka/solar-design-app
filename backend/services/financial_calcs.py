@@ -228,11 +228,17 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
 
         # Cashflow analysis
         lifetime_cashflow = [{'year': 0, 'cashflow': -float(system_cost)}]
-        cumulative_cashflow = -Decimal(system_cost)
-        for year in range(1, 21):
-            degraded_savings = annual_savings * ((1 - degradation_rate) ** (year - 1))
-            cumulative_cashflow += degraded_savings
-            lifetime_cashflow.append({'year': year, 'cashflow': float(round(cumulative_cashflow, 2))})
+        cumulative = Decimal(-system_cost)
+
+        for i in range(1, 21):
+            # escalate savings at 12% and then degrade at 0.5% p.a.
+            escalated = annual_savings * ((1 + TARIFF_ESCALATION_RATE) ** (i - 1))
+            net_savings = escalated * ((1 - degradation_rate) ** (i - 1))
+            cumulative += net_savings
+            lifetime_cashflow.append({
+                'year': i,
+                'cashflow': float(round(cumulative, 2))
+            })
 
         yearly_savings = [
             {"year": 2025 + i,
