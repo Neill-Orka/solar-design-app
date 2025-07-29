@@ -156,22 +156,29 @@ def import_tariffs():
                         if row.get(col, 0) != 0:
                             rates_to_insert.append({'charge_name': name, 'charge_category': 'demand', 'season': season, 'time_of_use': 'all', 'rate_unit': unit, 'rate_value': row[col], 'block_threshold_kwh': None})
 
-                    # LPU Energy Charges
+                    # LPU Energy Charges (incl. fallback Demand [c/kWh] columns)
                     energy_map = {
-                        'High-Peak': ('Energy Charge', 'high', 'peak'),
-                        'High-Standard': ('Energy Charge', 'high', 'standard'),
-                        'High-Off Peak': ('Energy Charge', 'high', 'off_peak'),
-                        'Low-Peak': ('Energy Charge', 'low', 'peak'),
-                        'Low-Standard': ('Energy Charge', 'low', 'standard'),
-                        'Low-Off Peak': ('Energy Charge', 'low', 'off_peak')
+                        'High-Peak [c/kWh]':      ('Energy Charge', 'high',      'peak'),
+                        'High-Standard [c/kWh]':  ('Energy Charge', 'high',      'standard'),
+                        'High-Off Peak [c/kWh]':  ('Energy Charge', 'high',      'off_peak'),
+                        'Low-Peak [c/kWh]':       ('Energy Charge', 'low',       'peak'),
+                        'Low-Standard [c/kWh]':   ('Energy Charge', 'low',       'standard'),
+                        'Low-Off Peak [c/kWh]':   ('Energy Charge', 'low',       'off_peak'),
+                        'High Demand [c/kWh]':    ('Energy Charge', 'high',      'all'),
+                        'Low Demand [c/kWh]':     ('Energy Charge', 'low',       'all'),
                     }
-
-                    if row.get('Legacy Charge [c/kWh]', 0) != 0:
-                        rates_to_insert.append({'charge_name': 'Legacy Charge', 'charge_category': 'energy', 'season': 'all', 'time_of_use': 'all', 'rate_unit': 'c/kWh', 'rate_value': row['Legacy Charge [c/kWh]'], 'block_threshold_kwh': None})
 
                     for col, (name, season, tou) in energy_map.items():
                         if row.get(col, 0) != 0:
-                            rates_to_insert.append({'charge_name': name, 'charge_category': 'energy', 'season': season, 'time_of_use': tou, 'rate_unit': 'c/kWh', 'rate_value': row[col], 'block_threshold_kwh': None})
+                            rates_to_insert.append({
+                                'charge_name':      name,
+                                'charge_category':  'energy',
+                                'season':           season,
+                                'time_of_use':      tou,
+                                'rate_unit':        'c/kWh',
+                                'rate_value':       row[col],
+                                'block_threshold_kwh': None
+                            })
 
                     # Insert the main tariff and get its ID
                     result = conn.execute(tariffs_table.insert().values(tariff_data).returning(tariffs_table.c.id))
