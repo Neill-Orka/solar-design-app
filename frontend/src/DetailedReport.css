@@ -1,0 +1,18 @@
+.detailed-report {
+  max-width: 21cm;
+  margin: 0 auto;
+  background: white;
+  padding: 2rem;
+  font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body {
+    background: white;
+  }
+  .detailed-report {
+    margin: 0;
+    padding: 0;
+  }
+}

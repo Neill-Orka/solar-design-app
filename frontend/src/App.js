@@ -16,6 +16,7 @@ import ProductsAdmin from './ProductsAdmin';
 import Optimize from './Optimize';
 import SystemBuilder from './SystemBuilder';
 import ProposalPage from './ProposalPage';
+import DetailedReport from './DetailedReport';
 import LoadProfileManager from './LoadProfileManager';
 import TariffManager from './TariffManager';
 import RuleEditor from './RuleEditor';
@@ -35,6 +36,11 @@ function SystemDesignWrapper() {
 function FinancialModelWrapper() {
   const { id } = useParams();
   return <FinancialModeling projectId={parseInt(id, 10)} />;
+}
+
+function DetailedReportWrapper() {
+  const { id } = useParams();
+  return <DetailedReport projectId={parseInt(id, 10)} />;
 }
 
 function App() {
@@ -109,6 +115,7 @@ function App() {
             <Route path="/load-profile-manager" element={<LoadProfileManager />} />
             <Route path="/projects/:id/optimize" element={<Optimize />} />
             <Route path="/proposal/:id" element={<ProposalPage />} />
+            <Route path="/projects/:id/detailed-report" element={<DetailedReportWrapper />} />
             <Route path="/tariffs" element={<TariffManager />} />
             <Route path="/rules" element={<RuleEditor />} />
           </Routes>
