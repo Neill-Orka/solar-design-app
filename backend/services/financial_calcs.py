@@ -210,7 +210,7 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
         yield_incl_losses = total_generation_kwh / panel_kw / 365 if panel_kw > 0 else 0
         yield_excl_losses = potential_generation_kwh / panel_kw / 365 if panel_kw > 0 else 0
 
-        self_consumption_rate = (pv_used_on_site_kwh / total_generation_kwh) * 100 if total_generation_kwh > 0 else 0
+        self_consumption_rate = (pv_used_on_site_kwh / potential_generation_kwh) * 100 if total_generation_kwh > 0 else 0
         grid_independence_rate = (pv_used_on_site_kwh / total_demand_kwh) * 100 if total_demand_kwh > 0 else 0
 
         maintenance_rate = Decimal('0.01') # 1% of system cost per year

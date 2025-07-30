@@ -911,7 +911,7 @@ function SystemDesign({ projectId }) {
         const totalImportKwh = filteredData.import_from_grid.reduce((sum, val) => sum + (val * timeIntervalHours), 0);
         const totalExportKwh = filteredData.export_to_grid.reduce((sum, val) => sum + (val * timeIntervalHours), 0);
         const pvUsedOnSiteKwh = totalUtlizedGenKwh - totalExportKwh; 
-        const pvUtilizationPct = totalUtlizedGenKwh > 0 ? (pvUsedOnSiteKwh/totalUtlizedGenKwh) * 100 : 0;
+        const pvUtilizationPct = totalUtlizedGenKwh > 0 ? (pvUsedOnSiteKwh/totalPotentialGenKwh) * 100 : 0;
 
         setMetrics({
             totalPVGeneration: totalPotentialGenKwh.toFixed(0),
