@@ -5,7 +5,7 @@ import EnergyDataUpload from './EnergyDataUpload';
 import EnergyAnalysis from './EnergyAnalysis';
 import SystemDesign from './SystemDesign';
 import FinancialModeling from './FinancialModeling';
-import Reporting from './Reporting';
+import ReportBuilder from './components/ReportBuilder';
 import Optimize from './Optimize';
 import BasicInfoForm from './BasicInfoForm';
 import ProfileSelection from './ProfileSelection';
@@ -278,7 +278,7 @@ function ProjectDashboard() {
           </div>
         )}
         {activeTab === 'optimize' && <Optimize projectId={projectId} />}
-        {activeTab === 'report' && <Reporting projectId={projectId} />}
+        {activeTab === 'report' && <ReportBuilder projectId={projectId} />}
       </div>
     </div>
   );
