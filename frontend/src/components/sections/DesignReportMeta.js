@@ -7,7 +7,7 @@ import "../../ReportBuilder.css";
 
 function DesignReportMeta({ data }) {
   const project = data?.project || {
-    name: "Rutherfords – Grid Tied Solar PV Solution",
+    name: "Rutherfords - Grid Tied Solar PV Solution",
     document_no: "250XX_Project Proposal",
     rev: 1,
     date: "12 March 2025",
@@ -112,7 +112,7 @@ function DesignReportMeta({ data }) {
           </tr>
         </thead>
         <tbody>
-          {project.amendment_history.map((row, i) => (
+          {(project.amendment_history || []).map((row, i) => (
             <tr key={i}>
               <td>{row.rev}</td>
               <td>{row.date}</td>

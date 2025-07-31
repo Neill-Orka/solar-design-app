@@ -851,7 +851,6 @@ function SystemDesign({ projectId }) {
                     return;
                 }
                 setSimulationData(res.data);
-                // Remove setChartKey line completely
 
                 try {
                     sessionStorage.setItem(`simulationData_${projectId}`, JSON.stringify(res.data));

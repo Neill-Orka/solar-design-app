@@ -480,9 +480,9 @@
 
 .orka-cover-centerblock {
   position: absolute;
-  left: 3.3cm;
+  left: 2cm;
   top: 16.0cm;
-  width: 15.5cm;
+  width: 16.5cm;
   background: transparent;
   z-index: 3;
   display: flex;
@@ -536,9 +536,9 @@
 
 .orka-cover-footerblock {
   position: absolute;
-  left: 2.3cm;
+  left: 2cm;
   bottom: 1.8cm;
-  width: 16.3cm;
+  width: 16.5cm;
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -581,9 +581,21 @@
     page-break-after: always;
     break-after: always;
   }
-  /* If you want to hide print buttons/controls: */
-  .no-print, .print-controls, nav, header, footer:not(.orka-cover-footer) {
+  /* Fix: Don't hide footer elements with orka-page-footer class */
+  .no-print, .print-controls, nav, header, 
+  footer:not(.orka-cover-footer):not(.orka-page-footer) {
     display: none !important;
+  }
+  /* Force display of page headers and footers */
+  .orka-page-header, .orka-page-footer {
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+  }
+  /* Add additional styling for proper display in PDF */
+  .orka-standard-page {
+    position: relative !important;
+    page-break-after: always;
   }
 }
 
@@ -603,15 +615,15 @@
 .orka-summary-headerbar {
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
+  justify-content: flex-start; /* <-- CHANGE to left align */
   align-items: flex-start;
-  height: 36px;
+  height: 20px;
   margin-bottom: 0.3cm;
 }
 .orka-summary-project {
   font-size: 1.04rem;
   color: #222;
-  margin-top: 3px;
+  margin-top: 12px;
   font-weight: 400;
   flex: 1;
 }
@@ -866,4 +878,275 @@
   left: 0;
   right: 0;
   bottom: 1.3cm;
+}
+
+/* Table of Content */
+.orka-toc-page {
+  position: relative;
+  width: 21cm;
+  height: 29.7cm;
+  background: #fff;
+  font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+  padding: 1.5cm 2.0cm 0.5cm 2.0cm;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.orka-toc-title {
+  font-size: 1.15rem;
+  font-weight: bold;
+  color: #111;
+  margin: 1.5cm 0 0.5cm 0;
+  letter-spacing: 0.02em;
+  text-align: left;
+}
+
+.orka-toc-list {
+  width: 100%;
+  margin-top: 0.0cm;
+}
+
+.orka-toc-entry {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  font-size: 1.01rem;
+  margin-bottom: 0.07cm;
+  letter-spacing: 0.01em;
+}
+
+.orka-toc-label {
+  flex-shrink: 0;
+  font-weight: 400;
+  color: #111;
+  max-width: 66%;
+  white-space: pre-line;
+}
+
+.orka-toc-dots {
+  flex: 1;
+  text-align: left;
+  margin: 0 0.24cm;
+  color: #333;
+  font-size: 1.07em;
+  font-family: 'Courier New', Courier, monospace;
+  letter-spacing: 0.15em;
+  user-select: none;
+  opacity: 0.95;
+  overflow: hidden;
+}
+
+.orka-toc-page {
+  flex-shrink: 0;
+  min-width: 1.5cm;
+  text-align: right;
+  font-weight: 600;
+  color: #111;
+}
+
+.orka-toc-sub {
+  margin-left: 1.2cm;
+  font-size: 0.94rem;
+  color: #222;
+}
+.orka-toc-annex {
+  font-weight: bold;
+  color: #016980;
+  margin-top: 0.11cm;
+}
+
+/* Print improvements */
+@media print {
+  .orka-toc-page {
+    page-break-after: always;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 1.5cm 2.0cm 0.5cm 2.0cm !important;
+  }
+}
+
+.report-builder {
+  display: flex;
+  min-height: 100vh;
+  background: #f4f5f7;
+}
+
+/* Modern sidebar styles */
+.orka-sidebar {
+  position: fixed;      /* <-- make the sidebar fixed to viewport */
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 290px;          /* match your existing width */
+  overflow-y: auto;      /* allow section toggles to scroll */
+  background: #111d2c;
+  color: #f6f7fa;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  box-shadow: 3px 0 18px rgba(0,0,0,0.07);
+  z-index: 30;          /* ensure above report content */
+}
+.orka-sidebar-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 36px 30px 18px 30px;
+  border-bottom: 1px solid #222c3d;
+}
+.orka-sidebar-logo {
+  width: 38px;
+  height: 38px;
+  background-image: url('assets/orka_logo_transparent_background.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  margin-bottom: 18px;
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px #20406018;
+}
+.orka-sidebar-title {
+  font-size: 1.13rem;
+  font-weight: bold;
+  color: #d3f0e7;
+  margin: 0 0 6px 0;
+  letter-spacing: 0.02em;
+}
+
+/* Section toggles */
+.orka-sidebar-section-list {
+  flex: 1;
+  padding: 18px 30px 0 30px;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+.orka-sidebar-section-toggle {
+  display: flex;
+  align-items: center;
+  margin-bottom: 17px;
+  font-size: 1.06rem;
+  cursor: pointer;
+}
+.orka-sidebar-section-toggle input[type="checkbox"] {
+  margin-right: 14px;
+  accent-color: #34bfa3;
+  width: 18px;
+  height: 18px;
+}
+.orka-sidebar-section-toggle span {
+  color: #e8eeff;
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+/* Footer with export button */
+.orka-sidebar-footer {
+  padding: 22px 30px 26px 30px;
+  border-top: 1px solid #20394a33;
+  background: linear-gradient(180deg, #111d2c 80%, #122237 100%);
+}
+.orka-sidebar-export-btn {
+  width: 100%;
+  padding: 16px 0;
+  background: linear-gradient(90deg, #23c586 0%, #41e4b4 100%);
+  color: #163542;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1.06rem;
+  cursor: pointer;
+  transition: box-shadow 0.2s, background 0.2s;
+  box-shadow: 0 2px 16px #22ffb155;
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.orka-sidebar-export-btn:hover {
+  background: linear-gradient(90deg, #17a068 0%, #1ac78e 100%);
+  box-shadow: 0 2px 22px #1af2bb70;
+}
+
+/* Main content to right of sidebar */
+.orka-report-printarea {
+  flex: 1;
+  margin-left: 90px;    /* same as sidebar width */
+  padding: 0;
+  background: #f6f7fa;
+  min-height: 100vh;
+  overflow-x: auto;
+}
+
+/* Standard Page */
+
+.orka-standard-page {
+  position: relative;
+  width: 21cm;
+  height: 29.7cm; /* Add explicit A4 height */
+  background: #fff;
+  font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+  padding: 1.5cm 1.5cm 1cm 1.5cm; /* Add consistent padding */
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin: 0; /* Reset any margins */
+  page-break-after: always; /* Ensure proper page breaks when printing */
+}
+
+.orka-page-header {
+  padding-bottom: 0.5cm;
+  margin-bottom: 0.6cm;
+  border-bottom: 1px solid #bfbfbf;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #222;
+  display: block !important; /* Force display */
+  visibility: visible !important; /* Ensure visibility */
+}
+
+.orka-page-content {
+  flex: 1;
+  overflow: hidden; /* Prevent content overflow */
+}
+
+.orka-page-footer {
+  margin-top: 1cm;
+  padding-top: 0.3cm;
+  color: #555;
+  text-align: center;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.orka-page-footer-line {
+  width: 100%;
+  border: none;
+  height: 1px;
+  background-color: #bfbfbf;
+  margin: 0 0 0.4cm 0;
+}
+
+.orka-page-number {
+  font-family: 'Courier New', Courier, monospace;
+  letter-spacing: 0.13em;
+  color: #3333338f;
+  font-size: 1rem;
+  margin-bottom: 0.2cm;
+}
+
+.orka-page-footer-text {
+  font-size: 0.9rem;
+}
+
+/* Make sure print styles don't hide these elements */
+@media print {
+  .orka-page-header, .orka-page-footer {
+    display: block !important;
+    visibility: visible !important;
+  }
 }
