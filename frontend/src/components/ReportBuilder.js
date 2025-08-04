@@ -24,11 +24,13 @@ function ReportBuilder({ projectId }) {
     bom: true,
     financial: true,
     custom: false,
+    siteLayout: false,
   });
 
   // Load all data once (simulation, financials, BOM, etc)
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [siteLayoutImage, setSiteLayoutImage] = useState(null);
 
   useEffect(() => {
     if (!projectId) return;
@@ -63,6 +65,28 @@ function ReportBuilder({ projectId }) {
   // Sidebar toggler
   const handleToggle = (sectionKey) => setSections(s => ({ ...s, [sectionKey]: !s[sectionKey] }));
 
+  const handleImageUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setSiteLayoutImage(e.target.result);
+        sessionStorage.setItem(`siteLayoutImage_${projectId}`, e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Check if site layout image exists in sessionStorage
+  useEffect(() => {
+    if (projectId) {
+      const savedImage = sessionStorage.getItem(`siteLayoutImage_${projectId}`);
+      if (savedImage) {
+        setSiteLayoutImage(savedImage);
+      }
+    }
+  }, [projectId]);
+
   return (
     <div className="report-builder">
 
@@ -71,6 +95,33 @@ function ReportBuilder({ projectId }) {
         <button className="export-btn" onClick={() => window.print()}>
           <span role="img" aria-label="Export">📄</span> Export as PDF
         </button>
+      </div>
+
+      <div className="section-controls no-print">
+        <div className='section-toggle'>
+          <label>
+            <input 
+              type="checkbox"
+              checked={sections.siteLayout}
+              onChange={() => setSections(s => ({ ...s, siteLayout: !s.siteLayout }))}
+            />
+            Show Site Layout
+          </label>
+          {sections.siteLayout && (
+            <div className='image-upload mt-2'>
+              <label htmlFor='site-layout-image' className='btn btn-sm btn-outline-secondary'>
+                {siteLayoutImage ? 'Change Layout Image' : 'Upload Layout Image'}
+              </label>
+              <input 
+                id='site-layout-image'
+                type='file'
+                accept='image/*'
+                style={{ display: 'none' }}
+                onChange={handleImageUpload}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* REPORT CONTENT */}
@@ -82,7 +133,7 @@ function ReportBuilder({ projectId }) {
             {sections.cover && <CoverPage data={data} />}
             <ExecutiveSummary data={data} />
             <DesignReportMeta data={data} />
-            <MainReportContent data={data} />
+            <MainReportContent data={data} showSiteLayout={sections.siteLayout} siteLayoutImage={siteLayoutImage}/>
             {/* ... other sections */}
           </>
         )}

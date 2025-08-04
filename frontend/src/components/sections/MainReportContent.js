@@ -1,8 +1,682 @@
-import React from "react";
+import React, {useState, useEffect } from "react";
+import axios from 'axios';
+import { Line, Bar } from 'react-chartjs-2';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { API_URL } from '../../apiConfig'
+import { useNotification } from '../../NotificationContext';
+import '../../ReportBuilder.css';
 import StandardPage from "./StandardPage";
+import 'chartjs-adapter-date-fns'
+import { enZA } from 'date-fns/locale';
 
-function MainReportContent({ data }) {
+function MainReportContent({ data, showSiteLayout, siteLayoutImage }) {
+    const { showNotification } = useNotification();
+    const [consumptionData, setConsumptionData] = useState([]);
+    const [startDate, setStartDate] = useState(null);
+    const [endDate, setEndDate] = useState(null);
+    const [demandStartDate, setDemandStartDate] = useState(null);
+    const [demandEndDate, setDemandEndDate] = useState(null);
+    const [demandData, setDemandData] = useState([]);
+    const [yearlyConsumptionData, setYearlyConsumptionData] = useState([]);
+
+    // Initialize dates - first clear any existing stored dates
+    useEffect(() => {
+        // Clear any existing stored dates that might be causing the issue
+        sessionStorage.removeItem('reportEnergyStartDate');
+        sessionStorage.removeItem('reportEnergyEndDate');
+        
+        const currentYear = new Date().getFullYear(); // 2025
+        const startOfYear = new Date(currentYear, 0, 1, 0, 0, 0); // January 1st of current year
+        const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59); // December 31st of current year
+
+        setStartDate(startOfYear);
+        setEndDate(endOfYear);
+        
+        console.log("Setting date range:", startOfYear, "to", endOfYear);
+    }, [])
+
+    // save date selections to sessionStorage
+    useEffect(() => {
+        if (startDate && endDate) {
+            sessionStorage.setItem('reportEnergyStartDate', startDate.toISOString());
+            sessionStorage.setItem('reportEnergyEndDate', endDate.toISOString());
+        }
+    }, [startDate, endDate]);
+
+    // get consumption data when dates or projectId changes
+    useEffect(() => {
+        if (!data?.project?.id || !startDate || !endDate) return;
+
+        const startStr = startDate.toISOString().split('T')[0];
+        const endStr = endDate.toISOString().split('T')[0];
+        
+        console.log(`Fetching data from ${startStr} to ${endStr}`);
+
+        axios.get(`${API_URL}/api/consumption_data/${data.project.id}`, {
+            params: { start_date: startStr, end_date: endStr }
+        })
+        .then(res => {
+            console.log("API returned data:", res.data.length, "records");
+            console.log("First record:", res.data[0]);
+            console.log("Last record:", res.data[res.data.length-1]);
+            
+            // Check what months are in the data
+            const months = new Set();
+            res.data.forEach(item => {
+                const date = new Date(item.timestamp);
+                months.add(date.getMonth());
+            });
+            console.log("Months in data:", Array.from(months).map(m => m+1)); // +1 because getMonth() is 0-based
+            
+            setConsumptionData(res.data);
+        })
+        .catch(err => {
+            console.error('Error loading consumption data:', err);
+            showNotification('Failed to fetch consumption data for report', 'danger');
+        });
+    }, [data?.project?.id, startDate, endDate, showNotification]);
+
+    // Process data into monthly consumption
+    const monthlyConsumption = React.useMemo(() => {
+        if (consumptionData.length === 0) return [];
+
+        const monthlyData = {};
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+        consumptionData.forEach(item => {
+            const date = new Date(item.timestamp);
+            const monthYear = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+
+            if (!monthlyData[monthYear]) {
+                monthlyData[monthYear] = 0;
+            }
+
+            monthlyData[monthYear] += item.demand_kw * 0.5;
+        });
+
+        const sortedMonths = Object.keys(monthlyData).sort((a, b) => {
+            const [aMonth, aYear] = a.split(' ');
+            const [bMonth, bYear] = b.split(' ');
+
+            if (aYear !== bYear) return parseInt(aYear) - parseInt(bYear);
+            return monthNames.indexOf(aMonth) - monthNames.indexOf(bMonth);
+        });
+
+        return {
+            months: sortedMonths,
+            values: sortedMonths.map(month => Math.round(monthlyData[month]))
+        };
+
+    }, [consumptionData])
+
+    // Monthly consumption chart data
+    const monthlyChartData = {
+        labels: monthlyConsumption.months || [],
+        datasets: [{
+            label: 'Monthly Energy Consumption (kWh)',
+            data: monthlyConsumption.values || [],
+            backgroundColor: 'rgba(22, 144, 144, 0.19)',
+            borderColor: 'rgba(27, 95, 95, 1)',
+            borderWidth: 2,
+            tension: 0.2,
+            fill: true,
+        }]
+    };
+
+    // Monthly chart options
+    const monthlyChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            tooltip: { mode: 'index', intersect: false },
+            legend: { display: false },
+            title: { display: true, text: 'Monthly Energy Consumption (kWh)' },
+            datalabels: { display: false }
+        },
+        scales: {
+            x: { 
+                title: { display: true, text: 'Month' },
+                grid: { display: false }
+            },
+            y: { 
+                title: { display: true, text: 'Energy (kWh)' },
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return formatValue(value);
+                    }
+                }
+            }
+        }
+    };    
+
+
+    // Calculate metrics
+    const totalKwh = consumptionData.length > 0 ?
+        (consumptionData.reduce((sum, row) => sum+row.demand_kw, 0) * 0.5).toFixed(0) : 0;
+    const dates = new Set(consumptionData.map(row => row.timestamp?.split("T")[0] || ""));
+    const avgDailyKwh = dates.size > 0 ? (totalKwh / dates.size).toFixed(0) : 0;
+    const peakDemand = consumptionData.length > 0 ?
+        Math.max(...consumptionData.map(row => row.demand_kw)).toFixed(1) : 0;
+    const avgDemand = consumptionData.length > 0 ?
+        (consumptionData.reduce((sum, row) => sum + row.demand_kw, 0) / consumptionData.length).toFixed(1) : 0;
+        
+    const chartData = {
+        labels: consumptionData.map(d => new Date(d.timestamp).toLocaleString()),
+        datasets: [{
+            label: 'Demand (kW)',
+            data: consumptionData.map(d => d.demand_kw),
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            fill: true,
+            tension: 0.1,
+            pointRadius: 0
+        }]        
+    };
+
+    // Chart options
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            tooltip: { mode: 'index', intersect: false },
+            legend: { position: 'top' },
+            title: { display: true, text: 'Energy Consumption (kW)' },
+            datalabels: { display: false }
+        },
+        scales: {
+            x: { 
+                title: { display: true, text: 'Timestamp' }, 
+                ticks: { autoSkip: true, maxTicksLimit: 10 } 
+            },
+            y: { 
+                title: { display: true, text: 'Demand (kW)' }, 
+                beginAtZero: true 
+            }
+        }
+    };
+
+    // Monthly cost breakdown chart data - only current costs
+    const costBreakdownChartData = React.useMemo(() => {
+        if (!data?.financials?.cost_comparison || !data.financials.cost_comparison?.length) return {
+            labels: [],
+            datasets: []
+        };
+        
+        const fin = data.financials;
+        const labels = fin.cost_comparison.map(item => 
+            new Date(item.month).toLocaleString('default', { month: 'short', year: '2-digit' })
+        );
+
+        // Only include the "old bill" (current costs) components
+        const datasets = [
+            {
+                label: 'Old Bill - Energy',
+                data: fin.cost_comparison.map(item => item.old_bill_breakdown.energy),
+                backgroundColor: '#f87171',
+                stack: 'Stack 0',
+            },
+            {
+                label: 'Old Bill - Fixed',
+                data: fin.cost_comparison.map(item => item.old_bill_breakdown.fixed),
+                backgroundColor: '#9ca3af',
+                stack: 'Stack 0',
+            },
+            {
+                label: 'Old Bill - Demand',
+                data: fin.cost_comparison.map(item => item.old_bill_breakdown.demand),
+                backgroundColor: '#b91c1c',
+                stack: 'Stack 0',
+            }
+        ];
+
+        return {
+            labels,
+            datasets: datasets.filter(ds => ds.data.some(val => val !== 0 && val !== null))
+        };
+    }, [data?.financials?.cost_comparison, data?.financials]);
+
+    // Chart options for cost breakdown
+    const costBreakdownOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            tooltip: { mode: 'index', intersect: false },
+            legend: { position: 'top' },
+            title: { display: true, text: 'Current Monthly Electricity Costs' },
+            datalabels: { display: false }
+        },
+        scales: {
+            x: { 
+                stacked: true,
+                title: { display: true, text: 'Month' }
+            },
+            y: { 
+                stacked: true,
+                title: { display: true, text: 'Cost (R)' },
+                ticks: {
+                    callback: function(value) {
+                        return 'R ' + formatValue(value);
+                    }
+                }
+            }
+        }
+    };
+
+    // Helper function to safely display JSON fields
+    const displayValue = (value, fallback, field = "") => {
+      if (value === undefined || value === null) return fallback;
+    
+      if (typeof value === 'object') {
+        // If it's an object, try to extract capacity or return the first value
+        if (field === "battery_kwh" && value.capacity && value.quantity) {
+          const total = value.capacity * value.quantity;
+          return total.toString();
+        }
+    
+        if (value.capacity && value.quantity) {
+          return `${value.capacity * value.quantity}`;
+        }
+    
+        return value.capacity || value.quantity || Object.values(value)[0] || fallback;
+      }
+      return value;
+    };
+
+    // Helper function to safely display numeric values and format them
+    const formatValue = (value, defaultValue = 0) => {
+      // Check if value exists and is a number
+      if (value !== undefined && value !== null) {
+        // If it's already a number, format it with no decimals and space separator
+        if (typeof value === 'number') {
+          return Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        }
+        // If it's a string that looks like a number, parse and format it
+        if (typeof value === 'string' && !isNaN(parseFloat(value))) {
+          return Math.round(parseFloat(value)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        }
+        // Otherwise return as is
+        return value;
+      }
+      // Return default value with formatting
+      return typeof defaultValue === 'number' ? 
+        Math.round(defaultValue).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : 
+        defaultValue;
+    };    
+
+    const systemContent = {
+        grid: {
+            projectGoal: "The goal of this project is to reduce grid dependency and electricity costs through a grid-tied solar PV system.",
+            benefits: [
+                "Cost savings on grid supplied electricity",
+                "Independece from high-cost increases",
+                "Reduced carbon footprint and greenhouse gas emiissions, through reducing ",
+            ],
+            systemDescription: "This grid-tied solar PV system is designed to work in conjunction with the utility grid. It produces electricity during daylight hours, reducing dependency on utility power when the sun is shining."
+        },
+        hybrid: {
+            projectGoal: "The goal of this project is to provide both energy cost savings and backup power during outages.",
+            benefits: [
+                "Reduced electricity bills",
+                "Backup power during outages",
+                "Increased energy independence",
+                "Lower carbon footprint",
+                "Protection against load shedding"
+            ],
+            systemDescription: "This hybrid solar PV system combines the benefits of grid-tied operation with battery storage for backup power."
+        },
+        off_grid: {
+            projectGoal: "The goal of this project is to achieve complete energy independence from the utility grid.",
+            benefits: [
+                "Cost savings by eliminating grid supplied electricity.",
+                "Long term power supply cost certainty: The cost of electricity from the system is defined, hence future cost certainty is improved, reducing the risks of unknown grid electricity price increases.",
+                "Reduced carbon footprint and greenhouse gas emissions, through reducing the use of fossil-based energy.",
+            ],
+            systemDescription: "This off-grid solar PV system with battery storage is designed to meet all of the site's energy needs without connection to the utility grid."
+        },
+        default: {
+            projectGoal: "The goal of this project is to provide a custom solar energy solution tailored to the client's specific requirements, optimizing energy production while ensuring reliability and performance.",
+            benefits: [
+                "Reduced electricity bills",
+                "Increased energy independence",
+                "Lower carbon footprint",
+                "Customized to specific needs"
+            ],
+            systemDescription: "This solar PV system is designed to meet the specific energy needs of the site, taking into account local conditions, consumption patterns, and future requirements."
+        }
+    };
+
+    // Helper function to get system-specific content
+    const getSystemContent = (contentType) => {
+        const systemType = data?.project?.system_type?.toLowerCase() || 'default';
+        const systemConfig = systemContent[systemType] || systemContent.default;
+        return systemConfig[contentType];
+    };    
+
+    // Add this useEffect to initialize the demand date range (Feb 3-9)
+    useEffect(() => {
+        const currentYear = new Date().getFullYear(); // 2025
+        const defaultStart = new Date(currentYear, 1, 3); // Feb 3
+    
+        // Get from session storage if available
+        const savedStart = sessionStorage.getItem('reportDemandStartDate');
+    
+        const startDate = savedStart ? new Date(savedStart) : defaultStart;
+        setDemandStartDate(startDate);
+    
+        // Automatically calculate end date (7 days total)
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        setDemandEndDate(endDate);
+    }, []);
+
+    // Add this useEffect to save demand date selections (only save start date)
+    useEffect(() => {
+        if (demandStartDate) {
+            sessionStorage.setItem('reportDemandStartDate', demandStartDate.toISOString());
+        }
+    }, [demandStartDate]);
+
+    // Add this useEffect to fetch demand data for the selected period
+    useEffect(() => {
+        if (!data?.project?.id || !demandStartDate || !demandEndDate) return;
+        
+        // Format dates as YYYY-MM-DD, ensuring we get exactly the days we want
+        const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        
+        const startStr = formatDate(demandStartDate);
+        const endStr = formatDate(demandEndDate);
+        
+        console.log(`Fetching demand data from ${startStr} to ${endStr}`);
+        
+        axios.get(`${API_URL}/api/consumption_data/${data.project.id}`, {
+            params: { start_date: startStr, end_date: endStr }
+        })
+        .then(res => {
+            setDemandData(res.data);
+        })
+        .catch(err => {
+            console.error('Error loading demand data:', err);
+            showNotification('Failed to fetch demand data for report', 'danger');
+        });
+    }, [data?.project?.id, demandStartDate, demandEndDate, showNotification]);
+
+    // Add this new useEffect to fetch the entire year's data once
+    useEffect(() => {
+        if (!data?.project?.id) return;
+        
+        const currentYear = new Date().getFullYear();
+        const startOfYear = new Date(currentYear, 0, 1, 0, 0, 0);
+        const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
+        
+        const startStr = startOfYear.toISOString().split('T')[0];
+        const endStr = endOfYear.toISOString().split('T')[0];
+        
+        console.log(`Fetching yearly data from ${startStr} to ${endStr}`);
+        
+        axios.get(`${API_URL}/api/consumption_data/${data.project.id}`, {
+            params: { start_date: startStr, end_date: endStr }
+        })
+        .then(res => {
+            setYearlyConsumptionData(res.data);
+            console.log("Yearly data loaded:", res.data.length, "records");
+        })
+        .catch(err => {
+            console.error('Error loading yearly consumption data:', err);
+        });
+    }, [data?.project?.id]);
+
+    // Calculate annual metrics
+    const annualMetrics = React.useMemo(() => {
+        if (!yearlyConsumptionData.length) return {
+            peakDemand: 0,
+            avgDemand: 0,
+            totalEnergy: 0
+        };
+        
+        return {
+            peakDemand: Math.max(...yearlyConsumptionData.map(d => d.demand_kw)),
+            avgDemand: yearlyConsumptionData.reduce((sum, d) => sum + d.demand_kw, 0) / yearlyConsumptionData.length,
+            totalEnergy: yearlyConsumptionData.reduce((sum, d) => sum + d.demand_kw, 0) * 0.5
+        };
+    }, [yearlyConsumptionData]);
+
+    // Create the demand chart data
+    const demandChartData = React.useMemo(() => {
+        // Group data by date to better display daily patterns
+        const dataByDate = {};
+        
+        demandData.forEach(d => {
+            const date = new Date(d.timestamp);
+            const dateStr = date.toLocaleDateString();
+            
+            if (!dataByDate[dateStr]) {
+                dataByDate[dateStr] = [];
+            }
+            
+            dataByDate[dateStr].push({
+                time: date,
+                demand: d.demand_kw
+            });
+        });
+        
+        return {
+            labels: demandData.map(d => new Date(d.timestamp)),
+            datasets: [{
+                label: 'Demand (kW)',
+                data: demandData.map(d => d.demand_kw),
+                borderColor: 'rgb(53, 162, 235)',
+                backgroundColor: 'rgba(53, 162, 235, 0.2)',
+                fill: true,
+                tension: 0.1,
+                pointRadius: 0
+            }]
+        };
+    }, [demandData]);
+
+    // Create the demand chart options
+    const demandChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            tooltip: { 
+                mode: 'index', 
+                intersect: false,
+                callbacks: {
+                    title: function(context) {
+                        // Show both date and time in tooltip for precision
+                        const date = new Date(context[0].label);
+                        return date.toLocaleString();
+                    }
+                }
+            },
+            legend: { display: true, position: 'top' },
+            title: { 
+                display: true, 
+                text: 'Detailed Demand Profile (kW)' 
+            },
+            datalabels: { display: false }
+        },
+        scales: {
+            x: { 
+                type: 'time',
+                time: {
+                    unit: 'day',
+                    displayFormats: {
+                        day: 'MMM d'
+                    },
+                    tooltipFormat: 'MMM d, HH:mm'
+                },
+                title: { display: true, text: 'Date' },
+                ticks: { maxTicksLimit: 10 }
+            },
+            y: { 
+                title: { display: true, text: 'Demand (kW)' },
+                beginAtZero: true
+            }
+        }
+    };
+
+    // Monthly production chart data
+    const monthlyProductionChartData = React.useMemo(() => {
+        // First try to use simulation data if available
+        if (data?.simulation?.timestamps && data?.simulation?.generation) {
+            const timestamps = data.simulation.timestamps;
+            const generation = data.simulation.generation;
+            const timeIntervalHours = 0.5; // 30-minute intervals
+            
+            // Group by month and sum up generation
+            const monthlyData = {};
+            
+            timestamps.forEach((ts, i) => {
+                const date = new Date(ts);
+                const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+                const monthName = date.toLocaleString('default', { month: 'short' });
+                
+                if (!monthlyData[monthKey]) {
+                    monthlyData[monthKey] = {
+                        monthName,
+                        totalKWh: 0,
+                        monthIndex: date.getMonth(),
+                        year: date.getFullYear()
+                    };
+                }
+                
+                // Convert kW to kWh by multiplying with the time interval (0.5 hours)
+                monthlyData[monthKey].totalKWh += generation[i] * timeIntervalHours;
+            });
+            
+            // Convert to array and sort by month/year
+            const sortedMonths = Object.values(monthlyData).sort((a, b) => {
+                if (a.year !== b.year) return a.year - b.year;
+                return a.monthIndex - b.monthIndex;
+            });
+            
+            return {
+                labels: sortedMonths.map(m => m.monthName),
+                datasets: [{
+                    label: 'Energy Production (kWh)',
+                    data: sortedMonths.map(m => Math.round(m.totalKWh)),
+                    backgroundColor: 'rgba(255, 193, 7, 0.6)',
+                    borderColor: 'rgba(255, 193, 7, 1)',
+                    borderWidth: 1,
+                    borderRadius: 5
+                }]
+            };
+        }
+        
+        // Fall back to the approximation method if simulation data isn't available
+        if (!data?.financials?.cost_comparison) return { labels: [], datasets: [] };
+        
+        // Extract month names and sort them in chronological order
+        const months = data.financials.cost_comparison.map(item => {
+            const date = new Date(item.month);
+            return {
+                monthName: date.toLocaleString('default', { month: 'short' }),
+                monthNum: date.getMonth(),
+                year: date.getFullYear(),
+                originalKey: item.month
+            };
+        });
+        
+        // Map the data - calculate based on total generation divided proportionally by days in month
+        // This is an approximation based on typical solar insolation patterns
+        const monthlyFactors = [
+            0.06, // Jan
+            0.07, // Feb
+            0.08, // Mar
+            0.09, // Apr
+            0.10, // May
+            0.10, // Jun
+            0.11, // Jul
+            0.11, // Aug
+            0.10, // Sep
+            0.08, // Oct
+            0.06, // Nov
+            0.04  // Dec
+        ];
+        
+        // Calculate total factors to normalize
+        const totalFactors = monthlyFactors.reduce((a, b) => a + b, 0);
+        
+        // Get total generation
+        const totalGeneration = data?.financials?.total_generation_kwh || 0;
+        
+        // Calculate monthly generation values
+        const monthlyGenerationValues = months.map(month => {
+            const factor = monthlyFactors[month.monthNum];
+            return Math.round((factor / totalFactors) * totalGeneration);
+        });
+        
+        return {
+            labels: months.map(m => m.monthName),
+            datasets: [{
+                label: 'Energy Production (kWh)',
+                data: monthlyGenerationValues,
+                backgroundColor: 'rgba(255, 193, 7, 0.6)',
+                borderColor: 'rgba(255, 193, 7, 1)',
+                borderWidth: 1,
+                borderRadius: 5
+            }]
+        };
+    }, [data?.simulation, data?.financials?.cost_comparison, data?.financials?.total_generation_kwh]);
+
+    // Monthly production chart options
+    const monthlyProductionChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            tooltip: { 
+                mode: 'index', 
+                intersect: false,
+                callbacks: {
+                    label: function(context) {
+                        let label = context.dataset.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        if (context.parsed.y !== null) {
+                            label += formatValue(context.parsed.y) + ' kWh';
+                        }
+                        return label;
+                    }
+                }
+            },
+            legend: { display: false },
+            title: { display: true, text: 'Monthly Energy Production (kWh)' },
+            datalabels: {
+                display: true,
+                align: 'center',
+                anchor: 'end',
+                color: '#333',
+                formatter: (value) => formatValue(value)
+            }
+        },
+        scales: {
+            x: { 
+                title: { display: true, text: 'Month' },
+                grid: { display: false }
+            },
+            y: { 
+                title: { display: true, text: 'Energy (kWh)' },
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return formatValue(value);
+                    }
+                }
+            }
+        }
+    };
+
     return (
+    <>
         <StandardPage
             header="System Performance"
             // footer="Orka Solar - Design Report"
@@ -14,37 +688,777 @@ function MainReportContent({ data }) {
             <div>
                 This site is located at {data?.project?.location}, South Africa: {data?.project?.latitude}, {data?.project?.longitude}.
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Metric</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        {/* <td>PV Capacity</td>
-                        <td>{data?.project?.pv_kwp || "32.2 kWp"}</td>
-                    </tr>
-                    <tr>
-                        <td>Inverter Capacity</td>
-                        <td>{data?.project?.inverter_total || "50 kVA"}</td>
-                    </tr>
-                    <tr>
-                        <td>Battery Storage</td>
-                        <td>{data?.project?.battery_kwh_100 || "0 kWh"}</td>
-                    </tr>
-                    <tr>
-                        <td>CAPEX</td>
-                        <td>{data?.project?.capex || "R465,527"}</td>
-                    </tr>
-                    <tr>
-                        <td>Savings Year 1</td>
-                        <td>{data?.project?.savings_year1 || "R107,676"}</td> */}
-                    </tr>
-                </tbody>
-            </table>
+
+            {showSiteLayout && (
+                <div className="site-layout-section mt-4">
+                    <h4>General Site Layout</h4>
+                    <p>
+                        The proposed module layout is shown below, this may change after detailed site visit but has in principle been proposed to the client:
+                    </p>
+                    {siteLayoutImage ? (
+                        <div className="site-layout-image-container">
+                            <img 
+                                src={siteLayoutImage}
+                                alt="Proposed Module Layout"
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '100%',
+                                    display: 'block',
+                                    margin: '1rem auto',
+                                    border: '1px solid #ddd'
+                                }}
+                            />
+                        </div> 
+                    ): (
+                        <div className="no-layout-image">
+                            <p className="text-muted fst-italic"> No layout image available. Please upload one in the sidebar.</p>
+                        </div>
+                    )}
+                </div>
+            )}
         </StandardPage>
+
+        <StandardPage
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={4} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report        
+        >
+            <h4>Project Goal</h4>
+            <p>{getSystemContent('projectGoal')}</p>
+            <p>
+                The following benefits will be achieved:
+                <ol>
+                    {getSystemContent('benefits').map((benefit, index) =>(
+                        <li key={index}>{benefit}</li>
+                    ))}
+                </ol>                
+            </p>
+
+            <h5>Current load profile and electrical consumption</h5>
+            {/* Monthly energy consumption chart */}
+            
+            <p className="mt-3">
+                The chart above shows the monthly energy consumption profile for {data?.project?.client_name}'s facility. 
+                This data was used as the foundation for designing an optimal solar solution that 
+                aligns with the actual usage patterns of the site.
+            </p>
+
+            <div className="chart-container" style={{height: "400px"}}>
+                {monthlyConsumption.months?.length > 0 ? (
+                    <Line data={monthlyChartData} options={monthlyChartOptions} />
+                ) : (
+                    <div className="text-center text-muted p-5">
+                        No consumption data available
+                    </div>
+                )}
+            </div>
+        </StandardPage>
+
+        <StandardPage
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={5} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report
+        >
+            <h4>Current Electricity Costs</h4>
+            <p>
+                The chart below shows the monthly electricity costs without solar, broken down by component. This analysis helps identify the areas where the solar solution will have the greatest financial impact.
+            </p>
+            
+            <div className="chart-container" style={{height: "400px"}}>
+                {data?.financials?.cost_comparison?.length > 0 ? (
+                    <Bar data={costBreakdownChartData} options={costBreakdownOptions} />
+                ) : (
+                    <div className="text-center text-muted p-5">
+                        No cost comparison data available
+                    </div>
+                )}
+            </div>
+            
+            {data?.financials?.annual_savings && (
+                <div className="mt-4">
+                    <h5>Potential Annual Savings</h5>
+                    <p>
+                        {(() => {
+                            // Calculate average and maximum monthly costs
+                            const costComparison = data.financials.cost_comparison || [];
+                            const oldCosts = costComparison.map(item => item.old_cost);
+                            
+                            // Average monthly cost
+                            const avgMonthlyCost = oldCosts.length > 0 
+                                ? oldCosts.reduce((sum, cost) => sum + cost, 0) / oldCosts.length 
+                                : 0;
+                                
+                            // Maximum monthly cost
+                            const maxMonthlyCost = oldCosts.length > 0 
+                                ? Math.max(...oldCosts) 
+                                : 0;
+                            
+                            return `Based on this simulation using the client's required energy consumption and tariff, the client's 2025 costs for electricity (grid plus generator) will be on average R ${formatValue(avgMonthlyCost)} per month with a maximum of R ${formatValue(maxMonthlyCost)} (excl. VAT).`;
+                        })()}
+                        <br/>
+                        This equates to an annual electricity cost of approximately <strong>R {formatValue(data.financials.original_annual_cost)}</strong> (excl. VAT).
+                    </p>
+                </div>
+            )}
+        </StandardPage>
+
+        <StandardPage
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={6} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report
+        >
+            <h4>Detailed Load Profile</h4>
+            <p>
+                The client's typical diurnal load profile is shown in the graph below. This visualization helps understand hourly usage patterns and identify opportunities for peak shaving and load management.
+            </p>
+            
+            {/* New compact date picker - hidden when printing */}
+            <div className="chart-header d-flex justify-content-between align-items-center mb-2">
+                <div className="no-print date-picker-wrapper ms-auto">
+                    <DatePicker
+                        selected={demandStartDate}
+                        onChange={(date) => {
+                            // Explicitly set to the start of the selected day (midnight)
+                            const selectedDate = new Date(date);
+                            selectedDate.setHours(0, 0, 0, 0);
+                            setDemandStartDate(selectedDate);
+                            
+                            // End date is 6 days later (7 days total including start date)
+                            const endDate = new Date(selectedDate);
+                            endDate.setDate(selectedDate.getDate() + 6);
+                            endDate.setHours(23, 59, 59, 999); // End of the last day
+                            setDemandEndDate(endDate);
+                        }}
+                        dateFormat="MMM d, yyyy"
+                        className="form-control form-control-sm"
+                        popperPlacement="bottom-end"
+                        minDate={new Date(new Date().getFullYear(), 0, 1)}
+                        maxDate={new Date(new Date().getFullYear(), 11, 31)}
+                        placeholderText="Select week start date"
+                    />
+                    <small className="text-muted ms-2">(Shows 7-day period)</small>
+                </div>
+            </div>
+            
+            {/* Demand chart */}
+            <div className="chart-container" style={{height: "300px"}}>
+                {demandData.length > 0 ? (
+                    <Line data={demandChartData} options={demandChartOptions} />
+                ) : (
+                    <div className="text-center text-muted p-5">
+                        No demand data available for the selected period
+                    </div>
+                )}
+            </div>
+
+            {/* Before Project table */}
+            <div className="mt-2">
+                <p className="mb-1 "><strong>Before Project:</strong> The table below summarizes the current consumption and cost as before the project:</p>
+                <p className="mb-1 small">Table 1: Existing operation information</p>
+                <div className="table-responsive">
+                    <table className="table table-bordered table-sm compact-table">
+                        <thead>
+                            <tr>
+                                <th colSpan="2" className="compact-header" style={{backgroundColor: "#f8f9fa"}}>Current Operation</th>
+                            </tr>
+                        </thead>
+                        <tbody className="small">
+                            <tr>
+                                <td colSpan="2" className="fst-italic py-1">All values below are for p.a. for year 1 of simulation, excl. VAT, unless specifically stated otherwise</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Electricity requirement p.a. (kWh)</td>
+                                <td className="text-end py-1">{formatValue(annualMetrics?.totalEnergy || data?.financials?.total_demand_kwh || 73200)}</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Off-Grid electricity (kWh)</td>
+                                <td className="text-end py-1">-</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Total Energy Consumption (kWh)</td>
+                                <td className="text-end py-1">{formatValue(annualMetrics?.totalEnergy || data?.financials?.total_demand_kwh || 73200)}</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1"><strong>Total Cost of Electricity</strong></td>
+                                <td className="text-end py-1"><strong>R {formatValue(data?.financials?.original_annual_cost || 217829)}</strong></td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Blended Rate</td>
+                                <td className="text-end py-1">R {((data?.financials?.original_annual_cost || 217829) / (annualMetrics?.totalEnergy || data?.financials?.total_demand_kwh || 73200)).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1" style={{backgroundColor: "#f8f9fa"}}><strong>Grid Supply</strong></td>
+                                <td style={{backgroundColor: "#f8f9fa"}}></td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Grid Electricity Consumption (y1) (kWh)</td>
+                                <td className="text-end py-1">{formatValue(annualMetrics?.totalEnergy || data?.financials?.total_demand_kwh || 73200)}</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Grid Electricity Cost (y1)</td>
+                                <td className="text-end py-1">R {formatValue(data?.financials?.original_annual_cost || 217829)}</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Cost per unit (y1 energy only)</td>
+                                <td className="text-end py-1">R {((data?.financials?.original_annual_cost || 217829) / (annualMetrics?.totalEnergy || data?.financials?.total_demand_kwh || 73200)).toFixed(2)}</td>
+                            </tr>
+                            {/* <tr>
+                                <td className="py-1" style={{backgroundColor: "#f8f9fa"}}><strong>Diesel Generator</strong></td>
+                                <td className="text-end py-1" style={{backgroundColor: "#f8f9fa"}}>{data?.project?.diesel_generator || "125kVA Gen. selected"}</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Total Capital Costs</td>
+                                <td className="text-end py-1">n/a</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Electricity from generator (y1) (kWh)</td>
+                                <td className="text-end py-1"></td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Running hours (y1)</td>
+                                <td className="text-end py-1"></td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Cost of diesel</td>
+                                <td className="text-end py-1"></td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">Total cost per kWh (y1)</td>
+                                <td className="text-end py-1"></td>
+                            </tr> */}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <p className="mt-2">
+                    Grid electricity cost shows what it would have been, if there was a grid connection available.
+                </p>
+            </div>
+        </StandardPage>
+
+        <StandardPage
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={7} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report
+        >
+            <h4>System Design</h4>
+            <p>
+                This section covers the design process and technical data used.
+            </p>
+
+            <h5>Meteorological Data</h5>
+            <p>The detailed designs were done using our own Solar Design tool which takes into account the site's specific meteorological information to predict the typical generation that can be expected from the specified equipment simulated over 365 days of the year. This enables an accurate analysis of the system yields and in return accurate results on the financial returns.</p>
+
+        </StandardPage>
+
+        <StandardPage
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={8} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report
+        >
+            <h4>System's Technical & Financial Information</h4>
+            <p>
+                Based on the design and simulation results, the system specifications and financial metrics are as follows:
+            </p>
+            
+            {/* Technical Specifications Banner */}
+            <div className="system-specs-banner" style={{
+                background: '#f2f2f2',
+                padding: '20px 0',
+                marginTop: '20px',
+                marginBottom: '20px',
+                borderRadius: '4px'
+            }}>
+                <div className="spec-items-container" style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-around',
+                    alignItems: 'flex-start'
+                }}>
+                    {/* Solar PV */}
+                    <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
+                        <img src={require('../../assets/panel_icon.png')} alt="Solar PV" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
+                        <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Solar PV</div>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                            {formatValue(data?.project?.panel_kw || 64.41)} <span style={{ fontSize: '14px' }}>kWp</span>
+                        </div>
+                        <div style={{ fontSize: '14px' }}>
+                            {Math.ceil((data?.project?.panel_kw || 64.41) * 1000 / 565)} panels
+                        </div>
+                    </div>
+
+                    {/* Inverters */}
+                    <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
+                        <img src={require('../../assets/inverter_icon.png')} alt="Inverters" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
+                        <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Inverters</div>
+                        <div style={{ fontSize: '15px' }}>
+                            Total{' '}
+                            <span style={{ fontWeight: 'bold' }}>
+                                {formatValue(displayValue(data?.project?.inverter_kva, 85, "inverter_kva"))} <span style={{ fontSize: '14px' }}>kVA</span>
+                            </span>
+                        </div>
+                        <div style={{ fontSize: '15px' }}>
+                            Hybrid{' '}
+                            <span style={{ fontWeight: 'bold' }}>
+                                {formatValue(data?.project?.inverter_hybrid || 0)} <span style={{ fontSize: '14px' }}>kVA</span>
+                            </span>
+                        </div>
+                        <div style={{ fontSize: '15px' }}>
+                            Grid{' '}
+                            <span style={{ fontWeight: 'bold' }}>
+                                {formatValue(data?.project?.inverter_grid || 0)} <span style={{ fontSize: '14px' }}>kVA</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Battery */}
+                    <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
+                        <img src={require('../../assets/battery_icon.png')} alt="Battery" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
+                        <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Battery</div>
+                        <div style={{ fontSize: '15px' }}>
+                            Chemistry: {data?.project?.battery_chem || "LiFePO4"}
+                        </div>
+                        <div style={{ fontSize: '15px' }}>
+                            <span style={{ fontWeight: 'bold' }}>
+                                {formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh"))}
+                            </span>{' '}
+                            <span style={{ fontSize: '14px' }}>kWh @100%</span>
+                        </div>
+                        <div style={{ fontSize: '15px' }}>
+                            <span style={{ fontWeight: 'bold' }}>
+                                {formatValue(data?.project?.battery_kwh_80 || (displayValue(data?.project?.battery_kwh, 0, "battery_kwh") * 0.8))}
+                            </span>{' '}
+                            <span style={{ fontSize: '14px' }}>kWh @80%</span>
+                        </div>
+                    </div>
+
+                    {/* Specific Yield */}
+                    <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
+                        <img src={require('../../assets/yield_icon.png')} alt="Specific Yield" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
+                        <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Specific Yield</div>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                            {formatValue(data?.financials?.yield_excl_losses * 365 || 1612)}
+                        </div>
+                        <div style={{ fontSize: '14px' }}>
+                            kWh/kWp/year
+                        </div>
+                    </div>
+
+                    {/* Utilized Energy */}
+                    <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
+                        <img src={require('../../assets/utilized_icon.png')} alt="Utilized Energy" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
+                        <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Utilized Energy<br />from System</div>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                            {formatValue(data?.financials?.total_generation_kwh || 68166)}
+                        </div>
+                        <div style={{ fontSize: '14px' }}>
+                            kWh/year
+                        </div>
+                    </div>
+
+                    {/* Load-shedding Backup */}
+                    <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
+                        <img src={require('../../assets/loadshedding_icon.png')} alt="Load-shedding Backup" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
+                        <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Load-shedding<br />Backup</div>
+                        <div style={{ fontSize: '15px' }}>
+                            Stg2 2.5hrs: {data?.project?.loadshedding_stg2 || "0%"}
+                        </div>
+                        <div style={{ fontSize: '15px' }}>
+                            Stg4 2.5hrs: {data?.project?.loadshedding_stg4 || "0%"}
+                        </div>
+                        <div style={{ fontSize: '15px' }}>
+                            Stg6 4.5hrs: {data?.project?.loadshedding_stg6 || "0%"}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+
+            <div className="mt-3">
+                <h6 className="fw-bold">5.1.1 Installed capacity and simulated yield</h6>
+                <p className="mb-3">Combined installation capacity and yields are shown in the tables below:</p>
+                
+                {/* Table 2: Technical Specifications */}
+                <div className="table-responsive mb-4">
+                    <p className="small mb-1">Table 2: Technical Specifications</p>
+                    <table className="table table-bordered table-sm">
+                        <thead>
+                            <tr>
+                                <th style={{width: "60%"}}>Technical Specifications</th>
+                                <th style={{width: "20%"}}>Value</th>
+                                <th style={{width: "20%"}}>Units</th>
+                            </tr>
+                        </thead>
+                        <tbody className="small">
+                            <tr>
+                                <td>PV Array</td>
+                                <td className="text-end">{formatValue(data?.project?.panel_kw || 0)}</td>
+                                <td>kWp</td>
+                            </tr>
+                            <tr>
+                                <td>Number of panels</td>
+                                <td className="text-end">{Math.ceil((data?.project?.panel_kw || 0) * 1000 / 565) || 0}</td>
+                                <td>ea</td>
+                            </tr>
+                            <tr>
+                                <td>Inverter Capacity (Total)</td>
+                                <td className="text-end">{formatValue(displayValue(data?.project?.inverter_kva, 0, "inverter_kva"))}</td>
+                                <td>kVA</td>
+                            </tr>
+                            <tr>
+                                <td>Inverter Capacity (hybrid with mppt)</td>
+                                <td className="text-end">{formatValue(data?.project?.inverter_hybrid || 0)}</td>
+                                <td>kVA</td>
+                            </tr>
+                            <tr>
+                                <td>Inverter Capacity (dedicated grid invt.)</td>
+                                <td className="text-end">{formatValue(data?.project?.inverter_grid || 0)}</td>
+                                <td>kVA</td>
+                            </tr>
+                            <tr>
+                                <td>Battery selected</td>
+                                <td className="text-end">{formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh"))}/
+                                    {formatValue(data?.project?.battery_kwh_80 || 0)}</td>
+                                <td>kWh</td>
+                            </tr>
+                            <tr>
+                                <td>Distribution</td>
+                                <td className="text-end" colSpan="2">Three Phase</td>
+                            </tr>
+                            <tr>
+                                <td>Monitoring</td>
+                                <td className="text-end" colSpan="2">Smart metered, remote</td>
+                            </tr>
+                            <tr>
+                                <td>Feedback Prevention</td>
+                                <td className="text-end" colSpan="2">Yes</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+
+            </div>
+        </StandardPage>
+
+        <StandardPage
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={9} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report
+        >
+                <p className="mb-3">The table below shows the simulated performance yields from the system:</p>
+                
+                {/* Table 3: Simulated yields */}
+                <div className="table-responsive">
+                    <p className="small mb-1">Table 3: Simulated yields (y1)</p>
+                    <table className="table table-bordered table-sm">
+                        <thead>
+                            <tr>
+                                <th style={{width: "60%"}}>Plant Output Specifications</th>
+                                <th style={{width: "20%"}}>Value</th>
+                                <th style={{width: "20%"}}>Units</th>
+                            </tr>
+                        </thead>
+                        <tbody className="small">
+                            <tr>
+                                <td>Daytime Consumption</td>
+                                <td className="text-end">{data?.financials?.daytime_consumption_perc || 0}%</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>PV Utilization</td>
+                                <td className="text-end">{data?.financials?.self_consumption_rate || 0}%</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>Overall Consumption from PV</td>
+                                <td className="text-end">{data?.financials?.grid_independence_rate || 0}%</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>Potential Generation (daily)</td>
+                                <td className="text-end">{formatValue((data?.financials?.potential_generation_kwh || 0) / 365)}</td>
+                                <td>kWh</td>
+                            </tr>
+                            <tr>
+                                <td>Utilized Generation (daily)</td>
+                                <td className="text-end">{formatValue((data?.financials?.total_generation_kwh || 0) / 365)}</td>
+                                <td>kWh</td>
+                            </tr>
+                            <tr>
+                                <td>Throttling Losses (daily)</td>
+                                <td className="text-end">{formatValue((data?.financials?.potential_generation_kwh - data?.financials?.total_generation_kwh || 0) / 365)}</td>
+                                <td>kWh</td>
+                            </tr>
+                            <tr>
+                                <td>Specific Yield Including Throttling Losses</td>
+                                <td className="text-end">{(data?.financials?.yield_incl_losses || 0)}</td>
+                                <td>kWh/kWp/day</td>
+                            </tr>
+                            <tr>
+                                <td>Potential Generation p.a.</td>
+                                <td className="text-end">{formatValue(data?.financials?.potential_generation_kwh || 0)}</td>
+                                <td>kWh</td>
+                            </tr>
+                            <tr>
+                                <td>Utilized Generation p.a.</td>
+                                <td className="text-end">{formatValue(data?.financials?.total_generation_kwh || 0)}</td>
+                                <td>kWh</td>
+                            </tr>
+                            <tr>
+                                <td>Throttling Losses p.a.</td>
+                                <td className="text-end">{formatValue(data?.financials?.potential_generation_kwh - data?.financials?.total_generation_kwh || 0)}</td>
+                                <td>kWh</td>
+                            </tr>
+                            <tr>
+                                <td>Specific Yield Excl. Throttling Losses</td>
+                                <td className="text-end">{(data?.financials?.yield_excl_losses || 0)}</td>
+                                <td>kWh/kWp/y</td>
+                            </tr>
+                            <tr>
+                                <td>Battery cycles in 1 year</td>
+                                <td className="text-end">{data?.financials?.battery_cycles || '-'}</td>
+                                <td>cycles/y</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+        </StandardPage>
+
+        <StandardPage
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={10} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report
+        >
+            <h6 className="fw-bold">Energy Production</h6>
+            <p>The below graph shows the potential solar production from the system per month.</p>
+
+            {/* Monthly Energy Production Chart */}
+            <div className="chart-container" style={{height: "300px"}}>
+                {data?.financials?.cost_comparison?.length > 0 ? (
+                    <Bar 
+                        data={monthlyProductionChartData} 
+                        options={monthlyProductionChartOptions}
+                    />
+                ) : (
+                    <div className="text-center text-muted p-5">
+                        No production data available
+                    </div>
+                )}
+            </div>
+
+            <p className="mt-3">
+                The system is projected to generate approximately {formatValue(data?.financials?.total_generation_kwh || 0)} kWh per year.
+            </p>
+
+            <h6 className="fw-bold">Simulated Profiles</h6>
+            
+            {/* Simulation Results Graph */}
+            <div className="mb-4">
+                <p>
+                    The below graph shows the consumption and generation profiles for the different components of the system, 
+                    post implementation for a number of days in the year.
+                </p>
+                
+                <div className="chart-container" style={{height: "350px"}}>
+                    {data?.simulation?.timestamps ? (
+                        <Line 
+                            data={{
+                                labels: data.simulation.timestamps.slice(0, 336).map(t => new Date(t)), // First week (336 points)
+                                datasets: [
+                                    {
+                                        label: 'Load Demand (kW)',
+                                        data: data.simulation.demand.slice(0, 336),
+                                        borderColor: '#ff6384',
+                                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                                        tension: 0.3,
+                                        pointRadius: 0,
+                                        borderWidth: 2,
+                                        fill: false
+                                    },
+                                    {
+                                        label: 'Solar Generation (kW)',
+                                        data: data.simulation.generation.slice(0, 336),
+                                        borderColor: '#ffce56',
+                                        backgroundColor: 'rgba(255, 206, 86, 0.1)',
+                                        tension: 0.3,
+                                        pointRadius: 0,
+                                        borderWidth: 2,
+                                    },
+                                    {
+                                        label: 'Grid Import (kW)',
+                                        data: data.simulation.import_from_grid.slice(0, 336),
+                                        borderColor: '#cc65fe',
+                                        backgroundColor: 'rgba(204, 101, 254, 0.1)',
+                                        tension: 0.3,
+                                        pointRadius: 0,
+                                        borderWidth: 1.5,
+                                        borderDash: [5, 5]
+                                    },
+                                    {
+                                        label: 'Battery SOC (%)',
+                                        data: data.simulation.battery_soc.slice(0, 336),
+                                        borderColor: '#36a2eb',
+                                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                                        yAxisID: 'y1',
+                                        tension: 0.3,
+                                        pointRadius: 0,
+                                        borderWidth: 2
+                                    }
+                                ]
+                            }}
+                            options={{
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                interaction: { mode: 'index', intersect: false },
+                                scales: {
+                                    x: {
+                                        type: 'time',
+                                        time: { unit: 'day', tooltipFormat: 'MMM dd, HH:mm' },
+                                        title: { display: true, text: 'Date' }
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: 'Power (kW)' }
+                                    },
+                                    y1: {
+                                        type: 'linear',
+                                        display: true,
+                                        position: 'right',
+                                        beginAtZero: true,
+                                        max: 100,
+                                        title: { display: true, text: 'Battery SOC (%)' },
+                                        grid: { drawOnChartArea: false }
+                                    }
+                                },
+                                plugins: {
+                                    legend: { position: 'top' },
+                                    title: { display: true, text: 'System Performance Simulation (Sample Week)' },
+                                    tooltip: { 
+                                        mode: 'index', 
+                                        intersect: false,
+                                        callbacks: {
+                                            title: function(context) {
+                                                const date = new Date(context[0].parsed.x);
+                                                return date.toLocaleString('en-ZA', { 
+                                                    weekday: 'short',
+                                                    month: 'short', 
+                                                    day: 'numeric', 
+                                                    hour: '2-digit', 
+                                                    minute: '2-digit'
+                                                });
+                                            }
+                                        }
+                                    },
+                                    datalabels: { display: false }
+                                }
+                            }}
+                        />
+                    ) : (
+                        <div className="text-center text-muted p-5">
+                            No simulation data available. Please run a system simulation first.
+                        </div>
+                    )}
+                </div>
+            </div>
+        </StandardPage>
+        <StandardPage 
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={11} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report
+        >
+            <h6 className='fw-bold'>Financial Information</h6>
+            <p>The key metrics to evaluate the business case of the project are shown in the table below:</p>
+            
+            {/* Table 4: Project Business Case Metrics */}
+            <div className="table-responsive">
+                <p className="small mb-1">Table 4: Project Business Case Metrics and Benchmarking</p>
+                <table className="table table-bordered table-sm">
+                    <thead>
+                        <tr>
+                            <th colSpan="2" className="bg-light">
+                                {data?.project?.system_type === 'off-grid' 
+                                    ? 'Off-Grid Summary' 
+                                    : data?.project?.system_type === 'hybrid' 
+                                        ? 'Hybrid System Summary' 
+                                        : 'Grid-Tied System Summary'}
+                            </th>
+                        </tr>
+                        <tr>
+                            <td colSpan="2" className="fst-italic small bg-light">All values below are year 1 of simulation, excl. VAT.</td>
+                        </tr>
+                    </thead>
+                    <tbody className="small">
+                        <tr>
+                            <td>Total Capital Cost</td>
+                            <td className="text-end">R {formatValue(data?.project?.project_value_excl_vat || 0)}</td>
+                        </tr>
+                        <tr>
+                            <td>Total utility cost savings</td>
+                            <td className="text-end">R {formatValue(data?.financials?.annual_savings || 0)}</td>
+                        </tr>
+                        <tr>
+                            <td>Utility Fixed Fee Savings</td>
+                            <td className="text-end">R {formatValue(data?.financials?.cost_comparison?.[0]?.old_bill_breakdown?.fixed - 
+                                                             data?.financials?.cost_comparison?.[0]?.new_bill_breakdown?.fixed || 0)}</td>
+                        </tr>
+                        <tr>
+                            <td>Utility Energy Cost Savings</td>
+                            <td className="text-end">R {formatValue(data?.financials?.cost_comparison?.[0]?.old_bill_breakdown?.energy - 
+                                                             data?.financials?.cost_comparison?.[0]?.new_bill_breakdown?.energy || 0)}</td>
+                        </tr>
+                        
+                        {/* Generator Running Cost - Only for off-grid systems */}
+                        {data?.project?.system_type === 'off-grid' && (
+                            <tr>
+                                <td>Generator Running Cost</td>
+                                <td className="text-end">R {formatValue(data?.financials?.generator_running_cost || 0)}</td>
+                            </tr>
+                        )}
+                        
+                        <tr>
+                            <td>Savings (year 1)</td>
+                            <td className="text-end">R {formatValue(data?.financials?.annual_savings || 0)}</td>
+                        </tr>
+                        <tr>
+                            <td>First year yield</td>
+                            <td className="text-end">
+                                {data?.financials?.yield_year1 || 
+                                Math.round((data?.financials?.annual_savings / data?.project?.project_value_excl_vat) * 100) || 0}%
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Payback (years)</td>
+                            <td className="text-end">
+                                {(data?.financials?.payback_period || 0).toFixed(2)}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <p className="mt-3">
+                The client's new monthly cost of electricity compared the current cost, as well as the cost and savings in year
+                one after installation is shown in the graphs below.
+            </p>
+        </StandardPage>
+    </>
     );
 }
 

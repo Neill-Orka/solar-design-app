@@ -32,11 +32,22 @@ function ExecutiveSummary({ data }) {
       defaultValue;
   };
 
-  const displayValue = (value, fallback) => {
+  // Helper function to safely display JSON fields
+  const displayValue = (value, fallback, field = "") => {
     if (value === undefined || value === null) return fallback;
+
     if (typeof value === 'object') {
       // If it's an object, try to extract capacity or return the first value
-      return value.capacity || Object.values(value)[0] || fallback;
+      if (field === "battery_kwh" && value.capacity && value.quantity) {
+        const total = value.capacity * value.quantity;
+        return total.toString();
+      }
+
+      if (value.capacity && value.quantity) {
+        return `${value.capacity * value.quantity}`;
+      }
+
+      return value.capacity || value.quantity || Object.values(value)[0] || fallback;
     }
     return value;
   };
@@ -116,13 +127,13 @@ function ExecutiveSummary({ data }) {
         <div className="orka-summary-icon-col">
           <img src={pvIcon} className="orka-summary-icon" alt="" />
           <div className="orka-summary-label">Solar PV</div>
-          <div className="orka-summary-value">{(project.panel_kw).toFixed(2)} <span className="orka-summary-unit">kWp</span></div>
+          <div className="orka-summary-value">{displayValue(project.panel_kw, "0", "panel_kw").toFixed(2)} <span className="orka-summary-unit">kWp</span></div>
           <div className="orka-summary-sublabel">{num_panels} panels</div>
         </div>
         <div className="orka-summary-icon-col">
           <img src={inverterIcon} className="orka-summary-icon" alt="" />
           <div className="orka-summary-label">Inverters</div>
-          <div className="orka-summary-value">Total: {displayValue(project.inverter_kva)} <span className="orka-summary-unit">kVA</span></div>
+          <div className="orka-summary-value">Total: {displayValue(project.inverter_kva, "0", "inverter_kva")} <span className="orka-summary-unit">kVA</span></div>
           <div className="orka-summary-sublabel">
             {/* Hybrid {displayValue(project.inverter_hybrid)} <span className="orka-summary-unit">kVA</span><br />
             Grid {displayValue(project.inverter_grid)} <span className="orka-summary-unit">kVA</span> */}
@@ -132,8 +143,8 @@ function ExecutiveSummary({ data }) {
           <img src={batteryIcon} className="orka-summary-icon" alt="" />
           <div className="orka-summary-label">Backup</div>
           <div className="orka-summary-sublabel">Chemistry: {project.battery_chem}</div>
-          <div className="orka-summary-sublabel">{displayValue(project.battery_kwh) || 0} kWh @ 100%</div>
-          <div className="orka-summary-sublabel">{displayValue(project.battery_kwh_80) || 0} kWh @ 80%</div>
+          <div className="orka-summary-sublabel">{displayValue(project.battery_kwh, "0", "battery_kwh")} kWh @ 100%</div>
+          <div className="orka-summary-sublabel">{displayValue(project.battery_kwh_80, "0", "battery_kwh_80")} kWh @ 80%</div>
         </div>
       </div>
       <div className="orka-summary-icons-row2">

@@ -875,9 +875,11 @@ function SystemDesign({ projectId }) {
         }
 
         const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0); // Set to beginning of start date
+        
         const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999); // Ensure the end date is inclusive
-
+        end.setHours(0, 0, 0, 0); // Set to beginning of end date - NOT end of day
+        
         const filtered = {
             timestamps: [], demand: [], generation: [], potential_generation: [],
             battery_soc: [], import_from_grid: [], export_to_grid: []
@@ -885,7 +887,7 @@ function SystemDesign({ projectId }) {
 
         simulationData.timestamps.forEach((ts, i) => {
             const date = new Date(ts);
-            if (date >= start && date <= end) {
+            if (date >= start && date < end) { // Changed <= to < to exclude the end date
                 filtered.timestamps.push(ts);
                 filtered.demand.push(simulationData.demand[i]);
                 filtered.generation.push(simulationData.generation[i]);

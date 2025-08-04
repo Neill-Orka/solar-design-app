@@ -86,7 +86,7 @@ function DesignReportMeta({ data }) {
           <tr>
             <td colSpan={2}></td>
             <td style={{ textAlign: "center" }}>
-              <img src={project.signature_img} alt="Signature" className="orka-meta-signature" />
+              <img src={signatureLB} alt="Signature" className="orka-meta-signature" />
             </td>
             <td style={{ textAlign: "center" }}>
               {project.approval_date}

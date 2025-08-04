@@ -1143,10 +1143,134 @@
   font-size: 0.9rem;
 }
 
+.section-controls {
+  margin: 1rem;
+  padding: 0.75rem;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  position: fixed;
+  top: 60px;
+  right: 20px;
+  z-index: 20;
+}
+
+.section-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  user-select: none;
+}
+
+.section-toggle input[type="checkbox"] {
+  accent-color: #23c586;
+}
+
+@media print {
+  .section-controls {
+    display: none !important;
+  }
+}
+
+.site-layout-section {
+  margin-top: 2rem;
+  padding-top: 1rem;
+}
+
+.site-layout-image-container {
+  text-align: center;
+  margin: 1rem 0;
+}
+
+/* Consumption data styles */
+
+.metric-box {
+    border: 1px solid #e0e0e0;
+    border-left: 4px solid #23c586;
+    border-radius: 6px;
+    padding: 10px 15px;
+    background: #fafafa;
+}
+
+.metric-label {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.metric-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.date-range-selector {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+/* Add these styles if not already present */
+.chart-header {
+    position: relative;
+    margin-bottom: 0.5rem;
+}
+
+.date-picker-wrapper {
+    position: relative;
+    z-index: 10;
+}
+
+.date-picker-wrapper .react-datepicker-wrapper {
+    display: inline-block;
+    width: auto;
+}
+
+/* Hide the date picker when printing */
+@media print {
+    .no-print, .no-print * {
+        display: none !important;
+    }
+    
+    .chart-container {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+}
+
 /* Make sure print styles don't hide these elements */
 @media print {
   .orka-page-header, .orka-page-footer {
     display: block !important;
     visibility: visible !important;
   }
+}
+
+/* Compact table styles for better fit */
+.compact-table {
+    font-size: 0.85rem;
+}
+
+.compact-table td, .compact-table th {
+    padding: 0.25rem 0.5rem;
+}
+
+.compact-header {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* For print, ensure the table stays compact */
+@media print {
+    .compact-table {
+        font-size: 0.8rem;
+    }
+    
+    .compact-table td, .compact-table th {
+        padding: 0.2rem 0.4rem;
+    }
 }

@@ -6,11 +6,21 @@ import "../../ReportBuilder.css";
 
 function CoverPage({ data }) {
   // Helper function to safely display JSON fields
-  const displayValue = (value, fallback) => {
+  const displayValue = (value, fallback, field = "") => {
     if (value === undefined || value === null) return fallback;
+
     if (typeof value === 'object') {
       // If it's an object, try to extract capacity or return the first value
-      return value.capacity || Object.values(value)[0] || fallback;
+      if (field === "battery_kwh" && value.capacity && value.quantity) {
+        const total = value.capacity * value.quantity;
+        return total.toString();
+      }
+
+      if (value.capacity && value.quantity) {
+        return `${value.capacity * value.quantity}`;
+      }
+
+      return value.capacity || value.quantity || Object.values(value)[0] || fallback;
     }
     return value;
   };
@@ -20,8 +30,8 @@ function CoverPage({ data }) {
     id: "24108_Proposal",
     description: "Design Report and Costing for grid tied solar PV supply solution",
     inverter_kva: "50",
-    ess_kwh: "0",
-    pv_kwp: "32.1",
+    battery_kwh: "0",
+    panel_kw: "32.1",
     load_shedding: "0",
     owner: "Rutherfords",
     version: "Final",
@@ -47,9 +57,9 @@ function CoverPage({ data }) {
         <div className="orka-cover-projectname">{project.name}</div>
         <hr className="orka-cover-line" />
         <div className="orka-cover-specblock">
-          <span>Inverting: <b>{displayValue(project.inverter_kva, "50")} kVA</b></span><br />
-          <span>ESS: <b>{displayValue(project.battery_kwh, "0")} kWh</b></span><br />
-          <span>PV: <b>{displayValue(project.panel_kw, "32.1")} kWp</b></span><br />
+          <span>Inverting: <b>{displayValue(project.inverter_kva, "50", "inverter_kva")} kVA</b></span><br />
+          <span>ESS: <b>{displayValue(project.battery_kwh, "0", "battery_kwh")} kWh</b></span><br />
+          <span>PV: <b>{displayValue(project.panel_kw, "32.1", "panel_kw")} kWp</b></span><br />
           <span>Load Shedding Scenario: <b>{displayValue(project.load_shedding, "0")}</b></span>
         </div>
         <hr className="orka-cover-line" />
