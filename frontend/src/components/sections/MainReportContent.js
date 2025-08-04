@@ -10,8 +10,12 @@ import StandardPage from "./StandardPage";
 import 'chartjs-adapter-date-fns'
 import { enZA } from 'date-fns/locale';
 
-function MainReportContent({ data, showSiteLayout, siteLayoutImage }) {
-    const { showNotification } = useNotification();
+function MainReportContent({ 
+  data, 
+  showSiteLayout, 
+  siteLayoutImage,
+}) {
+  const { showNotification } = useNotification();
     const [consumptionData, setConsumptionData] = useState([]);
     const [startDate, setStartDate] = useState(null);
     const [endDate, setEndDate] = useState(null);
@@ -673,6 +677,45 @@ function MainReportContent({ data, showSiteLayout, siteLayoutImage }) {
                 }
             }
         }
+    };
+
+    // Terms and project schedule
+    // Use the passed value or fall back to a default
+    const [priceValidUntil, setPriceValidUntil] = useState("30 August 2025");
+  
+    // Initialize with default schedule
+    const [projectSchedule, setProjectSchedule] = useState([
+      { activity: "Deposit received & document compilation", timeline: "Week 1" },
+      { activity: "Equipment procurement & delivery", timeline: "Week 2 (provided no major supplier delays)" },
+      { activity: "Construction & installation", timeline: "Week 2-4" },
+      { activity: "Commissioning", timeline: "Week 5" },
+      { activity: "Training", timeline: "Week 5" },
+      { activity: "Handover", timeline: "Week 6" }
+    ]);
+
+    // Function to update a specific schedule time
+    const updateScheduleTime = (index, field, value) => {
+        const updatedSchedule = [...projectSchedule];
+        updatedSchedule[index] = {
+            ...updatedSchedule[index],
+            [field]: value
+        };
+        setProjectSchedule(updatedSchedule);
+    };
+
+    // Function to add a new schedule item
+    const addScheduleItem = () => {
+      setProjectSchedule([
+        ...projectSchedule,
+        { activity: "", timeline: "" }
+      ]);
+    };
+
+    // Function to remove a schedule item
+    const removeScheduleItem = (index) => {
+      const updatedSchedule = [...projectSchedule];
+      updatedSchedule.splice(index, 1);
+      setProjectSchedule(updatedSchedule);
     };
 
     return (
@@ -1457,7 +1500,540 @@ function MainReportContent({ data, showSiteLayout, siteLayoutImage }) {
                 The client's new monthly cost of electricity compared the current cost, as well as the cost and savings in year
                 one after installation is shown in the graphs below.
             </p>
+            
+            {/* Monthly Cost Comparison Line Chart */}
+            <div className="row mt-4">
+                <div className="col-md-6">
+                    <p className="small mb-1">Figure 12: Client new monthly utility cost</p>
+                    <div className="chart-container" style={{height: "300px"}}>
+                        {data?.financials?.cost_comparison?.length > 0 ? (
+                            <Line 
+                                data={{
+                                    labels: data.financials.cost_comparison.map(item => {
+                                        const date = new Date(item.month);
+                                        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                                    }),
+                                    datasets: [
+                                        {
+                                            label: 'Grid Electricity Cost (no load shedding)',
+                                            data: data.financials.cost_comparison.map(item => item.old_cost),
+                                            borderColor: '#6c757d',
+                                            borderWidth: 2.5,
+                                            tension: 0.3,
+                                            pointRadius: 0,
+                                            fill: false
+                                        },
+                                        {
+                                            label: 'New Grid + Generator Cost',
+                                            data: data.financials.cost_comparison.map(item => item.new_cost),
+                                            borderColor: '#20c997',
+                                            borderWidth: 2.5,
+                                            tension: 0.3,
+                                            pointRadius: 0,
+                                            fill: false
+                                        }
+                                    ]
+                                }}
+                                options={{
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: { position: 'top' },
+                                        title: { display: false },
+                                        tooltip: { mode: 'index', intersect: false },
+                                        datalabels: { display: false }
+                                    },
+                                    scales: {
+                                        x: { 
+                                            grid: { display: false },
+                                            ticks: { maxRotation: 0 }
+                                        },
+                                        y: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                callback: function(value) {
+                                                    return 'R ' + value.toLocaleString('en-ZA');
+                                                }
+                                            },
+                                            title: { display: false }
+                                        }
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <div className="text-center text-muted p-5">
+                                No cost comparison data available
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Annual Cost Breakdown Bar Chart */}
+                <div className="col-md-6">
+                    <p className="small mb-1">Figure 13: Cost saving in year 1</p>
+                    <div className="chart-container" style={{height: "300px"}}>
+                        {data?.financials?.original_annual_cost && data?.financials?.new_annual_cost ? (
+                            <Bar
+                                data={{
+                                    labels: ['Cost of Electricity p.a.'],
+                                    datasets: [
+                                        {
+                                            label: 'Current cost p.a. - total',
+                                            data: [data.financials.original_annual_cost],
+                                            backgroundColor: '#6c757d',
+                                            barPercentage: 0.6
+                                        },
+                                        {
+                                            label: 'New Cost p.a. - total',
+                                            data: [data.financials.new_annual_cost],
+                                            backgroundColor: '#18736a',
+                                            stack: 'savings-stack',
+                                            barPercentage: 0.6
+                                        },                                        
+                                        {
+                                            label: 'Saving p.a. y1',
+                                            data: [data.financials.annual_savings],
+                                            backgroundColor: '#98e7c8',
+                                            stack: 'savings-stack',
+                                            barPercentage: 0.6
+                                        }
+                                    ]
+                                }}
+                                options={{
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: { position: 'bottom' },
+                                        title: {
+                                            display: true,
+                                            text: 'Cost of Electricity p.a.',
+                                            position: 'top',
+                                            align: 'center',
+                                            font: { size: 14 }
+                                        },
+                                        tooltip: { mode: 'index', intersect: false },
+                                        datalabels: {
+                                            display: true,
+                                            color: '#fff',
+                                            font: { weight: 'bold' },
+                                            formatter: (value) => {
+                                                return 'R' + formatValue(value);
+                                            },
+                                            anchor: 'center',
+                                            align: 'center'
+                                        }
+                                    },
+                                    scales: {
+                                        x: { 
+                                            display: false 
+                                        },
+                                        y: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                callback: function(value) {
+                                                    return 'R' + value.toLocaleString('en-ZA');
+                                                }
+                                            }
+                                        }
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <div className="text-center text-muted p-5">
+                                No annual cost data available
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
         </StandardPage>
+        <StandardPage
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={12} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report
+        >
+            <p>Post installation cost summary:</p>
+            
+            <div className="table-responsive">
+                <p className="small mb-1">Table 5: Cost and Savings Details</p>
+                <table className="table table-bordered table-sm">
+                    <thead>
+                        <tr>
+                            <th colSpan="2" className="bg-light">
+                                {data?.project?.system_type === 'off-grid' 
+                                    ? 'Off-Grid ESS' 
+                                    : data?.project?.system_type === 'hybrid' 
+                                        ? 'Hybrid ESS' 
+                                        : 'Grid-Tied Solar PV'}
+                            </th>
+                        </tr>
+                        <tr>
+                            <td colSpan="2" className="fst-italic small bg-light">
+                                All values below are for p.a. for year 1 of simulation, excl. VAT, unless specifically stated otherwise
+                            </td>
+                        </tr>
+                    </thead>
+                    <tbody className="small">
+                        <tr>
+                            <td>Total Capital Costs (excl. VAT)</td>
+                            <td className="text-end">R {formatValue(data?.project?.project_value_excl_vat || 0)}</td>
+                        </tr>
+                        <tr>
+                            <td>Effective cost (after appl. tax benefit)</td>
+                            <td className="text-end">R {formatValue(data?.project?.effective_cost || data?.project?.project_value_excl_vat * 0.72 || 0)}</td>
+                        </tr>
+                        <tr>
+                            <td>Total Energy Consumption (kWh)</td>
+                            <td className="text-end">{formatValue(data?.financials?.total_demand_kwh || 0)}</td>
+                        </tr>
+                        <tr>
+                            <td>Total Cost of Electricity</td>
+                            <td className="text-end">R {formatValue(data?.financials?.new_annual_cost || 0)}</td>
+                        </tr>
+                        <tr>
+                            <td>Blended Rate</td>
+                            <td className="text-end">
+                                R {((data?.financials?.new_annual_cost || 0) / (data?.financials?.total_demand_kwh || 1)).toFixed(2)}
+                            </td>
+                        </tr>
+                        
+                        {/* Savings Section */}
+                        <tr className="bg-light">
+                            <td colSpan="2" className="bg-light"><strong>Savings</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Total Cost Savings (y1)</strong></td>
+                            <td className="text-end">R {formatValue(data?.financials?.annual_savings || 0)}</td>
+                        </tr>
+                        <tr>
+                            <td>Grid savings (y1)</td>
+                            <td className="text-end">R {formatValue(data?.financials?.annual_savings || 0)}</td>
+                        </tr>
+                        {(data?.project?.system_type === 'hybrid' || data?.project?.system_type === 'off-grid') && (
+                            <tr>
+                                <td>Generator cost savings (y1)</td>
+                                <td className="text-end">R {formatValue(data?.financials?.generator_cost_savings || 0)}</td>
+                                </tr>
+                        )}
+                        
+                        {/* Grid Section - Only show for grid-tied and hybrid */}
+                        {data?.project?.system_type !== 'off-grid' && (
+                            <>
+                                <tr className="bg-light">
+                                    <td colSpan="2" className="bg-light"><strong>New Grid Supply</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>Grid Electricity Consumption (y1) (kWh)</td>
+                                    <td className="text-end">{formatValue(data?.financials?.total_import_kwh || 0)}</td>
+                                </tr>
+                                <tr>
+                                    <td>Grid Electricity Cost (y1)</td>
+                                    <td className="text-end">R {formatValue(data?.financials?.new_annual_cost || 0)}</td>
+                                </tr>
+                            </>
+                        )}
+                        
+                        {/* Solar/Battery Section - Show for all types but with different labels */}
+                        <tr className="bg-light">
+                            <td colSpan="2" className="bg-light">
+                                <strong>
+                                    {data?.project?.system_type === 'hybrid' 
+                                        ? 'Hybrid ESS' 
+                                        : data?.project?.system_type === 'off-grid' 
+                                        ? 'Off-Grid ESS' 
+                                        : 'Grid-Tied Solar PV'}
+                                </strong>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Electricity from PV (y1) direct {data?.project?.system_type === 'off-grid' ? 'Off-Grid' : 'On-Grid'} (kWh)</td>
+                            <td className="text-end">
+                                {formatValue(data?.financials?.pv_direct_consumption || data?.financials?.total_generation_kwh * 0.6 || 0)}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Electricity from PV (y1) direct consumption (kWh)</td>
+                            <td></td>
+                            <td className="text-end">
+                                {formatValue(data?.financials?.pv_direct_consumption || data?.financials?.total_generation_kwh * 0.6 || 0)}
+                            </td>
+                        </tr>
+                        {(data?.project?.system_type === 'hybrid' || data?.project?.system_type === 'off-grid') && (
+                            <>
+                                <tr>
+                                    <td>Electricity from PV (y1) direct {data?.project?.system_type === 'off-grid' ? 'Off-Grid' : 'On-Grid'} (kWh)</td>
+                                    <td></td>
+                                    <td className="text-end">
+                                        {formatValue(data?.financials?.pv_direct_consumption || data?.financials?.total_generation_kwh * 0.6 || 0)}
+                                    </td>
+                                </tr>
+                                {data?.project?.allow_export && (
+                                    <tr>
+                                        <td>Electricity from PV (y1) surplus recovery (kWh)</td>
+                                        <td></td>
+                                        <td className="text-end">{formatValue(data?.financials?.exported_energy || 0)}</td>
+                                    </tr>
+                                )}
+                                <tr>
+                                    <td>Electricity from Battery (y1) (kWh)</td>
+                                    <td></td>
+                                    <td className="text-end">
+                                        {formatValue(data?.financials?.battery_discharge || data?.financials?.total_generation_kwh * 0.4 || 0)}
+                                    </td>
+                                </tr>
+                            </>
+                        )}
+                        
+                        {/* Generator Section - Only for hybrid and off-grid */}
+                        {(data?.project?.system_type === 'hybrid' || data?.project?.system_type === 'off-grid') && (
+                            <>
+                                <tr className="bg-light">
+                                    <td colSpan="2"><strong>New Diesel Generator</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>Electricity from generator (y1) (kWh)</td>
+                                    <td className="text-end">{formatValue(data?.financials?.generator_energy || 0)}</td>
+                                </tr>
+                                <tr>
+                                    <td>Generator Electricity Cost (y1)</td>
+                                    <td className="text-end">R {formatValue(data?.financials?.generator_running_cost || 0)}</td>
+                                </tr>
+                            </>
+                        )}
+                    </tbody>
+                </table>
+                
+                {(data?.project?.system_type === 'hybrid' || data?.project?.system_type === 'off-grid') && (
+                    <p className="small mt-2 fst-italic">
+                        *Generator costs based on simulated load shedding scenarios and quiet hours.
+                    </p>
+                )}
+            </div>
+        </StandardPage>
+
+        <StandardPage
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={13} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report
+        >
+            <div className="scope-of-work">
+                <h6 className="fw-bold">SCOPE OF WORK</h6>
+
+                <p>The following scope of work will be completed as part of the project and are included in the cost of the proposal:</p>
+                
+                <ul className="ps-4">
+                    <li>Engineering design done by qualified Orka Solar engineers.</li>
+                    <li>Full <span className="fw-bold">turn key</span> solution, done by experienced Orka Solar employees, including:
+                        <ul className="circle-list">
+                            <li>Procurement, delivery and installation</li>
+                            <li>Site supervision</li>
+                            <li>SHEQ management</li>
+                            <li>Project management</li>
+                            <li>Testing and commissioning</li>
+                            <li>Electrical Certificate of Compliance</li>
+                            <li>Client training and project hand over</li>
+                        </ul>
+                    </li>
+                    <li>Manufacturer's warranty on all major equipment and workmanship warranty.</li>
+                    <li>Orka Solar warranty on installation and project performance.</li>
+                </ul>
+                
+                <h6 className="fw-bold">Major Equipment List</h6>
+                
+                <p>The major equipment and materials that may be used as part of this project is listed below:</p>
+                
+                <div className="table-responsive">
+                    <table className="table table-bordered table-sm compact-table">
+                        <tbody>
+                            <tr>
+                                <td style={{width: '30%'}}>PV Modules</td>
+                                <td style={{width: '30%'}}>
+                                    Tier 1:<br/>
+                                    JA Solar/ Jinko Solar
+                                </td>
+                                <td style={{width: '40%', textAlign: 'center'}}>
+                                    {/* Placeholder for JA Solar & Jinko logos */}
+                                    <div className="d-flex justify-content-around align-items-center">
+                                        <div className="logo-placeholder">JA SOLAR</div>
+                                        <div className="logo-placeholder">Jinko Solar</div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Grid Inverters</td>
+                                <td>Fronius</td>
+                                <td style={{textAlign: 'center'}}>
+                                    {/* Placeholder for inverter logos */}
+                                    <div className="d-flex justify-content-around align-items-center">
+                                        <div className="logo-placeholder">Fronius</div>
+                                        <div className="logo-placeholder">SMA</div>
+                                        <div className="logo-placeholder">HUAWEI</div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Hybrid Inverters</td>
+                                <td>Victron Hybrid</td>
+                                <td style={{textAlign: 'center'}}>
+                                    {/* Placeholder for Victron logo */}
+                                    <div className="logo-placeholder">victron energy</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Mounting Structure</td>
+                                <td>
+                                    Lumax <sup>®</sup>
+                                </td>
+                                <td style={{textAlign: 'center'}}>
+                                    {/* Placeholder for Lumax logo */}
+                                    <div className="logo-placeholder">LUMAX ENERGY</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Switch Gear</td>
+                                <td>ABB/ Schneider</td>
+                                <td style={{textAlign: 'center'}}>
+                                    {/* Placeholder for Schneider logo */}
+                                    <div className="logo-placeholder">Schneider Electric</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Battery Storage<br/>LiFePO4 &<br/>Super Caps</td>
+                                <td>
+                                    Freedom Won<br/>
+                                    WEST (S Caps)
+                                </td>
+                                <td style={{textAlign: 'center'}}>
+                                    {/* Placeholder for battery logos */}
+                                    <div className="d-flex justify-content-around align-items-center">
+                                        <div className="logo-placeholder">freedom won</div>
+                                        <div className="logo-placeholder">WEST</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h6 className="fw-bold">QUALITY AND WARRANTY</h6>
+
+                <p>
+                    Orka Solar is product agnostic and can therefore supply equipment to the client's specification, provided that 
+                    the equipment meets the minimum quality standards of our company. Orka Solar has long standing relationships 
+                    with our product suppliers and the products proposed as part of this design are of the highest quality and comes 
+                    with standard supplier or manufacturer's warranties. Only internationally recognised tier 1 rated panels will be 
+                    supplied.
+                </p>
+                
+                <p>Major component warranty details are provided below:</p>
+                
+                <ul className="ps-4">
+                    <li>PV modules: <span className="fw-bold">12-year</span> product warranty, <span className="fw-bold">25-year</span> linear power output warranty</li>
+                    <li>Inverter: <span className="fw-bold">5-year</span> manufacturer's warranty (option to extend to 10 years)</li>
+                    <li>Mounting system <span className="fw-bold">10-year</span> manufacturer's warranty</li>
+                    <li>Workmanship warranty of <span className="fw-bold">2-years</span></li>
+                    <li>Post installation maintenance, monitoring and control service available from Orka Solar to ensure optimal benefit from the system.</li>
+                </ul>
+            </div>
+        </StandardPage>
+
+        <StandardPage
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={14} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report
+        >
+            <div className="terms-of-service">
+                <h6 className="fw-bold">TERMS OF SERVICE</h6>
+
+                <p>The project's invoicing will be as follows: 50% deposit on order, 40% on delivery of panels and inverters to site and 10% on project handover certificate sign off.
+                
+                Prices are valid to 30 August 2025. Thereafter, prices may change due to exchange rate fluctuations, inflation (CPI) and/or supplier price changes.
+                
+                Invoices will be paid on 7 days terms.
+                
+                Late delivery penalty due to delays caused by the contractor will be 0.5% of project value per week.
+                </p>
+                <h6 className="fw-bold mt-2">PROJECT SCHEDULE</h6>
+
+                <p>The project timeline is dependent on the date of deposit and availability of key components. An indicative timeline for this project without any delays due to long lead items are shown below:</p>
+                
+                <div className="table-responsive">
+                    <table className="table table-bordered table-sm compact-table">
+                        <thead>
+                            <tr>
+                                <th>Activity/ phase/ milestone</th>
+                                <th>Project week</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {projectSchedule.map((item, index) => (
+                                <tr key={index}>
+                                    <td>{item.activity}</td>
+                                    <td>{item.timeline}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                <h6 className="fw-bold">STANDARDS AND REGULATIONS</h6>
+
+                <p>Orka Solar installations are completed in compliance with the following standards and regulations where applicable:</p>
+                
+                <ul className="ps-4">
+                    <li>Electricity Regulation Act, 2006</li>
+                    <li>NRS097-2-1: Utility Interface</li>
+                    <li>NRS097-2-3: Simplified utility connection criteria for low-voltage connected generators</li>
+                    <li>South African Renewable Power Plant Grid Code (although the NRS 097-2 series cover most issues relevant to SSEG)</li>
+                    <li>NRS 048: Electricity Supply – Quality of Supply</li>
+                    <li>SANS 10142-1 and 10142-1-2: The wiring of premises (as amended and published)</li>
+                    <li>SANS 62305-4:2011 Protection against lightning and Surge – Surge Arrestors and Earthing Regulations</li>
+                    <li>SANS 474 / NRS 057: Code of Practice for Electricity Metering</li>
+                    <li>Municipal Electricity Supply by-laws of the applicable municipality</li>
+                </ul>
+            </div>
+        </StandardPage>
+
+        <StandardPage
+            header="System Performance"
+            // footer="Orka Solar - Design Report"
+            data={data} // Pass the data prop to StandardPage
+            pageNumber={15} // Set an appropriate page number here
+            totalPages={24} // Set the total number of pages in your report
+        >
+            <h6 className="fw-bold">Notable Points</h6>
+                <p>The following assumptions and exclusions were made and form part of this proposal:</p>
+                <ol className="ps-4">
+                    <li>Actual consumption data was not used for the design or simulations of the solution. Should the loads change or differ from the data analysed Orka Solar should be notified by the client.</li>
+                    <li>It was assumed that the consumption data is a fair representation of the future consumption.</li>
+                    <li>When applicable, in most municipalities there is currently either no regulations around exporting electricity to the grid, or such export is prohibited. For this reason, Orka Solar advise against exporting excess solar energy to the grid without the required permits, although many of Orka Solar' clients have chosen to export where possible. All inverters supplied by Orka Solar conform to internationally recognized grid-export safety regulations.</li>
+                    <li>The scope and activities listed as part of this proposal is sufficient so successfully delivery the project. Any additional work, not listed as part of this scope and which could not be taken into account, will be negotiated separately, regarding any additional time and/or materials that may be required.</li>
+                    <li>Orka Solar reserve the right to requote should a detailed site visit and logging not have been completed or if any of the assumptions or information provided are found not to be accurate.</li>
+                    <li>It was assumed that all existing infrastructure on site are installed according to the relevant standards and complies with regulation.</li>
+                    <li>Unless specified otherwise:
+                        <ol type="a" className="ps-4">
+                            <li>Generator integration is excluded.</li>
+                            <li>Construction of walkways are excluded.</li>
+                            <li>No roof inspection for possible roof mounted panels were included, it is recommended that the client conduct such an inspection or contact Orka Solar to facilitate an inspection with a qualified third party.</li>
+                            <li>Tree trimming/removal is excluded from the scope of work.</li>
+                            <li>MV Transformers and/or MV switchgear are excluded.</li>
+                            <li>No cost for building an inverter enclosure has been excluded.</li>
+                            <li>No cost for internet supply has been allowed for, as the client will supply internet to the inverter enclosure by means of an ethernet socket.</li>
+                            <li>No costs for Eskom's SSEG or NERSA administration has been allowed.</li>
+                            <li>It was assumed that all existing infrastructure on site are installed according to the relevant standards and complies with regulation.</li>
+                        </ol>
+                    </li>
+                    <li>Orka Solar guarantees the production output of the system if an active Orka Solar SLA is in place.</li>
+                </ol>
+
+        </StandardPage>
+
     </>
     );
 }

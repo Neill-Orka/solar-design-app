@@ -1264,6 +1264,23 @@
     font-size: 0.9rem;
 }
 
+/* Add this to your CSS or as a style tag */
+.circle-list {
+    list-style-type: circle;
+    padding-left: 2rem;
+    margin-top: 0.5rem;
+}
+
+.logo-placeholder {
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-style: italic;
+    color: #666;
+}
+
 /* For print, ensure the table stays compact */
 @media print {
     .compact-table {
