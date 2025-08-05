@@ -21,7 +21,7 @@ def list_products():
     category = request.args.get('category')  # optional filter
     query = Product.query
     if category:
-        query = query.filter_by(category=category)
+        query = query.filter(Product.category.ilike(category))
     return jsonify([p.as_dict() for p in query.all()])
 
 @products_bp.route('/products/<int:pid>', methods=['GET'])

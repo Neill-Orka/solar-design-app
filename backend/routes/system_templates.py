@@ -19,12 +19,13 @@ def get_system_templates():
 
         for comp in template.components:
             if comp.product:
+                cat = (comp.product.category or '').lower()
                 total_cost += (comp.product.price or 0) * comp.quantity
-                if comp.product.category == 'panel':
+                if cat == 'panel':
                     panel_kw += (comp.product.power_w or 0) * comp.quantity / 1000
-                elif comp.product.category == 'inverter':
+                elif cat == 'inverter':
                     inverter_kva += (comp.product.rating_kva or 0) * comp.quantity # MOET INVERTERS BY MEKAAR GETEL WORD? 
-                elif comp.product.category == 'battery':
+                elif cat == 'battery':
                     battery_kwh += (comp.product.capacity_kwh or 0) * comp.quantity
 
                 components_list.append({

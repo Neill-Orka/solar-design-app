@@ -10,20 +10,46 @@ const EMPTY_PRODUCT = {
     cost: '', price: '', warranty_y: '', notes: '', properties: ''
 };
 
+//  Meta for every field we MIGHT display/edit
+const FIELD_META = {
+  brand:        { label: "Brand",          type: "text"   },
+  model:        { label: "Model / SKU",    type: "text"   },
+  price:        { label: "Price (R)",      type: "number" },
+  power_w:      { label: "Power (W)",      type: "number", category: "Panel"    },
+  rating_kva:   { label: "Rating (kVA)",   type: "number", category: "Inverter" },
+  capacity_kwh: { label: "Capacity (kWh)", type: "number", category: "Battery"  },
+  unit_cost:    { label: "Unit Cost (R)",  type: "number" },
+  margin:       { label: "Margin (%)",     type: "number" },
+  warranty_y:   { label: "Warranty (y)",   type: "number" },
+  notes:        { label: "Notes",          type: "textarea" },
+};
+
+// Helper that only returns the keys that are not null
+const getVisibleFields = (prod) => {
+    return Object.keys(FIELD_META)
+    .filter((k) => {
+        const catOK = !FIELD_META[k].category || FIELD_META[k].category === prod.category;
+        const v = prod[k];
+        return catOK && v !== null && v !== undefined && v !== '';
+    })
+    .map((k) => ({ key: k, meta: FIELD_META[k] }));
+};
+
+
 const getCategoryIcon = (category) => {
     switch(category) {
-        case 'panel': return 'bi-grid-3x3-gap-fill';
-        case 'inverter': return 'bi-box-seam';
-        case 'battery': return 'bi-battery-full';
+        case 'Panel': return 'bi-grid-3x3-gap-fill';
+        case 'Inverter': return 'bi-box-seam';
+        case 'Battery': return 'bi-battery-full';
         default: return 'bi-gear-fill';
     }
 };
 
 const getCategoryColor = (category) => {
     switch(category) {
-        case 'panel': return 'warning';
-        case 'inverter': return 'info';
-        case 'battery': return 'success';
+        case 'Panel': return 'warning';
+        case 'Inverter': return 'info';
+        case 'Battery': return 'success';
         default: return 'secondary';
     }
 };
@@ -162,30 +188,27 @@ export default function ProductsAdmin() {
                                                     <Card.Subtitle className="text-muted mb-3">{product.model}</Card.Subtitle>
 
                                                     <div className="mb-3">
-                                                        {product.category === 'panel' && product.power_w && (
-                                                            <div className="d-flex justify-content-between align-items-center mb-1">
-                                                                <small className="text-muted">Power:</small>
-                                                                <Badge bg="warning" text="dark">{product.power_w}W</Badge>
+                                                        {getVisibleFields(product).map(({ key, meta }) => (
+                                                          ["power_w","rating_kva","capacity_kwh","price"].includes(key) && (
+                                                            <div
+                                                              key={key}
+                                                              className="d-flex justify-content-between align-items-center mb-1"
+                                                            >
+                                                              <small className="text-muted">{meta.label.replace(/ \(.+/, "")}:</small>
+                                                              <Badge bg={
+                                                                key === "power_w" ? "warning"
+                                                                : key === "rating_kva" ? "info"
+                                                                : key === "capacity_kwh" ? "success"
+                                                                : "secondary"
+                                                              } text={key === "power_w" ? "dark" : undefined}>
+                                                                {key === "price" ? "R " : ""}{product[key]}
+                                                                {key === "power_w" ? "W" :
+                                                                 key === "rating_kva" ? "kVA" :
+                                                                 key === "capacity_kwh" ? "kWh" : ""}
+                                                              </Badge>
                                                             </div>
-                                                        )}
-                                                        {product.category === 'inverter' && product.rating_kva && (
-                                                            <div className="d-flex justify-content-between align-items-center mb-1">
-                                                                <small className="text-muted">Rating:</small>
-                                                                <Badge bg="info">{product.rating_kva}kVA</Badge>
-                                                            </div>
-                                                        )}
-                                                        {product.category === 'battery' && product.capacity_kwh && (
-                                                            <div className="d-flex justify-content-between align-items-center mb-1">
-                                                                <small className="text-muted">Capacity:</small>
-                                                                <Badge bg="success">{product.capacity_kwh}kWh</Badge>
-                                                            </div>
-                                                        )}
-                                                        {product.price && (
-                                                            <div className="d-flex justify-content-between align-items-center">
-                                                                <small className="text-muted">Price:</small>
-                                                                <span className="fw-bold text-primary">R{product.price?.toLocaleString()}</span>
-                                                            </div>
-                                                        )}
+                                                          )
+                                                        ))}
                                                     </div>
 
                                                     <div className="d-flex gap-2 mt-auto">
@@ -227,154 +250,32 @@ export default function ProductsAdmin() {
                 </Modal.Header>
                 <Modal.Body className="p-4">
                     <Form>
-                        <Row className="mb-3">
-                            <Col md={4}>
-                                <Form.Group>
-                                    <Form.Label className="fw-semibold">Category</Form.Label>
-                                    <Form.Select 
-                                        value={form.category}
-                                        onChange={e => handleChange('category', e.target.value)}
-                                        size="lg"
-                                        className="rounded-lg"
-                                    >
-                                        <option value="panel">Panel</option>
-                                        <option value="inverter">Inverter</option>
-                                        <option value="battery">Battery</option>
-                                        <option value="fuse">Fuse</option>
-                                        <option value="cable">Cable</option>
-                                        <option value="breaker">Breaker</option>
-                                        <option value="isolator">Isolator</option>
-                                    </Form.Select>
-                                </Form.Group>
+                        {getVisibleFields(form).map(({ key, meta }) => (
+                          <Row className="mb-3" key={key}>
+                            <Col md={6}>
+                              <Form.Group>
+                                <Form.Label className="fw-semibold">{meta.label}</Form.Label>
+                                {meta.type === "textarea" ? (
+                                  <Form.Control
+                                    as="textarea"
+                                    rows={3}
+                                    value={form[key] || ""}
+                                    onChange={(e) => handleChange(key, e.target.value)}
+                                    className="rounded-lg"
+                                  />
+                                ) : (
+                                  <Form.Control
+                                    type={meta.type}
+                                    value={form[key] || ""}
+                                    onChange={(e) => handleChange(key, e.target.value)}
+                                    size="lg"
+                                    className="rounded-lg"
+                                  />
+                                )}
+                              </Form.Group>
                             </Col>
-                            <Col md={4}>
-                                <Form.Group>
-                                    <Form.Label className="fw-semibold">Brand</Form.Label>
-                                    <Form.Control 
-                                        value={form.brand}
-                                        onChange={e => handleChange('brand', e.target.value)}
-                                        size="lg"
-                                        className="rounded-lg"
-                                        placeholder="e.g., SunPower"
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                                <Form.Group>
-                                    <Form.Label className="fw-semibold">Model</Form.Label>
-                                    <Form.Control 
-                                        value={form.model}
-                                        onChange={e => handleChange('model', e.target.value)}
-                                        size="lg"
-                                        className="rounded-lg"
-                                        placeholder="e.g., A-Series"
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-
-                        <Row className="mb-3">
-                            {form.category === 'panel' && (
-                                <Col md={4}>
-                                    <Form.Group>
-                                        <Form.Label className="fw-semibold">Power (W)</Form.Label>
-                                        <Form.Control 
-                                            type="number" 
-                                            value={form.power_w || ''}
-                                            onChange={e => handleChange('power_w', e.target.value)}
-                                            size="lg"
-                                            className="rounded-lg"
-                                            placeholder="e.g., 400"
-                                        />
-                                    </Form.Group>
-                                </Col>
-                            )}
-                            {form.category === 'inverter' && (
-                                <Col md={4}>
-                                    <Form.Group>
-                                        <Form.Label className="fw-semibold">Rating (kVA)</Form.Label>
-                                        <Form.Control 
-                                            type="number" 
-                                            value={form.rating_kva || ''}
-                                            onChange={e => handleChange('rating_kva', e.target.value)}
-                                            size="lg"
-                                            className="rounded-lg"
-                                            placeholder="e.g., 5"
-                                        />
-                                    </Form.Group>
-                                </Col>
-                            )}
-                            {form.category === 'battery' && (
-                                <Col md={4}>
-                                    <Form.Group>
-                                        <Form.Label className="fw-semibold">Capacity (kWh)</Form.Label>
-                                        <Form.Control 
-                                            type="number" 
-                                            value={form.capacity_kwh || ''}
-                                            onChange={e => handleChange('capacity_kwh', e.target.value)}
-                                            size="lg"
-                                            className="rounded-lg"
-                                            placeholder="e.g., 10"
-                                        />
-                                    </Form.Group>
-                                </Col>
-                            )}
-
-                            <Col md={4}>
-                                <Form.Group>
-                                    <Form.Label className="fw-semibold">Price (R)</Form.Label>
-                                    <Form.Control 
-                                        type="number" 
-                                        value={form.price || ''}
-                                        onChange={e => handleChange('price', e.target.value)}
-                                        size="lg"
-                                        className="rounded-lg"
-                                        placeholder="e.g., 5000"
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                                <Form.Group>
-                                    <Form.Label className="fw-semibold">Warranty (years)</Form.Label>
-                                    <Form.Control 
-                                        type="number" 
-                                        value={form.warranty_y || ''}
-                                        onChange={e => handleChange('warranty_y', e.target.value)}
-                                        size="lg"
-                                        className="rounded-lg"
-                                        placeholder="e.g., 25"
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-
-                        <Form.Group className="mb-3">
-                            <Form.Label className="fw-semibold">Properties (JSON format)</Form.Label>
-                            <Form.Control 
-                                as="textarea"
-                                rows={7}
-                                value={
-                                    typeof form.properties === 'object' && form.properties !== null
-                                    ? JSON.stringify(form.properties, null, 2)
-                                    : form.properties || ''
-                                }
-                                onChange={e => handleChange('properties', e.target.value)}
-                                className="rounded-lg font-monospace"
-                                placeholder='{ "voltage": "48", "type": "lithium" }'
-                            />
-                        </Form.Group>
-
-                        <Form.Group className="mb-3">
-                            <Form.Label className="fw-semibold">Notes</Form.Label>
-                            <Form.Control 
-                                as="textarea" 
-                                rows={3} 
-                                value={form.notes || ''}
-                                onChange={e => handleChange('notes', e.target.value)}
-                                className="rounded-lg"
-                                placeholder="Additional product details or specifications..."
-                            />
-                        </Form.Group>
+                          </Row>
+                        ))}
                     </Form>
                 </Modal.Body>
                 <Modal.Footer className="bg-light">

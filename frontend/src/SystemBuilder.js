@@ -3,22 +3,22 @@ import axios from 'axios';
 import { Container, Row, Col, Card, Button, Form, Spinner, Alert, InputGroup, Badge, ListGroup, Stack } from 'react-bootstrap';
 import { API_URL } from './apiConfig';
 
-const CATEGORIES = [
-    { key: 'panel', name: 'Panels', icon: 'bi-grid-3x3-gap-fill', color: 'warning' },
-    { key: 'inverter', name: 'Inverters', icon: 'bi-box-seam', color: 'info' },
-    { key: 'battery', name: 'Batteries', icon: 'bi-battery-full', color: 'success' },
-    { key: 'breaker', name: 'Circuit Breakers', icon: 'bi-lightning-charge-fill', color: 'danger' },
-    { key: 'fuse', name: 'Fuses', icon: 'bi-shield-slash-fill', color: 'danger' },
-    { key: 'isolator', name: 'Isolators', icon: 'bi-plugin-fill', color: 'secondary' },
-    { key: 'inverter_aux', name: 'Inverter Aux', icon: 'bi-hdd-stack-fill', color: 'secondary' },
-    { key: 'dc_cable', name: 'DC Cables', icon: 'bi-plug-fill', color: 'dark' },
-    { key: 'accessory', name: 'Accessories', icon: 'bi-gear-fill', color: 'secondary' },
-];
+const CATEGORY_META = {
+  panel:        { name: 'Panels',           icon: 'bi-grid-3x3-gap-fill',     color: 'warning'  },
+  inverter:     { name: 'Inverters',        icon: 'bi-box-seam',              color: 'info'     },
+  battery:      { name: 'Batteries',        icon: 'bi-battery-full',          color: 'success'  },
+  fuse:         { name: 'Fuses',            icon: 'bi-shield-slash-fill',     color: 'danger'   },
+  breaker:      { name: 'Circuit Breakers', icon: 'bi-lightning-charge-fill', color: 'danger'   },
+  isolator:     { name: 'Isolators',        icon: 'bi-plugin-fill',           color: 'secondary'},
+  inverter_aux: { name: 'Inverter Aux',     icon: 'bi-hdd-stack-fill',        color: 'secondary'},
+  dc_cable:     { name: 'DC Cables',        icon: 'bi-plug-fill',             color: 'dark'     },
+  accessory:    { name: 'Accessories',      icon: 'bi-gear-fill',             color: 'secondary'},
+};
 
-const ProductList = ({ category, products, searchFilter, onSearchChange, onAddComponent }) => {
-    const searchTerm = searchFilter.toLowerCase();
-    const categoryInfo = CATEGORIES.find(c => c.key === category) || {};
+const ProductList = ({ category, products, searchFilter, onSearchChange, onAddComponent, categoryMeta }) => {
+    const categoryInfo = categoryMeta;
 
+    const searchTerm = (searchFilter || '').toLowerCase();
     const filteredProducts = products.filter(p => 
         p.category === category &&
         `${p.brand || ''} ${p.model || ''} ${p.power_w || ''} ${p.rating_kva || ''} ${p.capacity_kwh || ''}`.toLowerCase().includes(searchTerm)
@@ -102,9 +102,29 @@ function SystemBuilder() {
         fetchTemplates();
     }, []);
 
+    const slugify = (raw = '') => 
+        raw.toString()
+            .toLowerCase()
+            .replace(/&/g, ' and ')
+            .replace(/[^\w\s]/g, '')
+            .trim()
+            .replace(/\s+/g, '_');
+
+    const getMeta = (slug) => ({
+        name: CATEGORY_META[slug]?.name || slug.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        icon: CATEGORY_META[slug]?.icon || 'bi-box',
+        color: CATEGORY_META[slug]?.color || 'secondary',
+    });
+
     const fetchProducts = () => {
         axios.get(`${API_URL}/api/products`)
-            .then(res => setProducts(res.data))
+            .then(res => {
+                const normalised = res.data.map(p => ({
+                    ...p,
+                    category: slugify(p.category)
+                }));
+                setProducts(normalised);
+            })
             .catch(err => {
                 console.error("Error fetching products:", err);
                 setError('Failed to load products. The builder cannot be used.');
@@ -234,21 +254,17 @@ function SystemBuilder() {
 
                             <hr className="my-4" />
 
-                            {CATEGORIES.map(cat => {
-                                const productsInCategory = products.some(p => p.category === cat.key);
-                                if (!productsInCategory) return null; // Skip categories with no products
-
-                                return (
+                            {Array.from(new Set(products.map(p => p.category))).sort().map(slug => (
                                     <ProductList 
-                                        key={cat.key}
-                                        category={cat.key}
+                                        key={slug}
+                                        category={slug}
                                         products={products}
-                                        searchFilter={searchFilters[cat.key] || ''}
+                                        categoryMeta={getMeta(slug)}
+                                        searchFilter={searchFilters[slug] || ''}
                                         onSearchChange={handleSearchChange}
                                         onAddComponent={addComponent}
                                     />
-                                )
-                            })}
+                            ))}
                         </Card>
                     </Col>
 
