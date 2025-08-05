@@ -41,6 +41,7 @@ def get_system_templates():
             'name': template.name,
             'description': template.description,
             'system_type': template.system_type,
+            'extras_cost': template.extras_cost or 0,  # Add this line to explicitly include extras_cost
             'total_cost': total_cost,
             'panel_kw': round(panel_kw, 2),
             'inverter_kva': round(inverter_kva, 2),
