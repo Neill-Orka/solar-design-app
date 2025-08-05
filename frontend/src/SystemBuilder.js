@@ -185,7 +185,7 @@ function SystemBuilder() {
         };
 
         const request = editingTemplate
-            ? axios.put(`${API_URL}/system_templates/${editingTemplate.id}`, payload)
+            ? axios.put(`${API_URL}/api/system_templates/${editingTemplate.id}`, payload)
             : axios.post(`${API_URL}/api/system_templates`, payload);
 
         request.then(res => {
