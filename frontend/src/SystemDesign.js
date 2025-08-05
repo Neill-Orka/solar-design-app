@@ -31,13 +31,15 @@ const SizingView = ({ design, onDesignChange, onPromote, products, usePvgis, set
   
   const handleTargetKwChange = (e) => {
     const kw = e.target.value;
-    const newNumPanels = (kw && parseFloat(kw) > 0) ? Math.ceil((parseFloat(kw) * 1000) / PANEL_WATTAGE) : '';
+    const panelWattage = design.selectedPanel?.product?.power_w || PANEL_WATTAGE;
+    const newNumPanels = (kw && parseFloat(kw) > 0) ? Math.ceil((parseFloat(kw) * 1000) / panelWattage) : '';
     onDesignChange({ ...design, panelKw: kw, numPanels: newNumPanels });
   };
 
   const handleNumPanelsChange = (e) => {
     const panels = e.target.value;
-    const newKw = (panels && parseInt(panels) > 0) ? ((parseInt(panels) * PANEL_WATTAGE) / 1000).toFixed(2) : '';
+    const panelWattage = design.selectedPanel?.product?.power_w || PANEL_WATTAGE;
+    const newKw = (panels && parseInt(panels) > 0) ? ((parseInt(panels) * panelWattage) / 1000).toFixed(2) : '';
     onDesignChange({ ...design, numPanels: panels, panelKw: newKw });
   };
 
@@ -52,7 +54,19 @@ const SizingView = ({ design, onDesignChange, onPromote, products, usePvgis, set
           return;
       }
 
-      const productList = products[key === 'selectedInverter' ? 'inverters' : 'batteries'] || [];
+      // Determine which product list to use based on the selection key
+      let productType;
+      if (key === 'selectedPanel') {
+        productType = 'panels';
+      } else if (key === 'selectedInverter') {
+        productType = 'inverters';
+      } else if (key === 'selectedBattery') {
+        productType = 'batteries';
+      } else {
+        return;
+      }
+
+      const productList = products[productType] || [];
       const productObject = productList.find(p => p.id === selectedOption.value);
       onDesignChange({ ...design, [key]: productObject ? { ...selectedOption, product: productObject } : null });
     };
@@ -183,11 +197,23 @@ const SizingView = ({ design, onDesignChange, onPromote, products, usePvgis, set
                                 </Form.Group>
                             </Col>
                         </Row>
-                        <div className="mt-auto">
-                            <p className="text-muted small mb-0">
-                                Using {PANEL_WATTAGE}W panels. Entering a value in one box will automatically calculate the other.
-                            </p>
-                        </div>
+                        <Row>
+                            <Col md={12}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Panel</Form.Label>
+                                    <Select
+                                        options={products.panels.map(p => ({
+                                            value: p.id,
+                                            label: `${p.brand} ${p.model}`
+                                        }))}
+                                        value={design.selectedPanel}
+                                        onChange={opt => handleSelectChange('selectedPanel', opt)}
+                                        isClearable
+                                        placeholder="Select panel.."
+                                    />
+                                </Form.Group>
+                            </Col>
+                        </Row>
                     </Card.Body>
                 </Card>
             </div>
@@ -535,6 +561,7 @@ function SystemDesign({ projectId }) {
         numPanels: '',
         tilt: '15',
         azimuth: '0',
+        selectedPanel: null,
         selectedInverter: null, // Will hold the full { value, label, product } object
         inverterQuantity: 1,
         selectedBattery: null,  // Will hold the full { value, label, product } object
@@ -623,7 +650,12 @@ function SystemDesign({ projectId }) {
             if (!p) return;
 
             const savedKw = p.panel_kw || '';
-            const numPanels = savedKw ? Math.ceil((savedKw * 1000) / PANEL_WATTAGE) : '';
+            const defaultPanelId = p.panel_id;
+            const currentPanel = defaultPanelId ?
+                products.panels.find(panel => panel.id === defaultPanelId) :
+                products.panels.find(panel => panel.power_w === PANEL_WATTAGE)
+
+            const numPanels = savedKw ? Math.ceil((savedKw * 1000) / (currentPanel?.power_w || PANEL_WATTAGE)) : '';
             
             // Find the full product object for the saved inverter
             const inverterInfo = p.inverter_kva && typeof p.inverter_kva === 'object' ? p.inverter_kva : {model: null, capacity: p.inverter_kva, quantity: 1 };
@@ -643,6 +675,7 @@ function SystemDesign({ projectId }) {
                 numPanels: numPanels,
                 tilt: p.surface_tilt ?? '15',
                 azimuth: p.surface_azimuth ?? '0',
+                selectedPanel: currentPanel ? { value: currentPanel.id, label: `${currentPanel.brand} ${currentPanel.model}`, product: currentPanel } : null,
                 selectedInverter: currentInverter ? { value: currentInverter.id, label: `${currentInverter.model} (${currentInverter.rating_kva}kVA)`, product: currentInverter } : null,
                 inverterQuantity: inverterInfo.quantity || 1,
                 selectedBattery: currentBattery ? { value: currentBattery.id, label: `${currentBattery.model} (${currentBattery.capacity_kwh}kWh)`, product: currentBattery } : null,
@@ -800,6 +833,7 @@ function SystemDesign({ projectId }) {
             surface_tilt: parseFloat(design.tilt),
             surface_azimuth: parseFloat(design.azimuth),
             allow_export: design.allowExport,
+            panel_id: design.selectedPanel?.product.id,
             inverter_kva: design.selectedInverter ? {
                 model: design.selectedInverter.product.model,
                 capacity: design.selectedInverter.product.rating_kva,
@@ -834,6 +868,7 @@ function SystemDesign({ projectId }) {
             profile_name: profileName,
             system: {
                 panel_kw: parseFloat(design.panelKw),
+                panel_id: design.selectedPanel?.product.id,
                 tilt: parseFloat(design.tilt),
                 azimuth: parseFloat(design.azimuth),
                 system_type: design.systemType,
@@ -851,7 +886,6 @@ function SystemDesign({ projectId }) {
                     return;
                 }
                 setSimulationData(res.data);
-                // Remove setChartKey line completely
 
                 try {
                     sessionStorage.setItem(`simulationData_${projectId}`, JSON.stringify(res.data));
@@ -876,9 +910,11 @@ function SystemDesign({ projectId }) {
         }
 
         const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0); // Set to beginning of start date
+        
         const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999); // Ensure the end date is inclusive
-
+        end.setHours(0, 0, 0, 0); // Set to beginning of end date - NOT end of day
+        
         const filtered = {
             timestamps: [], demand: [], generation: [], potential_generation: [],
             battery_soc: [], import_from_grid: [], export_to_grid: []
@@ -886,7 +922,7 @@ function SystemDesign({ projectId }) {
 
         simulationData.timestamps.forEach((ts, i) => {
             const date = new Date(ts);
-            if (date >= start && date <= end) {
+            if (date >= start && date < end) { // Changed <= to < to exclude the end date
                 filtered.timestamps.push(ts);
                 filtered.demand.push(simulationData.demand[i]);
                 filtered.generation.push(simulationData.generation[i]);

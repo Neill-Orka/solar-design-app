@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import inspect
+from sqlalchemy.orm import synonym
 
 db = SQLAlchemy()
 
@@ -57,24 +58,165 @@ class EnergyData(db.Model):
     demand_kw = db.Column(db.Float)
 
 class Product(db.Model):
-    __tablename__ = 'products'
-    id          = db.Column(db.Integer, primary_key=True)
-    category    = db.Column(db.String(20), index=True)  # 'panel', 'inverter', 'battery'
-    brand       = db.Column(db.String(80))
-    model       = db.Column(db.String(120))
-    power_w     = db.Column(db.Float,  nullable=True)   # panel STC power
-    rating_kva  = db.Column(db.Float,  nullable=True)   # inverter rating
-    capacity_kwh= db.Column(db.Float,  nullable=True)   # battery capacity
-    cost        = db.Column(db.Float,  nullable=True)   # your cost
-    price       = db.Column(db.Float,  nullable=True)   # selling price
-    warranty_y  = db.Column(db.Integer, nullable=True)
-    notes       = db.Column(db.String(250))
-    properties  = db.Column(JSONB, nullable=True)
+    __tablename__ = "products"
 
+    id = db.Column(db.Integer, primary_key=True)
+
+    # ─── 1‒11 : General info  ──────────────────────────────────────────────────
+    category               = db.Column("Category",               db.String(50))
+    component_type         = db.Column("Component Type",         db.String(50))
+    brand_name             = db.Column("Brand Name",             db.String(80))
+    description            = db.Column("Description",            db.String(300))
+    notes                  = db.Column("Notes",                  db.String(300))
+    supplier               = db.Column("Supplier",               db.String(80))
+    updated                = db.Column("Updated",                db.String(30))  # keep string for max flexibility
+    unit_cost              = db.Column("Unit Cost",              db.Float)
+    qty                    = db.Column("QTY",                    db.Integer)
+    margin                 = db.Column("Margin",                 db.Float)
+    price                  = db.Column("Price",                  db.Float)
+
+    # ─── 12‒17 : PV-module electrical  ────────────────────────────────────────
+    power_rating_w         = db.Column("Power Rating (W)",       db.Float)
+    isc_a                  = db.Column("Isc (A)",                db.Float)
+    max_voc_v              = db.Column("Max Voc (V)",            db.Float)
+    imp_a                  = db.Column("Imp (A)",                db.Float)
+    vmp                    = db.Column("Vmp",                    db.Float)
+    number_of_phases       = db.Column("Number Of Phases",       db.Integer)
+
+    # ─── 18‒27 : Inverter / charger limits  ───────────────────────────────────
+    power_rating_kva                       = db.Column("Power Rating (kVA)",                        db.Float)
+    number_of_inputs                       = db.Column("Number of Inputs",                         db.Integer)
+    max_input_current_per_input_a          = db.Column("Max Input Current per Input (A)",           db.Float)
+    number_of_mppt                         = db.Column("Number of MPPT",                           db.Integer)
+    max_input_current_per_mppt_a           = db.Column("Max Input Current per MPPT (A)",            db.Float)
+    max_isc_per_mppt_a                     = db.Column("Max Isc per MPPT (A)",                      db.Float)
+    max_dc_input_voltage_per_mppt_v        = db.Column("Max DC Input Voltage per MPPT (V)",         db.Float)
+    min_operating_voltage_range_v          = db.Column("Min Operating Voltage Range (V)",           db.Float)
+    max_operating_voltage_range_v          = db.Column("Max Operating Voltage Range (V)",           db.Float)
+    rated_input_voltage_v                  = db.Column("Rated Input Voltage (V)",                   db.Float)
+
+    # ─── 28‒31 : Battery specs  ───────────────────────────────────────────────
+    nominal_rating_kwh     = db.Column("Nominal Rating (kWh)",   db.Float)
+    usable_rating_kwh      = db.Column("Usable Rating (kWh)",    db.Float)
+    nominal_voltage_v      = db.Column("Nominal Voltage (V)",    db.Float)
+    nominal_amperage_a     = db.Column("Nominal Amperage (A)",   db.Float)
+
+    # ─── ALIASES : For Panel, Inverter and Battery  ───────────────────────────
+    power_w = synonym("power_rating_w")
+    rating_kva = synonym("power_rating_kva")
+    capacity_kwh = synonym("usable_rating_kwh")
+    brand = synonym("brand_name")
+    model = synonym("description") 
+
+    # ─── 32‒40 : Protection gear  ─────────────────────────────────────────────
+    poles                                = db.Column("Poles",                                db.Integer)
+    interrupting_capacity_ka             = db.Column("Interrupting Capacity (kA)",           db.Float)
+    min_current_rating_a                 = db.Column("Min Current Rating (A)",               db.Float)
+    max_current_rating_a                 = db.Column("Max Current Rating (A)",               db.Float)
+    voltage_rating_v                     = db.Column("Voltage Rating (V)",                   db.Float)
+    rated_voltage_v                      = db.Column("Rated Voltage (V)",                    db.Float)
+    nominal_current_a                    = db.Column("Nominal Current (A)",                  db.Float)
+    number_of_poles                      = db.Column("Number of Poles",                      db.Integer)
+    mounting_type                        = db.Column("Mounting Type",                        db.String(80))
+
+    # ─── 41‒56 : Cable / conductor parameters  ────────────────────────────────
+    cable_type                           = db.Column("Cable Type",                           db.String(80))
+    cable_size_mm2                       = db.Column("Cable Size (mm2)",                     db.Float)
+    cores_ac_cable                       = db.Column("Cores (AC Cable)",                     db.Integer)
+    ampacity_at_30c                      = db.Column("Ampacity at 30C",                      db.Float)
+    current_rating_ground_a              = db.Column("Current Rating (Ground) [A]",          db.Float)
+    current_rating_air_a                 = db.Column("Current Rating (Air) [A]",             db.Float)
+    current_rating_duct_a                = db.Column("Current Rating (Duct) [A]",            db.Float)
+    impedance_ohm_per_km                 = db.Column("Impedance (Ohm/km)",                   db.Float)
+    volt_drop_3ph_mv_per_a_m             = db.Column("3 Phase Volt Drop (mV/A/m)",           db.Float)
+    volt_drop_1ph_mv_per_a_m             = db.Column("1 Phase Volt Drop (mV/A/m)",           db.Float)
+    d1                                   = db.Column("D1",                                   db.Float)
+    d                                    = db.Column("d",                                    db.Float)
+    d2                                   = db.Column("D2",                                   db.Float)
+    mass_kg_per_km                       = db.Column("Mass (kg/km)",                         db.Float)
+    insulation_sheath                    = db.Column("Insulation/Sheath",                    db.String(80))
+    armour                               = db.Column("Armour",                               db.String(80))
+
+    # ─── 57‒68 : Voltage ratings  ─────────────────────────────────────────────
+    work_v_phase_to_earth_ac             = db.Column("Working voltage (phase to earth) - AC Cable", db.Float)
+    work_v_phase_to_phase_ac             = db.Column("Working voltage (phase to phase) - AC Cable", db.Float)
+    core                                 = db.Column("Core",                                 db.String(40))
+    cross_section_mm2                    = db.Column("Cross Section (mm2)",                  db.Float)
+    current_rating_a                     = db.Column("Current Rating (A)",                   db.Float)
+    voltage_drop_v_per_a_km              = db.Column("Voltage Drop (V/A/km)",                db.Float)
+    max_outer_diam_mm                    = db.Column("Max Outer Diam (mm)",                  db.Float)
+    weight_kg_per_km                     = db.Column("Weight (kg/km)",                       db.Float)
+    resistance_ohm_per_km                = db.Column("Resistance (ohm/km)",                    db.Float)
+    work_v_phase_to_earth_h07            = db.Column("Working voltage (phase to earth) - H07RN-F", db.Float)
+    work_v_phase_to_phase_h07            = db.Column("Working voltage (phase to phase) - H07RN-F", db.Float)
+    copper_cross_section_mm2             = db.Column("Copper Cross Section (mm2)",           db.Float)
+
+    # ─── 69‒78 : Organisers & mounting hardware  ──────────────────────────────
+    organiser_series       = db.Column("Organiser Series",            db.String(80))
+    organiser_length_m     = db.Column("Organiser Length (m)",        db.Float)
+    organiser_width_mm     = db.Column("Organiser Width (mm)",        db.Float)
+    organiser_height_mm    = db.Column("Organiser Height (mm)",       db.Float)
+    organiser_colour       = db.Column("Organiser Colour",            db.String(40))
+    material_duty          = db.Column("Material/Duty",               db.String(80))
+    mount_context          = db.Column("Mount Context",               db.String(80))
+    roof_interface         = db.Column("Roof Interface",              db.String(80))
+    mount_type             = db.Column("Mount Type",                  db.String(80))
+    tilt_angle_deg         = db.Column("Tilt Angle (deg)",            db.Float)
+
+    # ─── 79‒88 : Structural / enclosure  ──────────────────────────────────────
+    has_base_rails         = db.Column("Has Base Rails",              db.Boolean)
+    ballasted_mount        = db.Column("Ballasted Mount",             db.Boolean)
+    switch_min_current_rating = db.Column("Switch Min Current Rating", db.Float)
+    switch_max_current_rating = db.Column("Switch Mx Current Rating",  db.Float)
+    switchover_poles       = db.Column("Switchover Poles",           db.Integer)
+    voltage                = db.Column("Voltage",                    db.Float)
+    enclosure_width_mm     = db.Column("Enclosure Width (mm)",       db.Float)
+    enclosure_height_mm    = db.Column("Enclosure Height (mm)",      db.Float)
+    enclosure_depth_mm     = db.Column("Enclosure Depth (mm)",       db.Float)
+    ip_rating              = db.Column("IP Rating",                  db.String(20))
+    door_type              = db.Column("Door Type",                  db.String(50))
+
+    # ─── 89‒97 : Distribution board (DB) info  ───────────────────────────────
+    db_width_mm            = db.Column("DB Width (mm)",              db.Float)
+    db_height_mm           = db.Column("DB Height (mm)",             db.Float)
+    db_depth_mm            = db.Column("DB Depth (mm)",              db.Float)
+    db_mounting_type       = db.Column("DB Mounting Type",           db.String(50))
+    db_weatherproof_rating = db.Column("DB Weatherproof Rating",     db.String(50))
+    db_modular_size        = db.Column("DB Modular Size",            db.Integer)
+    voltage_class          = db.Column("Voltage Class",              db.String(50))
+    current_rating         = db.Column("Current Rating",             db.Float)
+
+    # ─── 98‒108 : Electronics & comms  ────────────────────────────────────────
+    mppt_communication     = db.Column("MPPT Communication",         db.String(80))
+    enclosure              = db.Column("Enclosure",                  db.String(80))
+    mppt_application       = db.Column("MPPT Application",           db.String(80))
+    mounting               = db.Column("Mounting",                   db.String(80))
+    function               = db.Column("Function",                   db.String(80))
+    control_communication  = db.Column("Control Communication",      db.String(80))
+    model_code_sku         = db.Column("Model Code / SKU",           db.String(120))
+    control_application    = db.Column("Control Application",        db.String(80))
+    monitoring_function    = db.Column("Monitoring Function",        db.String(80))
+    monitoring_communication = db.Column("Monitoring Communication", db.String(80))
+    monitoring_application = db.Column("Monitoring Application",     db.String(80))
+
+    # ─── Optional catch-all for anything else  ────────────────────────────────
+    properties = db.Column(JSONB, nullable=True)
+
+    # -------------------------------------------------------------------------
     def as_dict(self):
-        "Return a plain-dict representation of the Product instance (handy for JSON)."
-        from sqlalchemy.inspection import inspect as sqlalchemy_inspect
-        return {c.key: getattr(self, c.key) for c in sqlalchemy_inspect(self).mapper.column_attrs}
+        from sqlalchemy.inspection import inspect
+        d = {c.key: getattr(self, c.key) for c in inspect(self).mapper.column_attrs}
+    
+        d["brand"] = d.pop("brand_name", None)
+        d["model"] = d.pop("description", None)
+        d["power_w"] = d.pop("power_rating_w", None)
+        d["rating_kva"] = d.pop("power_rating_kva", None)
+        d["capacity_kwh"] = d.pop("usable_rating_kwh", None)
+
+        for k in ("brand_name", "description", "power_rating_w", "power_rating_kva", "usable_rating_kwh"):
+            d.pop(k, None)
+
+        return d
     
 class ComponentRule(db.Model):
     __tablename__ = 'component_rules'

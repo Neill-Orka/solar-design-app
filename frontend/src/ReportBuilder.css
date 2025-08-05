@@ -1,0 +1,1293 @@
+/* --- Base and Page Setup --- */
+.proposal-body {
+    background-color: #525659;
+}
+
+.page {
+    background: white;
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto 2rem auto;
+    padding: 2cm; /* Standard A4 padding */
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    width: 21cm;
+    height: 29.7cm;
+    position: relative;
+    font-family: Calibri, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
+
+
+
+/* --- Cover Page (Page 1) - NEW STYLES --- */
+.cover-page {
+    padding: 0; /* Remove padding to allow full-page background */
+    justify-content: space-between;
+}
+
+.cover-page header {
+    padding: 2cm 2cm 0 2cm; /* Re-apply padding to the header */
+    height: 33%; /* Give the top section a third of the page */
+}
+
+.cover-page .logo {
+    max-width: 250px;
+}
+
+.cover-content {
+    height: 50%;
+    min-height: 400px;
+    background-image: url('assets/solar_panel_bg.png');
+    background-size: auto;
+    background-position: left 50%;
+    background-repeat: no-repeat;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* White gradient overlay */
+.cover-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* background: linear-gradient(to top, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.7) 70%); */
+}
+
+.content-box {
+    position: relative; /* Ensure text is above the gradient overlay */
+    padding: 0 2cm; /* Match page padding */
+    width: 100%;
+}
+
+.proposal-title {
+    font-size: 1.5rem;
+    font-weight: normal;
+    margin-bottom: 1.5rem;
+}
+
+.project-name-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    border-bottom: 1px solid #000;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.detail-line {
+    border-bottom: 1px solid #000;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.detail-line .label {
+    display: inline-block;
+    width: 200px; /* Adjust width as needed for alignment */
+}
+
+.date-info {
+    font-size: 1.1rem;
+}
+
+.compiler-info span {
+    display: block;
+    font-size: 0.9rem;
+    color: #333;
+}
+
+/* --- Page 2: Design --- */
+
+/* Add a specific class to the page for easier targeting */
+.page-2 {
+    padding-top: 4cm; /* Add more space at the top */
+    overflow: hidden; /* Prevents background graphic from spilling out */
+}
+
+/* Ensure the generic header for page 2 has an underline */
+.page-2 .page-header {
+    border-bottom: 1px solid #bfbfbf;
+    padding-bottom: 0.5rem;
+    width: calc(100% - 4cm);
+}
+
+/* Position the footer in the center for page 2 */
+.page-2 .page-footer {
+    width: 100%;
+    left: 0;
+    text-align: center;
+}
+
+.metrics-column {
+    width: 60%; /* Takes up the left side of the page */
+}
+
+.metric-item {
+    margin-bottom: 1rem;
+}
+
+.metric-label {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #595959;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+}
+
+.metric-value-card {
+    border: 4px double #33d5a2; /* Light green double border */
+    border-radius: 50px; /* Pill shape */
+    padding: 0.5rem 1rem;
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #0bce8d; /* Darker green text */
+    max-width: 250px; /* Constrain width */
+}
+
+.vat-label {
+    font-size: 0.8rem;
+    font-weight: normal;
+    color: #595959;
+}
+
+.design-title-column {
+    width: 40%;
+    text-align: right;
+}
+
+.design-title-kw {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #70ad47; /* Bright green */
+    margin: 0;
+    line-height: 1;
+}
+
+.design-title-text {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #c5e0b3; /* Lighter olive green */
+    margin: 0;
+    line-height: 1;
+}
+
+.background-logo-graphic {
+    position: absolute;
+    bottom: -100px;
+    right: -150px;
+    width: 600px;
+    height: 600px;
+    background-image: url('assets/orka_logo_transparent_background.png'); /* Ensure this path is correct */
+    background-size: contain;
+    background-repeat: no-repeat;
+    opacity: 0.1;
+    z-index: -1;
+}
+
+/* --- Page 3: Performance --- */
+.page-3 .page-header {
+    border-bottom: 1px solid #bfbfbf;
+    padding-bottom: 0.5rem;
+    width: calc(100% - 4cm);
+}
+
+.page-3 .page-footer {
+    width: 100%;
+    left: 0;
+    text-align: center;
+}
+
+.performance-title {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #c5e0b3; /* Lighter olive green */
+    line-height: 1;
+    margin-bottom: 1.5rem;
+}
+
+.performance-title span {
+    color: #70ad47; /* Bright green */
+    border-bottom: 5px solid #70ad47;
+    padding-bottom: 0.25rem;
+}
+
+.performance-intro-text {
+    font-size: 0.9rem;
+    color: #595959;
+    margin-bottom: 0.5rem;
+}
+
+.performance-metric {
+    text-align: center;
+}
+
+.performance-metric .icon {
+    font-size: 2.5rem;
+    color: #a9d18e; /* Light green from page 2 cards */
+}
+
+.performance-metric .value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #548235; /* Darker green */
+    margin: 0.5rem 0 0.25rem 0;
+}
+
+.performance-metric .label {
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: #595959;
+    margin: 0;
+}
+
+.performance-chart-wrapper {
+    height: 350px; /* Give the chart a fixed height */
+    margin-top: 1rem;
+}
+
+/* --- Page 4: Benefit --- */
+.page-4 {
+    padding-top: 4cm;
+}
+
+.page-4 .page-header {
+    border-bottom: 1px solid #bfbfbf;
+    padding-bottom: 0.5rem;
+    width: calc(100% - 4cm);
+}
+
+.page-4 .page-footer {
+    width: 100%;
+    left: 0;
+    text-align: center;
+}
+
+.benefit-title {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #c5e0b3; /* Lighter olive green */
+    line-height: 1;
+    margin-bottom: 1.5rem;
+}
+
+.benefit-title span {
+    color: #70ad47; /* Bright green */
+    border-bottom: 5px solid #70ad47;
+    padding-bottom: 0.25rem;
+}
+
+.benefit-intro-text {
+    font-size: 0.9rem;
+    color: #595959;
+}
+
+.benefit-list {
+    list-style-type: none;
+    padding-left: 1rem;
+    margin: 0.5rem 0 2rem 0;
+    font-size: 0.9rem;
+    color: #595959;
+}
+
+.benefit-list li::before {
+    content: '-';
+    display: inline-block;
+    width: 1rem;
+    margin-left: -1rem;
+}
+
+.benefit-chart-wrapper {
+    height: 300px;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.benefit-chart-footer {
+    font-size: 0.9rem;
+    color: #595959;
+    text-align: center;
+    margin-top: 2rem;
+    padding: 0 3rem;
+}
+
+.savings-highlight-box {
+    text-align: center;
+    margin-top: auto; /* Pushes this to the bottom of the flex content area */
+    padding-bottom: 3rem;
+}
+
+.savings-highlight-box .label {
+    font-size: 1rem;
+    color: #548235; /* Darker green */
+    margin-bottom: 0.5rem;
+}
+
+.savings-highlight-box .value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #548235;
+    margin: 0;
+}
+
+/* --- Page 5: Quotation --- */
+.page-5 {
+    padding-top: 4cm;
+    font-size: 0.8rem;
+    color: #595959;
+}
+
+.page-5 .page-header {
+    border-bottom: 1px solid #bfbfbf;
+    padding-bottom: 0.5rem;
+    width: calc(100% - 4cm);
+}
+
+.page-5 .page-footer {
+    width: 100%;
+    left: 0;
+    text-align: center;
+}
+
+.quotation-title {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #c5e0b3; /* Lighter olive green */
+    line-height: 1;
+}
+
+.quotation-title span {
+    color: #70ad47; /* Bright green */
+}
+
+.quotation-subtitle {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #000;
+    margin: 1.5rem 0;
+}
+
+.quotation-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #bfbfbf;
+}
+
+.quotation-details .item-name {
+    font-weight: bold;
+    color: #000;
+    font-size: 1rem;
+    margin-bottom: 0.1rem;
+}
+.quotation-details .item-spec {
+    font-size: 0.8rem;
+    color: #595959;
+    margin-bottom: 0.25rem;
+}
+.quotation-details .item-desc {
+    font-size: 0.8rem;
+    color: #595959;
+    margin-bottom: 0;
+}
+
+.quotation-price {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #000;
+    white-space: nowrap;
+    margin-left: 2rem;
+}
+
+.totals-section {
+    width: 50%;
+    margin-left: auto; /* Pushes it to the right */
+    margin-top: 1rem;
+    font-size: 1rem;
+}
+.total-row .label {
+    width: 60%;
+    text-align: right;
+    padding-right: 1rem;
+}
+.total-row .value {
+    width: 40%;
+    text-align: right;
+    font-weight: bold;
+}
+.total-row.total {
+    border-top: 1px solid #000;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+}
+.total-row.total .label small {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: normal;
+}
+
+.info-footer {
+    font-size: 0.8rem;
+}
+
+.signature-footer {
+    font-size: 0.8rem;
+}
+.signature-line-box {
+    border-bottom: 1px solid #000;
+    height: 3rem;
+    margin-top: 1rem;
+}
+.signature-under-text {
+    font-size: 0.8rem;
+    color: #595959;
+    margin-top: 0.25rem;
+}
+
+/* ReportBuilder.css additions for Cover Page */
+
+.orka-reference-cover {
+  position: relative;
+  width: 21cm;
+  height: 29.7cm;
+  background: #fff;
+  font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+/* solar panel image watermark */
+.orka-cover-bgimg {
+  position: absolute;
+  left: 0; bottom: 0;
+  width: 100%;
+  height: 15cm;
+  opacity: 1;
+  object-fit: cover;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.orka-cover-logo-topright {
+  position: absolute;
+  top: 2.5cm; right: 2.7cm;
+  width: 4.6cm;
+  z-index: 2;
+}
+
+.orka-cover-centerblock {
+  position: absolute;
+  left: 2cm;
+  top: 16.0cm;
+  width: 16.5cm;
+  background: transparent;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.orka-cover-mainheading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 0.3cm;
+  letter-spacing: 0.03em;
+}
+
+.orka-cover-proposalno {
+  font-size: 0.98rem;
+  font-weight: 400;
+  color: #565656;
+  margin-bottom: 0.25cm;
+}
+
+.orka-cover-projectname {
+  font-size: 1.28rem;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 0.15cm;
+}
+
+.orka-cover-line {
+  width: 100%;
+  border: none;
+  border-top: 2px solid #444;
+  margin: 0.3cm 0 0.3cm 0;
+  opacity: 0.45;
+}
+
+.orka-cover-specblock {
+  font-size: 1.01rem;
+  color: #222;
+  margin-bottom: 0.18cm;
+}
+
+.orka-cover-description {
+  font-size: 1.02rem;
+  margin-top: 0.2cm;
+  color: #444;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+.orka-cover-footerblock {
+  position: absolute;
+  left: 2cm;
+  bottom: 1.8cm;
+  width: 16.5cm;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  font-size: 0.98rem;
+  z-index: 10;
+}
+
+.orka-cover-date {
+  color: #222;
+  font-weight: 400;
+}
+
+.orka-cover-preparedfor {
+  text-align: right;
+  color: #222;
+  font-size: 0.99rem;
+  line-height: 1.36;
+}
+
+/* PRINT-ONLY REPORT: Hide everything else except .orka-report-printarea when printing */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .orka-report-printarea, .orka-report-printarea * {
+    visibility: visible !important;
+  }
+  .orka-report-printarea {
+    position: absolute !important;
+    left: 0; top: 0;
+    width: 21cm !important;
+    min-height: 29.7cm !important;
+    margin: 0 !important;
+    background: white !important;
+    box-shadow: none !important;
+    z-index: 10000 !important;
+  }
+  /* Remove page breaks except for .page classes if you paginate */
+  .orka-report-printarea .page {
+    page-break-after: always;
+    break-after: always;
+  }
+  /* Fix: Don't hide footer elements with orka-page-footer class */
+  .no-print, .print-controls, nav, header, 
+  footer:not(.orka-cover-footer):not(.orka-page-footer) {
+    display: none !important;
+  }
+  /* Force display of page headers and footers */
+  .orka-page-header, .orka-page-footer {
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+  }
+  /* Add additional styling for proper display in PDF */
+  .orka-standard-page {
+    position: relative !important;
+    page-break-after: always;
+  }
+}
+
+/* Executive Summary */
+.orka-exec-summary-page {
+  position: relative;
+  width: 21cm;
+  height: 29.7cm;
+  background: #fff;
+  font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+  padding: 1.7cm 1.5cm 0.3cm 1.5cm;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Top header bar */
+.orka-summary-headerbar {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start; /* <-- CHANGE to left align */
+  align-items: flex-start;
+  height: 20px;
+  margin-bottom: 0.3cm;
+}
+.orka-summary-project {
+  font-size: 1.04rem;
+  color: #222;
+  margin-top: 12px;
+  font-weight: 400;
+  flex: 1;
+}
+.orka-summary-logo {
+  width: 70px;
+  margin-right: 0.3cm;
+  margin-top: 0;
+}
+.orka-summary-topline {
+  border: none;
+  border-top: 2px solid #222;
+  opacity: 0.7;
+  margin-bottom: 0.34cm;
+}
+
+/* Title and paragraphs */
+.orka-summary-title {
+  font-size: 1.17rem;
+  font-weight: bold;
+  letter-spacing: 0.09em;
+  color: #222;
+  margin-bottom: 0.23cm;
+}
+.orka-summary-paragraphs {
+  font-size: 1.01rem;
+  color: #222;
+  margin-bottom: 0.41cm;
+}
+
+/* Icon summary row */
+.orka-summary-icons-row1 {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 2.3cm;
+  margin: 0.55cm 0 0.24cm 0;
+}
+.orka-summary-icons-row2 {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 3.1cm;
+  margin-bottom: 0.25cm;
+}
+
+.orka-summary-icon-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 3.1cm;
+  max-width: 4.3cm;
+  text-align: center;
+  font-size: 1rem;
+  background: none;
+}
+
+.orka-summary-icon-col-wide {
+  min-width: 5.5cm;
+  max-width: 7.2cm;
+}
+.orka-summary-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 0.11cm;
+}
+.orka-summary-label {
+  font-size: 1.07rem;
+  font-weight: 600;
+  margin-bottom: 0.07cm;
+  color: #222;
+}
+
+.orka-summary-value {
+  font-size: 1.09rem;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 0.02cm;
+}
+.orka-summary-unit {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: #333;
+}
+.orka-summary-sublabel {
+  font-size: 0.98rem;
+  color: #222;
+  font-weight: 400;
+  margin-bottom: 0.04cm;
+}
+
+/* Footnote */
+.orka-summary-footnote {
+  font-size: 0.92rem;
+  margin-top: 0.18cm;
+  color: #333;
+}
+
+/* Site photo section */
+.orka-summary-sitephoto-fullwrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 8.2cm;
+  z-index: 10;
+}
+.orka-summary-sitephoto-full {
+  width: 100%;
+  height: 8.2cm;
+  object-fit: cover;
+  filter: grayscale(100%);
+  border-top: 1.5px solid #bbb;
+  border-radius: 0 0 2px 2px;
+  display: block;
+}
+.orka-summary-pagenum {
+  position: absolute;
+  left: 0; right: 0; bottom: 10px;
+  text-align: center;
+  font-size: 1rem;
+  color: #333;
+  font-family: 'Courier New', Courier, monospace;
+  letter-spacing: 0.13em;
+}
+.orka-summary-photocredit {
+  position: absolute;
+  right: 18px;
+  bottom: 0.46cm;
+  font-size: 0.90rem;
+  color: #444;
+  text-align: right;
+  white-space: pre-line;
+  z-index: 20;
+}
+
+/* Print improvements */
+@media print {
+  .orka-exec-summary-page {
+    page-break-after: always;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 1.7cm 1.5cm 0.3cm 1.5cm !important;
+  }
+}
+
+/* Design Report Meta */
+
+.orka-meta-page {
+  position: relative;
+  width: 21cm;
+  height: 29.7cm;
+  background: #fff;
+  font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+  box-sizing: border-box;
+  padding: 1.25cm 1.3cm 0.1cm 1.3cm;
+  overflow: hidden;
+}
+
+/* Banner styles */
+.orka-meta-banner {
+  width: 100%;
+  height: 4.6cm;
+  margin-bottom: 0.49cm;
+  background-size: cover;
+  background-position: center;
+  border-radius: 2.5px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+.orka-meta-banner-inner {
+  width: 100%;
+  padding-left: 1.3cm;
+  color: #fff;
+  z-index: 2;
+}
+.orka-meta-banner-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 0.37cm;
+  text-shadow: 0 2px 8px #222, 0 0 4px #333;
+}
+.orka-meta-banner-subtitle {
+  font-size: 1.04rem;
+  font-weight: 400;
+  text-shadow: 0 2px 8px #222, 0 0 4px #333;
+}
+
+/* Table styles */
+.orka-meta-table {
+  table-layout: auto;
+  width: 100%;
+}
+.orka-meta-table td,
+.orka-meta-table th {
+  border: 1px solid #222;
+  padding: 0.22cm 0.17cm 0.18cm 0.17cm;
+  font-weight: 400;
+  vertical-align: middle;
+  background: #fff;
+}
+.orka-meta-label {
+  background: #f6f6f6;
+  font-weight: 600;
+  min-width: 2.6cm;
+}
+.orka-meta-signature {
+  height: 1.1cm;
+  margin: 0.08cm 0 0 0;
+  filter: grayscale(100%);
+}
+.orka-meta-table td:nth-child(3),
+.orka-meta-table td:nth-child(5),
+.orka-meta-table th:nth-child(3),
+.orka-meta-table th:nth-child(5) {
+  width: 1.3cm;
+}
+
+/* Amendment table specific */
+.orka-meta-amendments {
+  margin-top: 0.36cm;
+}
+.orka-meta-amendments th,
+.orka-meta-amendments td {
+  text-align: left;
+  padding: 0.16cm 0.14cm 0.12cm 0.14cm;
+}
+
+/* Copyright */
+.orka-meta-copyright {
+  font-size: 0.89rem;
+  color: #444;
+  margin-bottom: 0.19cm;
+  margin-top: 0.28cm;
+  white-space: pre-line;
+}
+
+/* Footer page number */
+.orka-meta-footer-pagenum {
+  width: 100%;
+  text-align: center;
+  font-size: 1.01rem;
+  color: #333;
+  font-family: 'Courier New', Courier, monospace;
+  letter-spacing: 0.12em;
+  margin-top: 0.28cm;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1.3cm;
+}
+
+/* Table of Content */
+.orka-toc-page {
+  position: relative;
+  width: 21cm;
+  height: 29.7cm;
+  background: #fff;
+  font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+  padding: 1.5cm 2.0cm 0.5cm 2.0cm;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.orka-toc-title {
+  font-size: 1.15rem;
+  font-weight: bold;
+  color: #111;
+  margin: 1.5cm 0 0.5cm 0;
+  letter-spacing: 0.02em;
+  text-align: left;
+}
+
+.orka-toc-list {
+  width: 100%;
+  margin-top: 0.0cm;
+}
+
+.orka-toc-entry {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  font-size: 1.01rem;
+  margin-bottom: 0.07cm;
+  letter-spacing: 0.01em;
+}
+
+.orka-toc-label {
+  flex-shrink: 0;
+  font-weight: 400;
+  color: #111;
+  max-width: 66%;
+  white-space: pre-line;
+}
+
+.orka-toc-dots {
+  flex: 1;
+  text-align: left;
+  margin: 0 0.24cm;
+  color: #333;
+  font-size: 1.07em;
+  font-family: 'Courier New', Courier, monospace;
+  letter-spacing: 0.15em;
+  user-select: none;
+  opacity: 0.95;
+  overflow: hidden;
+}
+
+.orka-toc-page {
+  flex-shrink: 0;
+  min-width: 1.5cm;
+  text-align: right;
+  font-weight: 600;
+  color: #111;
+}
+
+.orka-toc-sub {
+  margin-left: 1.2cm;
+  font-size: 0.94rem;
+  color: #222;
+}
+.orka-toc-annex {
+  font-weight: bold;
+  color: #016980;
+  margin-top: 0.11cm;
+}
+
+/* Print improvements */
+@media print {
+  .orka-toc-page {
+    page-break-after: always;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 1.5cm 2.0cm 0.5cm 2.0cm !important;
+  }
+}
+
+.report-builder {
+  display: flex;
+  min-height: 100vh;
+  background: #f4f5f7;
+}
+
+/* Modern sidebar styles */
+.orka-sidebar {
+  position: fixed;      /* <-- make the sidebar fixed to viewport */
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 290px;          /* match your existing width */
+  overflow-y: auto;      /* allow section toggles to scroll */
+  background: #111d2c;
+  color: #f6f7fa;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  box-shadow: 3px 0 18px rgba(0,0,0,0.07);
+  z-index: 30;          /* ensure above report content */
+}
+.orka-sidebar-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 36px 30px 18px 30px;
+  border-bottom: 1px solid #222c3d;
+}
+.orka-sidebar-logo {
+  width: 38px;
+  height: 38px;
+  background-image: url('assets/orka_logo_transparent_background.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  margin-bottom: 18px;
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px #20406018;
+}
+.orka-sidebar-title {
+  font-size: 1.13rem;
+  font-weight: bold;
+  color: #d3f0e7;
+  margin: 0 0 6px 0;
+  letter-spacing: 0.02em;
+}
+
+/* Section toggles */
+.orka-sidebar-section-list {
+  flex: 1;
+  padding: 18px 30px 0 30px;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+.orka-sidebar-section-toggle {
+  display: flex;
+  align-items: center;
+  margin-bottom: 17px;
+  font-size: 1.06rem;
+  cursor: pointer;
+}
+.orka-sidebar-section-toggle input[type="checkbox"] {
+  margin-right: 14px;
+  accent-color: #34bfa3;
+  width: 18px;
+  height: 18px;
+}
+.orka-sidebar-section-toggle span {
+  color: #e8eeff;
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+/* Footer with export button */
+.orka-sidebar-footer {
+  padding: 22px 30px 26px 30px;
+  border-top: 1px solid #20394a33;
+  background: linear-gradient(180deg, #111d2c 80%, #122237 100%);
+}
+.orka-sidebar-export-btn {
+  width: 100%;
+  padding: 16px 0;
+  background: linear-gradient(90deg, #23c586 0%, #41e4b4 100%);
+  color: #163542;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1.06rem;
+  cursor: pointer;
+  transition: box-shadow 0.2s, background 0.2s;
+  box-shadow: 0 2px 16px #22ffb155;
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.orka-sidebar-export-btn:hover {
+  background: linear-gradient(90deg, #17a068 0%, #1ac78e 100%);
+  box-shadow: 0 2px 22px #1af2bb70;
+}
+
+/* Main content to right of sidebar */
+.orka-report-printarea {
+  flex: 1;
+  margin-left: 90px;    /* same as sidebar width */
+  padding: 0;
+  background: #f6f7fa;
+  min-height: 100vh;
+  overflow-x: auto;
+}
+
+/* Standard Page */
+
+.orka-standard-page {
+  position: relative;
+  width: 21cm;
+  height: 29.7cm; /* Add explicit A4 height */
+  background: #fff;
+  font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+  padding: 1.5cm 1.5cm 1cm 1.5cm; /* Add consistent padding */
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin: 0; /* Reset any margins */
+  page-break-after: always; /* Ensure proper page breaks when printing */
+}
+
+.orka-page-header {
+  padding-bottom: 0.5cm;
+  margin-bottom: 0.6cm;
+  border-bottom: 1px solid #bfbfbf;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #222;
+  display: block !important; /* Force display */
+  visibility: visible !important; /* Ensure visibility */
+}
+
+.orka-page-content {
+  flex: 1;
+  overflow: hidden; /* Prevent content overflow */
+}
+
+.orka-page-footer {
+  margin-top: 1cm;
+  padding-top: 0.3cm;
+  color: #555;
+  text-align: center;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.orka-page-footer-line {
+  width: 100%;
+  border: none;
+  height: 1px;
+  background-color: #bfbfbf;
+  margin: 0 0 0.4cm 0;
+}
+
+.orka-page-number {
+  font-family: 'Courier New', Courier, monospace;
+  letter-spacing: 0.13em;
+  color: #3333338f;
+  font-size: 1rem;
+  margin-bottom: 0.2cm;
+}
+
+.orka-page-footer-text {
+  font-size: 0.9rem;
+}
+
+.section-controls {
+  margin: 1rem;
+  padding: 0.75rem;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  position: fixed;
+  top: 60px;
+  right: 20px;
+  z-index: 20;
+}
+
+.section-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  user-select: none;
+}
+
+.section-toggle input[type="checkbox"] {
+  accent-color: #23c586;
+}
+
+@media print {
+  .section-controls {
+    display: none !important;
+  }
+}
+
+.site-layout-section {
+  margin-top: 2rem;
+  padding-top: 1rem;
+}
+
+.site-layout-image-container {
+  text-align: center;
+  margin: 1rem 0;
+}
+
+/* Consumption data styles */
+
+.metric-box {
+    border: 1px solid #e0e0e0;
+    border-left: 4px solid #23c586;
+    border-radius: 6px;
+    padding: 10px 15px;
+    background: #fafafa;
+}
+
+.metric-label {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.metric-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.date-range-selector {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+/* Add these styles if not already present */
+.chart-header {
+    position: relative;
+    margin-bottom: 0.5rem;
+}
+
+.date-picker-wrapper {
+    position: relative;
+    z-index: 10;
+}
+
+.date-picker-wrapper .react-datepicker-wrapper {
+    display: inline-block;
+    width: auto;
+}
+
+/* Hide the date picker when printing */
+@media print {
+    .no-print, .no-print * {
+        display: none !important;
+    }
+    
+    .chart-container {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+}
+
+/* Make sure print styles don't hide these elements */
+@media print {
+  .orka-page-header, .orka-page-footer {
+    display: block !important;
+    visibility: visible !important;
+  }
+}
+
+/* Compact table styles for better fit */
+.compact-table {
+    font-size: 0.85rem;
+}
+
+.compact-table td, .compact-table th {
+    padding: 0.25rem 0.5rem;
+}
+
+.compact-header {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* Add this to your CSS or as a style tag */
+.circle-list {
+    list-style-type: circle;
+    padding-left: 2rem;
+    margin-top: 0.5rem;
+}
+
+.logo-placeholder {
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-style: italic;
+    color: #666;
+}
+
+/* For print, ensure the table stays compact */
+@media print {
+    .compact-table {
+        font-size: 0.8rem;
+    }
+    
+    .compact-table td, .compact-table th {
+        padding: 0.2rem 0.4rem;
+    }
+}

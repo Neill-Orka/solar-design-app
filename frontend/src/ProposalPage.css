@@ -46,7 +46,7 @@
     .cover-content {
         height: 50%; /* Keep same as screen */
         min-height: 400px;
-        background-image: url('assets/report_background.png'); /* Keep background image */
+        background-image: url('assets/solar_panel_bg.png'); /* Keep background image */
         background-size: auto; /* Keep same as screen */
         background-position: left 50%; /* Move the background up */
         background-repeat: no-repeat; /* Keep same as screen */
@@ -75,7 +75,7 @@
 .cover-content {
     height: 50%;
     min-height: 400px;
-    background-image: url('assets/report_background.png');
+    background-image: url('assets/solar_panel_bg.png');
     background-size: auto;
     background-position: left 50%;
     background-repeat: no-repeat;
