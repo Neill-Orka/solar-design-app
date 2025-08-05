@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Container, Row, Col, Card, Button, Form, Spinner, Alert, InputGroup, Badge, ListGroup, Stack } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Form, Spinner, Alert, InputGroup, Badge, ListGroup, Stack, Table, ButtonGroup } from 'react-bootstrap';
 import { API_URL } from './apiConfig';
 
 const CATEGORY_META = {
@@ -15,15 +15,24 @@ const CATEGORY_META = {
   accessory:    { name: 'Accessories',      icon: 'bi-gear-fill',             color: 'secondary'},
 };
 
-const ProductList = ({ category, products, searchFilter, onSearchChange, onAddComponent, categoryMeta }) => {
+const ProductList = ({ category, products, searchFilter, onSearchChange, onAddComponent, categoryMeta, viewMode }) => {
     const categoryInfo = categoryMeta;
 
-    const searchTerm = (searchFilter || '').toLowerCase();
-    const filteredProducts = products.filter(p => 
-        p.category === category &&
-        `${p.brand || ''} ${p.model || ''} ${p.power_w || ''} ${p.rating_kva || ''} ${p.capacity_kwh || ''}`.toLowerCase().includes(searchTerm)
-    );
-
+    // Enhanced smart search functionality
+    const filteredProducts = products.filter(p => {
+        if (p.category !== category) return false;
+        
+        if (!searchFilter) return true;
+        
+        // Basic product data string for searching
+        const productText = `${p.brand || ''} ${p.model || ''} ${p.power_w || ''} ${p.rating_kva || ''} ${p.capacity_kwh || ''}`.toLowerCase();
+        
+        // Split search into fragments and check if all fragments exist in the product text
+        const fragments = searchFilter.toLowerCase().split(/\s+/).filter(f => f.trim());
+        
+        return fragments.every(fragment => productText.includes(fragment));
+    });
+    
     return (
         <>
             <h4 className="text-xl font-semibold text-gray-700 mt-4 mb-2 ps-1 d-flex justify-content-between align-items-center">
@@ -36,34 +45,77 @@ const ProductList = ({ category, products, searchFilter, onSearchChange, onAddCo
                     style={{ width: '200px' }}
                     placeholder={`Search ${categoryInfo.name}...`}
                     value={searchFilter}
-                    onChange={e => onSearchChange(category, e.target.value)} // Use prop for change handler
+                    onChange={e => onSearchChange(category, e.target.value)}
                 />
             </h4>
             <div style={{ maxHeight: '300px', overflowY: 'auto', padding: '0.5rem' }}>
                 {filteredProducts.length > 0 ? (
-                    <Row xs={1} lg={2} xl={3} className="g-3">
-                        {filteredProducts.map(product => (
-                            <Col key={product.id}>
-                                <Card className="h-100 shadow-sm border-light">
-                                    <Card.Body className="p-3">
-                                        <Badge bg={categoryInfo.color} className='text-capitalize mb-2'>{product.category.replace('_', ' ')}</Badge>
-                                        <Card.Title className="text-md font-bold text-gray-800">{product.brand} {product.model}</Card.Title>
-                                        <Card.Text className="text-xs text-muted mb-2">
-                                            {category === 'panel' && `${product.power_w}W`}
-                                            {category === 'inverter' && `${product.rating_kva}kVA`}
-                                            {category === 'battery' && `${product.capacity_kwh}kWh`}
-                                        </Card.Text>
-                                        <div className="d-flex justify-content-between align-items-center">
+                    viewMode === 'card' ? (
+                        // Card View
+                        <Row xs={1} lg={2} xl={3} className="g-3">
+                            {filteredProducts.map(product => (
+                                <Col key={product.id}>
+                                    <Card className="h-100 shadow-sm border-light">
+                                        <Card.Body className="p-3">
+                                            <Badge bg={categoryInfo.color} className='text-capitalize mb-2'>{product.category.replace('_', ' ')}</Badge>
+                                            <Card.Title className="text-md font-bold text-gray-800">{product.brand} {product.model}</Card.Title>
+                                            <Card.Text className="text-xs text-muted mb-2">
+                                                {category === 'panel' && `${product.power_w}W`}
+                                                {category === 'inverter' && `${product.rating_kva}kVA`}
+                                                {category === 'battery' && `${product.capacity_kwh}kWh`}
+                                            </Card.Text>
+                                            <div className="d-flex justify-content-between align-items-center">
+                                                <span className="text-sm font-semibold text-primary">R{product.price?.toLocaleString()}</span>
+                                                <Button variant="outline-primary" size="sm" onClick={() => onAddComponent(product)}>
+                                                    <i className="bi bi-plus-lg me-1"></i> Add
+                                                </Button>
+                                            </div>
+                                        </Card.Body>
+                                    </Card>
+                                </Col>
+                            ))}
+                        </Row>
+                    ) : (
+                        // List View
+                        <Table hover responsive className="mb-2 table-sm">
+                            <thead className="table-light">
+                                <tr>
+                                    <th>Brand</th>
+                                    <th>Model</th>
+                                    <th className="text-center">Specifications</th>
+                                    <th className="text-end">Price</th>
+                                    <th className="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredProducts.map(product => (
+                                    <tr key={product.id} style={{ verticalAlign: 'middle' }}>
+                                        <td className="fw-semibold">{product.brand}</td>
+                                        <td>{product.model}</td>
+                                        <td className="text-center">
+                                            {category === 'panel' && product.power_w && (
+                                                <Badge bg="warning" text="dark">{product.power_w}W</Badge>
+                                            )}
+                                            {category === 'inverter' && product.rating_kva && (
+                                                <Badge bg="info">{product.rating_kva}kVA</Badge>
+                                            )}
+                                            {category === 'battery' && product.capacity_kwh && (
+                                                <Badge bg="success">{product.capacity_kwh}kWh</Badge>
+                                            )}
+                                        </td>
+                                        <td className="text-end">
                                             <span className="text-sm font-semibold text-primary">R{product.price?.toLocaleString()}</span>
+                                        </td>
+                                        <td className="text-end">
                                             <Button variant="outline-primary" size="sm" onClick={() => onAddComponent(product)}>
                                                 <i className="bi bi-plus-lg me-1"></i> Add
                                             </Button>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                        ))}
-                    </Row>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )
                 ) : <p className="text-muted small">No {category} products found matching your search.</p>}
             </div>
         </>
@@ -93,8 +145,12 @@ function SystemBuilder() {
     const [loadingTemplates, setLoadingTemplates] = useState(true);
     const [editingTemplate, setEditingTemplate] = useState(null); // Holds the template being edited
 
-    // --- NEW: State for search filters ---
+    // --- State for search filters ---
     const [searchFilters, setSearchFilters] = useState({});
+    
+    // --- NEW: Main search and view mode state ---
+    const [mainSearch, setMainSearch] = useState('');
+    const [viewMode, setViewMode] = useState('list'); // Default to list view
 
     // Fetch all initial data on component mount
     useEffect(() => {
@@ -139,6 +195,25 @@ function SystemBuilder() {
             .catch(err => console.error("Error fetching templates:", err))
             .finally(() => setLoadingTemplates(false));
     };
+
+    // Smart search function
+    const applySmartSearch = (product) => {
+        if (!mainSearch) return true;
+        
+        // Create a combined string of all product info for searching
+        const searchableText = `${product.brand || ''} ${product.model || ''} ${product.category || ''} ${product.power_w || ''} ${product.rating_kva || ''} ${product.capacity_kwh || ''}`.toLowerCase();
+        
+        // Split search into fragments and check if all exist in searchable text
+        const fragments = mainSearch.toLowerCase().split(/\s+/).filter(f => f.trim());
+        
+        return fragments.every(fragment => searchableText.includes(fragment));
+    };
+
+    // Filter products based on main search
+    const filteredProducts = useMemo(() => {
+        if (!mainSearch) return products;
+        return products.filter(applySmartSearch);
+    }, [products, mainSearch]);
 
     // Memoized calculations for totals (no changes needed here)
     const { totalCost, totalPanelKw, totalInverterKva, totalBatteryKwh } = useMemo(() => {
@@ -197,13 +272,16 @@ function SystemBuilder() {
         }).finally(() => setIsSaving(false));
     };
 
-    // --- NEW: Handlers for Edit and Delete ---
+    // --- Handlers for Edit and Delete ---
     const handleEditClick = (template) => {
         setEditingTemplate(template);
         setTemplateName(template.name);
         setTemplateDesc(template.description);
         setTemplateType(template.system_type);
-        setExtrasCost(template.extras_cost || '');
+        
+        // Make sure we're using the dedicated extras_cost field and providing a fallback
+        // Convert to string because the form control expects a string value
+        setExtrasCost(template.extras_cost !== undefined ? template.extras_cost.toString() : '');
         
         // Reconstruct the components list with full product details
         const reconstructedComponents = template.components.map(comp => {
@@ -235,6 +313,9 @@ function SystemBuilder() {
     if (loading) return <div className="d-flex justify-content-center mt-5"><Spinner animation="border" /></div>;
     if (error) return <Container className="mt-4"><Alert variant="danger">{error}</Alert></Container>;
 
+    // Get unique categories from filtered products
+    const uniqueCategories = Array.from(new Set(filteredProducts.map(p => p.category))).sort();
+
     return (
         <div className='min-vh-100' style={{ backgroundColor: '#f8f9fa' }}>
             <Container fluid className="py-4 py-md-5">
@@ -254,16 +335,54 @@ function SystemBuilder() {
 
                             <hr className="my-4" />
 
-                            {Array.from(new Set(products.map(p => p.category))).sort().map(slug => (
-                                    <ProductList 
-                                        key={slug}
-                                        category={slug}
-                                        products={products}
-                                        categoryMeta={getMeta(slug)}
-                                        searchFilter={searchFilters[slug] || ''}
-                                        onSearchChange={handleSearchChange}
-                                        onAddComponent={addComponent}
-                                    />
+                            {/* NEW: Main Search and View Controls */}
+                            <Card className='shadow-sm border-0 rounded-xl p-3 mb-4'>
+                                <Row className='g-3 align-items-center'>
+                                    <Col md={8}>
+                                        <InputGroup>
+                                            <InputGroup.Text className="bg-light border-end-0">
+                                                <i className="bi bi-search"></i>
+                                            </InputGroup.Text>
+                                            <Form.Control 
+                                                value={mainSearch} 
+                                                onChange={e => setMainSearch(e.target.value)}
+                                                placeholder="Search all products across categories..."
+                                                className="border-start-0 rounded-end-lg"
+                                            />
+                                        </InputGroup>
+                                    </Col>
+                                    <Col md={4} className="d-flex justify-content-end">
+                                        <ButtonGroup>
+                                            <Button 
+                                                variant={viewMode === 'card' ? 'primary' : 'outline-secondary'} 
+                                                onClick={() => setViewMode('card')} 
+                                                title='Card View'
+                                            >
+                                                <i className="bi bi-grid-3x3-gap-fill"></i>
+                                            </Button>
+                                            <Button 
+                                                variant={viewMode === 'list' ? 'primary' : 'outline-secondary'} 
+                                                onClick={() => setViewMode('list')} 
+                                                title='List View'
+                                            >
+                                                <i className="bi bi-list-ul"></i>
+                                            </Button>
+                                        </ButtonGroup>
+                                    </Col>
+                                </Row>
+                            </Card>
+
+                            {uniqueCategories.map(slug => (
+                                <ProductList 
+                                    key={slug}
+                                    category={slug}
+                                    products={filteredProducts}
+                                    categoryMeta={getMeta(slug)}
+                                    searchFilter={searchFilters[slug] || ''}
+                                    onSearchChange={handleSearchChange}
+                                    onAddComponent={addComponent}
+                                    viewMode={viewMode}
+                                />
                             ))}
                         </Card>
                     </Col>
@@ -323,10 +442,10 @@ function SystemBuilder() {
 
                                     {saveSuccess && <Alert variant="success" className="mt-3">{saveSuccess}</Alert>}
                                     {saveError && <Alert variant="danger" className="mt-3">{saveError}</Alert>}
-
                                 </Card.Body>
                             </Card>
-                                                        {/* --- NEW: Existing Templates List --- */}
+                            
+                            {/* Existing Templates List */}
                             <Card className="shadow-lg border-0 rounded-xl">
                                 <Card.Header className="bg-secondary text-white rounded-top-xl py-3">
                                     <h3 className="text-xl font-semibold mb-0"><i className="bi bi-collection-fill me-2"></i>Existing Systems</h3>

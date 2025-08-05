@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Container, Row, Col, Card, Button, Modal, Form, InputGroup, Badge, Spinner, Alert } from "react-bootstrap";
+import { Container, Row, Col, Card, Button, Modal, Form, InputGroup, Badge, Spinner, Alert, ButtonGroup, Table } from "react-bootstrap";
 import { FaTrash, FaEdit, FaPlus } from "react-icons/fa";
 import { API_URL } from "./apiConfig";
 
@@ -62,6 +62,7 @@ export default function ProductsAdmin() {
     const [form, setForm] = useState(EMPTY_PRODUCT);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [viewMode, setViewMode] = useState('list'); // Default to list view
 
     // ------ load list -----------------------------------
     const fetchProducts = () => 
@@ -140,19 +141,42 @@ export default function ProductsAdmin() {
                                 </Button>
                             </div>
 
-                            <div className="mb-4">
-                                <InputGroup size="lg">
-                                    <InputGroup.Text className="bg-light border-end-0">
-                                        <i className="bi bi-search"></i>
-                                    </InputGroup.Text>
-                                    <Form.Control 
-                                        value={search} 
-                                        onChange={e => setSearch(e.target.value)}
-                                        placeholder="Search products by brand or model..."
-                                        className="border-start-0 rounded-end-lg"
-                                    />
-                                </InputGroup>
-                            </div>
+                            {/* Search and View Controls */}
+                            <Card className='shadow-sm border-0 rounded-xl p-3 mb-4'>
+                                <Row className='g-3 align-items-center'>
+                                    <Col md={8}>
+                                        <InputGroup>
+                                            <InputGroup.Text className="bg-light border-end-0">
+                                                <i className="bi bi-search"></i>
+                                            </InputGroup.Text>
+                                            <Form.Control 
+                                                value={search} 
+                                                onChange={e => setSearch(e.target.value)}
+                                                placeholder="Search products by brand or model..."
+                                                className="border-start-0 rounded-end-lg"
+                                            />
+                                        </InputGroup>
+                                    </Col>
+                                    <Col md={4} className="d-flex justify-content-end">
+                                        <ButtonGroup>
+                                            <Button 
+                                                variant={viewMode === 'card' ? 'primary' : 'outline-secondary'} 
+                                                onClick={() => setViewMode('card')} 
+                                                title='Card View'
+                                            >
+                                                <i className="bi bi-grid-3x3-gap-fill"></i>
+                                            </Button>
+                                            <Button 
+                                                variant={viewMode === 'list' ? 'primary' : 'outline-secondary'} 
+                                                onClick={() => setViewMode('list')} 
+                                                title='List View'
+                                            >
+                                                <i className="bi bi-list-ul"></i>
+                                            </Button>
+                                        </ButtonGroup>
+                                    </Col>
+                                </Row>
+                            </Card>
 
                             {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
 
@@ -169,7 +193,8 @@ export default function ProductsAdmin() {
                                         </Button>
                                     )}
                                 </div>
-                            ) : (
+                            ) : viewMode === 'card' ? (
+                                // Card View (your existing implementation)
                                 <Row xs={1} md={2} lg={3} xl={4} className="g-4">
                                     {filtered.map(product => (
                                         <Col key={product.id}>
@@ -199,7 +224,7 @@ export default function ProductsAdmin() {
                                                                 key === "power_w" ? "warning"
                                                                 : key === "rating_kva" ? "info"
                                                                 : key === "capacity_kwh" ? "success"
-                                                                : "secondary"
+                                                                : "primary"
                                                               } text={key === "power_w" ? "dark" : undefined}>
                                                                 {key === "price" ? "R " : ""}{product[key]}
                                                                 {key === "power_w" ? "W" :
@@ -234,6 +259,73 @@ export default function ProductsAdmin() {
                                         </Col>
                                     ))}
                                 </Row>
+                            ) : (
+                                // New List View
+                                <Card className="shadow-sm border-0 rounded-xl">
+                                    <Table hover responsive className="mb-0">
+                                        <thead className="table-light">
+                                            <tr>
+                                                <th className="ps-4" style={{width: "15%"}}>Category</th>
+                                                <th style={{width: "20%"}}>Brand</th>
+                                                <th style={{width: "20%"}}>Model</th>
+                                                <th style={{width: "15%"}}>Specifications</th>
+                                                <th style={{width: "15%"}}>Price</th>
+                                                <th className="text-end pe-4" style={{width: "15%"}}>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filtered.map(product => (
+                                                <tr key={product.id} style={{ verticalAlign: 'middle' }}>
+                                                    <td className="ps-4">
+                                                        <div className="d-flex align-items-center">
+                                                            <div className={`bg-${getCategoryColor(product.category)} bg-opacity-10 rounded-circle p-2 me-2`} style={{width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center"}}>
+                                                                <i className={`bi ${getCategoryIcon(product.category)} text-${getCategoryColor(product.category)}`}></i>
+                                                            </div>
+                                                            <Badge bg={getCategoryColor(product.category)} className="text-capitalize">
+                                                                {product.category}
+                                                            </Badge>
+                                                        </div>
+                                                    </td>
+                                                    <td className="fw-semibold">{product.brand}</td>
+                                                    <td>{product.model}</td>
+                                                    <td>
+                                                        {product.category === 'Panel' && product.power_w && (
+                                                            <Badge bg="warning" text="dark">{product.power_w}W</Badge>
+                                                        )}
+                                                        {product.category === 'Inverter' && product.rating_kva && (
+                                                            <Badge bg="info">{product.rating_kva}kVA</Badge>
+                                                        )}
+                                                        {product.category === 'Battery' && product.capacity_kwh && (
+                                                            <Badge bg="success">{product.capacity_kwh}kWh</Badge>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        {product.price && (
+                                                            <Badge bg="primary">R {product.price}</Badge>
+                                                        )}
+                                                    </td>
+                                                    <td className="text-end pe-4">
+                                                        <Button 
+                                                            variant="outline-primary" 
+                                                            size="sm" 
+                                                            className="me-2"
+                                                            onClick={() => openEdit(product)}
+                                                        >
+                                                            <FaEdit className="me-1" />Edit
+                                                        </Button>
+                                                        <Button 
+                                                            variant="outline-danger" 
+                                                            size="sm"
+                                                            onClick={() => deleteProduct(product.id)}
+                                                        >
+                                                            <FaTrash />
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </Table>
+                                </Card>
                             )}
                         </Card>
                     </Col>
