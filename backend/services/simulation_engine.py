@@ -11,7 +11,7 @@ import math
 import os
 
 
-def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export, tilt, azimuth, use_pvgis=False, profile_name='Midrand Azth:east-west Tilt:5'):
+def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, allow_export, tilt, azimuth, use_pvgis=False, profile_name='Midrand Azth:east-west Tilt:5', battery_soc_limit=20):
     try:
         project = Projects.query.get(project_id)
         if not project:
@@ -212,7 +212,7 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
             current_usable_gen_kwh = energy_from_pv_to_load + energy_from_pv_to_battery + export_kwh
 
             if remaining_load_kwh > 0 and system_type in ['hybrid', 'off-grid']:
-                min_soc_limit_kwh = battery_capacity_kwh * 0.2 if system_type == 'hybrid' else 0.0
+                min_soc_limit_kwh = battery_capacity_kwh * (battery_soc_limit / 100) if system_type == 'hybrid' else 0.0
                 available_discharge_kwh = max(0, battery_soc_kwh - min_soc_limit_kwh)
                 discharge_amount = min(remaining_load_kwh, available_discharge_kwh)
                 battery_soc_kwh -= discharge_amount
@@ -226,7 +226,7 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
             battery_soc_trace.append((battery_soc_kwh / battery_capacity_kwh * 100) if battery_capacity_kwh > 0 else 0)
 
         return {
-            "timestamps": [r.timestamp.isoformat() for r in records],
+            "timestamps": [ts.isoformat() for ts in full_30min_index],
             "demand": demand_kw,
             "generation": [round(val, 2) for val in usable_generation_kw],
             "import_from_grid": import_from_grid,

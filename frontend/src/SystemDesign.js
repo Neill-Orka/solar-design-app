@@ -248,17 +248,36 @@ const SizingView = ({ design, onDesignChange, onPromote, products, usePvgis, set
                                     <Form.Label>Battery</Form.Label>
                                     <Select isDisabled={design.systemType === 'grid'} options={products.batteries.map(p => ({ value: p.id, label: `${p.brand} ${p.model} (${p.capacity_kwh}kWh)`}))} value={design.selectedBattery} onChange={opt => handleSelectChange('selectedBattery', opt)} isClearable />
                                 </Form.Group>
-                                <Form.Group className="mt-2">
-                                    <Form.Label className="small">Battery Quantity</Form.Label>
-                                    <Form.Control
-                                        type="number"
-                                        size="sm"
-                                        min="1"
-                                        value={design.batteryQuantity}
-                                        onChange={e => onDesignChange({...design, batteryQuantity: Math.max(1, parseInt(e.target.value) || 1)})}
-                                        disabled={design.systemType === 'grid'}
-                                    />
-                                </Form.Group>
+
+                                <Row className="mt-2">
+                                    <Col md={6}>
+                                        <Form.Group>
+                                            <Form.Label className="small">Battery Quantity</Form.Label>
+                                            <Form.Control
+                                                type="number"
+                                                size="sm"
+                                                min="1"
+                                                value={design.batteryQuantity}
+                                                onChange={e => onDesignChange({...design, batteryQuantity: Math.max(1, parseInt(e.target.value) || 1)})}
+                                                disabled={design.systemType === 'grid'}
+                                            />
+                                        </Form.Group>
+                                    </Col>
+                                    <Col md={6}>
+                                        <Form.Group>
+                                            <Form.Label className="small">Min SOC Limit (%)</Form.Label>
+                                            <Form.Control
+                                                type="number"
+                                                size="sm"
+                                                min="0"
+                                                max="100"
+                                                value={design.batterySocLimit}
+                                                onChange={e => onDesignChange({...design, batterySocLimit: Math.max(0, Math.min(50, parseInt(e.target.value) || 0))})}
+                                                disabled={design.systemType === 'grid' || design.systemType === 'off-grid'}
+                                            />
+                                        </Form.Group>
+                                    </Col>
+                                </Row>
                             </Col>
                         </Row>
                     </Card.Body>
@@ -534,6 +553,9 @@ const safeParseFloat = (value) => {
     return 0;
 };
 
+const toMidnight = (d) => { d.setHours(0, 0, 0, 0); return d; };
+const toEndOfDay = (d) => { d.setHours(23, 59, 59, 999); return d; };
+
 function SystemDesign({ projectId }) {
     // Remove chartKey completely
     // const [chartKey, setChartKey] = useState(0); // Remove this line
@@ -567,6 +589,7 @@ function SystemDesign({ projectId }) {
         selectedBattery: null,  // Will hold the full { value, label, product } object
         batteryQuantity: 1,
         allowExport: false,
+        batterySocLimit: 20,
     });
 
     // State for all calculated metrics from the simulation results
@@ -681,6 +704,7 @@ function SystemDesign({ projectId }) {
                 selectedBattery: currentBattery ? { value: currentBattery.id, label: `${currentBattery.model} (${currentBattery.capacity_kwh}kWh)`, product: currentBattery } : null,
                 batteryQuantity: batteryInfo.quantity || 1,
                 allowExport: p.allow_export || false,
+                batterySocLimit: p.battery_soc_limit || 20,
             });
         });
     }, [projectId, products]); // Reruns if projectId or the loaded products change
@@ -845,7 +869,8 @@ function SystemDesign({ projectId }) {
                 quantity: design.batteryQuantity
             } : null,
             use_pvgis: usePvgis,
-            generation_profile_name: profileName
+            generation_profile_name: profileName,
+            battery_soc_limit: design.batterySocLimit
         };
 
         axios.put(`${API_URL}/api/projects/${projectId}`, payload)
@@ -875,7 +900,8 @@ function SystemDesign({ projectId }) {
                 // Ensure we safely access nested properties
                 inverter_kva: (design.selectedInverter?.product.rating_kva || 0) * design.inverterQuantity,
                 battery_kwh: (design.selectedBattery?.product.capacity_kwh || 0) * design.batteryQuantity,
-                allow_export: design.allowExport
+                allow_export: design.allowExport,
+                battery_soc_limit: design.batterySocLimit
             }
         };
 
@@ -913,8 +939,8 @@ function SystemDesign({ projectId }) {
         start.setHours(0, 0, 0, 0); // Set to beginning of start date
         
         const end = new Date(endDate);
-        end.setHours(0, 0, 0, 0); // Set to beginning of end date - NOT end of day
-        
+        end.setHours(0, 0, 0, 0); // Set to end of end date
+
         const filtered = {
             timestamps: [], demand: [], generation: [], potential_generation: [],
             battery_soc: [], import_from_grid: [], export_to_grid: []
@@ -1070,27 +1096,25 @@ function SystemDesign({ projectId }) {
                             
                             <div className='date-picker-container'>
                                 <button className="btn btn-outline-secondary" onClick={() => {
-                                    const today = new Date();
-                                    const weekAgo = new Date();
-                                    weekAgo.setDate(today.getDate() - 7);
-                                    setStartDate(weekAgo);
-                                    setEndDate(today);
+                                    const end = toEndOfDay(new Date());
+                                    const start = toMidnight(new Date());
+                                    start.setDate(end.getDate() - 7);
+                                    setStartDate(start);
+                                    setEndDate(end);
                                 }}>Last 7 Days</button>
 
                                 <button className="btn btn-outline-secondary" onClick={() => {
-                                  const today = new Date();
-                                  const monthAgo = new Date();
-                                  monthAgo.setDate(today.getDate() - 30);
-                                  setStartDate(monthAgo);
-                                  setEndDate(today);
+                                  const end = toEndOfDay(new Date());
+                                  const start = toMidnight(new Date());
+                                  start.setDate(end.getDate() - 30);
+                                  setStartDate(start);
+                                  setEndDate(end);
                                 }}>Last 30 Days</button>
 
                                 <button className="btn btn-outline-secondary" onClick={() => {
-                                  const simStartDate = new Date(simulationData.timestamps[0]);
-                                  const simEndDate = new Date(simulationData.timestamps[simulationData.timestamps.length - 1]);
-                                  setStartDate(simStartDate);
-                                  setEndDate(simEndDate);
-                                }}>Full Year</button>   
+                                  setStartDate(toMidnight(new Date(2025, 0, 1)));
+                                  setEndDate(toEndOfDay(new Date(2025, 11, 31)));
+                                }}>Full Year</button>
 
                                 <DatePicker
                                     selected={startDate}

@@ -208,7 +208,8 @@ function FinancialModeling({ projectId }) {
                   title: {
                     display: true,
                     text: 'Electricity Cost Before vs After Solar (Monthly)'  
-                  }
+                  },
+                  datalabels: {display: false}
                 },
                 responsive: true,
                 scales: {
@@ -247,7 +248,7 @@ function FinancialModeling({ projectId }) {
               options={{
                 plugins: {
                   title: { display: true, text: '2025 Annual Cost Comparison' },
-
+                  datalabels: { display: true, formatter: (value) => `R${value.toFixed(0)}` }
                 },
                 responsive: true,
                 scales: {
