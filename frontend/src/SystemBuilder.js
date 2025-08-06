@@ -389,7 +389,8 @@ function SystemBuilder() {
 
                     {/* Right Column: Summary & Save */}
                     <Col lg={5} xl={4}>
-                        <div className="sticky-top" style={{ top: '88px' }}>
+                        <div className="sticky-top" style={{ top: '88px', height: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+                            {/* System Summary Card */}
                             <Card className="shadow-lg border-0 rounded-xl mb-4">
                                 <Card.Header className="bg-dark text-white rounded-top-xl py-3">
                                     <h3 className="text-xl font-semibold mb-0"><i className="bi bi-card-checklist me-2"></i>System Summary</h3>
@@ -402,11 +403,16 @@ function SystemBuilder() {
                                             <div key={comp.product.id} className="d-flex align-items-center mb-3">
                                                 <div className="flex-grow-1">
                                                     <p className="mb-0 fw-bold text-sm text-gray-800">{comp.product.brand} {comp.product.model}</p>
-                                                    <p className="mb-0 text-xs text-muted">R{comp.product.price?.toLocaleString()} ea.</p>
+                                                    <div className="d-flex justify-content-between align-items-center">
+                                                        <p className="mb-0 text-xs text-muted">R{comp.product.price?.toLocaleString()} ea.</p>
+                                                        <Badge bg="secondary" className="ms-2">
+                                                            R{(comp.product.price * comp.quantity).toLocaleString()}
+                                                        </Badge>
+                                                    </div>
                                                 </div>
                                                 <InputGroup style={{width: '120px'}} className="ms-2">
                                                     <InputGroup.Text className="small">Qty</InputGroup.Text>
-                                                    <Form.Control type="number" size="sm" value={comp.quantity} onChange={e => updateQuantity(comp.product.id, e.target.value)} min="1" />
+                                                    <Form.Control type="number" size="sm" value={comp.quantity} onChange={e => updateQuantity(comp.product.id, e.target.value)} min="0" />
                                                 </InputGroup>
                                                 <Button variant="link" className="text-danger p-0 ms-2" onClick={() => removeComponent(comp.product.id)}><i className="bi bi-trash fs-5"></i></Button>
                                             </div>
@@ -450,7 +456,7 @@ function SystemBuilder() {
                                 <Card.Header className="bg-secondary text-white rounded-top-xl py-3">
                                     <h3 className="text-xl font-semibold mb-0"><i className="bi bi-collection-fill me-2"></i>Existing Systems</h3>
                                 </Card.Header>
-                                <ListGroup variant="flush" style={{maxHeight: '400px', overflowY: 'auto'}}>
+                                <ListGroup variant="flush">
                                     {loadingTemplates ? <ListGroup.Item className="text-center p-3"><Spinner size="sm" /></ListGroup.Item> :
                                     savedTemplates.map(template => (
                                         <ListGroup.Item key={template.id} className="d-flex justify-content-between align-items-center">

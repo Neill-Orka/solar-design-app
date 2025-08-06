@@ -8,7 +8,6 @@ import { useNotification } from '../../NotificationContext';
 import '../../ReportBuilder.css';
 import StandardPage from "./StandardPage";
 import 'chartjs-adapter-date-fns'
-import { enZA } from 'date-fns/locale';
 
 function MainReportContent({ 
   data, 
@@ -655,11 +654,7 @@ function MainReportContent({
             legend: { display: false },
             title: { display: true, text: 'Monthly Energy Production (kWh)' },
             datalabels: {
-                display: true,
-                align: 'center',
-                anchor: 'end',
-                color: '#333',
-                formatter: (value) => formatValue(value)
+                display: false
             }
         },
         scales: {
@@ -727,7 +722,7 @@ function MainReportContent({
             pageNumber={3} // Set an appropriate page number here
             totalPages={24} // Set the total number of pages in your report
         >
-            <h4>Site Information</h4>
+            <h6 className="fw-bold">Site Information</h6>
             <div>
                 This site is located at {data?.project?.location}, South Africa: {data?.project?.latitude}, {data?.project?.longitude}.
             </div>
@@ -768,7 +763,7 @@ function MainReportContent({
             pageNumber={4} // Set an appropriate page number here
             totalPages={24} // Set the total number of pages in your report        
         >
-            <h4>Project Goal</h4>
+            <h6 className="fw-bold">Project Goal</h6>
             <p>{getSystemContent('projectGoal')}</p>
             <p>
                 The following benefits will be achieved:

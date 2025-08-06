@@ -6,12 +6,6 @@ import CoverPage from './sections/CoverPage';
 import ExecutiveSummary from './sections/ExecutiveSummary'; 
 import DesignReportMeta from './sections/DesignReportMeta';
 import MainReportContent from './sections/MainReportContent';
-// import TableOfContents from './sections/TableOfContents';
-// import ClientDetails from './sections/ClientDetails';
-// import PerformanceCharts from './sections/PerformanceCharts';
-// import BillOfMaterials from './sections/BillOfMaterials';
-// import FinancialKPIs from './sections/FinancialKPIs';
-// import CustomSection from './sections/CustomSection'; // If needed
 import '../ReportBuilder.css';
 
 function ReportBuilder({ projectId }) {
@@ -24,7 +18,7 @@ function ReportBuilder({ projectId }) {
     bom: true,
     financial: true,
     custom: false,
-    siteLayout: false,
+    siteLayout: true,
   });
 
   // Load all data once (simulation, financials, BOM, etc)
@@ -56,14 +50,7 @@ function ReportBuilder({ projectId }) {
         showNotification('Error loading report data', 'error');
         setLoading(false);
       });
-
-
-
   }, [projectId, showNotification]);
-
-
-  // Sidebar toggler
-  const handleToggle = (sectionKey) => setSections(s => ({ ...s, [sectionKey]: !s[sectionKey] }));
 
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
@@ -88,58 +75,55 @@ function ReportBuilder({ projectId }) {
   }, [projectId]);
 
   return (
-    <div className="report-builder">
-
-      {/* PRINT CONTROL BUTTON */}
-      <div className="print-controls">
-        <button className="export-btn" onClick={() => window.print()}>
-          <span role="img" aria-label="Export">📄</span> Export as PDF
-        </button>
-      </div>
-
-      <div className="section-controls no-print">
-        <div className='section-toggle'>
-          <label>
-            <input 
-              type="checkbox"
-              checked={sections.siteLayout}
-              onChange={() => setSections(s => ({ ...s, siteLayout: !s.siteLayout }))}
-            />
-            Show Site Layout
-          </label>
-          {sections.siteLayout && (
-            <div className='image-upload mt-2'>
-              <label htmlFor='site-layout-image' className='btn btn-sm btn-outline-secondary'>
-                {siteLayoutImage ? 'Change Layout Image' : 'Upload Layout Image'}
-              </label>
-              <input 
-                id='site-layout-image'
-                type='file'
-                accept='image/*'
-                style={{ display: 'none' }}
-                onChange={handleImageUpload}
-              />
-            </div>
-          )}
+      <div className="report-builder">
+        {/* PRINT CONTROL BUTTON */}
+        <div className="print-controls">
+          <button className="export-btn" onClick={() => window.print()}>
+            <span role="img" aria-label="Export">📄</span> Export as PDF
+          </button>
         </div>
+
+        <div className="section-controls no-print">
+          <div className='section-toggle'>
+            <label>
+              <input 
+                type="checkbox"
+                checked={sections.siteLayout}
+                onChange={() => setSections(s => ({ ...s, siteLayout: !s.siteLayout }))}
+              />
+              Show Site Layout
+            </label>
+            {sections.siteLayout && (
+              <div className='image-upload mt-2'>
+                <label htmlFor='site-layout-image' className='btn btn-sm btn-outline-secondary'>
+                  {siteLayoutImage ? 'Change Layout Image' : 'Upload Layout Image'}
+                </label>
+                <input 
+                  id='site-layout-image'
+                  type='file'
+                  accept='image/*'
+                  style={{ display: 'none' }}
+                  onChange={handleImageUpload}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* REPORT CONTENT */}
+        <main className="orka-report-printarea report-content">
+          {loading ? (
+            <div className="loading-spinner">Loading report data...</div>
+          ) : (
+            <>
+              {sections.cover && <CoverPage data={data} />}
+              <ExecutiveSummary data={data} />
+              <DesignReportMeta data={data} />
+              <MainReportContent data={data} showSiteLayout={sections.siteLayout} siteLayoutImage={siteLayoutImage}/>
+            </>
+          )}
+        </main>
       </div>
-
-      {/* REPORT CONTENT */}
-      <main className="orka-report-printarea report-content">
-        {loading ? (
-          <div className="loading-spinner">Loading report data...</div>
-        ) : (
-          <>
-            {sections.cover && <CoverPage data={data} />}
-            <ExecutiveSummary data={data} />
-            <DesignReportMeta data={data} />
-            <MainReportContent data={data} showSiteLayout={sections.siteLayout} siteLayoutImage={siteLayoutImage}/>
-            {/* ... other sections */}
-          </>
-        )}
-      </main>
-
-    </div>
   );
 }
 

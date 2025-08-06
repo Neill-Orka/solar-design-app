@@ -208,7 +208,8 @@ function EnergyAnalysis({ projectId }) {
         enabled: true,
         algorithm: 'lttb',
         samples: 200
-      }
+      },
+      datalabels: { display: false }
     },
     scales: {
       x: {
@@ -274,7 +275,7 @@ function EnergyAnalysis({ projectId }) {
 
               <button className="btn btn-outline-secondary" onClick={() => {
                 setStartDate('2025-01-01');
-                setEndDate('2025-12-31');
+                setEndDate('2026-01-01');
               }}>Full Year</button>
 
               <button className="btn btn-outline-primary" onClick={() => setShowDateModal(true)}>
