@@ -435,21 +435,6 @@ function MainReportContent({
         });
     }, [data?.project?.id]);
 
-    // Calculate annual metrics
-    const annualMetrics = React.useMemo(() => {
-        if (!yearlyConsumptionData.length) return {
-            peakDemand: 0,
-            avgDemand: 0,
-            totalEnergy: 0
-        };
-        
-        return {
-            peakDemand: Math.max(...yearlyConsumptionData.map(d => d.demand_kw)),
-            avgDemand: yearlyConsumptionData.reduce((sum, d) => sum + d.demand_kw, 0) / yearlyConsumptionData.length,
-            totalEnergy: yearlyConsumptionData.reduce((sum, d) => sum + d.demand_kw, 0) * 0.5
-        };
-    }, [yearlyConsumptionData]);
-
     // Create the demand chart data
     const demandChartData = React.useMemo(() => {
         // Group data by date to better display daily patterns
@@ -912,7 +897,7 @@ function MainReportContent({
                             </tr>
                             <tr>
                                 <td className="py-1">Electricity requirement p.a. (kWh)</td>
-                                <td className="text-end py-1">{formatValue(annualMetrics?.totalEnergy || data?.financials?.total_demand_kwh || 73200)}</td>
+                                <td className="text-end py-1">{formatValue(data?.financials?.total_demand_kwh || 0)}</td>
                             </tr>
                             <tr>
                                 <td className="py-1">Off-Grid electricity (kWh)</td>
@@ -920,15 +905,15 @@ function MainReportContent({
                             </tr>
                             <tr>
                                 <td className="py-1">Total Energy Consumption (kWh)</td>
-                                <td className="text-end py-1">{formatValue(annualMetrics?.totalEnergy || data?.financials?.total_demand_kwh || 73200)}</td>
+                                <td className="text-end py-1">{formatValue(data?.financials?.total_demand_kwh || 0)}</td>
                             </tr>
                             <tr>
                                 <td className="py-1"><strong>Total Cost of Electricity</strong></td>
-                                <td className="text-end py-1"><strong>R {formatValue(data?.financials?.original_annual_cost || 217829)}</strong></td>
+                                <td className="text-end py-1"><strong>R {formatValue(data?.financials?.original_annual_cost || 0)}</strong></td>
                             </tr>
                             <tr>
                                 <td className="py-1">Blended Rate</td>
-                                <td className="text-end py-1">R {((data?.financials?.original_annual_cost || 217829) / (annualMetrics?.totalEnergy || data?.financials?.total_demand_kwh || 73200)).toFixed(2)}</td>
+                                <td className="text-end py-1">R {((data?.financials?.original_annual_cost || 0) / (data?.financials?.total_demand_kwh || 0)).toFixed(2)}</td>
                             </tr>
                             <tr>
                                 <td className="py-1" style={{backgroundColor: "#f8f9fa"}}><strong>Grid Supply</strong></td>
@@ -936,15 +921,15 @@ function MainReportContent({
                             </tr>
                             <tr>
                                 <td className="py-1">Grid Electricity Consumption (y1) (kWh)</td>
-                                <td className="text-end py-1">{formatValue(annualMetrics?.totalEnergy || data?.financials?.total_demand_kwh || 73200)}</td>
+                                <td className="text-end py-1">{formatValue(data?.financials?.total_demand_kwh || 0)}</td>
                             </tr>
                             <tr>
                                 <td className="py-1">Grid Electricity Cost (y1)</td>
-                                <td className="text-end py-1">R {formatValue(data?.financials?.original_annual_cost || 217829)}</td>
+                                <td className="text-end py-1">R {formatValue(data?.financials?.original_annual_cost || 0)}</td>
                             </tr>
                             <tr>
                                 <td className="py-1">Cost per unit (y1 energy only)</td>
-                                <td className="text-end py-1">R {((data?.financials?.original_annual_cost || 217829) / (annualMetrics?.totalEnergy || data?.financials?.total_demand_kwh || 73200)).toFixed(2)}</td>
+                                <td className="text-end py-1">R {((data?.financials?.original_annual_cost || 0) / ( data?.financials?.total_demand_kwh || 0)).toFixed(2)}</td>
                             </tr>
                             {/* <tr>
                                 <td className="py-1" style={{backgroundColor: "#f8f9fa"}}><strong>Diesel Generator</strong></td>
@@ -1432,10 +1417,10 @@ function MainReportContent({
                         <tr>
                             <th colSpan="2" className="bg-light">
                                 {data?.project?.system_type === 'off-grid' 
-                                    ? 'Off-Grid Summary' 
+                                    ? 'Off-Grid Investment Metrics' 
                                     : data?.project?.system_type === 'hybrid' 
-                                        ? 'Hybrid System Summary' 
-                                        : 'Grid-Tied System Summary'}
+                                        ? 'Hybrid Investement Metrics' 
+                                        : 'Grid-Tied Investment Metrics'}
                             </th>
                         </tr>
                         <tr>
@@ -1448,19 +1433,23 @@ function MainReportContent({
                             <td className="text-end">R {formatValue(data?.project?.project_value_excl_vat || 0)}</td>
                         </tr>
                         <tr>
+                            <td>Effective cost after tax incentive</td>
+                            <td className="text-end">R {formatValue(data?.project?.project_value_excl_vat * 0.73 || 0)}</td>
+                        </tr>
+                        {/* <tr>
                             <td>Total utility cost savings</td>
                             <td className="text-end">R {formatValue(data?.financials?.annual_savings || 0)}</td>
-                        </tr>
-                        <tr>
+                        </tr> */}
+                        {/* <tr>
                             <td>Utility Fixed Fee Savings</td>
                             <td className="text-end">R {formatValue(data?.financials?.cost_comparison?.[0]?.old_bill_breakdown?.fixed - 
                                                              data?.financials?.cost_comparison?.[0]?.new_bill_breakdown?.fixed || 0)}</td>
-                        </tr>
-                        <tr>
+                        </tr> */}
+                        {/* <tr>
                             <td>Utility Energy Cost Savings</td>
                             <td className="text-end">R {formatValue(data?.financials?.cost_comparison?.[0]?.old_bill_breakdown?.energy - 
                                                              data?.financials?.cost_comparison?.[0]?.new_bill_breakdown?.energy || 0)}</td>
-                        </tr>
+                        </tr> */}
                         
                         {/* Generator Running Cost - Only for off-grid systems */}
                         {data?.project?.system_type === 'off-grid' && (
@@ -1677,7 +1666,7 @@ function MainReportContent({
                         </tr>
                         <tr>
                             <td>Effective cost (after appl. tax benefit)</td>
-                            <td className="text-end">R {formatValue(data?.project?.effective_cost || data?.project?.project_value_excl_vat * 0.72 || 0)}</td>
+                            <td className="text-end">R {formatValue(data?.project?.project_value_excl_vat * 0.73 || 0)}</td>
                         </tr>
                         <tr>
                             <td>Total Energy Consumption (kWh)</td>
@@ -1710,7 +1699,7 @@ function MainReportContent({
                             <tr>
                                 <td>Generator cost savings (y1)</td>
                                 <td className="text-end">R {formatValue(data?.financials?.generator_cost_savings || 0)}</td>
-                                </tr>
+                            </tr>
                         )}
                         
                         {/* Grid Section - Only show for grid-tied and hybrid */}
@@ -1750,7 +1739,6 @@ function MainReportContent({
                         </tr>
                         <tr>
                             <td>Electricity from PV (y1) direct consumption (kWh)</td>
-                            <td></td>
                             <td className="text-end">
                                 {formatValue(data?.financials?.pv_direct_consumption || data?.financials?.total_generation_kwh * 0.6 || 0)}
                             </td>
@@ -1759,7 +1747,6 @@ function MainReportContent({
                             <>
                                 <tr>
                                     <td>Electricity from PV (y1) direct {data?.project?.system_type === 'off-grid' ? 'Off-Grid' : 'On-Grid'} (kWh)</td>
-                                    <td></td>
                                     <td className="text-end">
                                         {formatValue(data?.financials?.pv_direct_consumption || data?.financials?.total_generation_kwh * 0.6 || 0)}
                                     </td>
@@ -1767,13 +1754,11 @@ function MainReportContent({
                                 {data?.project?.allow_export && (
                                     <tr>
                                         <td>Electricity from PV (y1) surplus recovery (kWh)</td>
-                                        <td></td>
                                         <td className="text-end">{formatValue(data?.financials?.exported_energy || 0)}</td>
                                     </tr>
                                 )}
                                 <tr>
                                     <td>Electricity from Battery (y1) (kWh)</td>
-                                    <td></td>
                                     <td className="text-end">
                                         {formatValue(data?.financials?.battery_discharge || data?.financials?.total_generation_kwh * 0.4 || 0)}
                                     </td>
