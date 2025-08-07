@@ -233,7 +233,9 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
             "export_to_grid": export_to_grid,
             "battery_soc": [round(val, 2) for val in battery_soc_trace],
             "panel_kw": degraded_panel_kw,
-            "potential_generation": [round(val, 2) for val in potential_generation_kw]
+            "potential_generation": [round(val, 2) for val in potential_generation_kw],
+            "inverter_kva": inverter_kva,
+            "battery_kwh": battery_kwh
         }
 
     except Exception as e:

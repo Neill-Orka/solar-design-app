@@ -4,6 +4,7 @@ import axios from 'axios';
 import EnergyDataUpload from './EnergyDataUpload';
 import EnergyAnalysis from './EnergyAnalysis';
 import SystemDesign from './SystemDesign';
+import BillOfMaterials from './BillOfMaterials';
 import FinancialModeling from './FinancialModeling';
 import ReportBuilder from './components/ReportBuilder';
 import Optimize from './Optimize';
@@ -244,14 +245,17 @@ function ProjectDashboard() {
         <li className="nav-item">
           <button className={`nav-link ${activeTab === 'design' ? 'active' : ''}`} onClick={() => setActiveTab('design')}>System Design</button>
         </li>
-        <li className="nav-item">
+        {/* <li className="nav-item">
           <button className={`nav-link ${activeTab === 'optimize' ? 'active' : ''}`} onClick={() => setActiveTab('optimize')}>Optimize System</button>
+        </li> */}
+        <li className="nav-item">
+          <button className={`nav-link ${activeTab === 'bom' ? 'active' : ''}`} onClick={() => setActiveTab('bom')}>Bill of Materials</button>
+        </li>        
+        <li className="nav-item">
+          <button className={`nav-link ${activeTab === 'tariff' ? 'active' : ''}`} onClick={() => setActiveTab('tariff')}>Tariff</button>
         </li>
         <li className="nav-item">
           <button className={`nav-link ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => setActiveTab('finance')}>Financial Modeling</button>
-        </li>
-        <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'tariff' ? 'active' : ''}`} onClick={() => setActiveTab('tariff')}>Tariff</button>
         </li>
         <li className="nav-item">
           <button className={`nav-link ${activeTab === 'report' ? 'active' : ''}`} onClick={() => setActiveTab('report')}>Reporting</button>
@@ -262,6 +266,7 @@ function ProjectDashboard() {
         {activeTab === 'upload' && <EnergyDataUpload projectId={projectId} />}
         {activeTab === 'analysis' && <EnergyAnalysis projectId={projectId} />}
         {activeTab === 'design' && <SystemDesign projectId={projectId} />}
+        {activeTab === 'bom' && <BillOfMaterials projectId={projectId} />}
         {activeTab === 'finance' && <FinancialModeling projectId={projectId} />}
         {activeTab === 'tariff' && (
           <div>

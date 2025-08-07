@@ -672,7 +672,10 @@ function SystemDesign({ projectId }) {
                 use_pvgis: usePvgis,
                 generation_profile_name: profileName,
                 battery_soc_limit: newDesign.batterySocLimit,
-                project_value_excl_vat: template.total_cost
+                project_value_excl_vat: template.total_cost,
+                from_standard_template: true,
+                template_id: template.id,
+                template_name: template.name
             };
 
             // Save first, then simulate (just like in handleSimulate)
@@ -863,31 +866,8 @@ function SystemDesign({ projectId }) {
         console.log('Cleared simulation cache from sessionStorage.');
     };
 
-    const saveProject = () => {
-        // Build the payload from the 'design' state object
-        const payload = {
-            system_type: design.systemType,
-            panel_kw: parseFloat(design.panelKw),
-            surface_tilt: parseFloat(design.tilt),
-            surface_azimuth: parseFloat(design.azimuth),
-            allow_export: design.allowExport,
-            panel_id: design.selectedPanel?.product.id,
-            inverter_kva: design.selectedInverter ? {
-                model: design.selectedInverter.product.model,
-                capacity: design.selectedInverter.product.rating_kva,
-                quantity: design.inverterQuantity
-            } : null,
-            battery_kwh: design.systemType !== 'grid' && design.selectedBattery ? {
-                model: design.selectedBattery.product.model,
-                capacity: design.selectedBattery.product.capacity_kwh,
-                quantity: design.batteryQuantity
-            } : null,
-            use_pvgis: usePvgis,
-            generation_profile_name: profileName,
-            battery_soc_limit: design.batterySocLimit
-        };
-
-        axios.put(`${API_URL}/api/projects/${projectId}`, payload)
+    const saveProject = (payload) => {
+        return axios.put(`${API_URL}/api/projects/${projectId}`, payload)
             .then(() => {
                 showNotification('System saved to project 👍', 'success');
             })
@@ -899,57 +879,45 @@ function SystemDesign({ projectId }) {
     
     const handleSimulate = () => {
         setLoading(true);
+        
         // Build the payload from the 'design' state object
-
-        // Save current system config
         const savePayload = {
             system_type: design.systemType,
             panel_kw: parseFloat(design.panelKw),
             surface_tilt: parseFloat(design.tilt),
             surface_azimuth: parseFloat(design.azimuth),
             allow_export: design.allowExport,
-            panel_id: design.selectedPanel?.product.id,
-            inverter_kva: design.selectedInverter ? {
-                model: design.selectedInverter.product.model,
-                capacity: design.selectedInverter.product.rating_kva,
-                quantity: design.inverterQuantity
-            } : null,
-            battery_kwh: design.systemType !== 'grid' && design.selectedBattery ? {
-                model: design.selectedBattery.product.model,
-                capacity: design.selectedBattery.product.capacity_kwh,
-                quantity: design.batteryQuantity
-            } : null,
-            use_pvgis: usePvgis,
-            generation_profile_name: profileName,
-            battery_soc_limit: design.batterySocLimit            
-        };
-
-        // Auto-save before simulation
-        axios.put(`${API_URL}/api/projects/${projectId}`, savePayload)
+            // Make sure these IDs are included:
+            panel_id: design.selectedPanel?.product?.id,
+            inverter_ids: design.selectedInverter ? [design.selectedInverter.product.id] : [],
+            battery_ids: design.systemType !== 'grid' && design.selectedBattery ? 
+              [design.selectedBattery.product.id] : [],
+            // Rest of the code...
+          };
+          
+          // Save first, then simulate
+          saveProject(savePayload)
             .then(() => {
-                // No need for notification here as we're proceeding to simulate
-                console.log('System auto-saved before simulation');
+              // Now run simulation with the same data
+              const simPayload = {
+                  project_id: projectId,
+                  use_pvgis: usePvgis,
+                  profile_name: profileName,
+                  system: {
+                      panel_kw: parseFloat(design.panelKw),
+                      panel_id: design.selectedPanel?.product.id,
+                      tilt: parseFloat(design.tilt),
+                      azimuth: parseFloat(design.azimuth),
+                      system_type: design.systemType,
+                      // Ensure we safely access nested properties
+                      inverter_kva: (design.selectedInverter?.product.rating_kva || 0) * design.inverterQuantity,
+                      battery_kwh: (design.selectedBattery?.product.capacity_kwh || 0) * design.batteryQuantity,
+                      allow_export: design.allowExport,
+                      battery_soc_limit: design.batterySocLimit
+                  }
+              };
 
-                // Then run simulation with the same data
-                const simPayload = {
-                    project_id: projectId,
-                    use_pvgis: usePvgis,
-                    profile_name: profileName,
-                    system: {
-                        panel_kw: parseFloat(design.panelKw),
-                        panel_id: design.selectedPanel?.product.id,
-                        tilt: parseFloat(design.tilt),
-                        azimuth: parseFloat(design.azimuth),
-                        system_type: design.systemType,
-                        // Ensure we safely access nested properties
-                        inverter_kva: (design.selectedInverter?.product.rating_kva || 0) * design.inverterQuantity,
-                        battery_kwh: (design.selectedBattery?.product.capacity_kwh || 0) * design.batteryQuantity,
-                        allow_export: design.allowExport,
-                        battery_soc_limit: design.batterySocLimit
-                    }
-                };
-
-                return axios.post(`${API_URL}/api/simulate`, simPayload);
+              return axios.post(`${API_URL}/api/simulate`, simPayload);
             })
             .then(res => {
                 if (!res || !res.data || !res.data.timestamps) {
@@ -1077,9 +1045,9 @@ function SystemDesign({ projectId }) {
         setAnnualMetrics({
             daytimeConsumption: daytimeConsumptionPct.toFixed(0),
             consumptionFromPV: consumptionFromPvPct.toFixed(0),
-            potentialGenDaily: potentialGenDaily.toFixed(0),
-            utilizedGenDaily: utilizedGenDaily.toFixed(1),
-            throttlingLossesDaily: throttlingLossesDaily.toFixed(1),
+            potentialGenDaily: potentialGenDaily.toFixed(2),
+            utilizedGenDaily: utilizedGenDaily.toFixed(2),
+            throttlingLossesDaily: throttlingLossesDaily.toFixed(2),
             specificYieldWithThrottling: specYieldInclThrottling.toFixed(2),
             specificYieldExclThrottling: specYieldExclThrottling.toFixed(2),
             potentialGenAnnual: (potentialGenDaily * 365).toFixed(0),

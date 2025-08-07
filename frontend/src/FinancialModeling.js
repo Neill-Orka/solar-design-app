@@ -497,14 +497,74 @@ function FinancialModeling({ projectId }) {
         </Card.Body>
       </Card>
 
+      {/* System Specifications Cards */}
+      <Row className='mb-2 g-2'>
+        <Col md={3} className='mb-1'>
+          <Card className='text-center shadow-sm h-100'>
+            <Card.Body className='py-2'>
+              <div className='fs-1 text-secondary'>
+                <i className='bi bi-cash-stack'></i>
+              </div>
+              <h5>Total System Cost</h5>
+              <h3 className='fw-bold'>{formatCurrency(projectValue)}</h3>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col md={3} className="mb-1">
+          <Card className="text-center shadow-sm h-100">
+            <Card.Body className='py-2'>
+              <div className="fs-1 text-warning">
+                <i className="bi bi-sun-fill"></i>
+              </div>
+              <h5>PV Size</h5>
+              <h3 className="fw-bold">
+                {simulationData?.panel_kw ? `${simulationData.panel_kw} kWp` : 'N/A'}
+              </h3>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col md={3} className="mb-1">
+          <Card className="text-center shadow-sm h-100">
+            <Card.Body className='py-2'>
+              <div className="fs-1 text-danger">
+                <i className="bi bi-cpu-fill"></i>
+              </div>
+              <h5>Inverter Size</h5>
+              <h3 className="fw-bold">
+                {simulationData?.inverter_kva ? `${simulationData.inverter_kva} kVA` : 'N/A'}
+              </h3>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col md={3} className="mb-1">
+          <Card className="text-center shadow-sm h-100">
+            <Card.Body className='py-2'>
+              <div className="fs-1 text-success">
+                <i className="bi bi-battery-charging"></i>
+              </div>
+              <h5>Battery Size</h5>
+              <h3 className="fw-bold">
+                {simulationData?.battery_kwh && simulationData.battery_kwh > 0 
+                  ? `${simulationData.battery_kwh} kWh` 
+                  : '0 kWh'}
+              </h3>
+            </Card.Body>
+          </Card>
+        </Col>
+
+      </Row>
+
       {/* Results section - only show if financial results exist */}
       {financialResult && (
         <>
           {/* Key metrics cards */}
-          <Row className="mb-4 g-3">
-            <Col md={3} className="mb-3">
+          <Row className="mb-4 g-2">
+            <Col md={3} className="mb-1">
               <Card className="text-center shadow-sm h-100">
-                <Card.Body>
+                <Card.Body className='py-2'>
                   <div className="fs-1 text-success">
                     <i className="bi bi-wallet2"></i>
                   </div>
@@ -513,9 +573,9 @@ function FinancialModeling({ projectId }) {
                 </Card.Body>
               </Card>
             </Col>
-            <Col md={3} className="mb-3">
+            <Col md={3} className="mb-1">
               <Card className="text-center shadow-sm h-100">
-                <Card.Body>
+                <Card.Body className='py-2'>
                   <div className="fs-1 text-primary">
                     <i className="bi bi-lightning-charge-fill"></i>
                   </div>
@@ -524,9 +584,9 @@ function FinancialModeling({ projectId }) {
                 </Card.Body>
               </Card>
             </Col>
-            <Col md={3} className="mb-3">
+            <Col md={3} className="mb-1">
               <Card className="text-center shadow-sm h-100">
-                <Card.Body>
+                <Card.Body className='py-2'>
                   <div className="fs-1 text-info">
                     <i className="bi bi-calendar-check"></i>
                   </div>
@@ -537,9 +597,9 @@ function FinancialModeling({ projectId }) {
                 </Card.Body>
               </Card>
             </Col>
-            <Col md={3} className="mb-3">
+            <Col md={3} className="mb-1">
               <Card className="text-center shadow-sm h-100">
-                <Card.Body>
+                <Card.Body className='py-2'>
                   <div className="fs-1 text-warning">
                     <i className="bi bi-graph-up-arrow"></i>
                   </div>
@@ -609,7 +669,7 @@ function FinancialModeling({ projectId }) {
                       </td>
                     </tr>
                     <tr>
-                      <td>Total Solar Production</td>
+                      <td>Direct Solar Consumption</td>
                       <td className="text-end fw-bold">
                         {financialResult.total_generation_kwh?.toLocaleString()} kWh
                       </td>
@@ -651,7 +711,7 @@ function FinancialModeling({ projectId }) {
                       </td>
                     </tr>
                     <tr>
-                      <td>Yield (incl. throttling losses)</td>
+                      <td>Specific Yield (incl. throttling losses)</td>
                       <td className='text-end fw-bold'>
                         <Badge bg="secondary" className="fs-6">
                           {financialResult.yield_incl_losses} kWh/kWp/day
@@ -659,7 +719,7 @@ function FinancialModeling({ projectId }) {
                       </td>
                     </tr>
                     <tr>
-                      <td>Yield (excl. throttling losses)</td>
+                      <td>Specific Yield (excl. throttling losses)</td>
                       <td className='text-end fw-bold'>
                         <Badge bg="secondary" className="fs-6">
                           {financialResult.yield_excl_losses} kWh/kWp/day
