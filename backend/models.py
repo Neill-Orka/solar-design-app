@@ -1,4 +1,5 @@
 # models.py
+from email.policy import default
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import JSONB
@@ -359,3 +360,21 @@ class TariffRates(db.Model):
 
     def __repr__(self):
         return f'<TariffRate for TariffID {self.tariff_id}: {self.charge_name}>'
+    
+class BOMComponent(db.Model):
+    __tablename__ = 'bom_components'
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+    price_at_time = db.Column(db.Float, nullable=True) # Stores historical price
+    quote_status = db.Column(db.String(20), default='draft')
+    extras_cost = db.Column(db.Float, nullable=True, default=0)
+
+    # Relationships
+    project = db.relationship('Projects', backref=db.backref('bom_components', lazy=True, cascade="all, delete-orphan"))
+    product = db.relationship('Product')
+
+    def __repr__(self):
+        return f'<BOMComponent {self.id} for Project {self.project_id}>'

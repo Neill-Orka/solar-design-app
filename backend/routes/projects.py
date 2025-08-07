@@ -20,7 +20,10 @@ def get_projects():
                 'longitude': p.longitude,
                 'system_type': p.system_type,
                 'panel_kw': p.panel_kw,
+                # Remove panel_id from here
                 'inverter_kva': p.inverter_kva,
+                'inverter_ids': p.inverter_ids if p.inverter_ids is not None else [],
+                'battery_ids': p.battery_ids if p.battery_ids is not None else [],
                 'battery_kwh': p.battery_kwh,
                 'project_value_excl_vat': p.project_value_excl_vat,
                 'site_contact_person': p.site_contact_person,
@@ -35,6 +38,9 @@ def get_projects():
             for p in projects
         ])
     except Exception as e:
+        import traceback
+        print(f"Error in get_projects: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 
@@ -45,6 +51,9 @@ def get_project_by_id(project_id):
         if not project:
             return jsonify({'error': 'Project not found'}), 404
 
+        # Update debug logging to remove panel_id
+        print(f"Project data: ID={project.id}, inverter_ids={project.inverter_ids}, battery_ids={project.battery_ids}")
+        
         # Fetch and serialize quick design data if it exists.
         quick_design_data = None
         if project.quick_design_entry:
@@ -59,6 +68,11 @@ def get_project_by_id(project_id):
                 'profile_scaler': qdd.profile_scaler,
                 'selected_system_config_json': qdd.selected_system_config_json
             }
+            pass
+
+        # Remove panel_id from variables
+        inverter_ids = project.inverter_ids if project.inverter_ids is not None else []
+        battery_ids = project.battery_ids if project.battery_ids is not None else []
 
         return jsonify({
             'id': project.id,
@@ -69,7 +83,10 @@ def get_project_by_id(project_id):
             'longitude': project.longitude,
             'system_type': project.system_type,
             'panel_kw': project.panel_kw,
+            # Remove panel_id from here
             'inverter_kva': project.inverter_kva,
+            'inverter_ids': inverter_ids,
+            'battery_ids': battery_ids,
             'battery_kwh': project.battery_kwh,
             'project_value_excl_vat': project.project_value_excl_vat,
             'site_contact_person': project.site_contact_person,
@@ -86,6 +103,10 @@ def get_project_by_id(project_id):
             'generation_profile_name': project.generation_profile_name,
         })
     except Exception as e:
+        # Add better error logging
+        import traceback
+        print(f"Error in get_project_by_id: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 
