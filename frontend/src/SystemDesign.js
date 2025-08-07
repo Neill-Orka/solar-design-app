@@ -27,7 +27,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const PANEL_WATTAGE = 565; // JA SOLAR 72S30-565/GR
 
 // Sub Component for Stage 1: Sizing Mode
-const SizingView = ({ design, onDesignChange, onPromote, products, usePvgis, setUsePvgis, profileName, setProfileName }) => {
+const SizingView = ({ design, onDesignChange, products, usePvgis, setUsePvgis, profileName, setProfileName }) => {
   
   const handleTargetKwChange = (e) => {
     const kw = e.target.value;
@@ -284,262 +284,9 @@ const SizingView = ({ design, onDesignChange, onPromote, products, usePvgis, set
                 </Card>
             </div>
         </div> 
-        <Button onClick={onPromote} variant="success" size="lg"><i className="bi bi-tools me-2"></i>Refine Components & Build BOM</Button>    
+        {/* Remove the Button for "Refine Components & Build BOM" */}
     </>
   );
-};
-
-// ===================================================================================
-//  SUB-COMPONENT FOR STAGE 2: BOM BUILDER
-// ===================================================================================
-const Step1InverterAC = ({ design, onBomChange }) => {
-    const { showNotification } = useNotification();
-    const inverter = design.selectedInverter?.product;
-
-    // State to hold the lists of compatible products
-    const [compatibleCables, setCompatibleCables] = useState([]);
-    const [compatibleIsolators, setCompatibleIsolators] = useState([]);
-    const [compatibleBreakers, setCompatibleBreakers] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const inverterId = inverter?.id;
-        if (!inverterId) {
-            setLoading(false);
-            return;
-        }
-
-        const fetchCompatible = async (category, setter) => {
-            try {
-                const res = await axios.get(`${API_URL}/api/compatible_products`, {
-                    params: { subject_id: inverterId, category: category }
-                });
-                const options = res.data.map(p => ({
-                    value: p.id,
-                    label: `${p.model}`,
-                    product: p
-                }));
-                setter(options);
-            } catch (error) {
-                showNotification(`Failed to load compatible ${category}s`, 'danger');
-            }
-        };
-
-        setLoading(true);
-        Promise.all([
-            fetchCompatible('cable', setCompatibleCables),
-            fetchCompatible('isolator', setCompatibleIsolators),
-            fetchCompatible('breaker', setCompatibleBreakers)
-        ]).finally(() => setLoading(false));
-
-    }, [inverter, showNotification]);
-
-    if (!inverter) return <Alert variant="warning">Go back to Sizing Mode to select an inverter first.</Alert>;
-
-    return (
-        <div>
-            <h5 className="mb-3 fw-bold">Step 1: Inverter & AC Protection</h5>
-            <Alert variant="success">
-                <i className="bi bi-info-circle-fill me-2"></i>
-                <strong>Selected Inverter:</strong> {inverter.model} ({inverter.rating_kva}kVA)
-            </Alert>
-            <hr />
-            {loading ? <div className="text-center"><Spinner animation="border" /></div> : <>
-                <Form.Group className="mb-3">
-                    <Form.Label>Main AC Cable to Point of Connection</Form.Label>
-                    <Select placeholder="Select AC Cable..." options={compatibleCables} onChange={opt => onBomChange(opt.product, 1)} />
-                </Form.Group>
-                <Form.Group className="mb-3">
-                    <Form.Label>Inverter Isolator</Form.Label>
-                    <Select placeholder="Select Isolator..." options={compatibleIsolators} onChange={opt => onBomChange(opt.product, 1)} />
-                </Form.Group>
-                <Form.Group className="mb-3">
-                    <Form.Label>Inverter OCPD at POC (Breaker)</Form.Label>
-                    <Select placeholder="Select AC Breaker..." options={compatibleBreakers} onChange={opt => onBomChange(opt.product, 1)} />
-                </Form.Group>
-            </>}
-        </div>
-    );
-};
-
-const Step2PanelsAndStringing = ({ design, onBomChange }) => {
-    const [strings, setStrings] = useState([{ id: 1, count: design.numPanels || 0 }]);
-    const [validationMsg, setValidationMsg] = useState({ type: 'info', text: '' });
-
-    const handleStringCountChange = (index, value) => {
-        const newStrings = [...strings];
-        newStrings[index].count = parseInt(value, 10) || 0;
-        setStrings(newStrings);
-    };
-
-    const addString = () => setStrings([...strings, { id: Date.now(), count: 0 }]);
-    const removeString = (index) => setStrings(strings.filter((_, i) => i !== index));
-    const totalPanelsInStrings = useMemo(() => strings.reduce((sum, s) => sum + s.count, 0), [strings]);
-    
-    // Placeholder for validation logic
-    useEffect(() => {
-        const panel = { voc: design.selectedInverter?.product?.properties?.voc || 50.28 }; // Example
-        const inverter = { max_dc_voltage: design.selectedInverter?.product?.properties?.max_dc_voltage || 450 };
-        // This is where you would call your backend validation engine
-        // For now, we'll simulate it
-        const longestString = Math.max(...strings.map(s => s.count));
-        const maxVoltage = longestString * panel.voc * 1.15; // Simulated cold temp calculation
-        if (maxVoltage > inverter.max_dc_voltage) {
-            setValidationMsg({ type: 'danger', text: `Warning: String voltage (${maxVoltage.toFixed(0)}V) exceeds inverter limit of ${inverter.max_dc_voltage}V!` });
-        } else {
-            setValidationMsg({ type: 'success', text: `Max String Voltage: ${maxVoltage.toFixed(0)}V (OK)` });
-        }
-    }, [strings, design.selectedInverter]);
-
-    return (
-        <div>
-            <h5 className="mb-3 fw-bold">Step 2: PV Panel & String Configuration</h5>
-            <Alert variant="info">
-                <i className="bi bi-info-circle-fill me-2"></i>
-                You need to configure **{design.numPanels}** panels. Please arrange them into strings below.
-            </Alert>
-            {strings.map((str, index) => (
-                <Form.Group as={Row} key={str.id} className="mb-2 align-items-center">
-                    <Form.Label column sm={3}>String {index + 1}</Form.Label>
-                    <Col sm={5}>
-                        <Form.Control type="number" min="0" value={str.count} onChange={(e) => handleStringCountChange(index, e.target.value)} />
-                    </Col>
-                    <Col sm={3}><small className="text-muted">panels</small></Col>
-                    <Col sm={1}><Button variant="link" className="text-danger p-0" onClick={() => removeString(index)}><i className="bi bi-trash"></i></Button></Col>
-                </Form.Group>
-            ))}
-            <Button variant="outline-primary" size="sm" onClick={addString} className="mt-2"><i className="bi bi-plus-lg me-1"></i> Add String</Button>
-            <hr />
-            <div className="text-end">
-                <p className="mb-1">Total Panels Configured: <strong className={totalPanelsInStrings !== parseInt(design.numPanels) ? 'text-danger' : 'text-success'}>{totalPanelsInStrings}</strong></p>
-                {validationMsg.text && <Alert variant={validationMsg.type} className="py-2 px-3 mt-2 text-center small">{validationMsg.text}</Alert>}
-            </div>
-        </div>
-    );
-};
-
-// ===================================================================================
-//  BOM BUILDER MAIN COMPONENT
-// ===================================================================================
-const BomBuilderView = ({ onBack, design, products }) => {
-    const [currentStep, setCurrentStep] = useState(1);
-    const [bom, setBom] = useState([]);
-
-    useEffect(() => {
-        let initialBom = [];
-        if (design.selectedInverter?.product) {
-            initialBom.push({ product: design.selectedInverter.product, quantity: design.inverterQuantity });
-        }
-        const panelProduct = products.panels.find(p => p.power_w === PANEL_WATTAGE);
-        if (panelProduct && design.numPanels > 0) {
-            initialBom.push({ product: panelProduct, quantity: parseInt(design.numPanels) });
-        }
-        if (design.selectedBattery?.product) {
-            initialBom.push({ product: design.selectedBattery.product, quantity: design.batteryQuantity });
-        }
-        setBom(initialBom);
-    }, [design, products]);
-
-    const handleBomChange = (product, quantity) => {
-        setBom(currentBom => {
-            const newBom = [...currentBom];
-            const existingItemIndex = newBom.findIndex(item => item.product.id === product.id);
-
-            if (existingItemIndex > -1) {
-                // If item exists and quantity is > 0, update it. Otherwise, remove it.
-                if (quantity > 0) {
-                    newBom[existingItemIndex] = { ...newBom[existingItemIndex], quantity: quantity };
-                } else {
-                    newBom.splice(existingItemIndex, 1);
-                }
-            } else if (quantity > 0) {
-                // Add new item if it doesn't exist and quantity is positive
-                newBom.push({ product, quantity });
-            }
-            return newBom;
-        });
-    };
-
-    const handleRemoveItem = (productIdToRemove) => {
-        const coreProductIds = [
-            design.selectedInverter?.product?.id,
-            products.panels.find(p => p.power_w === PANEL_WATTAGE)?.id,
-            design.selectedBattery?.product?.id
-        ].filter(Boolean);
-
-        if (coreProductIds.includes(productIdToRemove)) {
-            alert("Core componenets cannot be removed");
-            return;
-        }
-
-        setBom(currentBom => currentBom.filter(item => item.product.id !== productIdToRemove));
-    };
-
-    const totalCost = useMemo(() => {
-        return bom.reduce((acc, item) => {
-            const price = item.product.price || 0;
-            const quantity = item.quantity || 0;
-            return acc + (price * quantity);
-        }, 0);
-    }, [bom]);
-
-    const renderStep = () => {
-        switch (currentStep) {
-            // MODIFIED: Pass the correct handler function to the step components
-            case 1: return <Step1InverterAC design={design} onBomChange={handleBomChange} />;
-            case 2: return <Step2PanelsAndStringing design={design} onBomChange={handleBomChange} />;
-            default: return <h4>Review Final BOM</h4>;
-        }
-    };
-
-    const totalSteps = 3; // Update this as you add more steps
-
-    return (
-        <Row className="g-4">
-            <Col lg={4}>
-                <Card className="shadow-sm sticky-top" style={{ top: '20px' }}>
-                    <Card.Header className='d-flex justify-content-between align-items-center'>
-                        <h5 className="mb-0">Live Bill of Materials</h5>
-                        <span className='fw-bold text-success'>
-                            R{totalCost.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                    </Card.Header>
-                    <ListGroup variant="flush" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                        {bom.map(item => (
-                            <ListGroup.Item key={item.product.id} className="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <p className="mb-0 fw-bold">{item.product.model}</p>
-                                    <small className="text-muted text-capitalize">{item.product.category.replace('_', ' ')}</small>
-                                </div>
-                                <div className='d-flex align-items-center'>
-                                    <Badge bg="primary" pill className='me-2'>x {item.quantity}</Badge>
-                                    <Button variant="link" size='sm' className='text-danger p-0' onClick={() => handleRemoveItem(item.product.id)} title="Remove Item">
-                                        <i className="bi bi-x-circle-fill"></i>
-                                    </Button>
-                                </div>
-                            </ListGroup.Item>
-                        ))}
-                    </ListGroup>
-                </Card>
-            </Col>
-            <Col lg={8}>
-                <Card className="shadow-sm">
-                    <Card.Body className="p-4">
-                        <div className="d-flex justify-content-between align-items-center mb-4">
-                            <h4 className="mb-0">Step-by-Step Builder</h4>
-                            <Button onClick={onBack} variant="outline-secondary" size="sm"><i className="bi bi-arrow-left me-2"></i>Back to Sizing Mode</Button>
-                        </div>
-                        {renderStep()}
-                        <div className="d-flex justify-content-between mt-4 border-top pt-3">
-                            <Button variant="secondary" onClick={() => setCurrentStep(s => Math.max(1, s - 1))} disabled={currentStep === 1}>Previous</Button>
-                            <span className="text-muted align-self-center">Step {currentStep} of {totalSteps}</span>
-                            <Button variant="primary" onClick={() => setCurrentStep(s => Math.min(totalSteps, s + 1))} disabled={currentStep === totalSteps}>Next</Button>
-                        </div>
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
-    );
 };
 
 // ===================================================================================
@@ -555,15 +302,118 @@ const safeParseFloat = (value) => {
 
 const toMidnight = (d) => { d.setHours(0, 0, 0, 0); return d; };
 const toEndOfDay = (d) => { d.setHours(23, 59, 59, 999); return d; };
+// Component for the Standard Desing feature
+const StandardDesignSelector = ({ templates, loading, onSelectSystem }) => {
+    if (loading) {
+        return (
+            <div className='text-center p-5'>
+                <Spinner animation="border" variant='primary' />
+                <p className='mt-3'>Loading standard designs...</p>
+            </div>
+        );
+    }
+
+    if (!templates || templates.length === 0) {
+        return (
+            <Alert variant='info' className='my-4'>
+                <Alert.Heading>No Standard Designs Available</Alert.Heading>
+                <p>There are no standard designs available. You can create a design in the System Builder Tool.</p>
+            </Alert>
+        );
+    }
+
+    return (
+        <div className='row g-4 mb-4'>
+            {templates.map((system) => (
+                <div className='col-md-6 col-lg-4' key={system.id}>
+                    <Card className='h-100 shadow-sm hover-card'>
+                        <Card.Body className='d-flex flex-column'>
+                            <div className='d-flex align-items-center mb-3'>
+                                <div className={`rounded-circle bg-${getSystemTypeColor(system.system_type)} p-2 me-2`}>
+                                    <i className={`bi ${getSystemTypeIcon(system.system_type)} text-white`}></i>
+                                </div>
+                                <Card.Title className='mb-0 fs-5'>
+                                    {system.name}
+                                </Card.Title>
+                            </div>
+
+                            <Card.Text className='small text-muted mb-3'>
+                                {system.description || 'No description available.'}
+                            </Card.Text>
+                            <div className='small mb-3'>
+                                <div className='small mb-3'>
+                                    <span>PV Size:</span>
+                                    <Badge bg='warning' text='dark'>{system.panel_kw} kWp</Badge>
+                                </div>
+                                <div className='d-flex justify-content-between mb-1'>
+                                    <span>Inverter:</span>
+                                    <Badge bg='info'>{system.inverter_kva} kVA</Badge>
+                                </div>
+                                <div className='d-flex justify-content-between mb-1'>
+                                    <span>Battery:</span>
+                                    <Badge bg='success'>
+                                        {system.battery_kwh > 0 ? `${system.battery_kwh} kWh` : 'None'}
+                                    </Badge>
+                                </div>
+                                <div className='d-flex justify-content-between mb-1'>
+                                    <span>Type:</span>
+                                    <span className='fw-semibold'>{formatSystemType(system.system_type)}</span>
+                                </div>
+                            </div>
+
+                            <div className='mt-auto pt-3 border-top'>
+                                <div className='d-flex justify-content-between align-items-center'>
+                                    <span className='fw-bold text-primary'>
+                                        R{system.total_cost.toLocaleString()}
+                                    </span>
+                                    <Button 
+                                        variant='primary'
+                                        size='sm'
+                                        onClick={() => onSelectSystem(system)}>
+                                        Use This System
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card.Body>
+                    </Card>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// Helper functions for StandardDesignSelector
+const getSystemTypeColor = (type) => {
+    switch (type?.toLowerCase()) {
+        case 'hybrid': return 'success';
+        case 'grid-tied': return 'primary';
+        case 'off-grid': return 'danger';
+        default: return 'secondary';
+    }
+};
+
+const getSystemTypeIcon = (type) => {
+    switch (type?.toLowerCase()) {
+        case 'hybrid': return 'bi-battery-charging';
+        case 'grid-tied': return 'bi-plug-fill';
+        case 'off-grid': return 'bi-sun-fill';
+        default: return 'bi-gear-fill';
+    }
+};
+
+const formatSystemType = (type) => {
+    if (!type) return 'Unknown';
+    return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase().replace('-', ' ');
+};
+
+
 
 function SystemDesign({ projectId }) {
-    // Remove chartKey completely
-    // const [chartKey, setChartKey] = useState(0); // Remove this line
+    const simulateButtonRef = useRef(null);
 
     // --- Piece 1: State Management ---
 
     // UI Control State
-    const [designStage, setDesignStage] = useState('sizing'); // To switch between 'sizing' and 'bom'
     const [loading, setLoading] = useState(false);
     const [simulationData, setSimulationData] = useState(null);
     const [startDate, setStartDate] = useState(null); // Changed to null like QuickResults
@@ -575,6 +425,12 @@ function SystemDesign({ projectId }) {
     const [project, setProject] = useState(null); // Will hold the loaded project details
     const [usePvgis, setUsePvgis] = useState(false);
     const [profileName, setProfileName] = useState('midrand_ew_5'); // Default profile for non-PVGIS mode
+
+    const [designMode, setDesignMode] = useState('custom');
+    const [systemTemplates, setSystemTemplates] = useState([]);
+    const [loadingTemplates, setLoadingTemplates] = useState(true);
+
+    const { showNotification } = useNotification();
 
     // The single, unified state object for the entire design
     const [design, setDesign] = useState({
@@ -618,8 +474,24 @@ function SystemDesign({ projectId }) {
 
 // --- Piece 2: Data Fetching & Side Effects ---
 
+    // Effect to fetch all system templates
+    useEffect(() => {
+        if (designMode === 'standard') {
+            setLoadingTemplates(true);
+            axios.get(`${API_URL}/api/system_templates`)
+                .then(res => {
+                    setSystemTemplates(res.data);
+                    setLoadingTemplates(false);
+                })
+                .catch(err => {
+                    console.error("Error fetching system templates:", err);
+                    showNotification("Failed to load standard designs.", 'danger');
+                    setLoadingTemplates(false);
+                });
+        }
+    }, [designMode, showNotification]); // Only runs when designMode changes
+
     // Effect to fetch all product lists once
-    const { showNotification } = useNotification();
     useEffect(() => {
         const fetchAllProducts = async () => {
             try {
@@ -708,6 +580,148 @@ function SystemDesign({ projectId }) {
             });
         });
     }, [projectId, products]); // Reruns if projectId or the loaded products change
+
+    // Logic to load products of the system templates
+    const handleSelectTemplate = (template) => {
+        setLoading(true);
+        // Find the products from the template components
+        const panelProduct = template.components?.find(c => 
+            products.panels.some(p => p.id === c.product_id))?.product_id;
+        const inverterProduct = template.components?.find(c =>
+            products.inverters.some(p => p.id === c.product_id))?.product_id;
+        const batteryProduct = template.components?.find(c =>
+            products.batteries.some(p => p.id === c.product_id))?.product_id;
+
+        // Find the product objects
+        const selectedPanel = panelProduct ? 
+            products.panels.find(p => p.id === panelProduct) : null;
+        const selectedInverter = inverterProduct ? 
+            products.inverters.find(p => p.id === inverterProduct) : null;
+        const selectedBattery = batteryProduct ? 
+            products.batteries.find(p => p.id === batteryProduct) : null;
+
+        // Calculate quantities
+        const inverterQuantity = template.components?.find(c => 
+            c.product_id === inverterProduct)?.quantity || 1;
+        const batteryQuantity = template.components?.find(c => 
+            c.product_id === batteryProduct)?.quantity || 1;
+
+        // Update the design state
+        const newDesign = ({
+            systemType: template.system_type?.toLowerCase() || 'grid',
+            panelKw: template.panel_kw?.toString() || '',
+            numPanels: selectedPanel ? Math.ceil((template.panel_kw * 1000) / selectedPanel.power_w).toString() : '',
+            tilt: '15',
+            azimuth: '0',
+            selectedPanel: selectedPanel ? {
+                value: selectedPanel.id,
+                label: `${selectedPanel.brand} ${selectedPanel.model}`,
+                product: selectedPanel
+            } : null,
+            selectedInverter: selectedInverter ? {
+                value: selectedInverter.id,
+                label: `${selectedInverter.brand} ${selectedInverter.model} (${selectedInverter.rating_kva} kVA)`,
+                product: selectedInverter
+            } : null,
+            inverterQuantity: inverterQuantity,
+            selectedBattery: selectedBattery ? {
+                value: selectedBattery.id,
+                label: `${selectedBattery.brand} ${selectedBattery.model} (${selectedBattery.capacity_kwh} kWh)`,
+                product: selectedBattery
+            } : null,
+            batteryQuantity: batteryQuantity,
+            allowExport: template.allow_export || false,
+            batterySocLimit: template.battery_soc_limit || 20,
+        });
+
+        setDesign(newDesign);
+        // Switch back to custom design mode to show the populated form
+        setDesignMode('custom');
+        showNotification(`Applied system template: ${template.name}`, 'success');
+
+        // Scroll to simulate button immediately
+        if (simulateButtonRef.current) {
+            simulateButtonRef.current.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+            });
+        }
+
+        // Automatically run simulation with the new design
+        // Use Timeout to ensure state is updated before simulation
+        setTimeout(() => {
+            
+            // First, build the save payload (just like in handleSimulate)
+            const savePayload = {
+                system_type: newDesign.systemType,
+                panel_kw: parseFloat(newDesign.panelKw),
+                surface_tilt: parseFloat(newDesign.tilt),
+                surface_azimuth: parseFloat(newDesign.azimuth),
+                allow_export: newDesign.allowExport,
+                panel_id: newDesign.selectedPanel?.product?.id,
+                inverter_kva: newDesign.selectedInverter ? {
+                    model: newDesign.selectedInverter.product.model,
+                    capacity: newDesign.selectedInverter.product.rating_kva,
+                    quantity: newDesign.inverterQuantity
+                } : null,
+                battery_kwh: newDesign.systemType !== 'grid' && newDesign.selectedBattery ? {
+                    model: newDesign.selectedBattery.product.model,
+                    capacity: newDesign.selectedBattery.product.capacity_kwh,
+                    quantity: newDesign.batteryQuantity
+                } : null,
+                use_pvgis: usePvgis,
+                generation_profile_name: profileName,
+                battery_soc_limit: newDesign.batterySocLimit,
+                project_value_excl_vat: template.total_cost
+            };
+
+            // Save first, then simulate (just like in handleSimulate)
+            axios.put(`${API_URL}/api/projects/${projectId}`, savePayload)
+                .then(() => {
+                    // Now run simulation with the same data
+                    const simPayload = {
+                        project_id: projectId,
+                        use_pvgis: usePvgis,
+                        profile_name: profileName,
+                        system: {
+                            panel_kw: parseFloat(newDesign.panelKw),
+                            panel_id: newDesign.selectedPanel?.product?.id || null,
+                            tilt: parseFloat(newDesign.tilt),
+                            azimuth: parseFloat(newDesign.azimuth),
+                            system_type: newDesign.systemType,
+                            inverter_kva: (newDesign.selectedInverter?.product?.rating_kva || 0) * newDesign.inverterQuantity,
+                            battery_kwh: (newDesign.selectedBattery?.product?.capacity_kwh || 0) * newDesign.batteryQuantity,
+                            allow_export: newDesign.allowExport,
+                            battery_soc_limit: newDesign.batterySocLimit
+                        }
+                    };
+
+                    return axios.post(`${API_URL}/api/simulate`, simPayload);
+                })
+                .then(res => {
+                    if (!res.data || !res.data.timestamps) {
+                        showNotification('Simulation failed: No data returned.', 'danger');
+                        return;
+                    }
+
+                    setSimulationData(res.data);
+
+                    try {
+                        sessionStorage.setItem(`simulationData_${projectId}`, JSON.stringify(res.data));
+                        console.log('Cached simulation data:', projectId);
+                    } catch (err) {
+                        console.error('Failed to cache simulation data:', err);
+                    }
+
+                    showNotification('Standard system applied, saved, and simulated!', 'success');
+                })
+                .catch(err => {
+                    const errorMsg = err.response?.data?.error || 'Failed to save or simulate the system.';
+                    showNotification(errorMsg, 'danger');
+                })
+                .finally(() => setLoading(false));
+        }, 100);
+    }
 
     // --- Piece 3: User Actions & Event Handlers ---
 
@@ -876,7 +890,6 @@ function SystemDesign({ projectId }) {
         axios.put(`${API_URL}/api/projects/${projectId}`, payload)
             .then(() => {
                 showNotification('System saved to project 👍', 'success');
-                clearSimulationCache();
             })
             .catch(err => {
                 const errorMsg = err.response?.data?.error || 'Could not save the system.';
@@ -887,27 +900,59 @@ function SystemDesign({ projectId }) {
     const handleSimulate = () => {
         setLoading(true);
         // Build the payload from the 'design' state object
-        const payload = {
-            project_id: projectId,
+
+        // Save current system config
+        const savePayload = {
+            system_type: design.systemType,
+            panel_kw: parseFloat(design.panelKw),
+            surface_tilt: parseFloat(design.tilt),
+            surface_azimuth: parseFloat(design.azimuth),
+            allow_export: design.allowExport,
+            panel_id: design.selectedPanel?.product.id,
+            inverter_kva: design.selectedInverter ? {
+                model: design.selectedInverter.product.model,
+                capacity: design.selectedInverter.product.rating_kva,
+                quantity: design.inverterQuantity
+            } : null,
+            battery_kwh: design.systemType !== 'grid' && design.selectedBattery ? {
+                model: design.selectedBattery.product.model,
+                capacity: design.selectedBattery.product.capacity_kwh,
+                quantity: design.batteryQuantity
+            } : null,
             use_pvgis: usePvgis,
-            profile_name: profileName,
-            system: {
-                panel_kw: parseFloat(design.panelKw),
-                panel_id: design.selectedPanel?.product.id,
-                tilt: parseFloat(design.tilt),
-                azimuth: parseFloat(design.azimuth),
-                system_type: design.systemType,
-                // Ensure we safely access nested properties
-                inverter_kva: (design.selectedInverter?.product.rating_kva || 0) * design.inverterQuantity,
-                battery_kwh: (design.selectedBattery?.product.capacity_kwh || 0) * design.batteryQuantity,
-                allow_export: design.allowExport,
-                battery_soc_limit: design.batterySocLimit
-            }
+            generation_profile_name: profileName,
+            battery_soc_limit: design.batterySocLimit            
         };
 
-        axios.post(`${API_URL}/api/simulate`, payload)
+        // Auto-save before simulation
+        axios.put(`${API_URL}/api/projects/${projectId}`, savePayload)
+            .then(() => {
+                // No need for notification here as we're proceeding to simulate
+                console.log('System auto-saved before simulation');
+
+                // Then run simulation with the same data
+                const simPayload = {
+                    project_id: projectId,
+                    use_pvgis: usePvgis,
+                    profile_name: profileName,
+                    system: {
+                        panel_kw: parseFloat(design.panelKw),
+                        panel_id: design.selectedPanel?.product.id,
+                        tilt: parseFloat(design.tilt),
+                        azimuth: parseFloat(design.azimuth),
+                        system_type: design.systemType,
+                        // Ensure we safely access nested properties
+                        inverter_kva: (design.selectedInverter?.product.rating_kva || 0) * design.inverterQuantity,
+                        battery_kwh: (design.selectedBattery?.product.capacity_kwh || 0) * design.batteryQuantity,
+                        allow_export: design.allowExport,
+                        battery_soc_limit: design.batterySocLimit
+                    }
+                };
+
+                return axios.post(`${API_URL}/api/simulate`, simPayload);
+            })
             .then(res => {
-                if (!res.data.timestamps) {
+                if (!res || !res.data || !res.data.timestamps) {
                     showNotification('Simulation failed: No data returned.', 'danger');
                     return;
                 }
@@ -919,15 +964,17 @@ function SystemDesign({ projectId }) {
                 } catch (err) {
                     console.error('Failed to cache simulation data:', err);
                 }
+
+                showNotification('System saved and simulation complete!', 'success');
             })
             .catch(err => {
-                const errorMsg = err.response?.data?.error || 'Simulation failed.';
+                const errorMsg = err.response?.data?.error || 'Failed to save system or run simulation.';
                 showNotification(errorMsg, 'danger');
             })
             .finally(() => setLoading(false));
     };
 
-// --- Piece 3: Data Filtering & Metrics Calculation ---
+    // --- Piece 3: Data Filtering & Metrics Calculation ---
 
     // This useMemo hook filters the simulation data based on the selected date range.
     const filteredData = useMemo(() => {
@@ -1045,11 +1092,36 @@ function SystemDesign({ projectId }) {
     // The main return statement that renders the component UI
     return (
         <>
-            {designStage === 'sizing' ? (
+            <div className='mb-4'>
+                <Card className='shadow-sm border-0'>
+                    <Card.Body>
+                        <h4 className='mb-3'>System Design Mode</h4>
+                        <div className='d-flex gap-3'>
+                            <Button
+                                variant={designMode === 'custom' ? 'primary': 'outline-primary'}
+                                onClick={() => setDesignMode('custom')}
+                                className='flex-grow-1 py-2'
+                            >
+                                <i className='bi bi-tools me-2'></i>
+                                Custom Design
+                            </Button>
+                            <Button
+                                variant={designMode === 'standard' ? 'primary': 'outline-primary'}
+                                onClick={() => setDesignMode('standard')}
+                                className='flex-grow-1 py-2'
+                            >
+                                <i className='bi bi-collection me-2'></i>
+                                Standard Design
+                            </Button>
+                        </div>
+                    </Card.Body>
+                </Card>
+            </div>
+
+            {designMode === 'custom' ? (
                 <SizingView
                     design={design}
                     onDesignChange={setDesign}
-                    onPromote={() => setDesignStage('bom')}
                     products={products}
                     usePvgis={usePvgis}
                     setUsePvgis={setUsePvgis}
@@ -1057,17 +1129,16 @@ function SystemDesign({ projectId }) {
                     setProfileName={setProfileName}
                 />
             ) : (
-                <BomBuilderView
-                    onBack={() => setDesignStage('sizing')}
-                    design={design}
-                    products={products}
+                <StandardDesignSelector 
+                    templates={systemTemplates}
+                    loading={loadingTemplates}
+                    onSelectSystem={handleSelectTemplate}
                 />
             )}
 
             {/* --- Action Buttons --- */}
             <div className="row g-3 my-4">
                 <div className="col-12 d-flex gap-2">
-                    <Button variant="secondary" onClick={saveProject}><i className="bi bi-floppy-fill me-2"></i>Save System</Button>
                     <Button variant="primary" onClick={handleSimulate} disabled={loading}>
                         {loading ? <Spinner as="span" animation="border" size="sm" className="me-2" /> : <i className="bi bi-play-fill me-2"></i>}
                         {loading ? 'Simulating…' : 'Simulate'}
@@ -1081,7 +1152,7 @@ function SystemDesign({ projectId }) {
                     <Card className="shadow-sm my-4">
                         <Card.Header as="h5" className='d-flex justify-content-between align-items-center flex-wrap'>
                             <span><i className="bi bi-bar-chart-line-fill me-2"></i>Simulation Results</span>
-                            <div className='d-flex align-items-center'>
+                            <div className='d-flex align-items-center' >
                                 <Button
                                     variant={showLosses ? "primary" : "outline-secondary"}
                                     size="sm"
@@ -1145,7 +1216,7 @@ function SystemDesign({ projectId }) {
                     </Card>
 
                     {/* The Metrics Cards */}
-                    <Row className="mb-4 g-3 mt-4">
+                    <Row className="mb-4 g-3 mt-4" ref={simulateButtonRef}>
                         <Col md={4} lg>
                             <Card className="border-start border-4 border-primary bg-white shadow-sm rounded p-3 h-100">
                                 <div className="text-muted small">Total PV Generation</div>
