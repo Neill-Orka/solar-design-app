@@ -63,6 +63,7 @@ function BillOfMaterials({ projectId }) {
         setProject(projectRes.data);
 
         console.log("Project data loaded: ", projectRes.data);
+        console.log("Project data structure: ", JSON.stringify(projectRes.data, null, 2));
 
         // Check if using a standard design
         if (projectRes.data.from_standard_template || projectRes.data.template_id) {
@@ -91,38 +92,192 @@ function BillOfMaterials({ projectId }) {
   // Load existing BOM or initialize from system design components
   const loadProjectBOM = async (projectId, productsData, projectData) => {
     try {
-      // Try to load existing BOM first
-      const bomRes = await axios.get(`${API_URL}/api/projects/${projectId}/bom`);
-      
-      if (bomRes.data && bomRes.data.length > 0) {
-        // If we have a saved BOM, use it with its historical pricing
-        const components = bomRes.data.map(item => {
-          const product = products.find(p => p.id === item.product_id) || {
-            id: item.product_id,
-            name: "Unknown Product"
-          };
+      // Track if we've loaded components from any source
+      let componentsLoaded = false;
+      let savedBomData = null;
+
+      // Check if system design has been modified since last BOM save
+      const designModified = sessionStorage.getItem(`systemDesignModified_${projectId}`) === 'true';
+
+      // FIRST PRIORITY: Check if this is a standard design and load its template components
+      if (projectData.template_id && !designModified) {
+        console.log(`Loading components from standard template (ID: ${projectData.template_id})`);
+        try {
+          // Fetch the complete template with all its components
+          const templateResponse = await axios.get(`${API_URL}/api/system_templates/${projectData.template_id}`);
+          const template = templateResponse.data;
           
-          return {
-            product,
-            quantity: item.quantity,
-            price_at_time: item.price_at_time, // Historical price
-            current_price: product.price // Current price for comparison
-          };
-        });
-        
-        setBomComponents(components);
-        setQuoteStatus(bomRes.data[0].quote_status || 'draft');
-        setExtrasCost(bomRes.data[0].extras_cost?.toString() || '0');
-        return;
+          if (template && template.components && template.components.length > 0) {
+            // Map the template components to the BOM structure
+            const templateComponents = template.components
+              .filter(comp => comp.product_id) // Ensure we have valid product IDs
+              .map(comp => {
+                const product = productsData.find(p => p.id === comp.product_id);
+                
+                if (product) {
+                  return {
+                    product,
+                    quantity: comp.quantity || 1,
+                    price_at_time: product.price,
+                    current_price: product.price
+                  };
+                }
+                return null;
+              })
+              .filter(comp => comp !== null); // Remove any nulls from products not found
+            
+            // Special case: If the user has modified the inverter or battery selection,
+            // use those instead of what's in the template
+            if (projectData.inverter_ids && projectData.inverter_ids.length > 0) {
+              // Remove any inverters from the template components
+              const templateWithoutInverters = templateComponents.filter(comp => 
+                comp.product.category !== 'inverter'
+              );
+              
+              // Add the user-selected inverter
+              const inverterId = projectData.inverter_ids[0];
+              const inverterProduct = productsData.find(p => p.id === inverterId);
+              if (inverterProduct) {
+                const quantity = typeof projectData.inverter_kva === 'object' ? 
+                  projectData.inverter_kva.quantity || 1 : 1;
+                
+                templateWithoutInverters.push({
+                  product: inverterProduct,
+                  quantity: quantity,
+                  price_at_time: inverterProduct.price,
+                  current_price: inverterProduct.price
+                });
+              }
+              
+              // Do the same for batteries if applicable
+              if (projectData.system_type !== 'grid' && projectData.battery_ids && projectData.battery_ids.length > 0) {
+                const batteryId = projectData.battery_ids[0];
+                const batteryProduct = productsData.find(p => p.id === batteryId);
+                
+                if (batteryProduct) {
+                  const batteryQuantity = typeof projectData.battery_kwh === 'object' ? 
+                    projectData.battery_kwh.quantity || 1 : 1;
+                  
+                  templateWithoutInverters.push({
+                    product: batteryProduct,
+                    quantity: batteryQuantity,
+                    price_at_time: batteryProduct.price,
+                    current_price: batteryProduct.price
+                  });
+                }
+              }
+              
+              setBomComponents(templateWithoutInverters);
+            } else {
+              // Just use all template components as is
+              setBomComponents(templateComponents);
+            }
+            
+            // If we've loaded from template, skip other loading methods
+            componentsLoaded = true;
+            console.log("Loaded components from standard template:", templateComponents.length);
+          }
+        } catch (templateError) {
+          console.error("Error loading template components:", templateError);
+          // If template loading fails, continue with other methods
+        }
       }
       
-      // If no saved BOM, initialize from system design
-      initializeFromSystemDesign(projectData, productsData);
+      // SECOND PRIORITY: Initialize from current system design if modified
+      if (!componentsLoaded && projectData && productsData && 
+          (projectData.inverter_ids?.length || projectData.battery_ids?.length)) {
+        console.log("Loading BOM from current system design");
+        initializeFromSystemDesign(projectData, productsData);
+        componentsLoaded = true;
+        
+        if (designModified) {
+          console.log("System design was modified since last save, using current design");
+          return;
+        }
+      }
 
+      // THIRD PRIORITY: Load from database as fallback
+      if (!componentsLoaded && !designModified) {
+        try {
+          // Try to load existing BOM from database as fallback
+          const bomRes = await axios.get(`${API_URL}/api/projects/${projectId}/bom`);
+          
+          if (bomRes.data && bomRes.data.length > 0) {
+            console.log("Loading BOM from database");
+            // If we have a saved BOM, use it with its historical pricing
+            const components = bomRes.data.map(item => {
+              const product = productsData.find(p => p.id === item.product_id) || {
+                id: item.product_id,
+                name: "Unknown Product"
+              };
+              
+              return {
+                product,
+                quantity: item.quantity,
+                price_at_time: item.price_at_time,
+                current_price: product.price
+              };
+            });
+            
+            setBomComponents(components);
+            setQuoteStatus(bomRes.data[0].quote_status || 'draft');
+            setExtrasCost(bomRes.data[0].extras_cost?.toString() || '0');
+            componentsLoaded = true;
+          }
+        } catch (bomError) {
+          console.error("Error loading BOM from database:", bomError);
+        }
+      }
+      
+      // LAST RESORT: If we still haven't loaded components, try initializing from system design
+      if (!componentsLoaded) {
+        console.log("Initializing BOM from system design as last resort");
+        initializeFromSystemDesign(projectData, productsData);
+      }
     } catch (error) {
       console.error("Error loading BOM:", error);
-      // If there's an error or no BOM, initialize from system design
+      // If there's an error, initialize from system design
       initializeFromSystemDesign(projectData, productsData);
+    }
+  };
+
+  // Save the BOM to the project
+  const saveBom = async () => {
+    try {
+      setSavingComponents(true);
+
+      // Format the BOM data for the API
+      const bomPayload = {
+        project_id: projectId,
+        components: bomComponents.map(c => ({
+          product_id: c.product_id,
+          quantity: c.quantity,
+          price_at_time: c.price_at_time || c.product.price // Use historical price if available, else current price
+        })),
+        extras_cost: parseFloat(extrasCost) || 0,
+        from_standard_template: isStandardDesign,
+        template_id: isStandardDesign ? templateInfo?.id: null,
+        quote_status: quoteStatus
+      };
+
+      // Call API to save BOM
+      await axios.post(`${API_URL}/api/projects/${projectId}/bom`, bomPayload);
+
+      // Also update project value
+      await axios.put(`${API_URL}/api/projects/${projectId}`, {
+        project_value_excl_vat: totalCost
+      });
+      
+      // Clear the design modified flag since we've now saved
+      sessionStorage.removeItem(`systemDesignModified_${projectId}`);
+
+      showNotification('Bill of materials saved!', "success");
+    }
+    catch (error) {
+      console.error("Error saving BOM:", error);
+      showNotification("Failed to save Bill of Materials", "danger");
+    } finally {
+      setSavingComponents(false);
     }
   };
 

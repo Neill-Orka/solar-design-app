@@ -46,6 +46,9 @@ class Projects(db.Model):
     project_type = db.Column(db.String(50), nullable=False) # 'residential', 'commercial'
     use_pvgis = db.Column(db.Boolean, nullable=False, default=False)  # Whether to use PVGIS for generation profiles
     generation_profile_name = db.Column(db.String(100), nullable=True, default='midrand_ew_5')
+    from_standard_template = db.Column(db.Boolean, default=False)
+    template_id = db.Column(db.Integer, nullable=True)
+    template_name = db.Column(db.String(100), nullable=True)
 
     energy_data = db.relationship('EnergyData', backref='project', lazy=True)
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")

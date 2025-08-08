@@ -74,6 +74,10 @@ def get_project_by_id(project_id):
         inverter_ids = project.inverter_ids if project.inverter_ids is not None else []
         battery_ids = project.battery_ids if project.battery_ids is not None else []
 
+        from_standard_template = getattr(project, 'from_standard_template', False)
+        template_id = getattr(project, 'template_id', None)
+        template_name = getattr(project, 'template_name', None)
+
         return jsonify({
             'id': project.id,
             'name': project.name,
@@ -101,6 +105,10 @@ def get_project_by_id(project_id):
             'surface_azimuth': project.surface_azimuth,
             'use_pvgis': project.use_pvgis,
             'generation_profile_name': project.generation_profile_name,
+            # Make sure these fields are included
+            'from_standard_template': project.from_standard_template,
+            'template_id': project.template_id,
+            'template_name': project.template_name,
         })
     except Exception as e:
         # Add better error logging
