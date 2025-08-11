@@ -241,46 +241,6 @@ function BillOfMaterials({ projectId }) {
     }
   };
 
-  // Save the BOM to the project
-  const saveBom = async () => {
-    try {
-      setSavingComponents(true);
-
-      // Format the BOM data for the API
-      const bomPayload = {
-        project_id: projectId,
-        components: bomComponents.map(c => ({
-          product_id: c.product_id,
-          quantity: c.quantity,
-          price_at_time: c.price_at_time || c.product.price // Use historical price if available, else current price
-        })),
-        extras_cost: parseFloat(extrasCost) || 0,
-        from_standard_template: isStandardDesign,
-        template_id: isStandardDesign ? templateInfo?.id: null,
-        quote_status: quoteStatus
-      };
-
-      // Call API to save BOM
-      await axios.post(`${API_URL}/api/projects/${projectId}/bom`, bomPayload);
-
-      // Also update project value
-      await axios.put(`${API_URL}/api/projects/${projectId}`, {
-        project_value_excl_vat: totalCost
-      });
-      
-      // Clear the design modified flag since we've now saved
-      sessionStorage.removeItem(`systemDesignModified_${projectId}`);
-
-      showNotification('Bill of materials saved!', "success");
-    }
-    catch (error) {
-      console.error("Error saving BOM:", error);
-      showNotification("Failed to save Bill of Materials", "danger");
-    } finally {
-      setSavingComponents(false);
-    }
-  };
-
   // Initialize BOM from system design components
   const initializeFromSystemDesign = (projectData, productsData) => {
     if (!projectData || !productsData.length) return;
