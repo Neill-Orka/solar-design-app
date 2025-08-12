@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { 
-  Container, Row, Col, Card, Button, Form, Spinner, 
-  Alert, InputGroup, Badge, Table, ButtonGroup, Modal 
+import {
+  Container, Row, Col, Card, Button, Form, Spinner,
+  Alert, InputGroup, Badge, Table, ButtonGroup, Modal
 } from 'react-bootstrap';
 import { API_URL } from './apiConfig';
 import { useNotification } from './NotificationContext';
 
-// Reuse component category metadata from SystemBuilder.js
+/* ---------- Category meta (display only) ---------- */
 const CATEGORY_META = {
   panel:        { name: 'Panels',           icon: 'bi-grid-3x3-gap-fill',     color: 'warning'  },
   inverter:     { name: 'Inverters',        icon: 'bi-box-seam',              color: 'info'     },
@@ -17,830 +17,872 @@ const CATEGORY_META = {
   isolator:     { name: 'Isolators',        icon: 'bi-plugin-fill',           color: 'secondary'},
   inverter_aux: { name: 'Inverter Aux',     icon: 'bi-hdd-stack-fill',        color: 'secondary'},
   dc_cable:     { name: 'DC Cables',        icon: 'bi-plug-fill',             color: 'dark'     },
+  ac_cable:     { name: 'AC Cables',        icon: 'bi-lightning',             color: 'dark'     },
+  enclosure:    { name: 'Enclosures',       icon: 'bi-box',                   color: 'secondary'},
+  combiner:     { name: 'Combiners',        icon: 'bi-diagram-3',            color: 'secondary'},
+  db:           { name: 'Distribution',     icon: 'bi-hdd-network',           color: 'secondary'},
   accessory:    { name: 'Accessories',      icon: 'bi-gear-fill',             color: 'secondary'},
+  other:        { name: 'Other',            icon: 'bi-box',                   color: 'secondary'},
 };
 
-// Helper to format currency
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('en-ZA', { 
-    style: 'currency', 
-    currency: 'ZAR', 
-    maximumFractionDigits: 0 
+/* ---------- Helpers ---------- */
+const slugify = (s) =>
+  (s || '')
+    .toString()
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^\w\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '_');
+
+const formatCurrency = (value) =>
+  new Intl.NumberFormat('en-ZA', {
+    style: 'currency',
+    currency: 'ZAR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   }).format(value || 0);
+
+const formatNumber0 = (value) =>
+  new Intl.NumberFormat('en-ZA', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value || 0);
+
+const toNumber = v => (v === null || v === undefined || v === '') ? 0 : Number(v);
+const DEFAULT_MARGIN_DEC = 0.25;
+
+const normalizeMarginToDecimal = (m) => {
+  const v = toNumber(m);
+  if (!Number.isFinite(v) || v < 0) return DEFAULT_MARGIN_DEC;
+  // tolerate DBs where margin is stored as 1 => 1% or 25 => 25%
+  return v <= 1 ? v : v / 100;
+}
+
+const computeUnitCost = (product) => toNumber(product?.unit_cost);
+
+const computeMarginPct = (product) => normalizeMarginToDecimal(product?.margin);
+
+const computeDerivedUnitFromProduct = (product) => {
+  const cost = computeUnitCost(product);
+  const m = computeMarginPct(product);
+  return Number.isFinite(cost) ? cost * (1 + m) : toNumber(product?.price);
+}
+
+// effective margin for a BOM row: override -> product -> default (25%)
+const getRowMarginDecimal = (row) => {
+  if (row?.override_margin != null) return toNumber(row.override_margin);
+  const prodM = computeMarginPct(row?.product);
+  return Number.isFinite(prodM) && prodM >= 0 ? prodM : DEFAULT_MARGIN_DEC;
 };
 
+const computeDerivedUnitFromRow = (row) => {
+  const cost = computeUnitCost(row?.product);
+  const m = getRowMarginDecimal(row);
+  if (Number.isFinite(cost) && Number.isFinite(m)) return cost * (1+m);
+  return toNumber(row?.product?.price);
+};
+
+// Draft = live; Locked = snapshot if present, else live
+const getUnitPriceForRow = (row, isDraft) => 
+  isDraft ? computeDerivedUnitFromRow(row) : (row.price_at_time ?? computeDerivedUnitFromRow(row));
+
+/* ---------- Component ---------- */
 function BillOfMaterials({ projectId }) {
   const { showNotification } = useNotification();
 
-  // State Management
+  // State
   const [loading, setLoading] = useState(true);
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState([]); // normalized categories
   const [project, setProject] = useState(null);
+
+  // BomItem: { product, quantity, price_at_time, current_price? }
   const [bomComponents, setBomComponents] = useState([]);
   const [isStandardDesign, setIsStandardDesign] = useState(false);
   const [templateInfo, setTemplateInfo] = useState(null);
+
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+
   const [savingComponents, setSavingComponents] = useState(false);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newTemplateDesc, setNewTemplateDesc] = useState('');
+
   const [extrasCost, setExtrasCost] = useState('0');
-  const [quoteStatus, setQuoteStatus] = useState('draft'); // draft, sent, accepted, complete
+  const [quoteStatus, setQuoteStatus] = useState('draft'); // draft | sent | accepted | complete
 
-  // Load initial data: project details, products, and existing BOM
+  /* ---------- Initial load ---------- */
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchAll = async () => {
       setLoading(true);
-
       try {
-        // Load products first
+        // products
         const productsRes = await axios.get(`${API_URL}/api/products`);
-        setProducts(productsRes.data);
+        const normalized = (productsRes.data || []).map(p => ({
+          ...p,
+          category: slugify(p.category)
+        }));
+        setProducts(normalized);
 
-        // Load project details
+        // project
         const projectRes = await axios.get(`${API_URL}/api/projects/${projectId}`);
-        setProject(projectRes.data);
+        const proj = projectRes.data;
+        setProject(proj);
 
-        console.log("Project data loaded: ", projectRes.data);
-        console.log("Project data structure: ", JSON.stringify(projectRes.data, null, 2));
-
-        // Check if using a standard design
-        if (projectRes.data.from_standard_template || projectRes.data.template_id) {
-            console.log("Standard design detected: ", projectRes.data.template_id);    
-            setIsStandardDesign(true);
-            setTemplateInfo({
-              id: projectRes.data.template_id,
-              name: projectRes.data.template_name || 'Standard Design'
-            });
+        const std = !!proj?.template_id || !!proj?.from_standard_template || !!proj?.template_name;
+        setIsStandardDesign(std);
+        if (std) {
+          setTemplateInfo({
+            id: proj.template_id || null,
+            name: proj.template_name || null
+          });
         }
 
-        // Load BOM for this project
-        await loadProjectBOM(projectId, productsRes.data, projectRes.data);
-
-      } catch (error) {
-        console.error("Error loading initial data:", error);
-        showNotification("Failed to load project or product data.", "danger");
+        // dispatch load in correct order
+        await loadProjectBOM(projectId, normalized, proj);
+      } catch (err) {
+        console.error('Init load error:', err);
+        showNotification('Failed to load project or products', 'danger');
       } finally {
         setLoading(false);
       }
     };
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
-    fetchData();
-  }, [projectId, showNotification]);
-
-  // Load existing BOM or initialize from system design components
-  const loadProjectBOM = async (projectId, productsData, projectData) => {
+  /* ---------- Template fetch helpers (by id OR by name) ------------ */
+  const fetchTemplateById = async (id) => {
+    if (!id) return null;
     try {
-      // Track if we've loaded components from any source
-      let componentsLoaded = false;
-      let savedBomData = null;
-
-      // Check if system design has been modified since last BOM save
-      const designModified = sessionStorage.getItem(`systemDesignModified_${projectId}`) === 'true';
-
-      // FIRST PRIORITY: Check if this is a standard design and load its template components
-      if (projectData.template_id && !designModified) {
-        console.log(`Loading components from standard template (ID: ${projectData.template_id})`);
-        try {
-          // Fetch the complete template with all its components
-          const templateResponse = await axios.get(`${API_URL}/api/system_templates/${projectData.template_id}`);
-          const template = templateResponse.data;
-          
-          if (template && template.components && template.components.length > 0) {
-            // Map the template components to the BOM structure
-            const templateComponents = template.components
-              .filter(comp => comp.product_id) // Ensure we have valid product IDs
-              .map(comp => {
-                const product = productsData.find(p => p.id === comp.product_id);
-                
-                if (product) {
-                  return {
-                    product,
-                    quantity: comp.quantity || 1,
-                    price_at_time: product.price,
-                    current_price: product.price
-                  };
-                }
-                return null;
-              })
-              .filter(comp => comp !== null); // Remove any nulls from products not found
-            
-            // Special case: If the user has modified the inverter or battery selection,
-            // use those instead of what's in the template
-            if (projectData.inverter_ids && projectData.inverter_ids.length > 0) {
-              // Remove any inverters from the template components
-              const templateWithoutInverters = templateComponents.filter(comp => 
-                comp.product.category !== 'inverter'
-              );
-              
-              // Add the user-selected inverter
-              const inverterId = projectData.inverter_ids[0];
-              const inverterProduct = productsData.find(p => p.id === inverterId);
-              if (inverterProduct) {
-                const quantity = typeof projectData.inverter_kva === 'object' ? 
-                  projectData.inverter_kva.quantity || 1 : 1;
-                
-                templateWithoutInverters.push({
-                  product: inverterProduct,
-                  quantity: quantity,
-                  price_at_time: inverterProduct.price,
-                  current_price: inverterProduct.price
-                });
-              }
-              
-              // Do the same for batteries if applicable
-              if (projectData.system_type !== 'grid' && projectData.battery_ids && projectData.battery_ids.length > 0) {
-                const batteryId = projectData.battery_ids[0];
-                const batteryProduct = productsData.find(p => p.id === batteryId);
-                
-                if (batteryProduct) {
-                  const batteryQuantity = typeof projectData.battery_kwh === 'object' ? 
-                    projectData.battery_kwh.quantity || 1 : 1;
-                  
-                  templateWithoutInverters.push({
-                    product: batteryProduct,
-                    quantity: batteryQuantity,
-                    price_at_time: batteryProduct.price,
-                    current_price: batteryProduct.price
-                  });
-                }
-              }
-              
-              setBomComponents(templateWithoutInverters);
-            } else {
-              // Just use all template components as is
-              setBomComponents(templateComponents);
-            }
-            
-            // If we've loaded from template, skip other loading methods
-            componentsLoaded = true;
-            console.log("Loaded components from standard template:", templateComponents.length);
-          }
-        } catch (templateError) {
-          console.error("Error loading template components:", templateError);
-          // If template loading fails, continue with other methods
-        }
-      }
-      
-      // SECOND PRIORITY: Initialize from current system design if modified
-      if (!componentsLoaded && projectData && productsData && 
-          (projectData.inverter_ids?.length || projectData.battery_ids?.length)) {
-        console.log("Loading BOM from current system design");
-        initializeFromSystemDesign(projectData, productsData);
-        componentsLoaded = true;
-        
-        if (designModified) {
-          console.log("System design was modified since last save, using current design");
-          return;
-        }
-      }
-
-      // THIRD PRIORITY: Load from database as fallback
-      if (!componentsLoaded && !designModified) {
-        try {
-          // Try to load existing BOM from database as fallback
-          const bomRes = await axios.get(`${API_URL}/api/projects/${projectId}/bom`);
-          
-          if (bomRes.data && bomRes.data.length > 0) {
-            console.log("Loading BOM from database");
-            // If we have a saved BOM, use it with its historical pricing
-            const components = bomRes.data.map(item => {
-              const product = productsData.find(p => p.id === item.product_id) || {
-                id: item.product_id,
-                name: "Unknown Product"
-              };
-              
-              return {
-                product,
-                quantity: item.quantity,
-                price_at_time: item.price_at_time,
-                current_price: product.price
-              };
-            });
-            
-            setBomComponents(components);
-            setQuoteStatus(bomRes.data[0].quote_status || 'draft');
-            setExtrasCost(bomRes.data[0].extras_cost?.toString() || '0');
-            componentsLoaded = true;
-          }
-        } catch (bomError) {
-          console.error("Error loading BOM from database:", bomError);
-        }
-      }
-      
-      // LAST RESORT: If we still haven't loaded components, try initializing from system design
-      if (!componentsLoaded) {
-        console.log("Initializing BOM from system design as last resort");
-        initializeFromSystemDesign(projectData, productsData);
-      }
-    } catch (error) {
-      console.error("Error loading BOM:", error);
-      // If there's an error, initialize from system design
-      initializeFromSystemDesign(projectData, productsData);
+      const res = await axios.get(`${API_URL}/api/system_templates/${id}`);
+      return res.data || null;
+    } catch (e) {
+      console.warn('fetchTemplateById failed:', e);
+      return null;
     }
   };
 
-  // Initialize BOM from system design components
-  const initializeFromSystemDesign = (projectData, productsData) => {
-    if (!projectData || !productsData.length) return;
-
-    console.log("Initializing BOM from system design:", projectData);
-    // Skip panel_id check as it doesn't exist yet
-    console.log("Inverter IDs:", projectData.inverter_ids);
-    console.log("Battery IDs:", projectData.battery_ids);
-    
-    const coreComponents = [];
-    
-    // Skip panel handling since we don't have panel_id yet
-    
-    // Handle inverters - ONLY use inverter_ids, no fallbacks
-    if (projectData.inverter_ids && projectData.inverter_ids.length > 0) {
-      const inverterId = projectData.inverter_ids[0]; // Take first one for simplicity
-      const inverterProduct = productsData.find(p => p.id === inverterId);
-      console.log("Inverter product from ID:", inverterProduct);
-      
-      if (inverterProduct) {
-        const quantity = typeof projectData.inverter_kva === 'object' ? 
-          projectData.inverter_kva.quantity || 1 : 1;
-        
-        coreComponents.push({
-          product: inverterProduct,
-          quantity: quantity,
-          price_at_time: inverterProduct.price,
-          current_price: inverterProduct.price
-        });
-      }
+  const fetchTemplateByName = async (name) => {
+    if (!name) return null;
+    try {
+      const res = await axios.get(`${API_URL}/api/system_templates`);
+      const list = res.data || [];
+      const match = list.find(t => (t.name || '').toLowerCase().trim() === name.toLowerCase().trim());
+      if (!match) return null;
+      return await fetchTemplateById(match.id);
+    } catch (e) {
+      console.warn('fetchTemplateByName failed:', e);
+      return null;
     }
-
-    // Handle batteries - ONLY use battery_ids, no fallbacks
-    if (projectData.battery_ids && projectData.battery_ids.length > 0 && projectData.system_type !== 'grid') {
-      const batteryId = projectData.battery_ids[0]; // Take first one for simplicity
-      const batteryProduct = productsData.find(p => p.id === batteryId);
-      console.log("Battery product from ID:", batteryProduct);
-      
-      if (batteryProduct) {
-        const quantity = typeof projectData.battery_kwh === 'object' ? 
-          projectData.battery_kwh.quantity || 1 : 1;
-          
-        coreComponents.push({
-          product: batteryProduct,
-          quantity: quantity,
-          price_at_time: batteryProduct.price,
-          current_price: batteryProduct.price
-        });
-      }
-    }
-
-    console.log("Core components initialized from system design:", coreComponents);
-    setBomComponents(coreComponents);
   };
 
-  // Filter products by search and category
-  const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      // Filter by category if a specific one is selected
-      if (selectedCategory !== 'all' && product.category !== selectedCategory) {
-        return false;
+  const mapTemplateToItems = (template, productsData) => {
+    const comps = (template?.components || []).map(c => {
+      const prod = productsData.find(p => p.id === c.product_id);
+      if (!prod) return null;
+      return {
+        product: prod,
+        quantity: Number(c.quantity) || 1,
+        price_at_time: null,
+        current_price: computeDerivedUnitFromRow({ product: prod })
+      };
+    }).filter(Boolean);
+    return comps;
+  };
+
+// Overlay panel/inverter/battery changes from systemDesign onto a full template
+const overlayFromProject = (items, projectData, productsData) => {
+  let result = [...items];
+
+  // Panels
+  if (projectData.panel_id) {
+    const prod = productsData.find(p => p.id === projectData.panel_id);
+    if (prod) {
+      result = result.filter(x => x.product?.category !== 'panel');
+      const qty = (projectData.panel_kw && prod.power_w)
+        ? Math.max(1, Math.ceil((Number(projectData.panel_kw) * 1000) / Number(prod.power_w)))
+        : 1;
+      result.push({ product: prod, quantity: qty, price_at_time: null, current_price: computeDerivedUnitFromRow({ product: prod }) });
+    }
+  }
+
+  // Inverters
+  if (projectData.inverter_ids?.length) {
+    result = result.filter(x => x.product?.category !== 'inverter');
+    const qty = Number(projectData.inverter_kva?.quantity) || 1;
+    projectData.inverter_ids.forEach((id, idx) => {
+      const prod = productsData.find(p => p.id === id);
+      if (prod) {
+        result.push({
+          product: prod,
+          quantity: idx === 0 ? qty : 1,
+          price_at_time: null,
+          current_price: computeDerivedUnitFromRow({ product: prod })
+        });
       }
-      
-      // Filter by search term
-      if (searchFilter) {
-        const searchText = `${product.brand || ''} ${product.model || ''} ${product.category || ''} ${product.power_w || ''} ${product.rating_kva || ''} ${product.capacity_kwh || ''}`.toLowerCase();
-        const searchTerms = searchFilter.toLowerCase().split(/\s+/).filter(term => term);
-        return searchTerms.every(term => searchText.includes(term));
-      }
-      
-      return true;
     });
-  }, [products, selectedCategory, searchFilter]);
+  }
 
-  // Add a component to the BOM
+  // Batteries
+  if (projectData.battery_ids?.length) {
+    result = result.filter(x => x.product?.category !== 'battery');
+    const qty = Number(projectData.battery_kwh?.quantity) || 1;
+    projectData.battery_ids.forEach((id, idx) => {
+      const prod = productsData.find(p => p.id === id);
+      if (prod) {
+        result.push({
+          product: prod,
+          quantity: idx === 0 ? qty : 1,
+          price_at_time: null,
+          current_price: computeDerivedUnitFromRow({ product: prod })
+        });
+      }
+    });
+  }
+
+  return result;
+};
+
+  /* ---------- Loader with single source-of-truth priority ---------- */
+const loadProjectBOM = async (pid, productsData, projectData) => {
+  let loaded = false;
+  const designModified = sessionStorage.getItem(`systemDesignModified_${pid}`) === 'true';
+
+  // Try to get the full template first (by id or name)
+  let templateItems = null;
+  if (projectData?.template_id || projectData?.template_name) {
+    try {
+      let tmpl = null;
+      if (projectData.template_id) tmpl = await fetchTemplateById(projectData.template_id);
+      if (!tmpl && projectData.template_name) tmpl = await fetchTemplateByName(projectData.template_name);
+      if (tmpl) {
+        templateItems = mapTemplateToItems(tmpl, productsData);
+        if (tmpl.extras_cost !== undefined && tmpl.extras_cost !== null) {
+          setExtrasCost(String(tmpl.extras_cost));
+        }
+      }
+    } catch (e) {
+      console.warn('Template fetch failed:', e);
+    }
+  }
+
+  if (templateItems) {
+    const items = designModified
+      ? overlayFromProject(templateItems, projectData, productsData)
+      : templateItems;
+    setBomComponents(items);
+    loaded = true;
+  }
+
+  // Fallback: saved BOM rows (if any)
+  if (!loaded) {
+    try {
+      const bomRes = await axios.get(`${API_URL}/api/projects/${pid}/bom`);
+      const list = bomRes.data || [];
+      if (list.length) {
+        const meta = list.find(x => x.quote_status || x.extras_cost);
+        if (meta?.quote_status) setQuoteStatus(meta.quote_status);
+        if (meta?.extras_cost !== undefined && meta?.extras_cost !== null) {
+          setExtrasCost(String(meta.extras_cost));
+        }
+        const items = list.map(row => {
+          const prod = productsData.find(p => p.id === row.product_id);
+          if (!prod) return null;
+          return {
+            product: prod,
+            quantity: Number(row.quantity) || 1,
+            override_margin: row.override_margin ?? null,
+            price_at_time: (row.price_at_time ?? null),
+            current_price: computeDerivedUnitFromRow({ product: prod })
+          };
+        }).filter(Boolean);
+        if (items.length) {
+          setBomComponents(items);
+          loaded = true;
+        }
+      }
+    } catch (e) {
+      console.warn('Saved BOM load failed:', e);
+    }
+  }
+
+  // Last resort: init from SystemDesign (core only)
+  if (!loaded && projectData) {
+    const init = initializeFromSystemDesign(projectData, productsData);
+    setBomComponents(init);
+  }
+};
+
+
+  /* ---------- Overlay helpers ---------- */
+  const overlayCoreFromSystemDesign = (templateItems, projectData, productsData) => {
+    const result = [...templateItems];
+
+    // Replace inverter lines if provided
+    if (projectData.inverter_ids?.length) {
+      // Remove all inverter items
+      for (let i = result.length - 1; i >= 0; i--) {
+        if (result[i].product?.category === 'inverter') result.splice(i, 1);
+      }
+      // Add selected inverters (1 each by default)
+      projectData.inverter_ids.forEach(id => {
+        const prod = productsData.find(p => p.id === id);
+        if (prod) {
+          result.push({ product: prod, quantity: 1, price_at_time: null, current_price: computeDerivedUnitFromRow({ product: prod }) });
+        }
+      });
+    }
+
+    // Replace battery lines if provided
+    if (projectData.battery_ids?.length) {
+      for (let i = result.length - 1; i >= 0; i--) {
+        if (result[i].product?.category === 'battery') result.splice(i, 1);
+      }
+      projectData.battery_ids.forEach(id => {
+        const prod = productsData.find(p => p.id === id);
+        if (prod) {
+          result.push({ product: prod, quantity: 1, price_at_time: null, current_price: computeDerivedUnitFromRow({ product: prod }) });
+        }
+      });
+    }
+
+    return result;
+  };
+
+  const initializeFromSystemDesign = (projectData, productsData) => {
+    const items = [];
+
+    // Inverters
+    if (projectData.inverter_ids?.length) {
+      projectData.inverter_ids.forEach(id => {
+        const prod = productsData.find(p => p.id === id);
+        if (prod) items.push({ product: prod, quantity: 1, price_at_time: null, current_price: computeDerivedUnitFromRow({ product: prod }) });
+      });
+    }
+
+    // Batteries
+    if (projectData.battery_ids?.length) {
+      projectData.battery_ids.forEach(id => {
+        const prod = productsData.find(p => p.id === id);
+        if (prod) items.push({ product: prod, quantity: 1, price_at_time: null, current_price: computeDerivedUnitFromRow({ product: prod }) });
+      });
+    }
+
+    // Panels: only possible if you store panel product id — project currently doesn’t.
+    // User can add panels from the left list.
+
+    return items;
+  };
+
+  /* ---------- Item ops ---------- */
   const addComponent = (product) => {
-    const existingComponent = bomComponents.find(c => c.product.id === product.id);
-    
-    if (existingComponent) {
-      // Update quantity if already in list
-      updateQuantity(product.id, (existingComponent.quantity || 1) + 1);
+    const existing = bomComponents.find(c => c.product.id === product.id);
+    if (existing) {
+      updateQuantity(product.id, existing.quantity + 1);
       return;
     }
-    
-    // Add new component with current price as historical price
-    setBomComponents([...bomComponents, { 
-      product, 
-      quantity: 1,
-      price_at_time: product.price,
-      current_price: product.price 
-    }]);
+    setBomComponents([
+      ...bomComponents,
+      {
+        product,
+        quantity: 1,
+        price_at_time: null,
+        current_price: computeDerivedUnitFromRow({ product })
+      }
+    ]);
   };
 
-  // Remove a component from the BOM
   const removeComponent = (productId) => {
     setBomComponents(bomComponents.filter(c => c.product.id !== productId));
   };
 
-  // Update component quantity
   const updateQuantity = (productId, quantity) => {
-    const numQuantity = parseInt(quantity, 10);
-    if (numQuantity > 0) {
-      setBomComponents(bomComponents.map(c => 
-        c.product.id === productId ? { ...c, quantity: numQuantity } : c
-      ));
-    }
+    const q = Math.max(1, parseInt(quantity || 1, 10));
+    setBomComponents(bomComponents.map(c =>
+      c.product.id === productId ? { ...c, quantity: q } : c
+    ));
   };
 
-  // Save the BOM to the project
+  const updateMargin = (productId, marginPct) => {
+    const dec = Math.max(0, Number(marginPct) / 100 || 0);
+    setBomComponents(bomComponents.map(c => 
+      c.product.id === productId ? { ...c, override_margin: dec } : c
+    ));
+  };
+
+  /* ---------- Save BOM ---------- */
   const saveBOM = async () => {
     try {
       setSavingComponents(true);
-      
-      // Format the BOM data for the API
-      const bomPayload = {
-        project_id: projectId,
-        components: bomComponents.map(c => ({
+
+      const parsedExtras = parseFloat(extrasCost || '0') || 0;
+      const isDraft = (quoteStatus === 'draft');
+
+      const components = (Array.isArray(bomComponents) ? bomComponents : []).map(c => {
+        const liveUnit = computeDerivedUnitFromRow(c);
+        const liveCost = computeUnitCost(c.product);
+        return {
           product_id: c.product.id,
           quantity: c.quantity,
-          price_at_time: c.price_at_time || c.product.price // Use historical price if available, else current price
-        })),
-        extras_cost: parseFloat(extrasCost) || 0,
-        from_standard_template: isStandardDesign,
-        template_id: isStandardDesign ? templateInfo?.id : null,
-        quote_status: quoteStatus
-      };
-      
-      // Call API to save BOM
-      await axios.post(`${API_URL}/api/projects/${projectId}/bom`, bomPayload);
-      
-      // Also update project value
-      await axios.put(`${API_URL}/api/projects/${projectId}`, {
-        project_value_excl_vat: totalCost
+          override_margin: c.override_margin ?? null,
+          price_at_time: isDraft ? null : (c.price_at_time ?? liveUnit),
+          unit_cost_at_time: isDraft ? null : (c.unit_cost_at_time ?? liveCost)
+        };
       });
-      
-      showNotification("Bill of Materials saved successfully!", "success");
-    } catch (error) {
-      console.error("Error saving BOM:", error);
-      showNotification("Failed to save Bill of Materials.", "danger");
+
+      await axios.post(`${API_URL}/api/projects/${projectId}/bom`, {
+        project_id: projectId,
+        components,
+        extras_cost: parsedExtras,
+        quote_status: quoteStatus,
+        from_standard_template: !!isStandardDesign,
+        template_id: templateInfo?.id || null,
+        template_name: templateInfo?.name || null
+      });
+
+      // Totals reflect what user sees: draft => live, locked => snapshot
+      const total = (Array.isArray(bomComponents) ? bomComponents: []).reduce((sum, c) => {
+        const unit = getUnitPriceForRow(c.product, c.price_at_time, isDraft);
+        return sum + unit * (c.quantity || 0);
+      }, parsedExtras);
+
+      await axios.put(`${API_URL}/api/projects/${projectId}`, {
+        project_value_excl_vat: total
+      });
+
+      // Clear modified flag
+      sessionStorage.removeItem(`systemDesignModified_${projectId}`);
+      showNotification('Bill of Materials saved', 'success');
+
+    } catch (err) {
+      console.error('Save BOM error:', err);
+      showNotification('Failed to save Bill of Materials', 'danger');
     } finally {
       setSavingComponents(false);
     }
   };
 
-  // Save current BOM as a new template
+  /* ---------- Save as Template ---------- */
   const saveAsTemplate = async () => {
-    if (!newTemplateName.trim()) {
-      showNotification("Please provide a template name.", "warning");
-      return;
-    }
-    
     try {
       setSavingComponents(true);
-      
-      const templatePayload = {
+      const payload = {
         name: newTemplateName.trim(),
         description: newTemplateDesc.trim(),
-        system_type: project?.system_type || 'hybrid',
-        extras_cost: parseFloat(extrasCost) || 0,
+        extras_cost: parseFloat(extrasCost || '0') || 0,
         components: bomComponents.map(c => ({
           product_id: c.product.id,
           quantity: c.quantity
         }))
       };
-      
-      await axios.post(`${API_URL}/api/system_templates`, templatePayload);
-      
-      showNotification("System template created successfully!", "success");
+      await axios.post(`${API_URL}/api/system_templates`, payload);
+
       setShowSaveTemplateModal(false);
       setNewTemplateName('');
       setNewTemplateDesc('');
-    } catch (error) {
-      console.error("Error saving template:", error);
-      showNotification("Failed to save system template.", "danger");
+      showNotification('Template saved', 'success');
+    } catch (err) {
+      console.error('Save template error:', err);
+      showNotification('Failed to save template', 'danger');
     } finally {
       setSavingComponents(false);
     }
   };
 
-  // Calculate totals
-  const totalCost = useMemo(() => {
-    let cost = parseFloat(extrasCost) || 0;
-    bomComponents.forEach(comp => {
-      // Use historical price (price_at_time) for calculations
-      cost += (comp.price_at_time || comp.product.price || 0) * comp.quantity;
+  /* ---------- Derived ---------- */
+  const filteredProducts = useMemo(() => {
+    const txt = searchFilter.toLowerCase().trim();
+    return products.filter(p => {
+      if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
+      if (!txt) return true;
+      const blob = `${p.brand || ''} ${p.model || ''} ${p.category || ''} ${p.power_w || ''} ${p.rating_kva || ''} ${p.capacity_kwh || ''}`.toLowerCase();
+      return txt.split(/\s+/).every(f => blob.includes(f));
     });
-    return cost;
-  }, [bomComponents, extrasCost]);
+  }, [products, searchFilter, selectedCategory]);
 
-  // Calculate system specifications
+  const grouped = useMemo(() => {
+    const g = {};
+    const list = Array.isArray(bomComponents) ? bomComponents : [];
+    list.forEach(c => {
+      const cat = c.product.category || 'other';
+      if (!g[cat]) g[cat] = [];
+      g[cat].push(c);
+    });
+    return g;
+  }, [bomComponents]);
+
+  const hasPriceChanges = useMemo(() => {
+    if (quoteStatus === 'draft') return false;
+    return (Array.isArray(bomComponents) ? bomComponents : []).some(c => 
+      c.price_at_time !== undefined &&
+      c.price_at_time !== null &&
+      computeDerivedUnitFromRow(c) !== c.price_at_time
+    );
+  }, [bomComponents, quoteStatus]);
+
   const systemSpecs = useMemo(() => {
-    let panelKw = 0, inverterKva = 0, batteryKwh = 0;
-    
-    bomComponents.forEach(comp => {
-      if (comp.product.category === 'panel') {
-        panelKw += (comp.product.power_w || 0) * comp.quantity / 1000;
-      }
-      if (comp.product.category === 'inverter') {
-        inverterKva += (comp.product.rating_kva || 0) * comp.quantity;
-      }
-      if (comp.product.category === 'battery') {
-        batteryKwh += (comp.product.capacity_kwh || 0) * comp.quantity;
+    let panelW = 0, inverterKva = 0, batteryKwh = 0;
+    const list = Array.isArray(bomComponents) ? bomComponents : [];
+    list.forEach(c => {
+      const cat = c.product.category;
+      if (cat === 'panel' && c.product.power_w) {
+        panelW += (Number(c.product.power_w) || 0) * (c.quantity || 0);
+      } else if (cat === 'inverter' && c.product.rating_kva) {
+        inverterKva += (Number(c.product.rating_kva) || 0) * (c.quantity || 0);
+      } else if (cat === 'battery' && c.product.capacity_kwh) {
+        batteryKwh += (Number(c.product.capacity_kwh) || 0) * (c.quantity || 0);
       }
     });
-    
     return {
-      panelKw: panelKw.toFixed(2),
+      panelKw: (panelW / 1000).toFixed(2),
       inverterKva: inverterKva.toFixed(2),
       batteryKwh: batteryKwh.toFixed(2)
     };
   }, [bomComponents]);
 
-  // Group components by category for display
-  const componentsByCategory = useMemo(() => {
-    const grouped = {};
-    
-    bomComponents.forEach(comp => {
-      const category = comp.product.category || 'other';
-      if (!grouped[category]) {
-        grouped[category] = [];
-      }
-      grouped[category].push(comp);
-    });
-    
-    return grouped;
-  }, [bomComponents]);
+  const totals = useMemo(() => {
+    const isDraft = (quoteStatus === 'draft');
+    const list = Array.isArray(bomComponents) ? bomComponents : [];
+    const sub = list.reduce((sum, c) => {
+      const unit = getUnitPriceForRow(c, isDraft);
+      return sum + unit * (c.quantity || 0);
+    }, 0);
+    const extras = parseFloat(extrasCost || '0') || 0;
+    return { subtotal: sub, extras, grand: sub + extras };
+  }, [bomComponents, extrasCost, quoteStatus]);
 
-  // Check if any prices have changed since last saved
-  const hasPriceChanges = useMemo(() => {
-    return bomComponents.some(comp => 
-      comp.price_at_time !== undefined && 
-      comp.current_price !== undefined && 
-      comp.price_at_time !== comp.current_price
-    );
-  }, [bomComponents]);
 
+  /* ---------- UI ---------- */
   if (loading) {
     return (
       <div className="text-center py-5">
-        <Spinner animation="border" variant="primary" />
-        <p className="mt-3">Loading bill of materials...</p>
+        <Spinner animation="border" />
+        <div className="mt-2">Loading bill of materials…</div>
       </div>
     );
   }
 
   return (
-    <div className="p-lg-4" style={{ backgroundColor: '#f8f9fa' }}>
-      <h2 className="text-3xl font-bold text-gray-800 mb-4 text-center">Bill of Materials</h2>
-      
-      {/* Status Card - Standard vs Custom */}
-      <Card className="shadow-sm mb-4">
-        <Card.Body>
-          <div className="d-flex align-items-center justify-content-between flex-wrap">
-            <div>
-              <h5 className="mb-0">
-                {isStandardDesign ? (
-                  <>
-                    <i className="bi bi-collection-fill me-2 text-success"></i>
-                    Standard Design: {templateInfo?.name}
-                  </>
-                ) : (
-                  <>
-                    <i className="bi bi-tools me-2 text-primary"></i>
-                    Custom System Design
-                  </>
-                )}
-              </h5>
-              <p className="text-muted mt-1 mb-0">
-                {isStandardDesign 
-                  ? "Using a predefined system template. You can modify components if needed." 
-                  : "Build your complete system by adding all necessary components."}
-              </p>
+    <div>
+      <Container fluid>
+        <Row className="mb-3">
+          <Col>
+            <h4 className="mb-0">
+              <i className="bi bi-basket3 me-2" />
+              Bill of Materials
+            </h4>
+            <div className="text-muted">
+              Project: <strong>{project?.name}</strong>
+              {isStandardDesign && (
+                <Badge bg="secondary" className="ms-2">
+                  Standard: {templateInfo?.name || 'Template'}
+                </Badge>
+              )}
             </div>
-            <div className="d-flex align-items-center">
-              <Form.Group className="me-3">
-                <Form.Select
-                  size="sm"
-                  value={quoteStatus}
-                  onChange={(e) => setQuoteStatus(e.target.value)}
-                  style={{ width: '180px' }}
-                >
-                  <option value="draft">Quote Status: Draft</option>
-                  <option value="sent">Quote Status: Sent</option>
-                  <option value="accepted">Quote Status: Accepted</option>
-                  <option value="complete">Quote Status: Complete</option>
-                </Form.Select>
-              </Form.Group>
-              <div>
-                <Button 
-                  variant="outline-primary"
-                  className="me-2"
-                  size="sm"
-                  onClick={() => setShowSaveTemplateModal(true)}
-                >
-                  <i className="bi bi-save me-1"></i>
-                  Save as Template
-                </Button>
-                <Button 
-                  variant="primary"
-                  size="sm"
-                  onClick={saveBOM}
-                  disabled={savingComponents}
-                >
-                  {savingComponents ? (
-                    <>
-                      <Spinner as="span" animation="border" size="sm" className="me-1" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <i className="bi bi-check-circle me-1"></i>
-                      Save BOM
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-          
-          {hasPriceChanges && (
-            <Alert variant="warning" className="mt-3 mb-0 d-flex align-items-center">
-              <i className="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
-              <div>
-                <strong>Price changes detected!</strong> Some product prices have changed since this BOM was created. 
-                The project will continue to use the historical prices unless you update them.
-              </div>
-            </Alert>
-          )}
-        </Card.Body>
-      </Card>
-      
-      <Row>
-        {/* Left Column - Component Selection */}
-        <Col lg={7}>
-          <Card className="shadow-sm mb-4">
-            <Card.Header as="h5">
-              <i className="bi bi-list-ul me-2"></i>
-              Add Components
-            </Card.Header>
-            <Card.Body>
-              {/* Search and Category Filter */}
-              <Row className="mb-3">
-                <Col md={6}>
-                  <InputGroup>
-                    <InputGroup.Text>
-                      <i className="bi bi-search"></i>
-                    </InputGroup.Text>
-                    <Form.Control
-                      placeholder="Search products..."
-                      value={searchFilter}
-                      onChange={e => setSearchFilter(e.target.value)}
-                    />
-                  </InputGroup>
-                </Col>
-                <Col md={6}>
-                  <Form.Select 
-                    value={selectedCategory}
-                    onChange={e => setSelectedCategory(e.target.value)}
-                  >
-                    <option value="all">All Categories</option>
-                    {Object.keys(CATEGORY_META).map(cat => (
-                      <option key={cat} value={cat}>{CATEGORY_META[cat].name}</option>
-                    ))}
-                  </Form.Select>
-                </Col>
-              </Row>
-              
-              {/* Product List */}
-              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                <Table hover responsive>
-                  <thead className="table-light sticky-top">
-                    <tr>
-                      <th>Category</th>
-                      <th>Product</th>
-                      <th>Specifications</th>
-                      <th className="text-end">Price</th>
-                      <th className="text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredProducts.length > 0 ? (
-                      filteredProducts.map(product => {
-                        const catMeta = CATEGORY_META[product.category] || { 
-                          name: product.category || 'Uncategorized', 
-                          icon: 'bi-box',
-                          color: 'secondary'
-                        };
-                        
-                        // Check if product is already in BOM
-                        const existingComponent = bomComponents.find(c => c.product.id === product.id);
-                        
+          </Col>
+          <Col className="text-end">
+            <Button
+              variant="primary"
+              className="me-2"
+              onClick={() => setShowSaveTemplateModal(true)}
+              disabled={!bomComponents.length || savingComponents}
+            >
+              <i className="bi bi-save me-1" />
+              Save as Template
+            </Button>
+            <Button
+              variant="success"
+              onClick={saveBOM}
+              disabled={savingComponents}
+            >
+              {savingComponents ? (
+                <>
+                  <Spinner size="sm" as="span" animation="border" className="me-2" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-check2-circle me-1" />
+                  Save BOM
+                </>
+              )}
+            </Button>
+          </Col>
+        </Row>
+
+        {hasPriceChanges && (
+          <Alert variant="warning" className="py-2">
+            <i className="bi bi-exclamation-triangle me-2" />
+            Some items have price changes since the BOM was last saved. The saved “unit price” will be respected on export unless you update it.
+          </Alert>
+        )}
+
+        <Row>
+          {/* Left: Product browser - Changed from lg={7} to lg={6} */}
+          <Col lg={6}>
+            <Card className="shadow-sm mb-4">
+              <Card.Header as="h5" className="py-2">
+                <i className="bi bi-list-ul me-2" />
+                Add Components
+              </Card.Header>
+              <Card.Body className="p-2">
+                <Row className="mb-2">
+                  <Col md={6}>
+                    <InputGroup size="sm">
+                      <InputGroup.Text className="py-0">
+                        <i className="bi bi-search" />
+                      </InputGroup.Text>
+                      <Form.Control
+                        size="sm"
+                        placeholder="Search products…"
+                        value={searchFilter}
+                        onChange={e => setSearchFilter(e.target.value)}
+                      />
+                    </InputGroup>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Select
+                      size="sm"
+                      value={selectedCategory}
+                      onChange={e => setSelectedCategory(e.target.value)}
+                    >
+                      <option value="all">All categories</option>
+                      {Object.keys(CATEGORY_META).map(k => (
+                        <option key={k} value={k}>{CATEGORY_META[k].name}</option>
+                      ))}
+                    </Form.Select>
+                  </Col>
+                </Row>
+
+                <div className="table-responsive" style={{ maxHeight: 400, overflowY: 'auto' }}>
+                  <Table hover size="sm" className="align-middle small">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Product</th>
+                        <th>Specs</th>
+                        <th className="text-end">Price</th>
+                        <th className="text-center" style={{ width: 100 }}>Add</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredProducts.map(product => {
+                        const existing = bomComponents.find(c => c.product.id === product.id);
                         return (
-                          <tr key={product.id} style={{ verticalAlign: 'middle' }}>
+                          <tr key={product.id}>
                             <td>
-                              <Badge bg={catMeta.color} className="text-capitalize">
-                                <i className={`bi ${catMeta.icon} me-1`}></i>
-                                {catMeta.name}
-                              </Badge>
-                            </td>
-                            <td>
-                              <strong>{product.brand} {product.model}</strong>
+                              <div className="fw-medium small">{product.brand} {product.model}</div>
+                              <div className="text-muted" style={{fontSize: '0.75rem'}}>{CATEGORY_META[product.category]?.name || product.category}</div>
                             </td>
                             <td>
                               {product.category === 'panel' && product.power_w && (
-                                <Badge bg="warning" text="dark">{product.power_w}W</Badge>
-                              )}
+                                <Badge bg="warning" text="dark" className="small">{formatNumber0(product.power_w)}W</Badge>
+                              )}{' '}
                               {product.category === 'inverter' && product.rating_kva && (
-                                <Badge bg="info">{product.rating_kva}kVA</Badge>
-                              )}
+                                <Badge bg="info" className="small">{product.rating_kva}kVA</Badge>
+                              )}{' '}
                               {product.category === 'battery' && product.capacity_kwh && (
-                                <Badge bg="success">{product.capacity_kwh}kWh</Badge>
+                                <Badge bg="success" className="small">{product.capacity_kwh}kWh</Badge>
                               )}
                             </td>
-                            <td className="text-end">
-                              {formatCurrency(product.price)}
-                            </td>
+                            <td className="text-end small">{formatCurrency(computeDerivedUnitFromProduct(product))}</td>
                             <td className="text-center">
-                              {existingComponent ? (
+                              {existing ? (
                                 <ButtonGroup size="sm">
-                                  <Button variant="outline-secondary" onClick={() => updateQuantity(product.id, existingComponent.quantity - 1)}>-</Button>
-                                  <Button variant="outline-secondary" disabled>{existingComponent.quantity}</Button>
-                                  <Button variant="outline-secondary" onClick={() => updateQuantity(product.id, existingComponent.quantity + 1)}>+</Button>
+                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, existing.quantity - 1)}>-</Button>
+                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" disabled>{existing.quantity}</Button>
+                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, existing.quantity + 1)}>+</Button>
                                 </ButtonGroup>
                               ) : (
-                                <Button
-                                  variant="outline-primary"
-                                  size="sm"
-                                  onClick={() => addComponent(product)}
-                                >
-                                  <i className="bi bi-plus-lg"></i> Add
+                                <Button variant="outline-primary" size="sm" className="py-0" onClick={() => addComponent(product)}>
+                                  <i className="bi bi-plus-lg" /> Add
                                 </Button>
                               )}
                             </td>
                           </tr>
                         );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="5" className="text-center py-3">
-                          No products match your search criteria.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </Table>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-        
-        {/* Right Column - BOM Summary */}
-        <Col lg={5}>
-          <Card className="shadow-sm mb-4">
-            <Card.Header as="h5">
-              <i className="bi bi-receipt me-2"></i>
-              Bill of Materials
-            </Card.Header>
-            <Card.Body style={{ maxHeight: '500px', overflowY: 'auto' }}>
-              {Object.keys(componentsByCategory).length > 0 ? (
-                <>
-                  {Object.entries(componentsByCategory).map(([category, comps]) => {
-                    const catMeta = CATEGORY_META[category] || { 
-                      name: category || 'Uncategorized', 
-                      icon: 'bi-box',
-                      color: 'secondary'
-                    };
-                    
-                    return (
-                      <div key={category} className="mb-4">
-                        <h6 className="text-uppercase text-muted small mb-3">
-                          <i className={`bi ${catMeta.icon} me-2`}></i>
-                          {catMeta.name}
-                        </h6>
-                        
-                        <Table size="sm" borderless className="mb-0">
-                          <tbody>
-                            {comps.map(comp => {
-                              // Check if price has changed
-                              const priceChanged = comp.price_at_time !== undefined && 
-                                                  comp.current_price !== undefined && 
-                                                  comp.price_at_time !== comp.current_price;
-                              
+                      })}
+                      {filteredProducts.length === 0 && (
+                        <tr>
+                          <td colSpan="4" className="text-center text-muted">No products match your search.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </Table>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Right: BOM + specs - Changed from lg={5} to lg={6} */}
+          <Col lg={6}>
+            <Card className="shadow-sm mb-4">
+              <Card.Header as="h5">
+                <i className="bi bi-clipboard-check me-2" />
+                Your BOM ({bomComponents.length} items)
+              </Card.Header>
+              <Card.Body>
+                {bomComponents.length === 0 ? (
+                  <div className="text-muted">Add components on the left to build your BOM.</div>
+                ) : (
+                  <div className="table-responsive">
+                    <Table hover size="sm" className="align-middle">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Product</th>
+                          <th className='text-end' style={{ width: 80 }}>Cost</th>
+                          <th style={{ width: 100 }}>Margin</th>
+                          <th className='text-end' style={{ width: 80 }}>Price</th>
+                          <th style={{ width: 90 }}>Qty</th>
+                          <th className='text-end' style={{ width: 80 }}>Total</th>
+                          <th style={{ width: 40 }} />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.keys(grouped).map(cat => (
+                          <React.Fragment key={cat}>
+                            <tr className="table-light">
+                              <td colSpan={7} className="py-1">
+                                <div className="fw-semibold">
+                                  <i className={`bi ${CATEGORY_META[cat]?.icon || 'bi-box'} me-1`} />
+                                  {CATEGORY_META[cat]?.name || cat}
+                                </div>
+                              </td>
+                            </tr>
+                            {grouped[cat].map(comp => {
+                              const isDraft = (quoteStatus === 'draft');
+                              const unitCost = computeUnitCost(comp.product);
+                              const unitPrice = getUnitPriceForRow(comp, isDraft);
+                              const line = unitPrice * (comp.quantity || 0);
+                              const priceChanged = !isDraft && comp.price_at_time != null && 
+                                computeDerivedUnitFromRow(comp) !== comp.price_at_time;
+
                               return (
                                 <tr key={comp.product.id}>
-                                  <td style={{width: '40%'}}>
-                                    <div className="fw-medium">{comp.product.brand} {comp.product.model}</div>
-                                    <small className="text-muted d-flex align-items-center">
-                                      {priceChanged ? (
-                                        <div>
-                                          <span className={`${comp.price_at_time < comp.current_price ? 'text-success' : 'text-danger'} me-1`}>
-                                            {formatCurrency(comp.price_at_time)} (saved)
-                                          </span>
-                                          <span className="ms-1">
-                                            <i className="bi bi-arrow-right"></i> {formatCurrency(comp.current_price)} (current)
-                                          </span>
-                                        </div>
-                                      ) : (
-                                        <span>
-                                          {formatCurrency(comp.price_at_time || comp.product.price)} each
-                                        </span>
-                                      )}
-                                    </small>
+                                  <td>
+                                    <div className="small fw-medium">{comp.product.brand} {comp.product.model}</div>
+                                    {priceChanged && (
+                                      <small className="text-danger">
+                                        Price changed: {formatCurrency(comp.price_at_time)} → {formatCurrency(computeDerivedUnitFromRow(comp))}
+                                      </small>
+                                    )}
                                   </td>
-                                  <td style={{width: '30%'}}>
-                                    <InputGroup size="sm">
-                                      <InputGroup.Text>Qty</InputGroup.Text>
+                                  <td className='text-end'>{formatCurrency(unitCost)}</td>
+                                  <td>
+                                    <InputGroup size='sm'>
+                                      <InputGroup.Text className="py-0 px-1">%</InputGroup.Text>
                                       <Form.Control
                                         type="number"
-                                        min="1"
-                                        value={comp.quantity}
-                                        onChange={e => updateQuantity(comp.product.id, e.target.value)}
+                                        min="0"
+                                        step="1"
+                                        value={Math.round(getRowMarginDecimal(comp) * 100)}
+                                        onChange={e => updateMargin(comp.product.id, e.target.value)}
+                                        disabled={quoteStatus !== 'draft'}
+                                        className="py-0"
                                       />
                                     </InputGroup>
                                   </td>
-                                  <td className="text-end" style={{width: '30%'}}>
-                                    <div className="fw-bold">
-                                      {formatCurrency((comp.price_at_time || comp.product.price) * comp.quantity)}
-                                    </div>
-                                    <Button 
-                                      variant="link" 
-                                      className="text-danger p-0"
-                                      onClick={() => removeComponent(comp.product.id)}
-                                    >
-                                      <i className="bi bi-trash"></i>
+                                  <td className='text-end'>{formatCurrency(unitPrice)}</td>
+                                  <td>
+                                    <InputGroup size='sm'>
+                                      <Form.Control 
+                                        type="number"
+                                        min="0"
+                                        value={comp.quantity}
+                                        onChange={e => updateQuantity(comp.product.id, e.target.value)}
+                                        className="py-0"
+                                      />
+                                    </InputGroup>
+                                  </td>
+                                  <td className='text-end'>{formatCurrency(line)}</td>
+                                  <td className='text-end'>
+                                    <Button variant="outline-danger" size='sm' className="py-0 px-1" onClick={() => removeComponent(comp.product.id)}>
+                                      <i className='bi bi-trash' />
                                     </Button>
                                   </td>
                                 </tr>
                               );
                             })}
-                          </tbody>
-                        </Table>
-                      </div>
-                    );
-                  })}
-                  
-                  <hr className="my-4" />
-                  
-                  <Form.Group className="mb-3">
-                    <Form.Label>Extras & Labor Cost</Form.Label>
-                    <InputGroup>
-                      <InputGroup.Text>R</InputGroup.Text>
+                          </React.Fragment>
+                        ))}
+                        
+                        {/* Totals rows */}
+                        <tr className="border-top border-dark">
+                          <td colSpan={5} className="text-end fw-semibold">Subtotal:</td>
+                          <td className="text-end fw-semibold">{formatCurrency(totals.subtotal)}</td>
+                          <td></td>
+                        </tr>
+                        <tr>
+                          <td colSpan={5} className="text-end fw-semibold">Extras:</td>
+                          <td className="text-end fw-semibold">{formatCurrency(totals.extras)}</td>
+                          <td></td>
+                        </tr>
+                        <tr className="border-top border-dark">
+                          <td colSpan={5} className="text-end fw-bold">Total (excl. VAT):</td>
+                          <td className="text-end fw-bold">{formatCurrency(totals.grand)}</td>
+                          <td></td>
+                        </tr>
+                      </tbody>
+                    </Table>
+                  </div>
+                )}
+
+                <Row className="align-items-center mt-3">
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>Extras / Labour (R)</Form.Label>
                       <Form.Control
-                        type="number"
                         value={extrasCost}
                         onChange={e => setExtrasCost(e.target.value)}
+                        type="number"
+                        min="0"
+                        step="0.01"
                       />
-                    </InputGroup>
-                  </Form.Group>
-                </>
-              ) : (
-                <p className="text-center text-muted py-4">
-                  No components added yet. Add components from the left panel.
-                </p>
-              )}
-            </Card.Body>
-            <Card.Footer className="bg-white">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <h6 className="mb-0">Total Cost:</h6>
-                </div>
-                <div className="text-primary fs-4 fw-bold">
-                  {formatCurrency(totalCost)}
-                </div>
-              </div>
-            </Card.Footer>
-          </Card>
-          
-          {/* System Specifications Card */}
-          <Card className="shadow-sm mb-4">
-            <Card.Header as="h5">
-              <i className="bi bi-info-circle me-2"></i>
-              System Specifications
-            </Card.Header>
-            <Card.Body>
-              <Row>
-                <Col sm={4} className="mb-3 text-center">
-                  <div className="small text-muted">PV Size</div>
-                  <div className="fs-4 fw-bold text-warning">
-                    {systemSpecs.panelKw} <small>kWp</small>
-                  </div>
-                </Col>
-                <Col sm={4} className="mb-3 text-center">
-                  <div className="small text-muted">Inverter</div>
-                  <div className="fs-4 fw-bold text-info">
-                    {systemSpecs.inverterKva} <small>kVA</small>
-                  </div>
-                </Col>
-                <Col sm={4} className="mb-3 text-center">
-                  <div className="small text-muted">Battery</div>
-                  <div className="fs-4 fw-bold text-success">
-                    {systemSpecs.batteryKwh} <small>kWh</small>
-                  </div>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-      
-      {/* Save as Template Modal */}
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>Quote Status</Form.Label>
+                      <Form.Select value={quoteStatus} onChange={e => setQuoteStatus(e.target.value)}>
+                        <option value="draft">Draft</option>
+                        <option value="sent">Sent</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="complete">Complete</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+            
+            <Card className="shadow-sm">
+              <Card.Header as="h5">
+                <i className="bi bi-info-circle me-2" />
+                System Specifications
+              </Card.Header>
+              <Card.Body>
+                <Row>
+                  <Col sm={4} className="mb-3 text-center">
+                    <div className="small text-muted">PV Size</div>
+                    <div className="fs-4 fw-bold text-warning">{systemSpecs.panelKw} <small>kWp</small></div>
+                  </Col>
+                  <Col sm={4} className="mb-3 text-center">
+                    <div className="small text-muted">Inverter</div>
+                    <div className="fs-4 fw-bold text-info">{systemSpecs.inverterKva} <small>kVA</small></div>
+                  </Col>
+                  <Col sm={4} className="mb-3 text-center">
+                    <div className="small text-muted">Battery</div>
+                    <div className="fs-4 fw-bold text-success">{systemSpecs.batteryKwh} <small>kWh</small></div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+
+      {/* Save Template Modal */}
       <Modal show={showSaveTemplateModal} onHide={() => setShowSaveTemplateModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Save as System Template</Modal.Title>
@@ -855,32 +897,32 @@ function BillOfMaterials({ projectId }) {
               placeholder="e.g., 10kW Hybrid System"
             />
           </Form.Group>
-          <Form.Group className="mb-3">
+          <Form.Group>
             <Form.Label>Description</Form.Label>
             <Form.Control
               as="textarea"
               rows={3}
               value={newTemplateDesc}
               onChange={e => setNewTemplateDesc(e.target.value)}
-              placeholder="Describe this system template..."
+              placeholder="Describe this system template…"
             />
           </Form.Group>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowSaveTemplateModal(false)}>
+          <Button variant="secondary" onClick={() => setShowSaveTemplateModal(false)} disabled={savingComponents}>
             Cancel
           </Button>
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             onClick={saveAsTemplate}
             disabled={savingComponents || !newTemplateName.trim()}
           >
             {savingComponents ? (
               <>
                 <Spinner as="span" animation="border" size="sm" className="me-2" />
-                Saving...
+                Saving…
               </>
-            ) : "Save Template"}
+            ) : 'Save Template'}
           </Button>
         </Modal.Footer>
       </Modal>

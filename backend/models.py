@@ -28,6 +28,7 @@ class Projects(db.Model):
     panel_kw = db.Column(db.Float)
     inverter_kva = db.Column(JSONB)
     battery_kwh = db.Column(JSONB)
+    panel_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)
     inverter_ids = db.Column(JSONB) # NEW COLUMN
     battery_ids = db.Column(JSONB) # NEW COLUMN
     project_value_excl_vat = db.Column(db.Float, nullable=True)
@@ -371,9 +372,22 @@ class BOMComponent(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
-    price_at_time = db.Column(db.Float, nullable=True) # Stores historical price
+
+    # pricing snapshot fields
+    override_margin = db.Column(db.Float, nullable=True)        # decimal fraction, e.g. 0.25 for 25%
+    unit_cost_at_time = db.Column(db.Float, nullable=True)      # snapshot of cost when locking
+    price_at_time = db.Column(db.Float, nullable=True)          # snapshot of sell price when locking
+    priced_at = db.Column(db.DateTime, nullable=True)           # when we locked the price
+
     quote_status = db.Column(db.String(20), default='draft')
     extras_cost = db.Column(db.Float, nullable=True, default=0)
+
+    # optional lifecycle timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    quote_number = db.Column(db.String(50), nullable=True)
+    quote_version = db.Column(db.Integer, default=1)
 
     # Relationships
     project = db.relationship('Projects', backref=db.backref('bom_components', lazy=True, cascade="all, delete-orphan"))

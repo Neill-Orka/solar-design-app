@@ -27,31 +27,56 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const PANEL_WATTAGE = 565; // JA SOLAR 72S30-565/GR
 
 // Sub Component for Stage 1: Sizing Mode
-const SizingView = ({ design, onDesignChange, products, usePvgis, setUsePvgis, profileName, setProfileName }) => {
-  
-  const handleTargetKwChange = (e) => {
-    const kw = e.target.value;
-    const panelWattage = design.selectedPanel?.product?.power_w || PANEL_WATTAGE;
-    const newNumPanels = (kw && parseFloat(kw) > 0) ? Math.ceil((parseFloat(kw) * 1000) / panelWattage) : '';
-    onDesignChange({ ...design, panelKw: kw, numPanels: newNumPanels });
-  };
+const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, setUsePvgis, profileName, setProfileName, showNotification }) => {
 
-  const handleNumPanelsChange = (e) => {
-    const panels = e.target.value;
-    const panelWattage = design.selectedPanel?.product?.power_w || PANEL_WATTAGE;
-    const newKw = (panels && parseInt(panels) > 0) ? ((parseInt(panels) * panelWattage) / 1000).toFixed(2) : '';
-    onDesignChange({ ...design, numPanels: panels, panelKw: newKw });
-  };
+    const persistPanel = async (panelId, panelKw) => {
+        try {
+            await axios.put(`${API_URL}/api/projects/${projectId}`, {
+                panel_id: panelId || null,
+                panel_kw: panelKw ? parseFloat(panelKw) : 0
+            });
+            sessionStorage.setItem(`systemDesignModified_${projectId}`, 'true');
+        } catch (e) {
+            console.error('Failed to save panel selection', e);
+            if (showNotification) showNotification('Failed to save panel selection', 'danger');
+        }
+    };
+
+    const handleTargetKwChange = async (e) => {
+      const kw = e.target.value;
+      const panelWattage = design.selectedPanel?.product?.power_w || PANEL_WATTAGE;
+      const newNumPanels = (kw && parseFloat(kw) > 0) 
+        ? Math.ceil((parseFloat(kw) * 1000) / panelWattage) 
+        : '';
+
+      onDesignChange({ ...design, panelKw: kw, numPanels: newNumPanels });
+    
+      // persist
+      const panelId = design.selectedPanel?.product?.id || null;
+      await persistPanel(panelId, kw || 0);
+    };
+
+    const handleNumPanelsChange = async (e) => {
+      const panels = e.target.value;
+      const panelWattage = design.selectedPanel?.product?.power_w || PANEL_WATTAGE;
+      const newKw = (panels && parseInt(panels) > 0) ? ((parseInt(panels) * panelWattage) / 1000).toFixed(2) : '';
+      onDesignChange({ ...design, numPanels: panels, panelKw: newKw });
+
+      // persist
+      const panelId = design.selectedPanel?.product?.id || null;
+      await persistPanel(panelId, newKw || 0);
+    };
 
     // Handler for react-select components
-    const handleSelectChange = (key, selectedOption) => {
-      if (!products) {
-        return;
-      }
+    const handleSelectChange = async (key, selectedOption) => {
+      if (!products) return;
       
       if (!selectedOption) {
         onDesignChange({ ...design, [key]: null });
-          return;
+        if (key === 'selectedPanel') {
+            await persistPanel(null, design.panelKw || 0);
+        }
+        return;
       }
 
       // Determine which product list to use based on the selection key
@@ -68,7 +93,25 @@ const SizingView = ({ design, onDesignChange, products, usePvgis, setUsePvgis, p
 
       const productList = products[productType] || [];
       const productObject = productList.find(p => p.id === selectedOption.value);
-      onDesignChange({ ...design, [key]: productObject ? { ...selectedOption, product: productObject } : null });
+      const next = productObject ? { ...selectedOption, product: productObject } : null;
+
+      onDesignChange({ ...design, [key]: next });
+
+      if (key === 'selectedPanel') {
+        const panelId = productObject?.id || null;
+
+        // recompute kWp based on existing numPanels (keeps UI consistent)
+        const watt = productObject?.power_w || PANEL_WATTAGE;
+        const qty = parseInt(design.numPanels || 0, 10);
+        const recomputedKw = qty > 0 ? ((qty * watt) / 1000).toFixed(2) : design.panelKw || 0;
+
+        // Keep design in sync if we recomputed
+        if (qty > 0) {
+            onDesignChange({ ...design, [key]: next, panelKw: recomputedKw });
+        }
+
+        await persistPanel(panelId, recomputedKw);
+      }
     };
 
   return (
@@ -1175,6 +1218,7 @@ function SystemDesign({ projectId }) {
 
             {designMode === 'custom' ? (
                 <SizingView
+                    projectId={projectId}
                     design={design}
                     onDesignChange={setDesign}
                     products={products}
@@ -1182,6 +1226,7 @@ function SystemDesign({ projectId }) {
                     setUsePvgis={setUsePvgis}
                     profileName={profileName}
                     setProfileName={setProfileName}
+                    showNotification={showNotification}
                 />
             ) : (
                 <StandardDesignSelector 
