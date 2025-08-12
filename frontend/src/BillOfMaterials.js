@@ -6,6 +6,7 @@ import {
 } from 'react-bootstrap';
 import { API_URL } from './apiConfig';
 import { useNotification } from './NotificationContext';
+import { useNavigate } from 'react-router-dom';
 
 /* ---------- Category meta (display only) ---------- */
 const CATEGORY_META = {
@@ -24,6 +25,7 @@ const CATEGORY_META = {
   accessory:    { name: 'Accessories',      icon: 'bi-gear-fill',             color: 'secondary'},
   other:        { name: 'Other',            icon: 'bi-box',                   color: 'secondary'},
 };
+
 
 /* ---------- Helpers ---------- */
 const slugify = (s) =>
@@ -90,6 +92,7 @@ const getUnitPriceForRow = (row, isDraft) =>
 /* ---------- Component ---------- */
 function BillOfMaterials({ projectId }) {
   const { showNotification } = useNotification();
+  const navigate = useNavigate();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -444,7 +447,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
 
       // Totals reflect what user sees: draft => live, locked => snapshot
       const total = (Array.isArray(bomComponents) ? bomComponents: []).reduce((sum, c) => {
-        const unit = getUnitPriceForRow(c.product, c.price_at_time, isDraft);
+        const unit = getUnitPriceForRow(c, isDraft);
         return sum + unit * (c.quantity || 0);
       }, parsedExtras);
 
@@ -564,6 +567,30 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     );
   }
 
+  // Add this function to prepare BOM data and navigate to print view
+  const handleExportToPdf = () => {
+    // Prepare data structure for the printable view
+    const categoriesForPrint = Object.keys(grouped).map(cat => ({
+      name: CATEGORY_META[cat]?.name || cat,
+      items: grouped[cat].map(comp => ({
+        product: comp.product,
+        quantity: comp.quantity,
+        price: getUnitPriceForRow(comp, quoteStatus === 'draft')
+      }))
+    }));
+
+    // Store the data in localStorage for the print view to access
+    localStorage.setItem('printBomData', JSON.stringify({
+      project,
+      systemSpecs,
+      totals,
+      categories: categoriesForPrint
+    }));
+
+    // Navigate to the print view
+    navigate('/print-bom');
+  };
+
   return (
     <div>
       <Container fluid>
@@ -583,6 +610,15 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
             </div>
           </Col>
           <Col className="text-end">
+            {/* Add the Export to PDF button */}
+            <Button
+              variant="outline-secondary"
+              className="me-2"
+              onClick={handleExportToPdf}
+            >
+              <i className="bi bi-file-earmark-pdf me-1" />
+              Export to PDF
+            </Button>
             <Button
               variant="primary"
               className="me-2"

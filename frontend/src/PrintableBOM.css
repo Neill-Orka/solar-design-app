@@ -1,0 +1,248 @@
+/* Print controls */
+.print-controls {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  gap: 10px;
+}
+
+/* Main container */
+.bom-container {
+  background-color: #525659;
+  min-height: 100vh;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Page styling */
+.bom-page {
+  background: white;
+  width: 21cm;
+  min-height: 29.7cm;
+  padding: 2cm;
+  margin: 0 auto 1cm;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  position: relative;
+  font-family: Calibri, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  page-break-after: always;
+}
+
+/* Header */
+.bom-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2cm;
+}
+
+.bom-header .logo {
+  height: 60px;
+  width: auto;
+}
+
+.header-text h1 {
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+.company-info {
+  font-size: 12px;
+  color: #666;
+}
+
+.company-info p {
+  margin: 0;
+}
+
+/* Project details */
+.project-details {
+  margin-bottom: 1.5cm;
+}
+
+.project-details h2 {
+  font-size: 20px;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 5px;
+}
+
+.detail-line {
+  display: flex;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.detail-line .label {
+  font-weight: bold;
+  width: 100px;
+}
+
+/* System specs */
+.system-specs {
+  margin-bottom: 1.5cm;
+}
+
+.system-specs h3 {
+  font-size: 16px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 5px;
+}
+
+.specs-grid {
+  display: flex;
+  justify-content: space-between;
+}
+
+.spec-item {
+  text-align: center;
+  flex: 1;
+}
+
+.spec-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.spec-value {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+/* Components table */
+.components-table {
+  margin-bottom: 1.5cm;
+}
+
+.components-table h3 {
+  font-size: 16px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 5px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+  font-size: 12px;
+}
+
+th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.category-row {
+  background-color: #f9f9f9;
+  font-weight: bold;
+}
+
+.product-name {
+  font-weight: bold;
+}
+
+.product-details {
+  font-size: 10px;
+  color: #666;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+tfoot {
+  font-weight: bold;
+}
+
+.total-row {
+  background-color: #f5f5f5;
+  font-size: 14px;
+}
+
+/* Footer */
+.bom-footer {
+  margin-top: 2cm;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+}
+
+/* Critical: Classes to hide/show based on print mode */
+.no-print {
+  display: initial;
+}
+
+/* Print specific styles */
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-controls {
+    display: none !important;
+  }
+
+  .bom-container {
+    background-color: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+    min-height: initial !important;
+  }
+
+  .bom-page {
+    width: 100% !important;
+    height: auto !important;
+    min-height: initial !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 1.5cm !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  /* Force background colors to print */
+  .category-row {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  th {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .total-row {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

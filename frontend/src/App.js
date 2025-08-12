@@ -19,6 +19,7 @@ import ProposalPage from './ProposalPage';
 import LoadProfileManager from './LoadProfileManager';
 import TariffManager from './TariffManager';
 import RuleEditor from './RuleEditor';
+import PrintableBOM from './PrintableBOM';
 
 import logo from './assets/orka_logo_transparent_background.png';
 import './Navbar.css';
@@ -36,6 +37,7 @@ function FinancialModelWrapper() {
   const { id } = useParams();
   return <FinancialModeling projectId={parseInt(id, 10)} />;
 }
+
 
 function App() {
   return (
@@ -111,6 +113,7 @@ function App() {
             <Route path="/proposal/:id" element={<ProposalPage />} />
             <Route path="/tariffs" element={<TariffManager />} />
             <Route path="/rules" element={<RuleEditor />} />
+            <Route path="/print-bom" element={<PrintableBOM />} />
           </Routes>
           </div>
       </Router>
