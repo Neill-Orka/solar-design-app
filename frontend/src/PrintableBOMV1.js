@@ -1,10 +1,14 @@
+
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from './assets/orka_logo_transparent_background.png';
 import './PrintableBOM.css';
 
 /**
- * PrintableBOM (paginated, WYSIWYG, print-stable)
+ * PrintableBOM (paginated)
+ * - Renders fixed-size A4 pages with a repeated header & footer
+ * - Pre-paginates BOM rows so you can SEE page layout before printing
+ * - Does not rely on browser table header repetition
  */
 function PrintableBOM() {
   const navigate = useNavigate();
@@ -24,20 +28,17 @@ function PrintableBOM() {
   // ----- Pagination constants (keep in sync with CSS) -----
   const CM_TO_PX = 37.79527559;
   const PAGE_HEIGHT_CM = 29.7;
-  const HEADER_HEIGHT_CM = 7.3;     // .bom-header height
+  const HEADER_HEIGHT_CM = 6.8;     // .bom-header height
   const FOOTER_HEIGHT_CM = 0.7;     // .bom-footer height
-  const CONTENT_TOP_PADDING_CM = 0;
+  const CONTENT_TOP_PADDING_CM = 0.2;
   const COLUMN_HEADER_HEIGHT_CM = 1.0; // .bom-thead-row height
   const ROW_HEIGHT_CM = 0.78;         // .bom-row height
   const CAT_ROW_HEIGHT_CM = 0.78;     // .bom-category-row height
 
-  // Safety margin to avoid print rounding causing overflow
-  const SAFETY_CM = 0.02;
-
   const CONTENT_HEIGHT_PX = (PAGE_HEIGHT_CM - HEADER_HEIGHT_CM - FOOTER_HEIGHT_CM - CONTENT_TOP_PADDING_CM) * CM_TO_PX;
-  const ROW_HEIGHT_PX = (ROW_HEIGHT_CM + SAFETY_CM) * CM_TO_PX;
-  const CAT_ROW_HEIGHT_PX = (CAT_ROW_HEIGHT_CM + SAFETY_CM) * CM_TO_PX;
-  const COL_HEADER_HEIGHT_PX = (COLUMN_HEADER_HEIGHT_CM + SAFETY_CM) * CM_TO_PX;
+  const ROW_HEIGHT_PX = ROW_HEIGHT_CM * CM_TO_PX;
+  const CAT_ROW_HEIGHT_PX = CAT_ROW_HEIGHT_CM * CM_TO_PX;
+  const COL_HEADER_HEIGHT_PX = COLUMN_HEADER_HEIGHT_CM * CM_TO_PX;
 
   // Flatten BOM data into renderable rows with known heights
   const rows = useMemo(() => {
@@ -45,7 +46,7 @@ function PrintableBOM() {
     if (Array.isArray(bomData.categories)) {
       bomData.categories.forEach((category) => {
         out.push({ type: 'category', name: category.name });
-        (category.items || []).forEach((item) => {
+        category.items.forEach((item) => {
           out.push({ type: 'item', item });
         });
       });
@@ -78,8 +79,8 @@ function PrintableBOM() {
     return result;
   }, [rows, CONTENT_HEIGHT_PX, COL_HEADER_HEIGHT_PX, ROW_HEIGHT_PX, CAT_ROW_HEIGHT_PX]);
 
-  // Estimate whether totals fit on the last page
-  const totalsBlockEstimatedRows = 9; // approx
+  // Decide if totals/content fit on last page; otherwise move to a new page
+  const totalsBlockEstimatedRows = 9; // approx visual height (deposit schedule, terms, banking, signature)
   const ROWS_PER_PAGE_ESTIMATE = Math.floor((CONTENT_HEIGHT_PX - COL_HEADER_HEIGHT_PX) / ROW_HEIGHT_PX);
   const needsTotalsOnNewPage = useMemo(() => {
     if (!pages.length) return true;
@@ -87,14 +88,14 @@ function PrintableBOM() {
     return (ROWS_PER_PAGE_ESTIMATE - lastPageRowCount) < totalsBlockEstimatedRows;
   }, [pages, ROWS_PER_PAGE_ESTIMATE]);
 
-  // Build pages: either append a dedicated totals page, or render totals inline on the last page
-  const pagesWithKinds = useMemo(() => {
-    const base = pages.map(p => ({ kind: 'rows', rows: p }));
-    if (needsTotalsOnNewPage) base.push({ kind: 'totals' });
-    return base;
+  const allPages = useMemo(() => {
+    // Clone to avoid mutating original
+    const cloned = pages.map(p => [...p]);
+    if (needsTotalsOnNewPage) {
+      cloned.push([]); // append a blank page for totals/terms
+    }
+    return cloned;
   }, [pages, needsTotalsOnNewPage]);
-
-  const totalPages = pagesWithKinds.length;
 
   const renderHeader = () => (
     <header className="bom-header">
@@ -143,7 +144,7 @@ function PrintableBOM() {
 
   const renderFooter = (pageIndex) => (
     <footer className="bom-footer">
-      <div className="bom-page-number">Page {pageIndex + 1} of {totalPages}</div>
+      <div className="bom-page-number">Page {pageIndex + 1} of {allPages.length}</div>
     </footer>
   );
 
@@ -236,28 +237,38 @@ function PrintableBOM() {
       </div>
 
       <main className="bom-printarea">
-        {pagesWithKinds.map((pg, pageIndex) => (
+        {allPages.map((pageRows, pageIndex) => (
           <section className="bom-page" key={pageIndex}>
             {renderHeader()}
+
             <div className="bom-content">
-              {pg.kind === 'rows' && (
+              {pageRows.length > 0 ? (
                 <table className="bom-table">
                   {renderTableHead()}
                   <tbody>
-                    {pg.rows.map((r, i) => renderRow(r, i))}
+                    {pageRows.map((r, i) => renderRow(r, i))}
                   </tbody>
                 </table>
-              )}
-              {/* If last 'rows' page and totals fit, render totals inline */}
-              {pg.kind === 'rows' && !needsTotalsOnNewPage && pageIndex === pagesWithKinds.length - 1 && (
+              ) : (
+                // Totals/terms page
                 <TotalsAndTerms />
               )}
-              {/* Dedicated totals page */}
-              {pg.kind === 'totals' && <TotalsAndTerms />}
             </div>
-            {/* {renderFooter(pageIndex)} */}
+
+            {renderFooter(pageIndex)}
           </section>
         ))}
+
+        {/* If everything fit on last page, still add totals block right there */}
+        {!needsTotalsOnNewPage && (
+          <section className="bom-page" key="totals-last">
+            {renderHeader()}
+            <div className="bom-content">
+              <TotalsAndTerms />
+            </div>
+            {renderFooter(allPages.length)}
+          </section>
+        )}
       </main>
     </div>
   );

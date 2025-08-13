@@ -1,3 +1,4 @@
+
 /* PrintableBOM.css — paginated, WYSIWYG A4 layout for Quotes */
 
 .bom-report {
@@ -48,14 +49,14 @@
 
 /* Fixed-size header/footer so JS can paginate accurately */
 .bom-header {
-  height: 7.3cm; /* MUST match HEADER_HEIGHT_CM in JS */
+  height: 6.8cm; /* MUST match HEADER_HEIGHT_CM in JS */
   padding: 1.0cm 1.5cm 0.4cm 1.5cm;
   box-sizing: border-box;
-  /* border-bottom: 1px solid #bfbfbf; */
+  border-bottom: 1px solid #bfbfbf;
 }
 
 .bom-footer {
-  height: 0.7cm; /* MUST match FOOTER_HEIGHT_CM in JS */
+  height: .7cm; /* MUST match FOOTER_HEIGHT_CM in JS */
   padding: 0.3cm 1.5cm 0.3cm 1.5cm;
   box-sizing: border-box;
   border-top: 1px solid #bfbfbf;
@@ -88,7 +89,7 @@
 }
 
 .bom-title {
-  text-align: right;
+  text-align: center;
   margin: 6px 0 6px 0;
   font-size: 20px;
   font-weight: 700;
@@ -113,7 +114,7 @@
   border-top: 1px solid #000;
   border-bottom: 1px solid #000;
   padding: 5px 0;
-  font-size: 17px;
+  font-size: 12px;
   font-weight: bold;
   white-space: nowrap;
   overflow: hidden;
@@ -123,7 +124,7 @@
 /* Content area between header & footer */
 .bom-content {
   flex: 1;
-  padding: 0cm 1.5cm 0 1.5cm;
+  padding: 0.2cm 1.5cm 0 1.5cm;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -173,7 +174,7 @@
 }
 
 /* Item description subline */
-.bom-item-model { font-weight: normal; }
+.bom-item-model { font-weight: 700; }
 .bom-item-spec {
   font-size: 10px;
   color: #666;
@@ -208,7 +209,6 @@
   gap: 4%;
   margin-top: 12px;
 }
-
 .bom-box {
   width: 48%;
   border: 1px solid #000;
@@ -233,77 +233,17 @@
   font-size: 1rem;
 }
 
-/* ==== PRINT: BOM ONLY, STABLE LAYOUT ==== */
-@page {
-  size: A4;
-  margin: 0;
-}
-
+/* Print rules */
 @media print {
-  /* Global app has 'body * { visibility:hidden }'. Re-enable only the BOM. */
-  .bom-report {
-    position: absolute !important;
-    top: 0; left: 0; right:0;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
-    z-index: 20001 !important;
-  }
-
-  header.bom-header, footer.bom-footer { margin: 0 !important ;}
-
-
-  .bom-report, .bom-report * {
-    visibility: visible !important;
-  }
-
-  .bom-page {
-    position: relative !important;
-    z-index: 20001 !important;
-  }
-
-  /* Hide explicit print controls */
+  body { background: #fff !important; }
   .no-print, .bom-controls { display: none !important; }
-
-  /* Normalize layout for Firefox/Edge (avoid flex quirks) */
-  html, body {
-    padding: 0 !important;
-    margin: 0 !important;
-    background: #fff !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  .bom-report { display: block !important; min-height: auto !important; background: transparent !important; }
-  .bom-printarea { padding: 0 !important; display: block !important; }
-
   .bom-page {
-    width: 210mm !important;
-    height: 297mm !important;
     box-shadow: none !important;
-    overflow: visible !important;
-    display: block !important;
-    break-after: page;
-    page-break-after: always; /* fallback */
-  }
-  .bom-page:last-child {
-    break-after: auto;
-    page-break-after: auto; /* fallback */
+    page-break-after: always;
   }
 
-  /* Keep table header background, logo etc */
-  * {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  nav,
-  .navbar,
-  .navbar-fixed-top,
-  .navbar-sticky,
-  header:not(.bom-header),
-  footer:not(.bom-footer) {
-    display: none !important;
+  body * {
+    visibility: visible !important;
   }
 
 }
