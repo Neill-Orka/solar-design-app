@@ -27,17 +27,31 @@ function PrintableBOM() {
   const HEADER_HEIGHT_CM = 7.3;     // .bom-header height
   const FOOTER_HEIGHT_CM = 0.7;     // .bom-footer height
   const CONTENT_TOP_PADDING_CM = 0;
-  const COLUMN_HEADER_HEIGHT_CM = 1.0; // .bom-thead-row height
-  const ROW_HEIGHT_CM = 0.78;         // .bom-row height
-  const CAT_ROW_HEIGHT_CM = 0.78;     // .bom-category-row height
+  const COLUMN_HEADER_HEIGHT_CM = 1.25; // .bom-thead-row height
+  const ROW_HEIGHT_CM = 1.05;         // .bom-row height
+  const CAT_ROW_HEIGHT_CM = 1.05;     // .bom-category-row height
 
   // Safety margin to avoid print rounding causing overflow
   const SAFETY_CM = 0.02;
+  const HEADROOM_CM = 0.40;
 
   const CONTENT_HEIGHT_PX = (PAGE_HEIGHT_CM - HEADER_HEIGHT_CM - FOOTER_HEIGHT_CM - CONTENT_TOP_PADDING_CM) * CM_TO_PX;
   const ROW_HEIGHT_PX = (ROW_HEIGHT_CM + SAFETY_CM) * CM_TO_PX;
   const CAT_ROW_HEIGHT_PX = (CAT_ROW_HEIGHT_CM + SAFETY_CM) * CM_TO_PX;
   const COL_HEADER_HEIGHT_PX = (COLUMN_HEADER_HEIGHT_CM + SAFETY_CM) * CM_TO_PX;
+  const TOTALS_MIN_HEIGHT_CM = 8.0;
+  const TOTALS_MIN_HEIGHT_PX = (TOTALS_MIN_HEIGHT_CM + SAFETY_CM) * CM_TO_PX;
+  const HEADROOM_PX = HEADROOM_CM * CM_TO_PX;
+
+  const H_TOT_CM = 3.0;
+  const H_TERM_CM = 6.4;
+  const H_BANK_CM = 4.2;
+  const BLOCK_GAP_CM = 0.3;
+
+  const H_TOT_PX = (H_TOT_CM + SAFETY_CM) * CM_TO_PX;
+  const H_TERM_PX = (H_TERM_CM + SAFETY_CM) * CM_TO_PX;
+  const H_BANK_PX = (H_BANK_CM + SAFETY_CM) * CM_TO_PX;
+  const BLOCK_GAP_PX = (BLOCK_GAP_CM) * CM_TO_PX;
 
   // Flatten BOM data into renderable rows with known heights
   const rows = useMemo(() => {
@@ -78,21 +92,79 @@ function PrintableBOM() {
     return result;
   }, [rows, CONTENT_HEIGHT_PX, COL_HEADER_HEIGHT_PX, ROW_HEIGHT_PX, CAT_ROW_HEIGHT_PX]);
 
+
+  const lastPageRemainingPx = useMemo(() => {
+    if (!pages.length) return 0;
+    const last = pages[pages.length - 1];
+    const usedRowsPx = last.reduce((acc, r) => acc + (r.type === 'category' ? CAT_ROW_HEIGHT_PX : ROW_HEIGHT_PX), 0);
+    return CONTENT_HEIGHT_PX - (COL_HEADER_HEIGHT_PX + usedRowsPx);
+  }, [pages, CONTENT_HEIGHT_PX, COL_HEADER_HEIGHT_PX, ROW_HEIGHT_PX, CAT_ROW_HEIGHT_PX]);  
+
+  const totalsPlacement = useMemo(() => {
+    const blocks = [
+        { key: 'totals', h: H_TOT_PX },
+        { key: 'termsDeposit', h: H_TERM_PX },
+        { key: 'bankingAccept', h: H_BANK_PX },
+    ];
+    const inlineKeys = [];
+    const carryKeys = [];
+    let rem = lastPageRemainingPx;
+
+    for (const b of blocks) {
+        const need = b.h + (inlineKeys.length ? BLOCK_GAP_PX : 0);
+        if (need + HEADROOM_PX <= rem) { inlineKeys.push(b.key); rem -= need; }
+        else { carryKeys.push(b.key); }
+    }
+    return { inlineKeys, carryKeys };
+  }, [lastPageRemainingPx, H_TOT_PX, H_TERM_PX, H_BANK_PX, BLOCK_GAP_PX]);
+
+  const carryPages = useMemo(() => {
+    if (!totalsPlacement.carryKeys.length) return [];
+    const h = { totals: H_TOT_PX, termsDeposit: H_TERM_PX, bankingAccept: H_BANK_PX };
+    const pagesArr = [];
+    let page = [];
+    let rem = CONTENT_HEIGHT_PX;
+
+    for (const key of totalsPlacement.carryKeys) {
+        const need = h[key] + (page.length ? BLOCK_GAP_PX : 0);
+        if (need > rem) { pagesArr.push(page); page = []; rem = CONTENT_HEIGHT_PX; }
+        page.push(key);
+        rem -= need;
+    }
+    if (page.length) pagesArr.push(page);
+    return pagesArr;
+  }, [totalsPlacement, CONTENT_HEIGHT_PX, H_TOT_PX, H_TERM_PX, H_BANK_PX, BLOCK_GAP_PX]);
+
   // Estimate whether totals fit on the last page
   const totalsBlockEstimatedRows = 9; // approx
   const ROWS_PER_PAGE_ESTIMATE = Math.floor((CONTENT_HEIGHT_PX - COL_HEADER_HEIGHT_PX) / ROW_HEIGHT_PX);
+  
   const needsTotalsOnNewPage = useMemo(() => {
     if (!pages.length) return true;
-    const lastPageRowCount = pages[pages.length - 1].length;
-    return (ROWS_PER_PAGE_ESTIMATE - lastPageRowCount) < totalsBlockEstimatedRows;
-  }, [pages, ROWS_PER_PAGE_ESTIMATE]);
+    const last = pages[pages.length - 1];
+
+    // sum actual height of last page rows
+    const usedRowsPx = last.reduce((acc, r) => 
+        acc + (r.type === 'category' ? CAT_ROW_HEIGHT_PX : ROW_HEIGHT_PX), 0);
+
+    // header (col head) + rows already on the page
+    const usedPx = COL_HEADER_HEIGHT_PX + usedRowsPx;
+
+    // remaining space on the page
+    const remainingPx = CONTENT_HEIGHT_PX - usedPx;
+
+    // if our totals+banking+acceptance block won't fit fully, push to a new page
+    return remainingPx < TOTALS_MIN_HEIGHT_PX;
+  }, [pages, CONTENT_HEIGHT_PX, COL_HEADER_HEIGHT_PX, ROW_HEIGHT_PX, CAT_ROW_HEIGHT_PX, TOTALS_MIN_HEIGHT_PX]);
 
   // Build pages: either append a dedicated totals page, or render totals inline on the last page
   const pagesWithKinds = useMemo(() => {
     const base = pages.map(p => ({ kind: 'rows', rows: p }));
-    if (needsTotalsOnNewPage) base.push({ kind: 'totals' });
+    if (carryPages.length) {
+        carryPages.forEach(blocks => base.push({ kind: 'totals', blocks }));
+    }
     return base;
-  }, [pages, needsTotalsOnNewPage]);
+  }, [pages, carryPages]);
 
   const totalPages = pagesWithKinds.length;
 
@@ -186,46 +258,55 @@ function PrintableBOM() {
     );
   };
 
-  const TotalsAndTerms = () => (
-    <div>
-      <div className="bom-totals">
-        <div className="row"><div>Subtotal:</div><div><b>{formatCurrency(bomData.totals?.subtotal || 0)}</b></div></div>
-        <div className="row"><div>Extras / Labor:</div><div>{formatCurrency(bomData.totals?.extras || 0)}</div></div>
-        <div className="row total">
-          <div>Total (excl. VAT):</div><div>{formatCurrency(bomData.totals?.grand || 0)}</div>
+    const TotalsBlock = () => (
+      <section className="bom-block bom-block-totals">
+        <div className="bom-totals">
+          <div className="row"><div>Subtotal:</div><div><b>{formatCurrency(bomData.totals?.subtotal || 0)}</b></div></div>
+          <div className="row"><div>Extras / Labor:</div><div>{formatCurrency(bomData.totals?.extras || 0)}</div></div>
+          <div className="row total">
+            <div>Total (excl. VAT):</div><div>{formatCurrency(bomData.totals?.grand || 0)}</div>
+          </div>
         </div>
-      </div>
+      </section>
+    );
 
-      <div className="bom-terms">
-        <p style={{ margin: '5px 0', fontWeight: 700 }}>Please note that a 65% deposit will be required before Orka Solar will commence with any work.</p>
-      </div>
-
-      {/* Payment schedule */}
-      <table className="bom-table" style={{ marginTop: '6px' }}>
-        <tbody>
-          <tr className="bom-row"><td className="bom-cell">Deposit</td><td className="bom-cell bom-col-units">65%</td><td className="bom-cell bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.grand || 0) * 0.65 * 1.15)} <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
-          <tr className="bom-row"><td className="bom-cell">On delivery of inverters and panels to site</td><td className="bom-cell bom-col-units">25%</td><td className="bom-cell bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.grand || 0) * 0.25 * 1.15)} <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
-          <tr className="bom-row"><td className="bom-cell">On project completion</td><td className="bom-cell bom-col-units">10%</td><td className="bom-cell bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.grand || 0) * 0.10 * 1.15)} <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
-          <tr className="bom-row"><td className="bom-cell" colSpan={4} style={{ borderBottom: '1px solid #000' }}></td></tr>
-          <tr className="bom-row"><td className="bom-cell" colSpan={2}></td><td className="bom-cell" colSpan={2} style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency((bomData.totals?.grand || 0) * 1.15)}</td></tr>
-        </tbody>
-      </table>
-
-      <div className="bom-two-col">
-        <div className="bom-box">
-          <div style={{ fontWeight: 700, borderBottom: '1px solid #000', paddingBottom: 4, marginBottom: 4 }}>Banking details:</div>
-          <div>Company: Orka Solar (Pty) Ltd.</div>
-          <div>Branch: ABSA Mooinooi Mall</div>
-          <div>Account name: Orka Solar (PTY) Ltd</div>
-          <div>Account type: Cheque</div>
-          <div>Account number: 409 240 5135</div>
+    const TermsDepositBlock = () => (
+      <section className="bom-block bom-block-termsdeposit">
+        <div className="bom-terms">
+          <p style={{ margin: '5px 0', fontWeight: 700 }}>
+            Please note that a 65% deposit will be required before Orka Solar will commence with any work.
+          </p>
         </div>
-        <div className="bom-box">
-          <div className="bom-signature">Client acceptance: signature & date</div>
+        <table className="bom-table" style={{ marginTop: '6px' }}>
+          <tbody>
+            <tr className="bom-row"><td className="bom-cell">Deposit</td><td className="bom-cell bom-col-units">65%</td><td className="bom-cell bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.grand || 0) * 0.65 * 1.15)} <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
+            <tr className="bom-row"><td className="bom-cell">On delivery of inverters and panels to site</td><td className="bom-cell bom-col-units">25%</td><td className="bom-cell bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.grand || 0) * 0.25 * 1.15)} <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
+            <tr className="bom-row"><td className="bom-cell">On project completion</td><td className="bom-cell bom-col-units">10%</td><td className="bom-cell bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.grand || 0) * 0.10 * 1.15)} <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
+            <tr className="bom-row"><td className="bom-cell" colSpan={4} style={{ borderBottom: '1px solid #000' }}></td></tr>
+            <tr className="bom-row"><td className="bom-cell" colSpan={2}></td><td className="bom-cell" colSpan={2} style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency((bomData.totals?.grand || 0) * 1.15)}</td></tr>
+          </tbody>
+        </table>
+      </section>
+    );
+
+    const BankingAcceptanceBlock = () => (
+      <section className="bom-block bom-block-bankingaccept">
+        <div className="bom-two-col">
+          <div className="bom-box">
+            <div style={{ fontWeight: 700, borderBottom: '1px solid #000', paddingBottom: 4, marginBottom: 4 }}>Banking details:</div>
+            <div>Company: Orka Solar (Pty) Ltd.</div>
+            <div>Branch: ABSA Mooinooi Mall</div>
+            <div>Account name: Orka Solar (PTY) Ltd</div>
+            <div>Account type: Cheque</div>
+            <div>Account number: 409 240 5135</div>
+          </div>
+          <div className="bom-box">
+            <div className="bom-signature">Client acceptance: signature & date</div>
+          </div>
         </div>
-      </div>
-    </div>
-  );
+      </section>
+    );
+
 
   return (
     <div className="bom-report">
@@ -248,12 +329,23 @@ function PrintableBOM() {
                   </tbody>
                 </table>
               )}
-              {/* If last 'rows' page and totals fit, render totals inline */}
-              {pg.kind === 'rows' && !needsTotalsOnNewPage && pageIndex === pagesWithKinds.length - 1 && (
-                <TotalsAndTerms />
+              {/* Inline blocks on the last rows page */}
+              {pg.kind === 'rows' && pageIndex === pagesWithKinds.length - 1 && (
+                <>
+                  {totalsPlacement.inlineKeys.includes('totals') && <TotalsBlock />}
+                  {totalsPlacement.inlineKeys.includes('termsDeposit') && <TermsDepositBlock />}
+                  {totalsPlacement.inlineKeys.includes('bankingAccept') && <BankingAcceptanceBlock />}
+                </>
               )}
-              {/* Dedicated totals page */}
-              {pg.kind === 'totals' && <TotalsAndTerms />}
+
+              {/* Dedicated totals page for any carried blocks */}
+              {pg.kind === 'totals' && (
+                <>
+                  {pg.blocks.includes('totals') && <TotalsBlock />}
+                  {pg.blocks.includes('termsDeposit') && <TermsDepositBlock />}
+                  {pg.blocks.includes('bankingAccept') && <BankingAcceptanceBlock />}
+                </>
+              )}
             </div>
             {/* {renderFooter(pageIndex)} */}
           </section>

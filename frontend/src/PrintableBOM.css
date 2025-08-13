@@ -66,6 +66,8 @@
   font-size: 0.92rem;
 }
 
+.bom-block { margin-top: 8px; }
+
 /* Company header layout */
 .bom-header-top {
   display: flex;
@@ -143,7 +145,7 @@
 
 /* fixed heights so pagination matches JS calculations */
 .bom-thead-row {
-  height: 1.0cm; /* MUST match COLUMN_HEADER_HEIGHT_CM */
+  height: 1.25cm; /* MUST match COLUMN_HEADER_HEIGHT_CM */
   background: #f2f2f2;
 }
 .bom-thead-cell {
@@ -153,7 +155,7 @@
 }
 
 .bom-row {
-  height: 0.78cm; /* MUST match ROW_HEIGHT_CM */
+  height: 1.05cm; /* MUST match ROW_HEIGHT_CM */
 }
 .bom-cell {
   padding: 6px 8px;
@@ -162,7 +164,7 @@
 }
 
 .bom-category-row {
-  height: 0.78cm; /* MUST match CAT_ROW_HEIGHT_CM */
+  height: 1.05cm; /* MUST match CAT_ROW_HEIGHT_CM */
   background: #f9f9f9;
   font-weight: 700;
 }
@@ -262,6 +264,8 @@
     z-index: 20001 !important;
   }
 
+  .bom-block { margin-top: 0.3cm !important; } /* Matches BLOCK_GAP_CM */
+
   /* Hide explicit print controls */
   .no-print, .bom-controls { display: none !important; }
 
@@ -304,6 +308,21 @@
   header:not(.bom-header),
   footer:not(.bom-footer) {
     display: none !important;
+  }
+
+  .bom-block,
+  .bom-totals-terms,
+  .bom-block * {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .bom-two-col,
+  .bom-box,
+  .bom-table,
+  .bom-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
 }
