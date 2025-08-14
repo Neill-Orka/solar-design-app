@@ -57,7 +57,11 @@ const DEFAULT_MARGIN_DEC = 0.25;
 const normalizeMarginToDecimal = (m) => {
   const v = toNumber(m);
   if (!Number.isFinite(v) || v < 0) return DEFAULT_MARGIN_DEC;
-  // tolerate DBs where margin is stored as 1 => 1% or 25 => 25%
+  
+  // If value is small (likely 1%), use default margin instead
+  if (v < 0.1) return DEFAULT_MARGIN_DEC;
+  
+  // Otherwise handle as before
   return v <= 1 ? v : v / 100;
 }
 
@@ -799,14 +803,14 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                               return (
                                 <tr key={comp.product.id}>
                                   <td>
-                                    <div className="small fw-medium">{comp.product.brand} {comp.product.model}</div>
+                                    <div className="small fw-small">{comp.product.brand} {comp.product.model}</div>
                                     {priceChanged && (
                                       <small className="text-danger">
                                         Price changed: {formatCurrency(comp.price_at_time)} → {formatCurrency(computeDerivedUnitFromRow(comp))}
                                       </small>
                                     )}
                                   </td>
-                                  <td className='text-end'>{formatCurrency(unitCost)}</td>
+                                  <td className='text-end small'>{formatCurrency(unitCost)}</td>
                                   <td>
                                     <InputGroup size='sm'>
                                       <InputGroup.Text className="py-0 px-1">%</InputGroup.Text>
@@ -821,7 +825,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                       />
                                     </InputGroup>
                                   </td>
-                                  <td className='text-end'>{formatCurrency(unitPrice)}</td>
+                                  <td className='text-end small'>{formatCurrency(unitPrice)}</td>
                                   <td>
                                     <InputGroup size='sm'>
                                       <Form.Control 
@@ -833,7 +837,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                       />
                                     </InputGroup>
                                   </td>
-                                  <td className='text-end'>{formatCurrency(line)}</td>
+                                  <td className='text-end small'>{formatCurrency(line)}</td>
                                   <td className='text-end'>
                                     <Button variant="outline-danger" size='sm' className="py-0 px-1" onClick={() => removeComponent(comp.product.id)}>
                                       <i className='bi bi-trash' />
