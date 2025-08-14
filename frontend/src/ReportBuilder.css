@@ -1331,4 +1331,5 @@
 @media print {
   .bom-compact-table { font-size: 0.75rem; }
   .bom-compact-table tr { page-break-inside: avoid; }
+  .bom-measurer { display: none !important; visibility: hidden !important; }
 }

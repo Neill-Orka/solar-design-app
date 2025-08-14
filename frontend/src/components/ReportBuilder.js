@@ -90,12 +90,6 @@ function ReportBuilder({ projectId }) {
 
   return (
       <div className="report-builder">
-        {/* PRINT CONTROL BUTTON */}
-        <div className="print-controls">
-          <button className="export-btn" onClick={() => window.print()}>
-            <span role="img" aria-label="Export">📄</span> Export as PDF
-          </button>
-        </div>
 
         <div className="section-controls no-print">
           <div className='section-toggle'>
@@ -115,6 +109,9 @@ function ReportBuilder({ projectId }) {
               />
               Bill of Materials
             </label>
+            <button className="export-btn" onClick={() => window.print()}>
+              <span role="img" aria-label="Export">📄</span> Export as PDF
+            </button>
             {sections.siteLayout && (
               <div className='image-upload mt-2'>
                 <label htmlFor='site-layout-image' className='btn btn-sm btn-outline-secondary'>
