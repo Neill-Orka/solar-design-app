@@ -6,6 +6,7 @@ import CoverPage from './sections/CoverPage';
 import ExecutiveSummary from './sections/ExecutiveSummary'; 
 import DesignReportMeta from './sections/DesignReportMeta';
 import MainReportContent from './sections/MainReportContent';
+import BOMSection from './sections/BOMSection';
 import '../ReportBuilder.css';
 
 function ReportBuilder({ projectId }) {
@@ -25,6 +26,8 @@ function ReportBuilder({ projectId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [siteLayoutImage, setSiteLayoutImage] = useState(null);
+
+  
 
   useEffect(() => {
     if (!projectId) return;
@@ -74,6 +77,17 @@ function ReportBuilder({ projectId }) {
     }
   }, [projectId]);
 
+  useEffect(() => {
+    const saved = localStorage.getItem('report_sections');
+    if (saved) {
+      setSections((s) => ({ ...s, ...JSON.parse(saved) }));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('report_sections', JSON.stringify(sections));
+  }, [sections]);
+
   return (
       <div className="report-builder">
         {/* PRINT CONTROL BUTTON */}
@@ -92,6 +106,14 @@ function ReportBuilder({ projectId }) {
                 onChange={() => setSections(s => ({ ...s, siteLayout: !s.siteLayout }))}
               />
               Show Site Layout
+            </label>
+            <label>
+              <input 
+                type="checkbox"
+                checked={sections.bom}
+                onChange={() => setSections(s => ({ ...s, bom: !s.bom }))}
+              />
+              Bill of Materials
             </label>
             {sections.siteLayout && (
               <div className='image-upload mt-2'>
@@ -120,6 +142,7 @@ function ReportBuilder({ projectId }) {
               <ExecutiveSummary data={data} />
               <DesignReportMeta data={data} />
               <MainReportContent data={data} showSiteLayout={sections.siteLayout} siteLayoutImage={siteLayoutImage}/>
+              {sections.bom && <BOMSection data={data} />}
             </>
           )}
         </main>
