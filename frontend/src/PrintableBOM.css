@@ -8,8 +8,8 @@
 
 .bom-controls {
   position: fixed;
-  top: 18px;
-  right: 24px;
+  top: 10%;
+  right: 6%;
   display: flex;
   gap: 10px;
   z-index: 50;
@@ -71,14 +71,14 @@
 /* Company header layout */
 .bom-header-top {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 6px;
 }
 
 .bom-logo {
-  height: 18mm;
+  height: 24mm;
   width: auto;
 }
 
@@ -91,7 +91,7 @@
 
 .bom-title {
   text-align: right;
-  margin: 6px 0 6px 0;
+  margin: 0px 0 0px 0;
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -125,7 +125,7 @@
 /* Content area between header & footer */
 .bom-content {
   flex: 1;
-  padding: 0cm 1.5cm 0 1.5cm;
+  padding: 0.2cm 1.5cm 0 1.5cm;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -155,16 +155,49 @@
 }
 
 .bom-row {
-  height: 1.05cm; /* MUST match ROW_HEIGHT_CM */
+  height: 0.75cm; /* MUST match ROW_HEIGHT_CM */
 }
+
+.bom-terms-table { table-layout: fixed; width: 100%; }
+
+.bom-terms-table .col-perc { width: 2cm; }
+.bom-terms-table .col-amount { width: 3.2cm; }   /* price column (left of label) */
+.bom-terms-table .col-incl   { width: 2.2cm; }   /* "Incl. VAT" at far right */
+.bom-terms-table .col-desc,
+.bom-terms-table .col-flex   { width: auto; }    /* flex to fill middle */
+.bom-terms-table td { vertical-align: middle; }
+
+.bom-terms-table .amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bom-terms-table .incl {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Draw the lines only on the final price cell */
+.bom-terms-table .grand .total-amount {
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #000;
+  font-weight: 700;
+}
+
+
+.bom-row-terms {
+  height: 0.45cm; /* MUST match ROW_HEIGHT_CM */
+}
+
 .bom-cell {
-  padding: 6px 8px;
+  padding: 6px 1px;
   border-bottom: 1px solid #eee;
   vertical-align: middle;
 }
 
 .bom-category-row {
-  height: 1.05cm; /* MUST match CAT_ROW_HEIGHT_CM */
+  height: 0.75cm; /* MUST match CAT_ROW_HEIGHT_CM */
   background: #f9f9f9;
   font-weight: 700;
 }
@@ -188,16 +221,45 @@
   margin-top: 10px;
   font-size: 12px;
 }
+
+.bom-totals .rule {
+  border-top: 1px solid #000;
+  height: 0;
+  margin: 4px 0;
+}
+
+.bom-totals .rule.double {
+  border-top: 3px double #000;
+  margin-top: 6px;
+}
+
 .bom-totals .row {
   display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
+  justify-content: flex-end;
+  padding: 0 0;
+  flex-wrap: nowrap;
+  align-items: baseline;
 }
-.bom-totals .row.total {
-  border-top: 1px solid #000;
-  margin-top: 6px;
-  padding-top: 6px;
+
+.bom-totals .label {
+  min-width: 6.2cm;
+  text-align: right;
+}
+
+.bom-totals .value {
+  width: 3.2cm;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bom-totals .row.grand .label,
+.bom-totals .row.grand .value {
   font-weight: 700;
+}
+
+.bom-totals .label,
+.bom-totals .value {
+  white-space: nowrap;
 }
 
 .bom-terms {

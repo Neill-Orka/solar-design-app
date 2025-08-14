@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import logo from './assets/orka_logo_transparent_background.png';
+import logo from './assets/orka_logo_text.png';
 import './PrintableBOM.css';
 
 /**
@@ -28,8 +28,8 @@ function PrintableBOM() {
   const FOOTER_HEIGHT_CM = 0.7;     // .bom-footer height
   const CONTENT_TOP_PADDING_CM = 0;
   const COLUMN_HEADER_HEIGHT_CM = 1.25; // .bom-thead-row height
-  const ROW_HEIGHT_CM = 1.05;         // .bom-row height
-  const CAT_ROW_HEIGHT_CM = 1.05;     // .bom-category-row height
+  const ROW_HEIGHT_CM = 0.75;         // .bom-row height
+  const CAT_ROW_HEIGHT_CM = 0.75;     // .bom-category-row height
 
   // Safety margin to avoid print rounding causing overflow
   const SAFETY_CM = 0.02;
@@ -175,8 +175,8 @@ function PrintableBOM() {
         <div className="bom-company-meta">
           <div>Orka Solar (Pty) Ltd</div>
           <div>Reg No: 2017/141572/07</div>
-          <div>VAT No: 443 028 1337</div>
-          <div>T: 082 660 0951&nbsp; E: info@orkasolar.co.za&nbsp; W: www.orkasolar.co.za</div>
+          <div>VAT No: 463 028 1337</div>
+          <div>T: 082 660 0851&nbsp; E: info@orkasolar.co.za&nbsp; W: www.orkasolar.co.za</div>
         </div>
       </div>
       <div className="bom-title">Quotation</div>
@@ -197,7 +197,7 @@ function PrintableBOM() {
           <span className="label">Address:</span> {bomData.project?.location || 'Address'}
         </div>
         <div>
-          <span className="label">Contact Person:</span> {bomData.project?.site_contact_person || '-'}
+          <span className="label">Contact Person:</span> Lambrecht Botha - 082 832 2236
         </div>
         <div>
           <span className="label">Tel:</span> {bomData.project?.site_phone || '-'}
@@ -249,7 +249,7 @@ function PrintableBOM() {
       <tr className="bom-row" key={`row-${idx}`}>
         <td className="bom-cell bom-col-desc">
           <div className="bom-item-model">{item.product.brand} {item.product.model}</div>
-          {spec && <div className="bom-item-spec">{spec}</div>}
+          {/* {spec && <div className="bom-item-spec">{spec}</div>} */}
         </td>
         <td className="bom-cell bom-col-units" style={{ textAlign: 'center' }}>{item.quantity}</td>
         <td className="bom-cell bom-col-unitprice">{formatCurrency(item.price)}</td>
@@ -258,36 +258,107 @@ function PrintableBOM() {
     );
   };
 
-    const TotalsBlock = () => (
-      <section className="bom-block bom-block-totals">
-        <div className="bom-totals">
-          <div className="row"><div>Subtotal:</div><div><b>{formatCurrency(bomData.totals?.subtotal || 0)}</b></div></div>
-          <div className="row"><div>Extras / Labor:</div><div>{formatCurrency(bomData.totals?.extras || 0)}</div></div>
-          <div className="row total">
-            <div>Total (excl. VAT):</div><div>{formatCurrency(bomData.totals?.grand || 0)}</div>
+    const TotalsBlock = () => {
+      const vatPerc = Number(bomData.totals?.vat_perc ?? 0);
+    
+      return (
+        <section className="bom-block bom-block-totals">
+          <div className="bom-totals">
+            <div className="rule" />
+            <div className="row">
+              <div className="label">Total (excl. VAT)</div>
+              <div className="value">{formatCurrency(bomData.totals?.total_excl_vat || 0)}</div>
+            </div>
+            <div className="row">
+              <div className="label">{vatPerc}% VAT</div>
+              <div className="value">{formatCurrency(bomData.totals?.vat_price || 0)}</div>
+            </div>
+            <div className="rule" />
+            <div className="row grand">
+              <div className="label">Total (incl. VAT)</div>
+              <div className="value">{formatCurrency(bomData.totals?.total_incl_vat || 0)}</div>
+            </div>
+            <div className="rule double" />
           </div>
-        </div>
-      </section>
-    );
+        </section>
+      );
+    };
 
-    const TermsDepositBlock = () => (
-      <section className="bom-block bom-block-termsdeposit">
-        <div className="bom-terms">
-          <p style={{ margin: '5px 0', fontWeight: 700 }}>
-            Please note that a 65% deposit will be required before Orka Solar will commence with any work.
-          </p>
-        </div>
-        <table className="bom-table" style={{ marginTop: '6px' }}>
-          <tbody>
-            <tr className="bom-row"><td className="bom-cell">Deposit</td><td className="bom-cell bom-col-units">65%</td><td className="bom-cell bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.grand || 0) * 0.65 * 1.15)} <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
-            <tr className="bom-row"><td className="bom-cell">On delivery of inverters and panels to site</td><td className="bom-cell bom-col-units">25%</td><td className="bom-cell bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.grand || 0) * 0.25 * 1.15)} <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
-            <tr className="bom-row"><td className="bom-cell">On project completion</td><td className="bom-cell bom-col-units">10%</td><td className="bom-cell bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.grand || 0) * 0.10 * 1.15)} <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
-            <tr className="bom-row"><td className="bom-cell" colSpan={4} style={{ borderBottom: '1px solid #000' }}></td></tr>
-            <tr className="bom-row"><td className="bom-cell" colSpan={2}></td><td className="bom-cell" colSpan={2} style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency((bomData.totals?.grand || 0) * 1.15)}</td></tr>
-          </tbody>
-        </table>
-      </section>
-    );
+    // const TermsDepositBlock = () => (
+    //   <section className="bom-block bom-block-termsdeposit">
+    //     <div className="bom-terms">
+    //       <p style={{ margin: '5px 0', fontWeight: 700 }}>
+    //         Please note that a 65% deposit will be required before Orka Solar will commence with any work.
+    //       </p>
+    //     </div>
+    //     <table className="bom-table" style={{ marginTop: '6px' }}>
+    //       <tbody>
+    //         <tr className="bom-row-terms"><td className="bom-cell-terms">Deposit</td><td className="bom-cell-terms bom-col-units">65%</td><td className="bom-cell-terms bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.total_incl_vat || 0) * 0.65)} </td><td> <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
+    //         <tr className="bom-row-terms"><td className="bom-cell-terms">On delivery of inverters and panels to site</td><td className="bom-cell-terms bom-col-units">25%</td><td className="bom-cell-terms bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.total_incl_vat || 0) * 0.25)} </td><td>  <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
+    //         <tr className="bom-row-terms"><td className="bom-cell-terms">On project completion</td><td className="bom-cell-terms bom-col-units">10%</td><td className="bom-cell-terms bom-col-unitprice" colSpan={2} style={{ textAlign: 'right' }}>{formatCurrency((bomData.totals?.total_incl_vat || 0) * 0.10)} </td><td> <span style={{ fontWeight: 400 }}>Incl. VAT</span></td></tr>
+    //         {/* <tr className="bom-row"><td className="bom-cell" colSpan={4} style={{ borderBottom: '1px solid #000' }}></td></tr> */}
+    //         <tr className="bom-row-terms"><td className="bom-cell-terms" colSpan={2}></td><td className="bom-cell-terms" colSpan={2} style={{ textAlign: 'right', fontWeight: 700, borderTop: '1px solid #000', borderBottom: '1px solid #000' }}>{formatCurrency((bomData.totals?.total_incl_vat || 0))}</td></tr>
+    //       </tbody>
+    //     </table>
+    //   </section>
+    // );
+
+    const TermsDepositBlock = () => {
+      const totalIncl = (bomData.totals?.total_incl_vat || 0);
+    
+      return (
+        <section className="bom-block bom-block-termsdeposit">
+          <div className="bom-terms">
+            <p style={{ margin: '5px 0', fontWeight: 700 }}>
+              Please note that a 65% deposit will be required before Orka Solar will commence with any work.
+            </p>
+          </div>
+      
+          <table className="bom-table bom-terms-table" style={{ marginTop: '6px' }}>
+            <colgroup>
+              <col className="col-desc" />
+              <col className="col-perc" />
+              <col className="col-flex" />
+              <col className="col-amount" />
+              <col className="col-incl" />
+            </colgroup>
+            <tbody>
+              <tr className="bom-row-terms">
+                <td className="bom-cell-terms">Deposit</td>
+                <td className="bom-cell-terms">65%</td>
+                <td className="bom-cell-terms"></td>
+                <td className="bom-cell-terms amount">{formatCurrency(totalIncl * 0.65)}</td>
+                <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
+              </tr>
+      
+              <tr className="bom-row-terms">
+                <td className="bom-cell-terms">On delivery of inverters and panels to site</td>
+                <td className="bom-cell-terms">25%</td>
+                <td className="bom-cell-terms"></td>
+                <td className="bom-cell-terms amount">{formatCurrency(totalIncl * 0.25)}</td>
+                <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
+              </tr>
+      
+              <tr className="bom-row-terms">
+                <td className="bom-cell-terms">On project completion</td>
+                <td className="bom-cell-terms">10%</td>
+                <td className="bom-cell-terms"></td>
+                <td className="bom-cell-terms amount">{formatCurrency(totalIncl * 0.10)}</td>
+                <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
+              </tr>
+      
+              <tr className="bom-row-terms grand">
+                <td className="bom-cell-terms" colSpan={3}></td>
+                <td className="bom-cell-terms amount total-amount">
+                  {formatCurrency(totalIncl)}
+                </td>
+                <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      );
+    };
 
     const BankingAcceptanceBlock = () => (
       <section className="bom-block bom-block-bankingaccept">
@@ -295,7 +366,7 @@ function PrintableBOM() {
           <div className="bom-box">
             <div style={{ fontWeight: 700, borderBottom: '1px solid #000', paddingBottom: 4, marginBottom: 4 }}>Banking details:</div>
             <div>Company: Orka Solar (Pty) Ltd.</div>
-            <div>Branch: ABSA Mooinooi Mall</div>
+            <div>Branch: ABSA Mooirivier Mall</div>
             <div>Account name: Orka Solar (PTY) Ltd</div>
             <div>Account type: Cheque</div>
             <div>Account number: 409 240 5135</div>
@@ -330,7 +401,7 @@ function PrintableBOM() {
                 </table>
               )}
               {/* Inline blocks on the last rows page */}
-              {pg.kind === 'rows' && pageIndex === pagesWithKinds.length - 1 && (
+              {pg.kind === 'rows' && pageIndex === (pages.length - 1) && (
                 <>
                   {totalsPlacement.inlineKeys.includes('totals') && <TotalsBlock />}
                   {totalsPlacement.inlineKeys.includes('termsDeposit') && <TermsDepositBlock />}

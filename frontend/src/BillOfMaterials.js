@@ -548,13 +548,15 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
   const totals = useMemo(() => {
     const isDraft = (quoteStatus === 'draft');
     const list = Array.isArray(bomComponents) ? bomComponents : [];
-    const sub = list.reduce((sum, c) => {
+    const total_ex_vat = list.reduce((sum, c) => {
       const unit = getUnitPriceForRow(c, isDraft);
       return sum + unit * (c.quantity || 0);
     }, 0);
-    const extras = parseFloat(extrasCost || '0') || 0;
-    return { subtotal: sub, extras, grand: sub + extras };
-  }, [bomComponents, extrasCost, quoteStatus]);
+    const vat_perc = 15;
+    const vat_price = total_ex_vat * (vat_perc / 100);
+    const total_in_vat = total_ex_vat * (1 + vat_perc / 100);
+    return { total_excl_vat: total_ex_vat, vat_perc: vat_perc, vat_price: vat_price, total_incl_vat: total_in_vat };
+  }, [bomComponents, quoteStatus]);
 
 
   /* ---------- UI ---------- */
@@ -845,18 +847,18 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                         
                         {/* Totals rows */}
                         <tr className="border-top border-dark">
-                          <td colSpan={5} className="text-end fw-semibold">Subtotal:</td>
-                          <td className="text-end fw-semibold">{formatCurrency(totals.subtotal)}</td>
+                          <td colSpan={5} className="text-end fw-semibold">Total (excl. VAT):</td>
+                          <td className="text-end fw-semibold">{formatCurrency(totals.total_excl_vat)}</td>
                           <td></td>
                         </tr>
                         <tr>
-                          <td colSpan={5} className="text-end fw-semibold">Extras:</td>
-                          <td className="text-end fw-semibold">{formatCurrency(totals.extras)}</td>
+                          <td colSpan={5} className="text-end fw-semibold">{ totals.vat_perc ? `${totals.vat_perc}% VAT` : 'VAT:'}</td>
+                          <td className="text-end fw-semibold">{formatCurrency(totals.vat_price)}</td>
                           <td></td>
                         </tr>
                         <tr className="border-top border-dark">
-                          <td colSpan={5} className="text-end fw-bold">Total (excl. VAT):</td>
-                          <td className="text-end fw-bold">{formatCurrency(totals.grand)}</td>
+                          <td colSpan={5} className="text-end fw-bold">Total (incl. VAT):</td>
+                          <td className="text-end fw-bold">{formatCurrency(totals.total_incl_vat)}</td>
                           <td></td>
                         </tr>
                       </tbody>
