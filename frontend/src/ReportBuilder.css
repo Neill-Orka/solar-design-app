@@ -563,7 +563,8 @@
   body * {
     visibility: hidden !important;
   }
-  .orka-report-printarea, .orka-report-printarea * {
+  .report-builder .orka-report-printarea,
+  .report-builder .orka-report-printarea * {
     visibility: visible !important;
   }
   .orka-report-printarea {
@@ -582,8 +583,9 @@
     break-after: always;
   }
   /* Fix: Don't hide footer elements with orka-page-footer class */
-  .no-print, .print-controls, nav, header, 
-  footer:not(.orka-cover-footer):not(.orka-page-footer) {
+  .no-print, .print-controls, nav,
+  header:not(.bom-header), 
+  footer:not(.orka-cover-footer):not(.orka-page-footer):not(.bom-footer) {
     display: none !important;
   }
   /* Force display of page headers and footers */

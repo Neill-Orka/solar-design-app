@@ -27,31 +27,56 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const PANEL_WATTAGE = 565; // JA SOLAR 72S30-565/GR
 
 // Sub Component for Stage 1: Sizing Mode
-const SizingView = ({ design, onDesignChange, products, usePvgis, setUsePvgis, profileName, setProfileName }) => {
-  
-  const handleTargetKwChange = (e) => {
-    const kw = e.target.value;
-    const panelWattage = design.selectedPanel?.product?.power_w || PANEL_WATTAGE;
-    const newNumPanels = (kw && parseFloat(kw) > 0) ? Math.ceil((parseFloat(kw) * 1000) / panelWattage) : '';
-    onDesignChange({ ...design, panelKw: kw, numPanels: newNumPanels });
-  };
+const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, setUsePvgis, profileName, setProfileName, showNotification }) => {
 
-  const handleNumPanelsChange = (e) => {
-    const panels = e.target.value;
-    const panelWattage = design.selectedPanel?.product?.power_w || PANEL_WATTAGE;
-    const newKw = (panels && parseInt(panels) > 0) ? ((parseInt(panels) * panelWattage) / 1000).toFixed(2) : '';
-    onDesignChange({ ...design, numPanels: panels, panelKw: newKw });
-  };
+    const persistPanel = async (panelId, panelKw) => {
+        try {
+            await axios.put(`${API_URL}/api/projects/${projectId}`, {
+                panel_id: panelId || null,
+                panel_kw: panelKw ? parseFloat(panelKw) : 0
+            });
+            sessionStorage.setItem(`systemDesignModified_${projectId}`, 'true');
+        } catch (e) {
+            console.error('Failed to save panel selection', e);
+            if (showNotification) showNotification('Failed to save panel selection', 'danger');
+        }
+    };
+
+    const handleTargetKwChange = async (e) => {
+      const kw = e.target.value;
+      const panelWattage = design.selectedPanel?.product?.power_w || PANEL_WATTAGE;
+      const newNumPanels = (kw && parseFloat(kw) > 0) 
+        ? Math.ceil((parseFloat(kw) * 1000) / panelWattage) 
+        : '';
+
+      onDesignChange({ ...design, panelKw: kw, numPanels: newNumPanels });
+    
+      // persist
+      const panelId = design.selectedPanel?.product?.id || null;
+      await persistPanel(panelId, kw || 0);
+    };
+
+    const handleNumPanelsChange = async (e) => {
+      const panels = e.target.value;
+      const panelWattage = design.selectedPanel?.product?.power_w || PANEL_WATTAGE;
+      const newKw = (panels && parseInt(panels) > 0) ? ((parseInt(panels) * panelWattage) / 1000).toFixed(2) : '';
+      onDesignChange({ ...design, numPanels: panels, panelKw: newKw });
+
+      // persist
+      const panelId = design.selectedPanel?.product?.id || null;
+      await persistPanel(panelId, newKw || 0);
+    };
 
     // Handler for react-select components
-    const handleSelectChange = (key, selectedOption) => {
-      if (!products) {
-        return;
-      }
+    const handleSelectChange = async (key, selectedOption) => {
+      if (!products) return;
       
       if (!selectedOption) {
         onDesignChange({ ...design, [key]: null });
-          return;
+        if (key === 'selectedPanel') {
+            await persistPanel(null, design.panelKw || 0);
+        }
+        return;
       }
 
       // Determine which product list to use based on the selection key
@@ -68,7 +93,25 @@ const SizingView = ({ design, onDesignChange, products, usePvgis, setUsePvgis, p
 
       const productList = products[productType] || [];
       const productObject = productList.find(p => p.id === selectedOption.value);
-      onDesignChange({ ...design, [key]: productObject ? { ...selectedOption, product: productObject } : null });
+      const next = productObject ? { ...selectedOption, product: productObject } : null;
+
+      onDesignChange({ ...design, [key]: next });
+
+      if (key === 'selectedPanel') {
+        const panelId = productObject?.id || null;
+
+        // recompute kWp based on existing numPanels (keeps UI consistent)
+        const watt = productObject?.power_w || PANEL_WATTAGE;
+        const qty = parseInt(design.numPanels || 0, 10);
+        const recomputedKw = qty > 0 ? ((qty * watt) / 1000).toFixed(2) : design.panelKw || 0;
+
+        // Keep design in sync if we recomputed
+        if (qty > 0) {
+            onDesignChange({ ...design, [key]: next, panelKw: recomputedKw });
+        }
+
+        await persistPanel(panelId, recomputedKw);
+      }
     };
 
   return (
@@ -544,6 +587,17 @@ function SystemDesign({ projectId }) {
             const p = res.data;
             if (!p) return;
 
+            // Check if this project uses a standard template
+            if (p.from_standard_template || p.template_id) {
+                console.log("Loading project from standard template:", p.template_name);
+                setUsingStandardTemplate(true);
+                setStandardTemplateInfo({
+                    id: p.template_id,
+                    name: p.template_name || 'Standard Design'
+                });
+            }
+
+            // Rest of your existing code for loading project data
             const savedKw = p.panel_kw || '';
             const defaultPanelId = p.panel_id;
             const currentPanel = defaultPanelId ?
@@ -632,6 +686,9 @@ function SystemDesign({ projectId }) {
             batteryQuantity: batteryQuantity,
             allowExport: template.allow_export || false,
             batterySocLimit: template.battery_soc_limit || 20,
+            from_standard_template: true,
+            template_id: template.id,
+            template_name: template.name
         });
 
         setDesign(newDesign);
@@ -664,11 +721,13 @@ function SystemDesign({ projectId }) {
                     capacity: newDesign.selectedInverter.product.rating_kva,
                     quantity: newDesign.inverterQuantity
                 } : null,
+                inverter_ids: newDesign.selectedInverter ? [newDesign.selectedInverter.product.id] : [],
                 battery_kwh: newDesign.systemType !== 'grid' && newDesign.selectedBattery ? {
                     model: newDesign.selectedBattery.product.model,
                     capacity: newDesign.selectedBattery.product.capacity_kwh,
                     quantity: newDesign.batteryQuantity
                 } : null,
+                battery_ids: newDesign.systemType !== 'grid' && newDesign.selectedBattery ? [newDesign.selectedBattery.product.id] : [],
                 use_pvgis: usePvgis,
                 generation_profile_name: profileName,
                 battery_soc_limit: newDesign.batterySocLimit,
@@ -677,6 +736,8 @@ function SystemDesign({ projectId }) {
                 template_id: template.id,
                 template_name: template.name
             };
+
+            sessionStorage.setItem(`systemDesignModified_${projectId}`, 'true'); 
 
             // Save first, then simulate (just like in handleSimulate)
             axios.put(`${API_URL}/api/projects/${projectId}`, savePayload)
@@ -696,7 +757,9 @@ function SystemDesign({ projectId }) {
                             battery_kwh: (newDesign.selectedBattery?.product?.capacity_kwh || 0) * newDesign.batteryQuantity,
                             allow_export: newDesign.allowExport,
                             battery_soc_limit: newDesign.batterySocLimit
+                            
                         }
+                        
                     };
 
                     return axios.post(`${API_URL}/api/simulate`, simPayload);
@@ -877,23 +940,50 @@ function SystemDesign({ projectId }) {
             });
     };
     
+    const [usingStandardTemplate, setUsingStandardTemplate] = useState(false);
+    const [standardTemplateInfo, setStandardTemplateInfo] = useState(null);
+
     const handleSimulate = () => {
         setLoading(true);
         
-        // Build the payload from the 'design' state object
+        // If we're modifying a standard design, we should indicate that
+        if (usingStandardTemplate) {
+            // Mark that we're working with a modified standard template
+            sessionStorage.setItem(`standardTemplateModified_${projectId}`, 'true');
+        }
+        
+        // Build the payload with all necessary fields
         const savePayload = {
-            system_type: design.systemType,
-            panel_kw: parseFloat(design.panelKw),
-            surface_tilt: parseFloat(design.tilt),
-            surface_azimuth: parseFloat(design.azimuth),
-            allow_export: design.allowExport,
-            // Make sure these IDs are included:
-            panel_id: design.selectedPanel?.product?.id,
-            inverter_ids: design.selectedInverter ? [design.selectedInverter.product.id] : [],
-            battery_ids: design.systemType !== 'grid' && design.selectedBattery ? 
-              [design.selectedBattery.product.id] : [],
-            // Rest of the code...
+                system_type: design.systemType,
+                panel_kw: parseFloat(design.panelKw),
+                surface_tilt: parseFloat(design.tilt),
+                surface_azimuth: parseFloat(design.azimuth),
+                allow_export: design.allowExport,
+                panel_id: design.selectedPanel?.product?.id,
+                inverter_kva: design.selectedInverter ? {
+                    model: design.selectedInverter.product.model,
+                    capacity: design.selectedInverter.product.rating_kva,
+                    quantity: design.inverterQuantity
+                } : null,
+                battery_kwh: design.systemType !== 'grid' && design.selectedBattery ? {
+                    model: design.selectedBattery.product.model,
+                    capacity: design.selectedBattery.product.capacity_kwh,
+                    quantity: design.batteryQuantity
+                } : null,
+                use_pvgis: usePvgis,
+                generation_profile_name: profileName,
+                battery_soc_limit: design.batterySocLimit,
+                inverter_ids: design.selectedInverter ? [design.selectedInverter.product.id] : [],
+                battery_ids: design.systemType !== 'grid' && design.selectedBattery ? [design.selectedBattery.product.id] : [],
+
+                // Include template information
+                from_standard_template: usingStandardTemplate,
+                template_id: standardTemplateInfo?.id,
+                template_name: standardTemplateInfo?.name
           };
+
+          // Set flag that system design has been modified
+          sessionStorage.setItem(`systemDesignModified_${projectId}`, 'true');
           
           // Save first, then simulate
           saveProject(savePayload)
@@ -1086,8 +1176,49 @@ function SystemDesign({ projectId }) {
                 </Card>
             </div>
 
+            {/* Move the standard template alert here, right after the design mode selector */}
+            {usingStandardTemplate && (
+                <Alert variant="success" className="d-flex align-items-center mb-4">
+                    <div className="d-flex align-items-center flex-grow-1">
+                        <i className="bi bi-collection-fill fs-4 me-3"></i>
+                        <div>
+                            <div className="fw-bold">Standard Design Template</div>
+                            <div>You're using "{standardTemplateInfo?.name}" template as a starting point</div>
+                        </div>
+                    </div>
+                    <div>
+                        <Button 
+                            variant="outline-success" 
+                            size="sm"
+                            onClick={() => {
+                                if (window.confirm("Reset to original template components? This will discard your changes.")) {
+                                    // Reset template modifications
+                                    sessionStorage.removeItem(`systemDesignModified_${projectId}`);
+                                    sessionStorage.removeItem(`standardTemplateModified_${projectId}`);
+                                    
+                                    // Re-fetch the template and apply it
+                                    axios.get(`${API_URL}/api/system_templates/${standardTemplateInfo.id}`)
+                                        .then(res => {
+                                            handleSelectTemplate(res.data);
+                                            showNotification("Reset to original template components", "success");
+                                        })
+                                        .catch(err => {
+                                            console.error("Error resetting to template:", err);
+                                            showNotification("Failed to reset template", "danger");
+                                        });
+                                }
+                            }}
+                        >
+                            <i className="bi bi-arrow-counterclockwise me-1"></i>
+                            Reset to Template
+                        </Button>
+                    </div>
+                </Alert>
+            )}
+
             {designMode === 'custom' ? (
                 <SizingView
+                    projectId={projectId}
                     design={design}
                     onDesignChange={setDesign}
                     products={products}
@@ -1095,6 +1226,7 @@ function SystemDesign({ projectId }) {
                     setUsePvgis={setUsePvgis}
                     profileName={profileName}
                     setProfileName={setProfileName}
+                    showNotification={showNotification}
                 />
             ) : (
                 <StandardDesignSelector 

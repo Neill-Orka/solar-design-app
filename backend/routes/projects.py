@@ -20,7 +20,7 @@ def get_projects():
                 'longitude': p.longitude,
                 'system_type': p.system_type,
                 'panel_kw': p.panel_kw,
-                # Remove panel_id from here
+                'panel_id': p.panel_id,
                 'inverter_kva': p.inverter_kva,
                 'inverter_ids': p.inverter_ids if p.inverter_ids is not None else [],
                 'battery_ids': p.battery_ids if p.battery_ids is not None else [],
@@ -70,9 +70,12 @@ def get_project_by_id(project_id):
             }
             pass
 
-        # Remove panel_id from variables
         inverter_ids = project.inverter_ids if project.inverter_ids is not None else []
         battery_ids = project.battery_ids if project.battery_ids is not None else []
+
+        from_standard_template = getattr(project, 'from_standard_template', False)
+        template_id = getattr(project, 'template_id', None)
+        template_name = getattr(project, 'template_name', None)
 
         return jsonify({
             'id': project.id,
@@ -83,7 +86,7 @@ def get_project_by_id(project_id):
             'longitude': project.longitude,
             'system_type': project.system_type,
             'panel_kw': project.panel_kw,
-            # Remove panel_id from here
+            'panel_id': project.panel_id,
             'inverter_kva': project.inverter_kva,
             'inverter_ids': inverter_ids,
             'battery_ids': battery_ids,
@@ -101,6 +104,10 @@ def get_project_by_id(project_id):
             'surface_azimuth': project.surface_azimuth,
             'use_pvgis': project.use_pvgis,
             'generation_profile_name': project.generation_profile_name,
+            # Make sure these fields are included
+            'from_standard_template': from_standard_template,
+            'template_id': template_id,
+            'template_name': template_name,
         })
     except Exception as e:
         # Add better error logging
@@ -151,6 +158,11 @@ def update_project(project_id):
             return jsonify({'error': 'Project not found'}), 404
 
         data = request.json
+
+        if 'panel_id' in data:
+            project.panel_id = data['panel_id'] or None
+        if 'panel_kw' in data:
+            project.panel_kw = float(data['panel_kw'] or 0)
 
         # Handle new quantity format
         for key in ['inverter_kva', 'battery_kwh']:

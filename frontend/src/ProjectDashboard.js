@@ -143,7 +143,6 @@ function ProjectDashboard() {
   if (loading) return <div className="text-center p-5"><Spinner animation="border" /></div>;
   if (error) return <div className="text-center p-5"><Alert variant="danger">{error}</Alert></div>;
 
-  console.log('Project design type:', project.design_type);
 
   // Quick Design: Wizard Flow
   if (project.design_type === 'Quick')
