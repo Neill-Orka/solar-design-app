@@ -1294,3 +1294,41 @@
         padding: 0.2rem 0.4rem;
     }
 }
+
+/* ===== Ultra-compact BOM page ===== */
+.orka-standard-page.bom-dense {
+  padding: 1.0cm 1.1cm 0.6cm 1.1cm; /* tighter than default */
+}
+.orka-standard-page.bom-dense .orka-summary-headerbar { height: 16px; margin-bottom: 0.15cm; }
+.orka-standard-page.bom-dense .orka-summary-topline { margin-bottom: 0.15cm; }
+
+/* Minimal two-column table */
+.bom-compact-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.8rem;           /* small text */
+  line-height: 1.1;            /* tight rows */
+  margin: 0;
+}
+.bom-compact-table thead th {
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid #ccc;
+  padding: 0.12rem 0.35rem;
+}
+.bom-compact-table td {
+  border-bottom: 1px solid #eee;
+  padding: 0.4rem 0.35rem;    /* super tight cells */
+  vertical-align: middle;
+  text-align: left;
+}
+.bom-prod-col { width: calc(100% - 60px); }
+.bom-qty-col  { width: 60px; text-align: right; }
+.bom-prod-cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bom-qty-cell  { text-align: right; }
+
+@media print {
+  .bom-compact-table { font-size: 0.75rem; }
+  .bom-compact-table tr { page-break-inside: avoid; }
+}
