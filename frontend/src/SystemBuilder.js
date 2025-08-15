@@ -220,10 +220,11 @@ function SystemBuilder() {
         let cost = parseFloat(extrasCost) || 0;
         let pKw = 0, iKva = 0, bKwh = 0;
         components.forEach(comp => {
-            cost += (comp.product.price || 0) * comp.quantity;
-            if (comp.product.category === 'panel') pKw += (comp.product.power_w || 0) * comp.quantity / 1000;
-            if (comp.product.category === 'inverter') iKva += (comp.product.rating_kva || 0) * comp.quantity;
-            if (comp.product.category === 'battery') bKwh += (comp.product.capacity_kwh || 0) * comp.quantity;
+            const qty = Number(comp.quantity) || 0;
+            cost += (comp.product.price || 0) * qty;
+            if (comp.product.category === 'panel') pKw += (comp.product.power_w || 0) * qty / 1000;
+            if (comp.product.category === 'inverter') iKva += (comp.product.rating_kva || 0) * qty;
+            if (comp.product.category === 'battery') bKwh += (comp.product.capacity_kwh || 0) * qty;
         });
         return { totalCost: cost, totalPanelKw: pKw.toFixed(2), totalInverterKva: iKva.toFixed(2), totalBatteryKwh: bKwh.toFixed(2) };
     }, [components, extrasCost]);
@@ -235,8 +236,18 @@ function SystemBuilder() {
     };
     const removeComponent = (productId) => setComponents(components.filter(c => c.product.id !== productId));
     const updateQuantity = (productId, quantity) => {
-        const numQuantity = parseInt(quantity, 10);
-        if (numQuantity > 0) setComponents(components.map(c => c.product.id === productId ? { ...c, quantity: numQuantity } : c));
+        // Allow empty string for better UX while typing
+        setComponents(components.map(c => 
+            c.product.id === productId ? { ...c, quantity: quantity } : c
+        ));
+    };
+
+    const handleQuantityBlur = (productId, quantity) => {
+        // When field loses focus, ensure we have a valid number
+        const numQuantity = Math.max(1, parseInt(quantity || 1, 10));
+        setComponents(components.map(c => 
+            c.product.id === productId ? { ...c, quantity: numQuantity } : c
+        ));
     };
 
     const handleClear = () => {
@@ -256,7 +267,7 @@ function SystemBuilder() {
         const payload = {
             name: templateName, description: templateDesc, system_type: templateType,
             extras_cost: parseFloat(extrasCost) || 0,
-            components: components.map(c => ({ product_id: c.product.id, quantity: c.quantity })),
+            components: components.map(c => ({ product_id: c.product.id, quantity: Math.max(1, Number(c.quantity) || 1) })),
         };
 
         const request = editingTemplate
@@ -406,13 +417,20 @@ function SystemBuilder() {
                                                     <div className="d-flex justify-content-between align-items-center">
                                                         <p className="mb-0 text-xs text-muted">R{comp.product.price?.toLocaleString()} ea.</p>
                                                         <Badge bg="secondary" className="ms-2">
-                                                            R{(comp.product.price * comp.quantity).toLocaleString()}
+                                                            R{(comp.product.price * (Number(comp.quantity) || 0)).toLocaleString()}
                                                         </Badge>
                                                     </div>
                                                 </div>
                                                 <InputGroup style={{width: '120px'}} className="ms-2">
                                                     <InputGroup.Text className="small">Qty</InputGroup.Text>
-                                                    <Form.Control type="number" size="sm" value={comp.quantity} onChange={e => updateQuantity(comp.product.id, e.target.value)} min="0" />
+                                                    <Form.Control 
+                                                        type="number" 
+                                                        size="sm" 
+                                                        value={comp.quantity} 
+                                                        onChange={e => updateQuantity(comp.product.id, e.target.value)} 
+                                                        onBlur={e => handleQuantityBlur(comp.product.id, e.target.value)}
+                                                        min="0" 
+                                                    />
                                                 </InputGroup>
                                                 <Button variant="link" className="text-danger p-0 ms-2" onClick={() => removeComponent(comp.product.id)}><i className="bi bi-trash fs-5"></i></Button>
                                             </div>

@@ -491,6 +491,14 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
   };
 
   const updateQuantity = (productId, quantity) => {
+    // Allow empty string for better UX, but store the actual value
+    setBomComponents(bomComponents.map(c =>
+      c.product.id === productId ? { ...c, quantity: quantity } : c
+    ));
+  };
+
+  const handleQuantityBlur = (productId, quantity) => {
+    // When field loses focus, ensure we have a valid number
     const q = Math.max(1, parseInt(quantity || 1, 10));
     setBomComponents(bomComponents.map(c =>
       c.product.id === productId ? { ...c, quantity: q } : c
@@ -517,7 +525,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
         const liveCost = computeUnitCost(c.product);
         return {
           product_id: c.product.id,
-          quantity: c.quantity,
+          quantity: Math.max(1, Number(c.quantity) || 1),
           override_margin: c.override_margin ?? null,
           price_at_time: isDraft ? null : (c.price_at_time ?? liveUnit),
           unit_cost_at_time: isDraft ? null : (c.unit_cost_at_time ?? liveCost)
@@ -537,7 +545,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
       // Totals reflect what user sees: draft => live, locked => snapshot
       const total = (Array.isArray(bomComponents) ? bomComponents: []).reduce((sum, c) => {
         const unit = getUnitPriceForRow(c, isDraft);
-        return sum + unit * (c.quantity || 0);
+        return sum + unit * (Number(c.quantity) || 0);
       }, parsedExtras);
 
       await axios.put(`${API_URL}/api/projects/${projectId}`, {
@@ -661,11 +669,11 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     list.forEach(c => {
       const cat = c.product.category;
       if (cat === 'panel' && c.product.power_w) {
-        panelW += (Number(c.product.power_w) || 0) * (c.quantity || 0);
+        panelW += (Number(c.product.power_w) || 0) * (Number(c.quantity) || 0);
       } else if (cat === 'inverter' && c.product.rating_kva) {
-        inverterKva += (Number(c.product.rating_kva) || 0) * (c.quantity || 0);
+        inverterKva += (Number(c.product.rating_kva) || 0) * (Number(c.quantity) || 0);
       } else if (cat === 'battery' && c.product.capacity_kwh) {
-        batteryKwh += (Number(c.product.capacity_kwh) || 0) * (c.quantity || 0);
+        batteryKwh += (Number(c.product.capacity_kwh) || 0) * (Number(c.quantity) || 0);
       }
     });
     return {
@@ -680,7 +688,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     const list = Array.isArray(bomComponents) ? bomComponents : [];
     const total_ex_vat = list.reduce((sum, c) => {
       const unit = getUnitPriceForRow(c, isDraft);
-      return sum + unit * (c.quantity || 0);
+      return sum + unit * (Number(c.quantity) || 0);
     }, 0);
     const vat_perc = 15;
     const vat_price = total_ex_vat * (vat_perc / 100);
@@ -863,9 +871,9 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                             <td className="text-center">
                               {existing ? (
                                 <ButtonGroup size="sm">
-                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, existing.quantity - 1)}>-</Button>
-                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" disabled>{existing.quantity}</Button>
-                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, existing.quantity + 1)}>+</Button>
+                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, Math.max(1, Number(existing.quantity) - 1))}>-</Button>
+                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" disabled>{Number(existing.quantity) || 1}</Button>
+                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, Number(existing.quantity) + 1)}>+</Button>
                                 </ButtonGroup>
                               ) : (
                                 <Button variant="outline-primary" size="sm" className="py-0" onClick={() => addComponent(product)}>
@@ -927,7 +935,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                               const isDraft = (quoteStatus === 'draft');
                               const unitCost = computeUnitCost(comp.product);
                               const unitPrice = getUnitPriceForRow(comp, isDraft);
-                              const line = unitPrice * (comp.quantity || 0);
+                              const line = unitPrice * (Number(comp.quantity) || 0);
                               const priceChanged = !isDraft && comp.price_at_time != null && 
                                 computeDerivedUnitFromRow(comp) !== comp.price_at_time;
 
@@ -964,6 +972,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                         min="0"
                                         value={comp.quantity}
                                         onChange={e => updateQuantity(comp.product.id, e.target.value)}
+                                        onBlur={e => handleQuantityBlur(comp.product.id, e.target.value)}
                                         className="py-0"
                                       />
                                     </InputGroup>
