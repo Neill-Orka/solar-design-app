@@ -7,24 +7,57 @@ import {
 import { API_URL } from './apiConfig';
 import { useNotification } from './NotificationContext';
 import { useNavigate } from 'react-router-dom';
+import Fuse from 'fuse.js';
 
 /* ---------- Category meta (display only) ---------- */
 const CATEGORY_META = {
-  panel:        { name: 'Panels',           icon: 'bi-grid-3x3-gap-fill',     color: 'warning'  },
-  inverter:     { name: 'Inverters',        icon: 'bi-box-seam',              color: 'info'     },
-  battery:      { name: 'Batteries',        icon: 'bi-battery-full',          color: 'success'  },
-  fuse:         { name: 'Fuses',            icon: 'bi-shield-slash-fill',     color: 'danger'   },
-  breaker:      { name: 'Circuit Breakers', icon: 'bi-lightning-charge-fill', color: 'danger'   },
-  isolator:     { name: 'Isolators',        icon: 'bi-plugin-fill',           color: 'secondary'},
-  inverter_aux: { name: 'Inverter Aux',     icon: 'bi-hdd-stack-fill',        color: 'secondary'},
-  dc_cable:     { name: 'DC Cables',        icon: 'bi-plug-fill',             color: 'dark'     },
-  ac_cable:     { name: 'AC Cables',        icon: 'bi-lightning',             color: 'dark'     },
-  enclosure:    { name: 'Enclosures',       icon: 'bi-box',                   color: 'secondary'},
-  combiner:     { name: 'Combiners',        icon: 'bi-diagram-3',            color: 'secondary'},
-  db:           { name: 'Distribution',     icon: 'bi-hdd-network',           color: 'secondary'},
-  accessory:    { name: 'Accessories',      icon: 'bi-gear-fill',             color: 'secondary'},
-  other:        { name: 'Other',            icon: 'bi-box',                   color: 'secondary'},
+  // Main system components
+  panel:                 { name: 'Panel',                        icon: 'bi-grid-3x3-gap-fill',     color: 'warning'  },
+  inverter:              { name: 'Inverter',                     icon: 'bi-box-seam',              color: 'info'     },
+  battery:               { name: 'Battery',                      icon: 'bi-battery-full',          color: 'success'  },
+  mppt:                  { name: 'MPPT',                         icon: 'bi-arrow-down-up',         color: 'info'     },
+  
+  // Components & protection
+  protection:            { name: 'Protection',                   icon: 'bi-shield-slash-fill',     color: 'danger'   },
+  inverter_aux:          { name: 'Inverter Aux',                 icon: 'bi-hdd-stack-fill',        color: 'secondary'},
+  contactor:             { name: 'Contactor',                    icon: 'bi-lightning-charge-fill', color: 'danger'   },
+  enclosure:             { name: 'Enclosure',                    icon: 'bi-box',                   color: 'secondary'},
+  change_over_switch:    { name: 'Change Over Switch',           icon: 'bi-toggle-on',             color: 'secondary'},
+  db:                    { name: 'DB',                           icon: 'bi-hdd-network',           color: 'secondary'},
+  
+  // Cables & management
+  cable:                 { name: 'Cable',                        icon: 'bi-lightning',             color: 'dark'     },
+  cable_management:      { name: 'Cable Management',             icon: 'bi-bezier2',               color: 'dark'     },
+  conductor:             { name: 'Conductor',                    icon: 'bi-plug-fill',             color: 'dark'     },
+  
+  // Installation & mounting
+  mounting_system:       { name: 'Mounting System',              icon: 'bi-bricks',                color: 'secondary'},
+  
+  // Monitoring & accessories
+  monitoring:            { name: 'Monitoring',                   icon: 'bi-graph-up',              color: 'primary'  },
+  monitoring_control:    { name: 'Monitoring & Control Equipment', icon: 'bi-display',             color: 'primary'  },
+  auxiliaries:           { name: 'Auxiliaries',                  icon: 'bi-tools',                 color: 'secondary'},
+  
+  // Other equipment
+  solar_geyser:          { name: 'Solar Geyser',                 icon: 'bi-water',                 color: 'info'     },
+  lights:                { name: 'Lights',                       icon: 'bi-lightbulb',             color: 'warning'  },
+  aux_generator:         { name: 'Aux Generator',                icon: 'bi-lightning-charge',      color: 'warning'  },
+  vsd:                   { name: 'VSD',                          icon: 'bi-speedometer2',          color: 'info'     },
+  
+  // Services & logistics
+  professional_services: { name: 'Professional Services',        icon: 'bi-person-badge',          color: 'primary'  },
+  transport_logistics:   { name: 'Transport & Logistics',        icon: 'bi-truck',                 color: 'dark'     },
+  human_resources:       { name: 'Human Resources',              icon: 'bi-people',                color: 'primary'  },
+  hseq_compliance:       { name: 'HSEQ & Compliance',            icon: 'bi-check-circle',          color: 'success'  },
+  st:                    { name: 'S&T',                          icon: 'bi-clipboard-check',       color: 'secondary'},
+  
+  // Fallbacks
+  0:                     { name: 'Uncategorized',                icon: 'bi-question-circle',       color: 'secondary'},
+  other:                 { name: 'Other',                        icon: 'bi-box',                   color: 'secondary'}
 };
+
+// Add this constant near the top of your file, after CATEGORY_META
+const CATEGORY_PRIORITY = ['panel', 'inverter', 'battery'];
 
 
 /* ---------- Helpers ---------- */
@@ -77,7 +110,7 @@ const computeDerivedUnitFromProduct = (product) => {
 
 // effective margin for a BOM row: override -> product -> default (25%)
 const getRowMarginDecimal = (row) => {
-  if (row?.override_margin != null) return toNumber(row.override_margin);
+  if (row?.override_margin != null) return Number(row.override_margin);
   const prodM = computeMarginPct(row?.product);
   return Number.isFinite(prodM) && prodM >= 0 ? prodM : DEFAULT_MARGIN_DEC;
 };
@@ -94,7 +127,7 @@ const getUnitPriceForRow = (row, isDraft) =>
   isDraft ? computeDerivedUnitFromRow(row) : (row.price_at_time ?? computeDerivedUnitFromRow(row));
 
 /* ---------- Component ---------- */
-function BillOfMaterials({ projectId }) {
+function BillOfMaterials({ projectId, onNavigateToPrintBom }) {
   const { showNotification } = useNotification();
   const navigate = useNavigate();
 
@@ -158,6 +191,35 @@ function BillOfMaterials({ projectId }) {
     fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  // Fuse instance for fuzzy search
+  const fuse = useMemo(() => {
+    const options = {
+      keys: [
+        'brand',
+        'model',
+        'category',
+        {
+          name: 'categoryName',
+          getFn: (product) => CATEGORY_META[product.category]?.name || product.category
+        },
+        'power_w',
+        'rating_kva',
+        'capacity_kwh'
+      ],
+      threshold: 0.4, // Lower means more strict matching
+      ignoreLocation: true,
+      useExtendedSearch: true
+    };
+
+    const records = products.map(p => ({
+      ...p,
+      categoryName: CATEGORY_META[p.category]?.name || p.category
+    }));
+
+    return new Fuse(records, options);
+  }, [products]);  
+
 
   /* ---------- Template fetch helpers (by id OR by name) ------------ */
   const fetchTemplateById = async (id) => {
@@ -257,34 +319,60 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
   let loaded = false;
   const designModified = sessionStorage.getItem(`systemDesignModified_${pid}`) === 'true';
 
-  // Try to get the full template first (by id or name)
-  let templateItems = null;
-  if (projectData?.template_id || projectData?.template_name) {
+  // Check if this is a standard design (has template info)
+  const isStandardDesign = projectData?.template_id || projectData?.template_name;
+
+  // For standard designs, always load from template first (to get latest template + design changes)
+  // For custom designs, prioritize saved BOM (to preserve manual changes and margin overrides)
+  
+  if (isStandardDesign) {
+    // STANDARD DESIGN: Load template first, then overlay saved margin overrides
     try {
       let tmpl = null;
       if (projectData.template_id) tmpl = await fetchTemplateById(projectData.template_id);
       if (!tmpl && projectData.template_name) tmpl = await fetchTemplateByName(projectData.template_name);
       if (tmpl) {
-        templateItems = mapTemplateToItems(tmpl, productsData);
+        let templateItems = mapTemplateToItems(tmpl, productsData);
         if (tmpl.extras_cost !== undefined && tmpl.extras_cost !== null) {
           setExtrasCost(String(tmpl.extras_cost));
         }
+        
+        // Apply design modifications (panel/inverter/battery changes)
+        const items = designModified
+          ? overlayFromProject(templateItems, projectData, productsData)
+          : templateItems;
+        
+        // Now overlay any saved margin overrides from the database
+        try {
+          const bomRes = await axios.get(`${API_URL}/api/projects/${pid}/bom`);
+          const savedData = bomRes.data || [];
+          if (savedData.length > 0) {
+            const meta = savedData.find(x => x.quote_status || x.extras_cost);
+            if (meta?.quote_status) setQuoteStatus(meta.quote_status);
+            if (meta?.extras_cost !== undefined && meta?.extras_cost !== null) {
+              setExtrasCost(String(meta.extras_cost));
+            }
+            
+            // Overlay saved margin overrides onto template items
+            items.forEach(item => {
+              const savedItem = savedData.find(saved => saved.product_id === item.product.id);
+              if (savedItem && savedItem.override_margin !== null && savedItem.override_margin !== undefined) {
+                item.override_margin = savedItem.override_margin;
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('Failed to load saved margin overrides:', e);
+        }
+        
+        setBomComponents(items);
+        loaded = true;
       }
     } catch (e) {
       console.warn('Template fetch failed:', e);
     }
-  }
-
-  if (templateItems) {
-    const items = designModified
-      ? overlayFromProject(templateItems, projectData, productsData)
-      : templateItems;
-    setBomComponents(items);
-    loaded = true;
-  }
-
-  // Fallback: saved BOM rows (if any)
-  if (!loaded) {
+  } else {
+    // CUSTOM DESIGN: Prioritize saved BOM data (preserves manual changes and margin overrides)
     try {
       const bomRes = await axios.get(`${API_URL}/api/projects/${pid}/bom`);
       const list = bomRes.data || [];
@@ -294,19 +382,22 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
         if (meta?.extras_cost !== undefined && meta?.extras_cost !== null) {
           setExtrasCost(String(meta.extras_cost));
         }
-        const items = list.map(row => {
+        const savedBOM = list.map(row => {
           const prod = productsData.find(p => p.id === row.product_id);
           if (!prod) return null;
-          return {
+          const bomItem = {
             product: prod,
             quantity: Number(row.quantity) || 1,
             override_margin: row.override_margin ?? null,
             price_at_time: (row.price_at_time ?? null),
-            current_price: computeDerivedUnitFromRow({ product: prod })
           };
+          // Include override_margin when computing current_price
+          bomItem.current_price = computeDerivedUnitFromRow(bomItem);
+          return bomItem;
         }).filter(Boolean);
-        if (items.length) {
-          setBomComponents(items);
+        
+        if (savedBOM.length > 0) {
+          setBomComponents(savedBOM);
           loaded = true;
         }
       }
@@ -500,14 +591,26 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
 
   /* ---------- Derived ---------- */
   const filteredProducts = useMemo(() => {
-    const txt = searchFilter.toLowerCase().trim();
-    return products.filter(p => {
-      if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
-      if (!txt) return true;
-      const blob = `${p.brand || ''} ${p.model || ''} ${p.category || ''} ${p.power_w || ''} ${p.rating_kva || ''} ${p.capacity_kwh || ''}`.toLowerCase();
-      return txt.split(/\s+/).every(f => blob.includes(f));
-    });
-  }, [products, searchFilter, selectedCategory]);
+    // First filter by category if needed
+    let results = products;
+    if (selectedCategory !== 'all') {
+      results = products.filter(p => p.category === selectedCategory);
+    }
+    
+    // If there's no search text, return category-filtered results
+    if (!searchFilter.trim()) {
+      return results;
+    }
+    
+    // Otherwise, perform fuzzy search
+    // If category filter applied, search within that subset
+    const searchOn = selectedCategory !== 'all' ? 
+      new Fuse(results, fuse.options) : fuse;
+      
+    return searchOn.search(searchFilter)
+      .map(result => result.item);
+      
+  }, [products, searchFilter, selectedCategory, fuse]);
 
   const grouped = useMemo(() => {
     const g = {};
@@ -519,6 +622,35 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     });
     return g;
   }, [bomComponents]);
+
+  // Add this new useMemo to create a sorted categories array
+  const sortedCategories = useMemo(() => {
+    // Get all categories from grouped
+    const allCategories = Object.keys(grouped);
+    
+    // Sort categories with priority items first, then alphabetically by display name
+    return allCategories.sort((a, b) => {
+      // Priority items at the top in specified order
+      const aIndex = CATEGORY_PRIORITY.indexOf(a);
+      const bIndex = CATEGORY_PRIORITY.indexOf(b);
+      
+      // If both are priority items, sort by priority order
+      if (aIndex >= 0 && bIndex >= 0) {
+        return aIndex - bIndex;
+      }
+      
+      // If only a is priority, it comes first
+      if (aIndex >= 0) return -1;
+      
+      // If only b is priority, it comes first
+      if (bIndex >= 0) return 1;
+      
+      // For non-priority items, sort alphabetically by display name
+      const aName = CATEGORY_META[a]?.name || a;
+      const bName = CATEGORY_META[b]?.name || b;
+      return aName.localeCompare(bName);
+    });
+  }, [grouped]);
 
   const hasPriceChanges = useMemo(() => {
     if (quoteStatus === 'draft') return false;
@@ -575,8 +707,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
 
   // Add this function to prepare BOM data and navigate to print view
   const handleExportToPdf = () => {
-    // Prepare data structure for the printable view
-    const categoriesForPrint = Object.keys(grouped).map(cat => ({
+    // Prepare data structure for the printable view using sortedCategories for proper ordering
+    const categoriesForPrint = sortedCategories.map(cat => ({
       name: CATEGORY_META[cat]?.name || cat,
       items: grouped[cat].map(comp => ({
         product: comp.product,
@@ -585,16 +717,21 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
       }))
     }));
 
-    // Store the data in localStorage for the print view to access
-    localStorage.setItem('printBomData', JSON.stringify({
+    // Store the data in localStorage for the print view to access (project-specific key)
+    localStorage.setItem(`printBomData_${projectId}`, JSON.stringify({
       project,
       systemSpecs,
       totals,
       categories: categoriesForPrint
     }));
 
-    // Navigate to the print view
-    navigate('/print-bom');
+    // Navigate to the print view tab instead of a separate page
+    if (onNavigateToPrintBom) {
+      onNavigateToPrintBom();
+    } else {
+      // Fallback to old navigation if prop not provided
+      navigate('/print-bom');
+    }
   };
 
   return (
@@ -782,7 +919,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {Object.keys(grouped).map(cat => (
+                        {sortedCategories.map(cat => (
                           <React.Fragment key={cat}>
                             <tr className="table-light">
                               <td colSpan={7} className="py-1">
@@ -871,7 +1008,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                 )}
 
                 <Row className="align-items-center mt-3">
-                  <Col md={6}>
+                  {/* <Col md={6}>
                     <Form.Group>
                       <Form.Label>Extras / Labour (R)</Form.Label>
                       <Form.Control
@@ -881,8 +1018,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                         min="0"
                         step="0.01"
                       />
-                    </Form.Group>
-                  </Col>
+                    </Form.Group> */}
+                  {/* </Col> */}
                   <Col md={6}>
                     <Form.Group>
                       <Form.Label>Quote Status</Form.Label>

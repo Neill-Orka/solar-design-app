@@ -7,7 +7,7 @@ import { API_URL } from "../../apiConfig";
 const slugify = (t) =>
   String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
-export default function BOMSection({ data }) {
+export default function BOMSection({ data, startPageNumber = 16, totalPages = 24 }) {
   const projectId = data?.project?.id;
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +112,7 @@ export default function BOMSection({ data }) {
   // ---- Render ----
   if (loading) {
     return (
-      <StandardPage header="Bill of Materials" className="bom-dense" data={data}>
+      <StandardPage header="Bill of Materials" className="bom-dense" data={data} pageNumber={startPageNumber} totalPages={totalPages}>
         <div className="text-center text-muted py-2">Loading BOM…</div>
         <Measurer />
       </StandardPage>
@@ -121,7 +121,7 @@ export default function BOMSection({ data }) {
 
   if (compactRows.length === 0) {
     return (
-      <StandardPage header="Bill of Materials" className="bom-dense" data={data}>
+      <StandardPage header="Bill of Materials" className="bom-dense" data={data} pageNumber={startPageNumber} totalPages={totalPages}>
         <div className="text-center text-muted py-2">No saved BOM for this project.</div>
         <Measurer />
       </StandardPage>
@@ -136,6 +136,8 @@ export default function BOMSection({ data }) {
           header={`Bill of Materials ${pages.length > 1 ? `(${idx + 1}/${pages.length})` : ""}`}
           className="bom-dense"
           data={data}
+          pageNumber={startPageNumber + idx}
+          totalPages={totalPages}
         >
           <div className="table-responsive">
             <table className="bom-compact-table">

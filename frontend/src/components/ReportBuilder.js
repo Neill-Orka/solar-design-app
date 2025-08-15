@@ -27,6 +27,35 @@ function ReportBuilder({ projectId }) {
   const [loading, setLoading] = useState(true);
   const [siteLayoutImage, setSiteLayoutImage] = useState(null);
 
+  // Calculate dynamic page numbers
+  const calculatePageCounts = () => {
+    const pageCounts = {
+      cover: 0, // Cover page doesn't count
+      executiveSummary: 1,
+      designReportMeta: 1,
+      mainReportContent: 13, // Based on the StandardPage components I saw (pages 3-15)
+      bomSection: sections.bom ? 1 : 0, // BOM can be multiple pages but starts with 1
+    };
+    
+    let totalPages = Object.values(pageCounts).reduce((sum, count) => sum + count, 0);
+    let currentPage = 1;
+    
+    return {
+      totalPages,
+      executiveSummary: { start: currentPage, count: pageCounts.executiveSummary },
+      designReportMeta: { start: currentPage += pageCounts.executiveSummary, count: pageCounts.designReportMeta },
+      mainReportContent: { start: currentPage += pageCounts.designReportMeta, count: pageCounts.mainReportContent },
+      bomSection: { start: currentPage += pageCounts.mainReportContent, count: pageCounts.bomSection },
+    };
+  };
+
+  const pageNumbers = calculatePageCounts();
+
+  // Recalculate when sections change
+  useEffect(() => {
+    // This will trigger a re-render when sections change
+  }, [sections]);
+
   
 
   useEffect(() => {
@@ -136,10 +165,16 @@ function ReportBuilder({ projectId }) {
           ) : (
             <>
               {sections.cover && <CoverPage data={data} />}
-              <ExecutiveSummary data={data} />
-              <DesignReportMeta data={data} />
-              <MainReportContent data={data} showSiteLayout={sections.siteLayout} siteLayoutImage={siteLayoutImage}/>
-              {sections.bom && <BOMSection data={data} />}
+              <ExecutiveSummary data={data} pageNumber={pageNumbers.executiveSummary.start} totalPages={pageNumbers.totalPages} />
+              <DesignReportMeta data={data} pageNumber={pageNumbers.designReportMeta.start} totalPages={pageNumbers.totalPages} />
+              <MainReportContent 
+                data={data} 
+                showSiteLayout={sections.siteLayout} 
+                siteLayoutImage={siteLayoutImage}
+                startPageNumber={pageNumbers.mainReportContent.start}
+                totalPages={pageNumbers.totalPages}
+              />
+              {sections.bom && <BOMSection data={data} startPageNumber={pageNumbers.bomSection.start} totalPages={pageNumbers.totalPages} />}
             </>
           )}
         </main>

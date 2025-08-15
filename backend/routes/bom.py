@@ -29,6 +29,8 @@ def save_project_bom(project_id):
                 project_id=project_id,
                 product_id=component['product_id'],
                 quantity=component['quantity'],
+                override_margin=component.get('override_margin'),  # User margin override
+                unit_cost_at_time=component.get('unit_cost_at_time'),  # Historical cost snapshot
                 price_at_time=component.get('price_at_time'),  # Historical price snapshot
                 quote_status=quote_status,
                 extras_cost=extras_cost  # Store on each component for now
@@ -66,6 +68,8 @@ def get_project_bom(project_id):
             result.append({
                 'product_id': comp.product_id,
                 'quantity': comp.quantity,
+                'override_margin': comp.override_margin,  # Include margin override
+                'unit_cost_at_time': comp.unit_cost_at_time,  # Include cost snapshot
                 'price_at_time': comp.price_at_time,
                 'current_price': current_price,
                 'quote_status': comp.quote_status,

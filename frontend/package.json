@@ -17,6 +17,7 @@
     "chartjs-plugin-datalabels": "^2.2.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.10.4",
+    "fuse.js": "^7.1.0",
     "pdfmake": "^0.2.20",
     "react": "^19.1.0",
     "react-bootstrap": "^2.10.9",

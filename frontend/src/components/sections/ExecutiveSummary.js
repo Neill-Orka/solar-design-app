@@ -10,7 +10,7 @@ import savingsIcon from "../../assets/icon_savings.svg";
 
 import "../../ReportBuilder.css";
 
-function ExecutiveSummary({ data }) {
+function ExecutiveSummary({ data, pageNumber = 1, totalPages = 24 }) {
   // Helper function to safely display numeric values and format them
   const formatValue = (value, defaultValue = 0) => {
     // Check if value exists and is a number
@@ -173,7 +173,7 @@ function ExecutiveSummary({ data }) {
       {/* Full-width site photo as page background */}
       <div className="orka-summary-sitephoto-fullwrap">
         <img className="orka-summary-sitephoto-full" src={sitePhoto} alt="Site Photo" />
-        <div className="orka-summary-pagenum">{project.page_number}</div>
+        <div className="orka-summary-pagenum">Page {pageNumber} of {totalPages}</div>
         <div className="orka-summary-photocredit">{project.photo_credit}</div>
       </div>
     </section>

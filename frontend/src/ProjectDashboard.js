@@ -5,6 +5,7 @@ import EnergyDataUpload from './EnergyDataUpload';
 import EnergyAnalysis from './EnergyAnalysis';
 import SystemDesign from './SystemDesign';
 import BillOfMaterials from './BillOfMaterials';
+import PrintableBOM from './PrintableBOM';
 import FinancialModeling from './FinancialModeling';
 import ReportBuilder from './components/ReportBuilder';
 import Optimize from './Optimize';
@@ -251,6 +252,9 @@ function ProjectDashboard() {
           <button className={`nav-link ${activeTab === 'bom' ? 'active' : ''}`} onClick={() => setActiveTab('bom')}>Bill of Materials</button>
         </li>        
         <li className="nav-item">
+          <button className={`nav-link ${activeTab === 'printbom' ? 'active' : ''}`} onClick={() => setActiveTab('printbom')}>Print BOM</button>
+        </li>
+        <li className="nav-item">
           <button className={`nav-link ${activeTab === 'tariff' ? 'active' : ''}`} onClick={() => setActiveTab('tariff')}>Tariff</button>
         </li>
         <li className="nav-item">
@@ -265,7 +269,8 @@ function ProjectDashboard() {
         {activeTab === 'upload' && <EnergyDataUpload projectId={projectId} />}
         {activeTab === 'analysis' && <EnergyAnalysis projectId={projectId} />}
         {activeTab === 'design' && <SystemDesign projectId={projectId} />}
-        {activeTab === 'bom' && <BillOfMaterials projectId={projectId} />}
+        {activeTab === 'bom' && <BillOfMaterials projectId={projectId} onNavigateToPrintBom={() => setActiveTab('printbom')} />}
+        {activeTab === 'printbom' && <PrintableBOM projectId={projectId} />}
         {activeTab === 'finance' && <FinancialModeling projectId={projectId} />}
         {activeTab === 'tariff' && (
           <div>

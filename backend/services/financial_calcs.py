@@ -1,6 +1,6 @@
 # services/financial_calcs.py
 from datetime import datetime
-from models import db, Tariffs, TariffRates
+from models import db, Tariffs, TariffRates, Projects
 import logging
 from datetime import datetime
 from calendar import monthrange
@@ -66,6 +66,10 @@ def calculate_financial_model(project, sim_response, eskom_tariff, export_enable
         roi_20yr = ((total_savings / system_cost) - 1) * 100 if system_cost > 0 else 0
         payback_years = system_cost / base_savings if base_savings > 0 else 0
 
+        # Calculate yield_year1 (financial yield) = annual_savings / project_value_excl_vat
+        project_value = project.project_value_excl_vat or system_cost
+        yield_year1 = (base_savings / project_value) * 100 if project_value > 0 else 0
+
         cost_comparison = [
             {"period": month, "old_cost": round(v["old_cost"], 2), "new_cost": round(v["new_cost"], 2)}
             for month, v in sorted(monthly_costs.items())
@@ -73,6 +77,7 @@ def calculate_financial_model(project, sim_response, eskom_tariff, export_enable
 
         return {
             "annual_savings": round(base_savings),
+            "yield_year1": round(yield_year1, 1),
             "payback_years": payback_years,
             "roi_20yr": roi_20yr,
             "yearly_savings": yearly_savings,
@@ -177,6 +182,10 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
         new_annual_cost = sum(v['total_new_bill'] for v in monthly_costs.values())
         annual_savings = original_annual_cost - new_annual_cost
 
+        # Calculate yield_year1 (financial yield) = annual_savings / project_value_excl_vat
+        project_value = project.project_value_excl_vat or system_cost
+        yield_year1 = (annual_savings / Decimal(project_value)) * 100 if project_value > 0 else Decimal('0')
+
         TARIFF_ESCALATION_RATE = Decimal('0.12') # Hardcoded 12% increase every year
         yearly_savings = []
         total_20yr_saving = Decimal(0)
@@ -264,9 +273,12 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             } for key, value in sorted(monthly_costs.items())
         ]
 
+        
+
         return {
             # Financial KPIs
             "annual_savings": float(round(annual_savings, 2)),
+            "yield_year1": float(round(yield_year1, 1)),
             "payback_period": float(round(payback_years, 1)) if payback_years != Decimal('inf') else 'N/A',
             "roi": float(round(roi_20yr, 1)) if roi_20yr != Decimal('inf') else 'N/A',
             "original_annual_cost": float(round(original_annual_cost, 2)),

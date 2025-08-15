@@ -6,11 +6,11 @@ import './PrintableBOM.css';
 /**
  * PrintableBOM (paginated, WYSIWYG, print-stable)
  */
-function PrintableBOM() {
+function PrintableBOM({ projectId }) {
   const navigate = useNavigate();
 
-  // Retrieve data from localStorage (set in BillOfMaterials.js)
-  const bomData = JSON.parse(localStorage.getItem('printBomData') || '{}');
+  // Retrieve data from localStorage (project-specific key)
+  const bomData = JSON.parse(localStorage.getItem(`printBomData_${projectId}`) || '{}');
   const currentDate = new Date().toLocaleDateString('en-ZA');
 
   const formatCurrency = (value) =>
@@ -116,7 +116,7 @@ function PrintableBOM() {
         else { carryKeys.push(b.key); }
     }
     return { inlineKeys, carryKeys };
-  }, [lastPageRemainingPx, H_TOT_PX, H_TERM_PX, H_BANK_PX, BLOCK_GAP_PX]);
+  }, [lastPageRemainingPx, H_TOT_PX, H_TERM_PX, H_BANK_PX, BLOCK_GAP_PX, HEADROOM_PX]);
 
   const carryPages = useMemo(() => {
     if (!totalsPlacement.carryKeys.length) return [];
@@ -197,10 +197,19 @@ function PrintableBOM() {
           <span className="label">Address:</span> {bomData.project?.location || 'Address'}
         </div>
         <div>
-          <span className="label">Contact Person:</span> Lambrecht Botha - 082 832 2236
+          <span className="label">Contact Person:</span> Lambrecht Botha
         </div>
         <div>
-          <span className="label">Tel:</span> {bomData.project?.site_phone || '-'}
+          <span className="label">Email:</span> {bomData.project?.client_email || '-'}
+        </div>
+        <div>
+          <span className='label'>Email:</span> lbotha@orkasolar.co.za
+        </div>
+        <div>
+          <span className="label">Tel:</span> {bomData.project?.client_phone || '-'}
+        </div>
+        <div>
+          <span className="label">Tel:</span> 082 832 2236
         </div>
         <div />
       </div>
@@ -378,6 +387,17 @@ function PrintableBOM() {
       </section>
     );
 
+  // If no BOM data exists for this project, show a message
+  if (!bomData.project || !bomData.categories || bomData.categories.length === 0) {
+    return (
+      <div className="container mt-5 text-center">
+        <div className="alert alert-info">
+          <h4>No Print Data Available</h4>
+          <p>Please go to the <strong>Bill of Materials</strong> tab and click <strong>"Export to PDF"</strong> to generate the printable BOM for this project.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bom-report">

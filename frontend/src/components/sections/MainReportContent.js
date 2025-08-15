@@ -13,6 +13,8 @@ function MainReportContent({
   data, 
   showSiteLayout, 
   siteLayoutImage,
+  startPageNumber = 3,
+  totalPages = 24
 }) {
   const { showNotification } = useNotification();
     const [consumptionData, setConsumptionData] = useState([]);
@@ -704,8 +706,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={3} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
             <h6 className="fw-bold">Site Information</h6>
             <div>
@@ -745,8 +747,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={4} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report        
+            pageNumber={startPageNumber + 1} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report        
         >
             <h6 className="fw-bold">Project Goal</h6>
             <p>{getSystemContent('projectGoal')}</p>
@@ -783,8 +785,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={5} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber + 2} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
             <h4>Current Electricity Costs</h4>
             <p>
@@ -833,8 +835,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={6} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber + 3} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
             <h4>Detailed Load Profile</h4>
             <p>
@@ -969,8 +971,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={7} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber + 4} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
             <h4>System Design</h4>
             <p>
@@ -986,8 +988,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={8} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber + 5} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
             <h4>System's Technical & Financial Information</h4>
             <p>
@@ -1178,8 +1180,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={9} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber + 6} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
                 <p className="mb-3">The table below shows the simulated performance yields from the system:</p>
                 
@@ -1264,8 +1266,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={10} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber + 7} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
             <h6 className="fw-bold">Energy Production</h6>
             <p>The below graph shows the potential solar production from the system per month.</p>
@@ -1403,8 +1405,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={11} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber + 8} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
             <h6 className='fw-bold'>Financial Information</h6>
             <p>The key metrics to evaluate the business case of the project are shown in the table below:</p>
@@ -1635,8 +1637,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={12} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber + 9} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
             <p>Post installation cost summary:</p>
             
@@ -1797,8 +1799,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={13} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber + 10} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
             <div className="scope-of-work">
                 <h6 className="fw-bold">SCOPE OF WORK</h6>
@@ -1925,8 +1927,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={14} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber + 11} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
             <div className="terms-of-service">
                 <h6 className="fw-bold">TERMS OF SERVICE</h6>
@@ -1984,8 +1986,8 @@ function MainReportContent({
             header="System Performance"
             // footer="Orka Solar - Design Report"
             data={data} // Pass the data prop to StandardPage
-            pageNumber={15} // Set an appropriate page number here
-            totalPages={24} // Set the total number of pages in your report
+            pageNumber={startPageNumber + 12} // Set an appropriate page number here
+            totalPages={totalPages} // Set the total number of pages in your report
         >
             <h6 className="fw-bold">Notable Points</h6>
                 <p>The following assumptions and exclusions were made and form part of this proposal:</p>

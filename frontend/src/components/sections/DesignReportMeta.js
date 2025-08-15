@@ -5,7 +5,7 @@ import signatureLB from "../../assets/signature_lb.png";
 
 import "../../ReportBuilder.css";
 
-function DesignReportMeta({ data }) {
+function DesignReportMeta({ data, pageNumber = 2, totalPages = 24 }) {
   const project = data?.project || {
     name: "Rutherfords - Grid Tied Solar PV Solution",
     document_no: "250XX_Project Proposal",
@@ -124,7 +124,7 @@ function DesignReportMeta({ data }) {
       </table>
 
       {/* Footer */}
-      <div className="orka-meta-footer-pagenum">{project.page_number}</div>
+      <div className="orka-meta-footer-pagenum">Page {pageNumber} of {totalPages}</div>
     </section>
   );
 }
