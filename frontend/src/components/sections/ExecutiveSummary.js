@@ -98,6 +98,13 @@ function ExecutiveSummary({ data, pageNumber = 1, totalPages = 24 }) {
   const PANEL_WATTAGE_W = 565;
   const num_panels = Math.ceil((project.panel_kw * 1000) / PANEL_WATTAGE_W);
 
+  // Add this helper function after the existing helper functions (around line 35):
+  const calculateBatteryAt100 = (batteryKwh) => {
+    const kwh = parseFloat(displayValue(batteryKwh, "0", "battery_kwh"));
+    if (isNaN(kwh) || kwh === 0) return 0;
+    return kwh / 0.8;
+  };
+
   return (
     <section className="orka-exec-summary-page">
       {/* Top bar */}
@@ -143,8 +150,8 @@ function ExecutiveSummary({ data, pageNumber = 1, totalPages = 24 }) {
           <img src={batteryIcon} className="orka-summary-icon" alt="" />
           <div className="orka-summary-label">Backup</div>
           <div className="orka-summary-sublabel">Chemistry: {project.battery_chem}</div>
-          <div className="orka-summary-sublabel">{displayValue(project.battery_kwh, "0", "battery_kwh")} kWh @ 100%</div>
-          <div className="orka-summary-sublabel">{displayValue(project.battery_kwh_80, "0", "battery_kwh_80")} kWh @ 80%</div>
+          <div className="orka-summary-sublabel">{formatValue(calculateBatteryAt100(project.battery_kwh))} kWh @ 100%</div>
+          <div className="orka-summary-sublabel">{displayValue(project.battery_kwh, "0", "battery_kwh_80")} kWh @ 80%</div>
         </div>
       </div>
       <div className="orka-summary-icons-row2">

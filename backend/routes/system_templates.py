@@ -22,9 +22,9 @@ def get_system_templates():
                 cat = (comp.product.category or '').lower()
                 total_cost += (comp.product.price or 0) * comp.quantity
                 if cat == 'panel':
-                    panel_kw += (comp.product.power_w or 0) * comp.quantity / 1000
+                    panel_kw += (comp.product.power_rating_w or 0) * comp.quantity / 1000
                 elif cat == 'inverter':
-                    inverter_kva += (comp.product.rating_kva or 0) * comp.quantity # MOET INVERTERS BY MEKAAR GETEL WORD? 
+                    inverter_kva += (comp.product.power_rating_kva or 0) * comp.quantity # MOET INVERTERS BY MEKAAR GETEL WORD? 
                 elif cat == 'battery':
                     battery_kwh += (comp.product.capacity_kwh or 0) * comp.quantity
 
@@ -82,9 +82,9 @@ def get_system_template_details(template_id):
             if product:
                 # Calculate system specs
                 if product.category == 'panel':
-                    panel_kw += (product.power_w or 0) * comp.quantity / 1000
+                    panel_kw += (product.power_rating_w or 0) * comp.quantity / 1000
                 elif product.category == 'inverter':
-                    inverter_kva += (product.rating_kva or 0) * comp.quantity
+                    inverter_kva += (product.power_rating_kva or 0) * comp.quantity
                 elif product.category == 'battery':
                     battery_kwh += (product.capacity_kwh or 0) * comp.quantity
                 

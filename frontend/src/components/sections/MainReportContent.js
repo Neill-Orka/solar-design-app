@@ -1907,8 +1907,9 @@ function MainReportContent({
                     Orka Solar is product agnostic and can therefore supply equipment to the client's specification, provided that 
                     the equipment meets the minimum quality standards of our company. Orka Solar has long standing relationships 
                     with our product suppliers and the products proposed as part of this design are of the highest quality and comes 
-                    with standard supplier or manufacturer's warranties. Only internationally recognised tier 1 rated panels will be 
-                    supplied.
+                    with standard supplier or manufacturer's warranties. 
+                    {/* Only internationally recognised tier 1 rated panels will be 
+                    supplied. */}
                 </p>
                 
                 <p>Major component warranty details are provided below:</p>
@@ -1935,7 +1936,7 @@ function MainReportContent({
 
                 <p>The project's invoicing will be as follows: 50% deposit on order, 40% on delivery of panels and inverters to site and 10% on project handover certificate sign off.
                 
-                Prices are valid to 30 August 2025. Thereafter, prices may change due to exchange rate fluctuations, inflation (CPI) and/or supplier price changes.
+                Prices are valid to 30 September 2025. Thereafter, prices may change due to exchange rate fluctuations, inflation (CPI) and/or supplier price changes.
                 
                 Invoices will be paid on 7 days terms.
                 

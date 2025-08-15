@@ -639,32 +639,35 @@ function SystemDesign({ projectId }) {
     const handleSelectTemplate = (template) => {
         setLoading(true);
         // Find the products from the template components
-        const panelProduct = template.components?.find(c => 
-            products.panels.some(p => p.id === c.product_id))?.product_id;
-        const inverterProduct = template.components?.find(c =>
-            products.inverters.some(p => p.id === c.product_id))?.product_id;
-        const batteryProduct = template.components?.find(c =>
-            products.batteries.some(p => p.id === c.product_id))?.product_id;
+        const panelComponent = template.components?.find(c => 
+            products.panels.some(p => p.id === c.product_id));
+        const inverterComponent = template.components?.find(c =>
+            products.inverters.some(p => p.id === c.product_id));
+        const batteryComponent = template.components?.find(c =>
+            products.batteries.some(p => p.id === c.product_id));
 
         // Find the product objects
-        const selectedPanel = panelProduct ? 
-            products.panels.find(p => p.id === panelProduct) : null;
-        const selectedInverter = inverterProduct ? 
-            products.inverters.find(p => p.id === inverterProduct) : null;
-        const selectedBattery = batteryProduct ? 
-            products.batteries.find(p => p.id === batteryProduct) : null;
+        const selectedPanel = panelComponent ? 
+            products.panels.find(p => p.id === panelComponent.product_id) : null;
+        const selectedInverter = inverterComponent ? 
+            products.inverters.find(p => p.id === inverterComponent.product_id) : null;
+        const selectedBattery = batteryComponent ? 
+            products.batteries.find(p => p.id === batteryComponent.product_id) : null;
 
         // Calculate quantities
-        const inverterQuantity = template.components?.find(c => 
-            c.product_id === inverterProduct)?.quantity || 1;
-        const batteryQuantity = template.components?.find(c => 
-            c.product_id === batteryProduct)?.quantity || 1;
+        const panelQuantity = panelComponent?.quantity || 0;
+        const inverterQuantity = inverterComponent?.quantity || 1;
+        const batteryQuantity = batteryComponent?.quantity || 1;
+
+        // Calculate panel_kw from panel quantity and power rating
+        const calculatedPanelKw = selectedPanel && panelQuantity > 0 ? 
+            ((selectedPanel.power_w * panelQuantity) / 1000) : 0;
 
         // Update the design state
         const newDesign = ({
             systemType: template.system_type?.toLowerCase() || 'grid',
-            panelKw: template.panel_kw?.toString() || '',
-            numPanels: selectedPanel ? Math.ceil((template.panel_kw * 1000) / selectedPanel.power_w).toString() : '',
+            panelKw: calculatedPanelKw.toString(),
+            numPanels: panelQuantity.toString(),
             tilt: '15',
             azimuth: '0',
             selectedPanel: selectedPanel ? {
@@ -700,7 +703,7 @@ function SystemDesign({ projectId }) {
         if (simulateButtonRef.current) {
             simulateButtonRef.current.scrollIntoView({
                 behavior: 'smooth',
-                block: 'center',
+                block: 'start',
             });
         }
 
@@ -1239,7 +1242,7 @@ function SystemDesign({ projectId }) {
             {/* --- Action Buttons --- */}
             <div className="row g-3 my-4">
                 <div className="col-12 d-flex gap-2">
-                    <Button variant="primary" onClick={handleSimulate} disabled={loading}>
+                    <Button variant="primary" onClick={handleSimulate} disabled={loading} >
                         {loading ? <Spinner as="span" animation="border" size="sm" className="me-2" /> : <i className="bi bi-play-fill me-2"></i>}
                         {loading ? 'Simulating…' : 'Simulate'}
                     </Button>
@@ -1248,9 +1251,9 @@ function SystemDesign({ projectId }) {
 
             {/* --- Simulation Results, Charts, and Metrics --- */}
             {simulationData && startDate && (
-                <div className="mt-5">
+                <div className="mt-5" >
                     <Card className="shadow-sm my-4">
-                        <Card.Header as="h5" className='d-flex justify-content-between align-items-center flex-wrap'>
+                        <Card.Header as="h5" className='d-flex justify-content-between align-items-center flex-wrap' ref={simulateButtonRef}>
                             <span><i className="bi bi-bar-chart-line-fill me-2"></i>Simulation Results</span>
                             <div className='d-flex align-items-center' >
                                 <Button
@@ -1316,7 +1319,7 @@ function SystemDesign({ projectId }) {
                     </Card>
 
                     {/* The Metrics Cards */}
-                    <Row className="mb-4 g-3 mt-4" ref={simulateButtonRef}>
+                    <Row className="mb-4 g-3 mt-4" >
                         <Col md={4} lg>
                             <Card className="border-start border-4 border-primary bg-white shadow-sm rounded p-3 h-100">
                                 <div className="text-muted small">Total PV Generation</div>

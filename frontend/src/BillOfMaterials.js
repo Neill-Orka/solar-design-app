@@ -102,12 +102,6 @@ const computeUnitCost = (product) => toNumber(product?.unit_cost);
 
 const computeMarginPct = (product) => normalizeMarginToDecimal(product?.margin);
 
-const computeDerivedUnitFromProduct = (product) => {
-  const cost = computeUnitCost(product);
-  const m = computeMarginPct(product);
-  return Number.isFinite(cost) ? cost * (1 + m) : toNumber(product?.price);
-}
-
 // effective margin for a BOM row: override -> product -> default (25%)
 const getRowMarginDecimal = (row) => {
   if (row?.override_margin != null) return Number(row.override_margin);
@@ -865,7 +859,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                 <Badge bg="success" className="small">{product.capacity_kwh}kWh</Badge>
                               )}
                             </td>
-                            <td className="text-end small">{formatCurrency(computeDerivedUnitFromProduct(product))}</td>
+                            <td className="text-end small">{formatCurrency(computeUnitCost(product))}</td>
                             <td className="text-center">
                               {existing ? (
                                 <ButtonGroup size="sm">
