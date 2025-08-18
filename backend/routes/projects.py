@@ -285,6 +285,8 @@ def get_load_profiles():
                 'description': profile.description,
                 'profile_type': profile.profile_type, # Changed from consumer_type to match your model
                 'annual_kwh': profile.annual_kwh,
+                'monthly_avg_kwh_original': profile.monthly_avg_kwh_original,
+                'max_peak_demand_kw': profile.max_peak_demand_kw,
                 'profile_data': profile.profile_data # This is the array of data points
             })
         return jsonify(profiles_list), 200

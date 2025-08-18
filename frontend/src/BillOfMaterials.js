@@ -6,7 +6,6 @@ import {
 } from 'react-bootstrap';
 import { API_URL } from './apiConfig';
 import { useNotification } from './NotificationContext';
-import { useNavigate } from 'react-router-dom';
 import Fuse from 'fuse.js';
 
 /* ---------- Category meta (display only) ---------- */
@@ -123,7 +122,6 @@ const getUnitPriceForRow = (row, isDraft) =>
 /* ---------- Component ---------- */
 function BillOfMaterials({ projectId, onNavigateToPrintBom }) {
   const { showNotification } = useNotification();
-  const navigate = useNavigate();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -491,6 +489,14 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
   };
 
   const updateQuantity = (productId, quantity) => {
+    // Allow empty string for better UX, but store the actual value
+    setBomComponents(bomComponents.map(c =>
+      c.product.id === productId ? { ...c, quantity: quantity } : c
+    ));
+  };
+
+  const handleQuantityBlur = (productId, quantity) => {
+    // When field loses focus, ensure we have a valid number
     const q = Math.max(1, parseInt(quantity || 1, 10));
     setBomComponents(bomComponents.map(c =>
       c.product.id === productId ? { ...c, quantity: q } : c
@@ -517,7 +523,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
         const liveCost = computeUnitCost(c.product);
         return {
           product_id: c.product.id,
-          quantity: c.quantity,
+          quantity: Math.max(1, Number(c.quantity) || 1),
           override_margin: c.override_margin ?? null,
           price_at_time: isDraft ? null : (c.price_at_time ?? liveUnit),
           unit_cost_at_time: isDraft ? null : (c.unit_cost_at_time ?? liveCost)
@@ -537,7 +543,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
       // Totals reflect what user sees: draft => live, locked => snapshot
       const total = (Array.isArray(bomComponents) ? bomComponents: []).reduce((sum, c) => {
         const unit = getUnitPriceForRow(c, isDraft);
-        return sum + unit * (c.quantity || 0);
+        return sum + unit * (Number(c.quantity) || 0);
       }, parsedExtras);
 
       await axios.put(`${API_URL}/api/projects/${projectId}`, {
@@ -661,11 +667,11 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     list.forEach(c => {
       const cat = c.product.category;
       if (cat === 'panel' && c.product.power_w) {
-        panelW += (Number(c.product.power_w) || 0) * (c.quantity || 0);
+        panelW += (Number(c.product.power_w) || 0) * (Number(c.quantity) || 0);
       } else if (cat === 'inverter' && c.product.rating_kva) {
-        inverterKva += (Number(c.product.rating_kva) || 0) * (c.quantity || 0);
+        inverterKva += (Number(c.product.rating_kva) || 0) * (Number(c.quantity) || 0);
       } else if (cat === 'battery' && c.product.capacity_kwh) {
-        batteryKwh += (Number(c.product.capacity_kwh) || 0) * (c.quantity || 0);
+        batteryKwh += (Number(c.product.capacity_kwh) || 0) * (Number(c.quantity) || 0);
       }
     });
     return {
@@ -678,15 +684,50 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
   const totals = useMemo(() => {
     const isDraft = (quoteStatus === 'draft');
     const list = Array.isArray(bomComponents) ? bomComponents : [];
+    
+    // Calculate selling price total
     const total_ex_vat = list.reduce((sum, c) => {
       const unit = getUnitPriceForRow(c, isDraft);
-      return sum + unit * (c.quantity || 0);
+      return sum + unit * (Number(c.quantity) || 0);
     }, 0);
+    
+    // Calculate cost price total
+    const total_cost = list.reduce((sum, c) => {
+      const costPrice = computeUnitCost(c.product);
+      return sum + costPrice * (Number(c.quantity) || 0);
+    }, 0);
+    
+    // Calculate total markup
+    const total_markup = total_ex_vat - total_cost;
+    
     const vat_perc = 15;
     const vat_price = total_ex_vat * (vat_perc / 100);
     const total_in_vat = total_ex_vat * (1 + vat_perc / 100);
-    return { total_excl_vat: total_ex_vat, vat_perc: vat_perc, vat_price: vat_price, total_incl_vat: total_in_vat };
+    
+    return { 
+      total_excl_vat: total_ex_vat, 
+      total_cost: total_cost,
+      total_markup: total_markup,
+      vat_perc: vat_perc, 
+      vat_price: vat_price, 
+      total_incl_vat: total_in_vat 
+    };
   }, [bomComponents, quoteStatus]);
+
+  // Calculate total selling price per category
+  const categoryTotals = useMemo(() => {
+    const isDraft = (quoteStatus === 'draft');
+    const totals = {};
+    
+    Object.keys(grouped).forEach(cat => {
+      totals[cat] = grouped[cat].reduce((sum, c) => {
+        const unit = getUnitPriceForRow(c, isDraft);
+        return sum + unit * (Number(c.quantity) || 0);
+      }, 0);
+    });
+    
+    return totals;
+  }, [grouped, quoteStatus]);
 
 
   /* ---------- UI ---------- */
@@ -699,32 +740,116 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     );
   }
 
+  
+  // Helper function to calculate totals for any component list
+  const calculateTotalsForComponents = (components) => {
+    const isDraft = (quoteStatus === 'draft');
+    const list = Array.isArray(components) ? components : [];
+    
+    // Calculate selling price total
+    const total_ex_vat = list.reduce((sum, c) => {
+      const unit = getUnitPriceForRow(c, isDraft);
+      return sum + unit * (Number(c.quantity) || 0);
+    }, 0);
+    
+    // Calculate cost price total
+    const total_cost = list.reduce((sum, c) => {
+      const costPrice = computeUnitCost(c.product);
+      return sum + costPrice * (Number(c.quantity) || 0);
+    }, 0);
+    
+    // Calculate total markup
+    const total_markup = total_ex_vat - total_cost;
+    
+    const vat_perc = 15;
+    const vat_price = total_ex_vat * (vat_perc / 100);
+    const total_in_vat = total_ex_vat * (1 + vat_perc / 100);
+    
+    return { 
+      total_excl_vat: total_ex_vat, 
+      total_cost: total_cost,
+      total_markup: total_markup,
+      vat_perc: vat_perc, 
+      vat_price: vat_price, 
+      total_incl_vat: total_in_vat 
+    };
+  };
+
   // Add this function to prepare BOM data and navigate to print view
-  const handleExportToPdf = () => {
-    // Prepare data structure for the printable view using sortedCategories for proper ordering
-    const categoriesForPrint = sortedCategories.map(cat => ({
+  const handleExportToPdf = async () => {
+    // CRITICAL FIX: Ensure we have the latest BOM data before printing
+    // This prevents stale data from being printed when coming from SystemDesign
+    
+    // If we have no components or this is a standard design that might have been modified,
+    // reload the BOM to ensure we have the latest data
+    const needsRefresh = bomComponents.length === 0 || 
+                        (isStandardDesign && sessionStorage.getItem(`systemDesignModified_${projectId}`) === 'true');
+    
+    let currentBomComponents = bomComponents;
+    
+    if (needsRefresh) {
+      try {
+        // Force reload the BOM with latest data
+        await loadProjectBOM(projectId, products, project);
+        // Use the freshly loaded components
+        // Note: We need to wait for the state update, so we'll re-calculate the grouped data
+      } catch (error) {
+        console.error('Failed to refresh BOM data:', error);
+        showNotification('Failed to load latest BOM data', 'danger');
+        return;
+      }
+    }
+    
+    // Re-calculate grouped data using either current or freshly loaded components
+    const componentsToUse = needsRefresh ? bomComponents : currentBomComponents;
+    
+    // Group components by category for the print view
+    const freshGrouped = {};
+    componentsToUse.forEach(comp => {
+      const cat = comp.product?.category || 'other';
+      if (!freshGrouped[cat]) freshGrouped[cat] = [];
+      freshGrouped[cat].push(comp);
+    });
+    
+    const freshSortedCategories = Object.keys(freshGrouped).sort((a, b) => {
+      const priorityA = CATEGORY_PRIORITY.indexOf(a);
+      const priorityB = CATEGORY_PRIORITY.indexOf(b);
+      if (priorityA !== -1 && priorityB !== -1) return priorityA - priorityB;
+      if (priorityA !== -1) return -1;
+      if (priorityB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    // Calculate fresh totals
+    const freshTotals = calculateTotalsForComponents(componentsToUse);
+    
+    // Prepare data structure for the printable view using fresh sorted categories
+    const categoriesForPrint = freshSortedCategories.map(cat => ({
       name: CATEGORY_META[cat]?.name || cat,
-      items: grouped[cat].map(comp => ({
+      items: freshGrouped[cat].map(comp => ({
         product: comp.product,
         quantity: comp.quantity,
         price: getUnitPriceForRow(comp, quoteStatus === 'draft')
       }))
     }));
 
-    // Store the data in localStorage for the print view to access (project-specific key)
+    // Store the FRESH data in localStorage for the print view to access
     localStorage.setItem(`printBomData_${projectId}`, JSON.stringify({
       project,
       systemSpecs,
-      totals,
+      totals: freshTotals,
       categories: categoriesForPrint
     }));
 
-    // Navigate to the print view tab instead of a separate page
+    // Clear the design modified flag since we've now captured the latest state
+    sessionStorage.removeItem(`systemDesignModified_${projectId}`);
+
+    // Navigate to the print view within the project dashboard if possible, otherwise open in new window
     if (onNavigateToPrintBom) {
       onNavigateToPrintBom();
     } else {
-      // Fallback to old navigation if prop not provided
-      navigate('/print-bom');
+      // Fallback for standalone use - open in new window
+      window.open(`/printable-bom/${projectId}`, '_blank');
     }
   };
 
@@ -863,9 +988,9 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                             <td className="text-center">
                               {existing ? (
                                 <ButtonGroup size="sm">
-                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, existing.quantity - 1)}>-</Button>
-                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" disabled>{existing.quantity}</Button>
-                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, existing.quantity + 1)}>+</Button>
+                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, Math.max(1, Number(existing.quantity) - 1))}>-</Button>
+                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" disabled>{Number(existing.quantity) || 1}</Button>
+                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, Number(existing.quantity) + 1)}>+</Button>
                                 </ButtonGroup>
                               ) : (
                                 <Button variant="outline-primary" size="sm" className="py-0" onClick={() => addComponent(product)}>
@@ -916,18 +1041,22 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                         {sortedCategories.map(cat => (
                           <React.Fragment key={cat}>
                             <tr className="table-light">
-                              <td colSpan={7} className="py-1">
+                              <td colSpan={5} className="py-1">
                                 <div className="fw-semibold">
                                   <i className={`bi ${CATEGORY_META[cat]?.icon || 'bi-box'} me-1`} />
                                   {CATEGORY_META[cat]?.name || cat}
                                 </div>
                               </td>
+                              <td className="py-1 text-end fw-semibold">
+                                {formatCurrency(categoryTotals[cat] || 0)}
+                              </td>
+                              <td className="py-1"></td>
                             </tr>
                             {grouped[cat].map(comp => {
                               const isDraft = (quoteStatus === 'draft');
                               const unitCost = computeUnitCost(comp.product);
                               const unitPrice = getUnitPriceForRow(comp, isDraft);
-                              const line = unitPrice * (comp.quantity || 0);
+                              const line = unitPrice * (Number(comp.quantity) || 0);
                               const priceChanged = !isDraft && comp.price_at_time != null && 
                                 computeDerivedUnitFromRow(comp) !== comp.price_at_time;
 
@@ -964,6 +1093,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                         min="0"
                                         value={comp.quantity}
                                         onChange={e => updateQuantity(comp.product.id, e.target.value)}
+                                        onBlur={e => handleQuantityBlur(comp.product.id, e.target.value)}
                                         className="py-0"
                                       />
                                     </InputGroup>
@@ -982,17 +1112,20 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                         
                         {/* Totals rows */}
                         <tr className="border-top border-dark">
-                          <td colSpan={5} className="text-end fw-semibold">Total (excl. VAT):</td>
+                          <td className="fw-semibold">Cost Price: {formatCurrency(totals.total_cost)}</td>
+                          <td colSpan={4} className="text-end fw-semibold">Total (excl. VAT):</td>
                           <td className="text-end fw-semibold">{formatCurrency(totals.total_excl_vat)}</td>
                           <td></td>
                         </tr>
                         <tr>
-                          <td colSpan={5} className="text-end fw-semibold">{ totals.vat_perc ? `${totals.vat_perc}% VAT` : 'VAT:'}</td>
+                          <td className="fw-semibold">Total Markup: {formatCurrency(totals.total_markup)}</td>
+                          <td colSpan={4} className="text-end fw-semibold">{ totals.vat_perc ? `${totals.vat_perc}% VAT` : 'VAT:'}</td>
                           <td className="text-end fw-semibold">{formatCurrency(totals.vat_price)}</td>
                           <td></td>
                         </tr>
                         <tr className="border-top border-dark">
-                          <td colSpan={5} className="text-end fw-bold">Total (incl. VAT):</td>
+                          <td className="fw-semibold"></td>
+                          <td colSpan={4} className="text-end fw-bold">Total (incl. VAT):</td>
                           <td className="text-end fw-bold">{formatCurrency(totals.total_incl_vat)}</td>
                           <td></td>
                         </tr>

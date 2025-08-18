@@ -43,6 +43,10 @@ def process_profile_file(file_stream, interval_hours=0.5):
         if actual_annual_kwh == 0:
             return {"error": "The total annual consumption is zero. Please check the data."}
         
+        # Calculate original metrics before normalization
+        monthly_avg_kwh_original = actual_annual_kwh / 12.0
+        max_peak_demand_kw = float(df[demand_col].max())
+        
         #3. Define the target annual consumption (1 kWh/month * 12 months)
         target_annual_kwh = 12.0
 
@@ -65,7 +69,13 @@ def process_profile_file(file_stream, interval_hours=0.5):
         # Prepare JSONB data
         profile_data_json = df[['timestamp', 'demand_kw']].to_dict(orient='records')
         
-        return {"annual_kwh": normalized_annual_kwh, "profile_data": profile_data_json, "error": None}
+        return {
+            "annual_kwh": normalized_annual_kwh, 
+            "monthly_avg_kwh_original": monthly_avg_kwh_original,
+            "max_peak_demand_kw": max_peak_demand_kw,
+            "profile_data": profile_data_json, 
+            "error": None
+        }
 
     except Exception as e:
         return {"error": str(e)}
@@ -92,6 +102,8 @@ def create_load_profile():
             description=request.form.get('description', ''),
             profile_type=request.form.get('profile_type', 'Residential'),
             annual_kwh=processed_data["annual_kwh"],
+            monthly_avg_kwh_original=processed_data["monthly_avg_kwh_original"],
+            max_peak_demand_kw=processed_data["max_peak_demand_kw"],
             profile_data=processed_data["profile_data"]
         )
         db.session.add(new_profile)

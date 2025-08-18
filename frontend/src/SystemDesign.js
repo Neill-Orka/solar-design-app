@@ -282,7 +282,8 @@ const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, set
                                         size="sm"
                                         min="1"
                                         value={design.inverterQuantity}
-                                        onChange={e => onDesignChange({...design, inverterQuantity: Math.max(1, parseInt(e.target.value) || 1)})}
+                                        onChange={e => onDesignChange({...design, inverterQuantity: e.target.value})}
+                                        onBlur={e => onDesignChange({...design, inverterQuantity: Math.max(1, parseInt(e.target.value) || 1)})}
                                     />
                                 </Form.Group>
                             </Col>
@@ -301,7 +302,8 @@ const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, set
                                                 size="sm"
                                                 min="1"
                                                 value={design.batteryQuantity}
-                                                onChange={e => onDesignChange({...design, batteryQuantity: Math.max(1, parseInt(e.target.value) || 1)})}
+                                                onChange={e => onDesignChange({...design, batteryQuantity: e.target.value})}
+                                                onBlur={e => onDesignChange({...design, batteryQuantity: Math.max(1, parseInt(e.target.value) || 1)})}
                                                 disabled={design.systemType === 'grid'}
                                             />
                                         </Form.Group>
@@ -315,7 +317,8 @@ const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, set
                                                 min="0"
                                                 max="100"
                                                 value={design.batterySocLimit}
-                                                onChange={e => onDesignChange({...design, batterySocLimit: Math.max(0, Math.min(50, parseInt(e.target.value) || 0))})}
+                                                onChange={e => onDesignChange({...design, batterySocLimit: e.target.value})}
+                                                onBlur={e => onDesignChange({...design, batterySocLimit: Math.max(0, Math.min(50, parseInt(e.target.value) || 0))})}
                                                 disabled={design.systemType === 'grid' || design.systemType === 'off-grid'}
                                             />
                                         </Form.Group>
