@@ -1,12 +1,140 @@
 # models.py
 from email.policy import default
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import inspect
 from sqlalchemy.orm import synonym
+from flask_bcrypt import Bcrypt
+from enum import Enum
+import secrets
 
 db = SQLAlchemy()
+bcrypt = Bcrypt()
+
+# User roles enum
+class UserRole(Enum):
+    ADMIN = "admin"
+    SALES = "sales"
+    DESIGN = "design"
+
+class User(db.Model):
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    first_name = db.Column(db.String(50), nullable=False)
+    last_name = db.Column(db.String(50), nullable=False)
+    role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.SALES)
+    is_active = db.Column(db.Boolean, default=True)
+    is_email_verified = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    last_login = db.Column(db.DateTime, nullable=True)
+    profile_picture = db.Column(db.String(255), nullable=True)
+    
+    # Invitation system
+    invitation_token = db.Column(db.String(255), nullable=True)
+    invitation_expires = db.Column(db.DateTime, nullable=True)
+    invited_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    
+    # Relationships
+    created_by = db.relationship('User', remote_side=[id], foreign_keys=[created_by_id])
+    invited_by = db.relationship('User', remote_side=[id], foreign_keys=[invited_by_id])
+    
+    def set_password(self, password):
+        """Set password hash"""
+        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+    
+    def check_password(self, password):
+        """Check password against hash"""
+        return bcrypt.check_password_hash(self.password_hash, password)
+    
+    def generate_invitation_token(self):
+        """Generate secure invitation token"""
+        self.invitation_token = secrets.token_urlsafe(32)
+        self.invitation_expires = datetime.utcnow() + timedelta(days=7)
+        return self.invitation_token
+    
+    def is_invitation_valid(self):
+        """Check if invitation token is still valid"""
+        return (self.invitation_token and 
+                self.invitation_expires and 
+                self.invitation_expires > datetime.utcnow())
+    
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'email': self.email,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'full_name': self.full_name,
+            'role': self.role.value if self.role else None,
+            'is_active': self.is_active,
+            'is_email_verified': self.is_email_verified,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            'profile_picture': self.profile_picture
+        }
+
+class AuditLog(db.Model):
+    __tablename__ = 'audit_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    action = db.Column(db.String(100), nullable=False)  # CREATE, UPDATE, DELETE, LOGIN, etc.
+    resource_type = db.Column(db.String(50), nullable=False)  # project, product, quote, etc.
+    resource_id = db.Column(db.Integer, nullable=True)  # ID of the affected resource
+    details = db.Column(JSONB, nullable=True)  # Additional details about the action
+    ip_address = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationship
+    user = db.relationship('User', backref='audit_logs')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'user_name': self.user.full_name if self.user else None,
+            'user_email': self.user.email if self.user else None,
+            'action': self.action,
+            'resource_type': self.resource_type,
+            'resource_id': self.resource_id,
+            'details': self.details,
+            'ip_address': self.ip_address,
+            'user_agent': self.user_agent,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None
+        }
+
+class RefreshToken(db.Model):
+    __tablename__ = 'refresh_tokens'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token = db.Column(db.String(255), nullable=False, unique=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_revoked = db.Column(db.Boolean, default=False)
+    
+    # Relationship
+    user = db.relationship('User', backref='refresh_tokens')
+    
+    @staticmethod
+    def generate_token():
+        return secrets.token_urlsafe(32)
+    
+    def is_valid(self):
+        return not self.is_revoked and self.expires_at > datetime.utcnow()
+    
+    def revoke(self):
+        self.is_revoked = True
 
 class Clients(db.Model):
     __tablename__ = 'clients'
