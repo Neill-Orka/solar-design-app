@@ -1,57 +1,105 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from "axios";
 import { Container, Row, Col, Card, Button, Modal, Form, InputGroup, Badge, Spinner, Alert, ButtonGroup, Table } from "react-bootstrap";
 import { FaTrash, FaEdit, FaPlus } from "react-icons/fa";
+import Fuse from 'fuse.js';
 import { API_URL } from "./apiConfig";
 
+// Category metadata consistent with SystemBuilder
+const CATEGORY_META = {
+  'Panel':                          { name: 'Panel',                          icon: 'bi-grid-3x3-gap-fill',     color: 'warning'  },
+  'panel':                          { name: 'Panel',                          icon: 'bi-grid-3x3-gap-fill',     color: 'warning'  },
+  'Inverter':                       { name: 'Inverter',                       icon: 'bi-box-seam',              color: 'info'     },
+  'inverter':                       { name: 'Inverter',                       icon: 'bi-box-seam',              color: 'info'     },
+  'Battery':                        { name: 'Battery',                        icon: 'bi-battery-full',          color: 'success'  },
+  'Solar Geyser':                   { name: 'Solar Geyser',                   icon: 'bi-thermometer-sun',       color: 'warning'  },
+  'Inverter Aux':                   { name: 'Inverter Aux',                   icon: 'bi-hdd-stack-fill',        color: 'secondary'},
+  'Lights':                         { name: 'Lights',                         icon: 'bi-lightbulb-fill',        color: 'warning'  },
+  'Transport & Logistics':          { name: 'Transport & Logistics',          icon: 'bi-truck',                 color: 'secondary'},
+  'Contactor':                      { name: 'Contactor',                      icon: 'bi-toggle-on',             color: 'primary'  },
+  'Enclosure':                      { name: 'Enclosure',                      icon: 'bi-box',                   color: 'secondary'},
+  'Cable Management':               { name: 'Cable Management',               icon: 'bi-diagram-3-fill',        color: 'dark'     },
+  'Human Resources':                { name: 'Human Resources',                icon: 'bi-people-fill',           color: 'secondary'},
+  'Conductor':                      { name: 'Conductor',                      icon: 'bi-plug-fill',             color: 'dark'     },
+  'VSD':                            { name: 'VSD',                            icon: 'bi-cpu-fill',              color: 'primary'  },
+  'Change Over Switch':             { name: 'Change Over Switch',             icon: 'bi-toggle2-off',           color: 'primary'  },
+  'HSEQ & Compliance':              { name: 'HSEQ & Compliance',              icon: 'bi-shield-check',          color: 'success'  },
+  'Aux Generator':                  { name: 'Aux Generator',                  icon: 'bi-lightning-charge-fill', color: 'warning'  },
+  'DB':                             { name: 'DB',                             icon: 'bi-collection-fill',       color: 'secondary'},
+  'Monitoring & Control Equipment': { name: 'Monitoring & Control Equipment', icon: 'bi-speedometer2',          color: 'info'     },
+  'S&T':                            { name: 'S&T',                            icon: 'bi-tools',                 color: 'secondary'},
+  'MPPT':                           { name: 'MPPT',                           icon: 'bi-cpu',                   color: 'primary'  },
+  'Mounting System':                { name: 'Mounting System',                icon: 'bi-grid-1x2-fill',         color: 'secondary'},
+  'Monitoring':                     { name: 'Monitoring',                     icon: 'bi-display-fill',          color: 'info'     },
+  'Auxiliaries':                    { name: 'Auxiliaries',                    icon: 'bi-gear-fill',             color: 'secondary'},
+  'Cable':                          { name: 'Cable',                          icon: 'bi-plug-fill',             color: 'dark'     },
+  'Protection':                     { name: 'Protection',                     icon: 'bi-shield-slash-fill',     color: 'danger'   },
+  'Professional Services':          { name: 'Professional Services',          icon: 'bi-briefcase-fill',        color: 'secondary'},
+  // Legacy lowercase entries for backward compatibility
+  'fuse':                           { name: 'Fuses',                          icon: 'bi-shield-slash-fill',     color: 'danger'   },
+  'breaker':                        { name: 'Circuit Breakers',               icon: 'bi-lightning-charge-fill', color: 'danger'   },
+  'isolator':                       { name: 'Isolators',                      icon: 'bi-plugin-fill',           color: 'secondary'},
+  'dc_cable':                       { name: 'DC Cables',                      icon: 'bi-plug-fill',             color: 'dark'     },
+  'accessory':                      { name: 'Accessories',                    icon: 'bi-gear-fill',             color: 'secondary'},
+};
+
 const EMPTY_PRODUCT = {
-    category: 'panel', brand: '', model: '',
+    category: 'Panel', brand: '', model: '',
     power_w: '', rating_kva: '', capacity_kwh: '',
-    cost: '', price: '', warranty_y: '', notes: '', properties: ''
+    unit_cost: '', margin: '', price: '', warranty_y: '', notes: '', properties: ''
 };
 
 //  Meta for every field we MIGHT display/edit
 const FIELD_META = {
+  category:     { label: "Category", type: "select", options: [
+    'Panel', 'Inverter', 'Battery', 'Solar Geyser', 'Inverter Aux', 'Lights', 
+    'Transport & Logistics', 'Contactor', 'Enclosure', 'Cable Management', 
+    'Human Resources', 'Conductor', 'VSD', 'Change Over Switch', 'HSEQ & Compliance',
+    'Aux Generator', 'DB', 'Monitoring & Control Equipment', 'S&T', 'MPPT',
+    'Mounting System', 'Monitoring', 'Auxiliaries', 'Cable', 'Protection',
+    'Professional Services'
+  ]},
   brand:        { label: "Brand",          type: "text"   },
   model:        { label: "Model / SKU",    type: "text"   },
-  price:        { label: "Price (R)",      type: "number" },
+  unit_cost:    { label: "Unit Cost (R)",  type: "number" },
+  margin:       { label: "Margin (%)",     type: "number" },
+  price:        { label: "Price (R)",      type: "number", readonly: true },
   power_w:      { label: "Power (W)",      type: "number", category: "Panel"    },
   rating_kva:   { label: "Rating (kVA)",   type: "number", category: "Inverter" },
   capacity_kwh: { label: "Capacity (kWh)", type: "number", category: "Battery"  },
-  unit_cost:    { label: "Unit Cost (R)",  type: "number" },
-  margin:       { label: "Margin (%)",     type: "number" },
   warranty_y:   { label: "Warranty (y)",   type: "number" },
   notes:        { label: "Notes",          type: "textarea" },
 };
 
-// Helper that only returns the keys that are not null
-const getVisibleFields = (prod) => {
+// Helper that returns fields based on category and editing context
+const getVisibleFields = (prod, isEditing = false) => {
     return Object.keys(FIELD_META)
     .filter((k) => {
         const catOK = !FIELD_META[k].category || FIELD_META[k].category === prod.category;
-        const v = prod[k];
-        return catOK && v !== null && v !== undefined && v !== '';
+        
+        if (isEditing) {
+            // In editing mode, show all relevant fields regardless of whether they have values
+            return catOK;
+        } else {
+            // In display mode, only show fields that have values
+            const v = prod[k];
+            return catOK && v !== null && v !== undefined && v !== '';
+        }
     })
     .map((k) => ({ key: k, meta: FIELD_META[k] }));
 };
 
 
 const getCategoryIcon = (category) => {
-    switch(category) {
-        case 'Panel': return 'bi-grid-3x3-gap-fill';
-        case 'Inverter': return 'bi-box-seam';
-        case 'Battery': return 'bi-battery-full';
-        default: return 'bi-gear-fill';
-    }
+    return CATEGORY_META[category]?.icon || 'bi-gear-fill';
 };
 
 const getCategoryColor = (category) => {
-    switch(category) {
-        case 'Panel': return 'warning';
-        case 'Inverter': return 'info';
-        case 'Battery': return 'success';
-        default: return 'secondary';
-    }
+    return CATEGORY_META[category]?.color || 'secondary';
+};
+
+const getCategoryName = (category) => {
+    return CATEGORY_META[category]?.name || category;
 };
 
 export default function ProductsAdmin() {
@@ -64,36 +112,104 @@ export default function ProductsAdmin() {
     const [error, setError] = useState('');
     const [viewMode, setViewMode] = useState('list'); // Default to list view
 
+    // Memoized helper functions for price calculation and margin conversion
+    const calculatePrice = useCallback((unitCost, margin) => {
+        const cost = parseFloat(unitCost) || 0;
+        const marginValue = parseFloat(margin) || 0;
+        return cost * (1 + marginValue);
+    }, []);
+
+    const formatMarginForDisplay = useCallback((margin) => {
+        return ((parseFloat(margin) || 0) * 100).toFixed(1);
+    }, []);
+
+    const formatMarginForBackend = useCallback((displayMargin) => {
+        return (parseFloat(displayMargin) || 0) / 100;
+    }, []);
+
+    // Memoized helper function to format values for display
+    const formatValueForDisplay = useCallback((key, value, product) => {
+        if (key === "margin") {
+            return formatMarginForDisplay(value) + "%";
+        } else if (key === "price") {
+            // Calculate price dynamically if we have unit_cost and margin
+            if (product.unit_cost && product.margin) {
+                return "R " + calculatePrice(product.unit_cost, product.margin).toFixed(2);
+            } else if (value) {
+                return "R " + parseFloat(value).toFixed(2);
+            }
+            return "";
+        } else if (key === "unit_cost") {
+            return value ? "R " + parseFloat(value).toFixed(2) : "";
+        }
+        return value;
+    }, [calculatePrice, formatMarginForDisplay]);
+
+    // Optimized handleChange with debouncing for price calculation
+    const handleChange = useCallback((k, v) => {
+        setForm(prevForm => {
+            const newForm = { ...prevForm, [k]: v };
+            
+            // Auto-calculate price when unit_cost or margin changes
+            if (k === 'unit_cost' || k === 'margin') {
+                const unitCost = k === 'unit_cost' ? v : prevForm.unit_cost;
+                const margin = k === 'margin' ? formatMarginForBackend(v) : prevForm.margin;
+                newForm.price = calculatePrice(unitCost, margin).toFixed(2);
+            }
+            
+            return newForm;
+        });
+    }, [calculatePrice, formatMarginForBackend]);
+
     // ------ load list -----------------------------------
-    const fetchProducts = () => 
+    const fetchProducts = useCallback(() => 
         axios.get(`${API_URL}/api/products`)
             .then(r => {
                 setProducts(r.data);
                 setError('');
             })
-            .catch(err => setError('Failed to load products'));
+            .catch(err => setError('Failed to load products')), []);
 
     useEffect(() => {
         fetchProducts();
-    }, []);
+    }, [fetchProducts]);
 
     // ------ open modal ----------------------------------
-    const openAdd = () => { setEditId(null); setForm(EMPTY_PRODUCT); setShowModal(true); };
-    const openEdit = (p) => { setEditId(p.id); setForm(p); setShowModal(true); };
+    const openAdd = useCallback(() => { 
+        setEditId(null); 
+        setForm(EMPTY_PRODUCT); 
+        setShowModal(true); 
+    }, []);
+    
+    const openEdit = useCallback((p) => { 
+        setEditId(p.id); 
+        // Format margin for display (convert from decimal to percentage)
+        const formData = { 
+            ...p, 
+            margin: p.margin ? formatMarginForDisplay(p.margin) : ''
+        };
+        setForm(formData); 
+        setShowModal(true); 
+    }, [formatMarginForDisplay]);
 
     // ------ delete --------------------------------------
-    const deleteProduct = (id) => {
+    const deleteProduct = useCallback((id) => {
         if (!window.confirm('Delete this product?')) return;
         axios.delete(`${API_URL}/api/products/${id}`)
             .then(fetchProducts)
             .catch(err => setError('Failed to delete product'));
-    };
+    }, [fetchProducts]);
 
     // ------ save (add or update) ---------------------
     const handleSave = () => {
         setLoading(true);
 
         const payload = { ...form };
+
+        // Convert margin from percentage display back to decimal for backend
+        if (payload.margin !== null && payload.margin !== undefined && payload.margin !== '') {
+            payload.margin = formatMarginForBackend(payload.margin);
+        }
 
         try {
             if (typeof payload.properties === 'string' && payload.properties.trim()) {
@@ -106,8 +222,8 @@ export default function ProductsAdmin() {
             setLoading(false);
             return;
         }
-        const req = editId ? axios.put(`${API_URL}/api/products/${editId}`, form) :
-            axios.post(`${API_URL}/api/products`, form);
+        const req = editId ? axios.put(`${API_URL}/api/products/${editId}`, payload) :
+            axios.post(`${API_URL}/api/products`, payload);
         req.then(() => {
             setShowModal(false);
             fetchProducts();
@@ -116,12 +232,57 @@ export default function ProductsAdmin() {
         .finally(() => setLoading(false))
     };
 
-    // ------ helpers -------------------------------------
-    const handleChange = (k, v) => setForm({ ...form, [k]: v });
+    // Optimized Fuse instance for fuzzy search with memoization
+    const fuse = useMemo(() => {
+        if (products.length === 0) return null;
+        
+        const options = {
+            keys: ['brand', 'model', 'category'],
+            threshold: 0.3,
+            ignoreLocation: true,
+            includeScore: false,
+            minMatchCharLength: 2
+        };
 
-    const filtered = products.filter(p =>
-        `${p.brand} ${p.model}`.toLowerCase().includes(search.toLowerCase())
-    );
+        // Pre-process records once
+        const records = products.map(p => ({
+            ...p,
+            categoryName: CATEGORY_META[p.category]?.name || p.category
+        }));
+
+        return new Fuse(records, options);
+    }, [products]);
+
+    // Debounced search state
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+        }, 300);
+        
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    // Enhanced filtering with optimized fuzzy search
+    const filtered = useMemo(() => {
+        if (!debouncedSearch.trim() || !fuse) {
+            return products;
+        }
+        
+        // Simple string matching for very short queries
+        if (debouncedSearch.length < 2) {
+            return products.filter(p => 
+                p.brand?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                p.model?.toLowerCase().includes(debouncedSearch.toLowerCase())
+            );
+        }
+        
+        // Use fuzzy search for longer queries
+        const searchResults = fuse.search(debouncedSearch);
+        return searchResults.map(result => result.item);
+    }, [products, debouncedSearch, fuse]);
 
     return (
         <div className='min-vh-100' style={{ backgroundColor: '#f8f9fa' }}>
@@ -152,7 +313,7 @@ export default function ProductsAdmin() {
                                             <Form.Control 
                                                 value={search} 
                                                 onChange={e => setSearch(e.target.value)}
-                                                placeholder="Search products by brand or model..."
+                                                placeholder="Search products by brand, model, category, or specs..."
                                                 className="border-start-0 rounded-end-lg"
                                             />
                                         </InputGroup>
@@ -205,7 +366,7 @@ export default function ProductsAdmin() {
                                                             <i className={`bi ${getCategoryIcon(product.category)} text-${getCategoryColor(product.category)}`}></i>
                                                         </div>
                                                         <Badge bg={getCategoryColor(product.category)} className="text-capitalize">
-                                                            {product.category}
+                                                            {getCategoryName(product.category)}
                                                         </Badge>
                                                     </div>
 
@@ -214,7 +375,7 @@ export default function ProductsAdmin() {
 
                                                     <div className="mb-3">
                                                         {getVisibleFields(product).map(({ key, meta }) => (
-                                                          ["power_w","rating_kva","capacity_kwh","price"].includes(key) && (
+                                                          ["power_w","rating_kva","capacity_kwh","unit_cost","margin","price"].includes(key) && (
                                                             <div
                                                               key={key}
                                                               className="d-flex justify-content-between align-items-center mb-1"
@@ -224,9 +385,11 @@ export default function ProductsAdmin() {
                                                                 key === "power_w" ? "warning"
                                                                 : key === "rating_kva" ? "info"
                                                                 : key === "capacity_kwh" ? "success"
+                                                                : key === "unit_cost" ? "secondary"
+                                                                : key === "margin" ? "info"
                                                                 : "primary"
                                                               } text={key === "power_w" ? "dark" : undefined}>
-                                                                {key === "price" ? "R " : ""}{product[key]}
+                                                                {formatValueForDisplay(key, product[key], product)}
                                                                 {key === "power_w" ? "W" :
                                                                  key === "rating_kva" ? "kVA" :
                                                                  key === "capacity_kwh" ? "kWh" : ""}
@@ -282,17 +445,17 @@ export default function ProductsAdmin() {
                                                                 <i className={`bi ${getCategoryIcon(product.category)} text-${getCategoryColor(product.category)}`}></i>
                                                             </div>
                                                             <Badge bg={getCategoryColor(product.category)} className="text-capitalize">
-                                                                {product.category}
+                                                                {getCategoryName(product.category)}
                                                             </Badge>
                                                         </div>
                                                     </td>
                                                     <td className="fw-semibold">{product.brand}</td>
                                                     <td>{product.model}</td>
                                                     <td>
-                                                        {product.category === 'Panel' && product.power_w && (
+                                                        {(product.category === 'Panel' || product.category === 'panel') && product.power_w && (
                                                             <Badge bg="warning" text="dark">{product.power_w}W</Badge>
                                                         )}
-                                                        {product.category === 'Inverter' && product.rating_kva && (
+                                                        {(product.category === 'Inverter' || product.category === 'inverter') && product.rating_kva && (
                                                             <Badge bg="info">{product.rating_kva}kVA</Badge>
                                                         )}
                                                         {product.category === 'Battery' && product.capacity_kwh && (
@@ -300,9 +463,23 @@ export default function ProductsAdmin() {
                                                         )}
                                                     </td>
                                                     <td>
-                                                        {product.price && (
-                                                            <Badge bg="primary">R {product.price}</Badge>
-                                                        )}
+                                                        <div className="d-flex flex-column gap-1">
+                                                            {(product.unit_cost && product.margin) ? (
+                                                                <>
+                                                                    <Badge bg="primary">
+                                                                        {formatValueForDisplay('price', null, product)}
+                                                                    </Badge>
+                                                                    <small className="text-muted">
+                                                                        Cost: {formatValueForDisplay('unit_cost', product.unit_cost, product)} | 
+                                                                        Margin: {formatValueForDisplay('margin', product.margin, product)}
+                                                                    </small>
+                                                                </>
+                                                            ) : product.price ? (
+                                                                <Badge bg="primary">{formatValueForDisplay('price', product.price, product)}</Badge>
+                                                            ) : (
+                                                                <span className="text-muted">No price set</span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="text-end pe-4">
                                                         <Button 
@@ -342,11 +519,14 @@ export default function ProductsAdmin() {
                 </Modal.Header>
                 <Modal.Body className="p-4">
                     <Form>
-                        {getVisibleFields(form).map(({ key, meta }) => (
+                        {getVisibleFields(form, true).map(({ key, meta }) => (
                           <Row className="mb-3" key={key}>
                             <Col md={6}>
                               <Form.Group>
-                                <Form.Label className="fw-semibold">{meta.label}</Form.Label>
+                                <Form.Label className="fw-semibold">
+                                  {meta.label}
+                                  {meta.readonly && <small className="text-muted ms-2">(Auto-calculated)</small>}
+                                </Form.Label>
                                 {meta.type === "textarea" ? (
                                   <Form.Control
                                     as="textarea"
@@ -354,7 +534,22 @@ export default function ProductsAdmin() {
                                     value={form[key] || ""}
                                     onChange={(e) => handleChange(key, e.target.value)}
                                     className="rounded-lg"
+                                    readOnly={meta.readonly}
                                   />
+                                ) : meta.type === "select" ? (
+                                  <Form.Select
+                                    value={form[key] || ""}
+                                    onChange={(e) => handleChange(key, e.target.value)}
+                                    size="lg"
+                                    className="rounded-lg"
+                                  >
+                                    <option value="">Select {meta.label}</option>
+                                    {meta.options.map(option => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </Form.Select>
                                 ) : (
                                   <Form.Control
                                     type={meta.type}
@@ -362,6 +557,8 @@ export default function ProductsAdmin() {
                                     onChange={(e) => handleChange(key, e.target.value)}
                                     size="lg"
                                     className="rounded-lg"
+                                    readOnly={meta.readonly}
+                                    style={meta.readonly ? { backgroundColor: '#f8f9fa' } : {}}
                                   />
                                 )}
                               </Form.Group>

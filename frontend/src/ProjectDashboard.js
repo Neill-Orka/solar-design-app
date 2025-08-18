@@ -252,7 +252,14 @@ function ProjectDashboard() {
           <button className={`nav-link ${activeTab === 'bom' ? 'active' : ''}`} onClick={() => setActiveTab('bom')}>Bill of Materials</button>
         </li>        
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'printbom' ? 'active' : ''}`} onClick={() => setActiveTab('printbom')}>Print BOM</button>
+          <button 
+            className="nav-link text-muted" 
+            style={{ cursor: 'not-allowed', opacity: 0.6 }}
+            disabled
+            title="Use 'Export to PDF' button in Bill of Materials tab instead"
+          >
+            Print BOM
+          </button>
         </li>
         <li className="nav-item">
           <button className={`nav-link ${activeTab === 'tariff' ? 'active' : ''}`} onClick={() => setActiveTab('tariff')}>Tariff</button>

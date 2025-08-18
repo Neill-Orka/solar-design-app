@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_URL } from './apiConfig';
 import { useNotification } from './NotificationContext';
-import { Card, Button, Form, Row, Col, Spinner, Tab, Tabs, Alert } from 'react-bootstrap';
+import { Card, Button, Form, Row, Col, Spinner, Tab, Tabs, Alert, Badge } from 'react-bootstrap';
 import { Line } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
@@ -261,6 +261,27 @@ function EnergyDataUpload({ projectId }) {
 
                   {selectedProfileId && (
                     <>
+                      {/* Display original profile metrics */}
+                      {(selectedProfile?.monthly_avg_kwh_original || selectedProfile?.max_peak_demand_kw) && (
+                        <div className="mb-3 p-3 bg-light rounded">
+                          <h6 className="mb-2">Original Profile Characteristics:</h6>
+                          <div className="d-flex flex-wrap gap-2">
+                            {selectedProfile?.monthly_avg_kwh_original && (
+                              <Badge bg="warning" className="text-dark">
+                                <i className="bi bi-calendar3 me-1"></i>
+                                {Math.round(selectedProfile.monthly_avg_kwh_original).toLocaleString()} kWh/month (original)
+                              </Badge>
+                            )}
+                            {selectedProfile?.max_peak_demand_kw && (
+                              <Badge bg="danger">
+                                <i className="bi bi-lightning-fill me-1"></i>
+                                {selectedProfile.max_peak_demand_kw.toFixed(2)} kW peak demand
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       <Row className="mb-3 align-items-center">
                         <Col md={6}>
                           <Form.Group>

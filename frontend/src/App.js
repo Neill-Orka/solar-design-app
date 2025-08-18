@@ -113,7 +113,7 @@ function App() {
             <Route path="/proposal/:id" element={<ProposalPage />} />
             <Route path="/tariffs" element={<TariffManager />} />
             <Route path="/rules" element={<RuleEditor />} />
-            <Route path="/print-bom" element={<PrintableBOM />} />
+            <Route path="/printable-bom/:projectId" element={<PrintableBOM />} />
           </Routes>
           </div>
       </Router>

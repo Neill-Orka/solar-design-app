@@ -1,13 +1,17 @@
 import React, { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import logo from './assets/orka_logo_text.png';
 import './PrintableBOM.css';
 
 /**
  * PrintableBOM (paginated, WYSIWYG, print-stable)
  */
-function PrintableBOM({ projectId }) {
+function PrintableBOM({ projectId: propProjectId }) {
   const navigate = useNavigate();
+  const { projectId: urlProjectId } = useParams();
+  
+  // Use projectId from props if available (when used in ProjectDashboard), otherwise from URL
+  const projectId = propProjectId || urlProjectId;
 
   // Retrieve data from localStorage (project-specific key)
   const bomData = JSON.parse(localStorage.getItem(`printBomData_${projectId}`) || '{}');

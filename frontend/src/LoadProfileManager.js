@@ -231,12 +231,28 @@ function LoadProfileManager() {
                                             <Col xs={12} md={8}>
                                                 <p className="fw-bold mb-1">{profile.name}</p>
                                                 <p className="text-muted text-sm mb-2">{profile.description}</p>
-                                                <Badge pill bg={profile.profile_type === 'Residential' ? 'success' : 'info'}>{profile.profile_type}</Badge>
-                                                {profile.annual_kwh > 0 && (
-                                                    <Badge pill bg="secondary" className='ms-2'>
-                                                        {Math.round(profile.annual_kwh/12).toLocaleString()} kWh/month
-                                                    </Badge>
-                                                )}
+                                                <div className="mb-2">
+                                                    <Badge pill bg={profile.profile_type === 'Residential' ? 'success' : 'info'}>{profile.profile_type}</Badge>
+                                                    {profile.annual_kwh > 0 && (
+                                                        <Badge pill bg="secondary" className='ms-2'>
+                                                            {Math.round(profile.annual_kwh/12).toLocaleString()} kWh/month (normalized)
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <div className="d-flex flex-wrap gap-2">
+                                                    {profile.monthly_avg_kwh_original && (
+                                                        <Badge pill bg="warning" className="text-dark">
+                                                            <i className="bi bi-calendar3 me-1"></i>
+                                                            {Math.round(profile.monthly_avg_kwh_original).toLocaleString()} kWh/month (original)
+                                                        </Badge>
+                                                    )}
+                                                    {profile.max_peak_demand_kw && (
+                                                        <Badge pill bg="danger">
+                                                            <i className="bi bi-lightning-fill me-1"></i>
+                                                            {profile.max_peak_demand_kw.toFixed(2)} kW peak
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                             </Col>
                                             <Col xs={12} md={4} className="d-flex flex-column justify-content-center align-items-md-end">
                                                 <ProfileMiniChart profileData={profile.profile_data} />

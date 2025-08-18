@@ -265,7 +265,9 @@ class LoadProfiles(db.Model):
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(200), nullable=True)
     profile_type = db.Column(db.String(50), nullable=False)  # 'residential', 'commercial'
-    annual_kwh = db.Column(db.Float, nullable=True)  # Annual energy consumption in kWh
+    annual_kwh = db.Column(db.Float, nullable=True)  # Annual energy consumption in kWh (normalized to 12 kWh)
+    monthly_avg_kwh_original = db.Column(db.Float, nullable=True)  # Monthly average consumption before normalization
+    max_peak_demand_kw = db.Column(db.Float, nullable=True)  # Maximum peak demand in kW before normalization
     profile_data = db.Column(JSONB, nullable=False)  # JSONB to store the load profile data
 
     def __repr__(self):
