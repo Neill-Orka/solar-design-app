@@ -686,15 +686,50 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
   const totals = useMemo(() => {
     const isDraft = (quoteStatus === 'draft');
     const list = Array.isArray(bomComponents) ? bomComponents : [];
+    
+    // Calculate selling price total
     const total_ex_vat = list.reduce((sum, c) => {
       const unit = getUnitPriceForRow(c, isDraft);
       return sum + unit * (Number(c.quantity) || 0);
     }, 0);
+    
+    // Calculate cost price total
+    const total_cost = list.reduce((sum, c) => {
+      const costPrice = computeUnitCost(c.product);
+      return sum + costPrice * (Number(c.quantity) || 0);
+    }, 0);
+    
+    // Calculate total markup
+    const total_markup = total_ex_vat - total_cost;
+    
     const vat_perc = 15;
     const vat_price = total_ex_vat * (vat_perc / 100);
     const total_in_vat = total_ex_vat * (1 + vat_perc / 100);
-    return { total_excl_vat: total_ex_vat, vat_perc: vat_perc, vat_price: vat_price, total_incl_vat: total_in_vat };
+    
+    return { 
+      total_excl_vat: total_ex_vat, 
+      total_cost: total_cost,
+      total_markup: total_markup,
+      vat_perc: vat_perc, 
+      vat_price: vat_price, 
+      total_incl_vat: total_in_vat 
+    };
   }, [bomComponents, quoteStatus]);
+
+  // Calculate total selling price per category
+  const categoryTotals = useMemo(() => {
+    const isDraft = (quoteStatus === 'draft');
+    const totals = {};
+    
+    Object.keys(grouped).forEach(cat => {
+      totals[cat] = grouped[cat].reduce((sum, c) => {
+        const unit = getUnitPriceForRow(c, isDraft);
+        return sum + unit * (Number(c.quantity) || 0);
+      }, 0);
+    });
+    
+    return totals;
+  }, [grouped, quoteStatus]);
 
 
   /* ---------- UI ---------- */
@@ -924,12 +959,16 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                         {sortedCategories.map(cat => (
                           <React.Fragment key={cat}>
                             <tr className="table-light">
-                              <td colSpan={7} className="py-1">
+                              <td colSpan={5} className="py-1">
                                 <div className="fw-semibold">
                                   <i className={`bi ${CATEGORY_META[cat]?.icon || 'bi-box'} me-1`} />
                                   {CATEGORY_META[cat]?.name || cat}
                                 </div>
                               </td>
+                              <td className="py-1 text-end fw-semibold">
+                                {formatCurrency(categoryTotals[cat] || 0)}
+                              </td>
+                              <td className="py-1"></td>
                             </tr>
                             {grouped[cat].map(comp => {
                               const isDraft = (quoteStatus === 'draft');
@@ -991,17 +1030,20 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                         
                         {/* Totals rows */}
                         <tr className="border-top border-dark">
-                          <td colSpan={5} className="text-end fw-semibold">Total (excl. VAT):</td>
+                          <td className="fw-semibold">Cost Price: {formatCurrency(totals.total_cost)}</td>
+                          <td colSpan={4} className="text-end fw-semibold">Total (excl. VAT):</td>
                           <td className="text-end fw-semibold">{formatCurrency(totals.total_excl_vat)}</td>
                           <td></td>
                         </tr>
                         <tr>
-                          <td colSpan={5} className="text-end fw-semibold">{ totals.vat_perc ? `${totals.vat_perc}% VAT` : 'VAT:'}</td>
+                          <td className="fw-semibold">Total Markup: {formatCurrency(totals.total_markup)}</td>
+                          <td colSpan={4} className="text-end fw-semibold">{ totals.vat_perc ? `${totals.vat_perc}% VAT` : 'VAT:'}</td>
                           <td className="text-end fw-semibold">{formatCurrency(totals.vat_price)}</td>
                           <td></td>
                         </tr>
                         <tr className="border-top border-dark">
-                          <td colSpan={5} className="text-end fw-bold">Total (incl. VAT):</td>
+                          <td className="fw-semibold"></td>
+                          <td colSpan={4} className="text-end fw-bold">Total (incl. VAT):</td>
                           <td className="text-end fw-bold">{formatCurrency(totals.total_incl_vat)}</td>
                           <td></td>
                         </tr>

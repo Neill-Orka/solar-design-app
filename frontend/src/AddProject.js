@@ -26,7 +26,7 @@ function AddProject() {
     project_value_excl_vat: '0',
     site_contact_person: '',
     site_phone: '0',
-    design_type: '',
+    design_type: 'Detailed',
     project_type: 'Commercial',
     tariff_id: null,
     custom_flat_rate: null
@@ -81,11 +81,11 @@ function AddProject() {
       return;
     }
 
-    if (!projectData.design_type) {
-      setError('Please select a design type.');
-      setLoading(false);
-      return;
-    }
+    // if (!projectData.design_type) {
+    //   setError('Please select a design type.');
+    //   setLoading(false);
+    //   return;
+    // }
 
     if (!projectData.system_type) {
       setError('Please select a system type.');
@@ -128,8 +128,8 @@ function AddProject() {
     try {
       await axios.post(`${API_URL}/api/projects`, {
         ...projectData,
-        latitude: parseFloat(projectData.latitude) || null,
-        longitude: parseFloat(projectData.longitude) || null,
+        latitude: parseFloat(projectData.latitude) || -25.9895,
+        longitude: parseFloat(projectData.longitude) || 28.1284,
         client_id: clientId
       });
       setShowToast(true);
@@ -163,7 +163,7 @@ function AddProject() {
               {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
 
               {/* Design Type Selection */}
-              <div className="mb-5">
+              {/* <div className="mb-5">
                 <h5 className="fw-semibold mb-3">
                   <i className="bi bi-gear-fill me-2"></i>Design Type
                 </h5>
@@ -185,7 +185,7 @@ function AddProject() {
                     <i className="bi bi-tools me-2"></i>Detailed Design
                   </Button>
                 </div>
-              </div>
+              </div> */}
 
               <Form onSubmit={handleSubmit}>
                 {/* Client Selection Section */}
@@ -392,110 +392,6 @@ function AddProject() {
                     </Form.Group>
                   </Card.Body>
                 </Card>
-
-                {/* Detailed Design Section */}
-                {/* {projectData.design_type === 'Detailed' && (
-                  <Card className="border-light mb-4">
-                    <Card.Header className="bg-light border-0">
-                      <h5 className="mb-0 fw-semibold">
-                        <i className="bi bi-tools me-2"></i>System Configuration
-                      </h5>
-                    </Card.Header>
-                    <Card.Body className="p-4">
-                      <Row>
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label className="fw-semibold">Panel Size (kWp)</Form.Label>
-                            <Form.Control 
-                              type="number" 
-                              name="panel_kw" 
-                              value={projectData.panel_kw} 
-                              onChange={handleInputChange} 
-                              step="0.1" 
-                              size="lg"
-                              className="rounded-lg"
-                            />
-                          </Form.Group>
-                        </Col>
-                        
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label className="fw-semibold">Inverter Size (kVA)</Form.Label>
-                            <Form.Control 
-                              type="number" 
-                              name="inverter_kva" 
-                              value={projectData.inverter_kva} 
-                              onChange={handleInputChange} 
-                              step="0.1" 
-                              size="lg"
-                              className="rounded-lg"
-                            />
-                          </Form.Group>
-                        </Col>
-                        
-                        {projectData.system_type !== 'grid' && (
-                          <Col md={4}>
-                            <Form.Group className="mb-3">
-                              <Form.Label className="fw-semibold">Battery Size (kWh)</Form.Label>
-                              <Form.Control 
-                                type="number" 
-                                name="battery_kwh" 
-                                value={projectData.battery_kwh} 
-                                onChange={handleInputChange} 
-                                step="0.1" 
-                                size="lg"
-                                className="rounded-lg"
-                              />
-                            </Form.Group>
-                          </Col>
-                        )}     
-                        
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label className="fw-semibold">Project Value (excl. VAT)</Form.Label>
-                            <Form.Control 
-                              type="number" 
-                              name="project_value_excl_vat" 
-                              value={projectData.project_value_excl_vat} 
-                              onChange={handleInputChange} 
-                              step="0.01" 
-                              size="lg"
-                              className="rounded-lg"
-                            />
-                          </Form.Group>
-                        </Col>
-
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label className="fw-semibold">Site Contact Person</Form.Label>
-                            <Form.Control 
-                              type="text" 
-                              name="site_contact_person" 
-                              value={projectData.site_contact_person} 
-                              onChange={handleInputChange} 
-                              size="lg"
-                              className="rounded-lg"
-                            />
-                          </Form.Group>
-                        </Col>
-
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label className="fw-semibold">Site Phone</Form.Label>
-                            <Form.Control 
-                              type="text" 
-                              name="site_phone" 
-                              value={projectData.site_phone} 
-                              onChange={handleInputChange} 
-                              size="lg"
-                              className="rounded-lg"
-                            />
-                          </Form.Group>
-                        </Col>                 
-                      </Row>
-                    </Card.Body>
-                  </Card>
-                )} */}
 
                 {/* Submit Buttons */}
                 <div className="d-flex gap-3 mt-5">
