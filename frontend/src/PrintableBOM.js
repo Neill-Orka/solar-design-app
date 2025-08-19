@@ -172,7 +172,7 @@ function PrintableBOM({ projectId: propProjectId }) {
 
   const totalPages = pagesWithKinds.length;
 
-  const renderHeader = () => (
+const renderHeader = () => (
     <header className="bom-header">
       <div className="bom-header-top">
         <img className="bom-logo" src={logo} alt="Orka Solar Logo" />

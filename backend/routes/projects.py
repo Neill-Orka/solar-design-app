@@ -78,6 +78,7 @@ def get_project_by_id(project_id):
         from_standard_template = getattr(project, 'from_standard_template', False)
         template_id = getattr(project, 'template_id', None)
         template_name = getattr(project, 'template_name', None)
+        bom_modified = getattr(project, 'bom_modified', False)
 
         return jsonify({
             'id': project.id,
@@ -91,6 +92,7 @@ def get_project_by_id(project_id):
             'system_type': project.system_type,
             'panel_kw': project.panel_kw,
             'panel_id': project.panel_id,
+            'num_panels': project.num_panels,
             'inverter_kva': project.inverter_kva,
             'inverter_ids': inverter_ids,
             'battery_ids': battery_ids,
@@ -112,6 +114,7 @@ def get_project_by_id(project_id):
             'from_standard_template': from_standard_template,
             'template_id': template_id,
             'template_name': template_name,
+            'bom_modified': bom_modified,
         })
     except Exception as e:
         # Add better error logging

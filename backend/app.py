@@ -15,7 +15,7 @@ import sys
 app = Flask(__name__)
 app.config.from_object(Config)
 # Update CORS for production - add your Vercel domain
-CORS(app, origins=["http://localhost:3000", "https://your-app-name.vercel.app"], supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
+CORS(app, origins=["http://localhost:3000", "https://solar-design-app.vercel.app"], supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
 
 # Initialize extensions
 db.init_app(app)

@@ -46,4 +46,5 @@ class Config:
     
     # Application settings
     ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'your-email@orkasolar.co.za')  # Your admin email
-    # SECRET_KEY = 'your-secret-key'  # Optional: for future auth, sessions
+    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')  # Frontend URL for invitation links
+    ENV = os.environ.get('FLASK_ENV', 'development')  # Environment (development/production)

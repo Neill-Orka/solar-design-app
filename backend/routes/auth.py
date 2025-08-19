@@ -4,12 +4,75 @@ from flask_jwt_extended import (
     create_access_token, create_refresh_token, 
     jwt_required, get_jwt_identity, get_jwt
 )
+from flask_mail import Message
 from models import db, User, RefreshToken, AuditLog, UserRole
 from datetime import datetime, timedelta
 import re
 from functools import wraps
 
 auth_bp = Blueprint('auth', __name__)
+
+def send_invitation_email(user, invitation_token):
+    """Send invitation email to user"""
+    try:
+        from app import mail  # Import mail instance
+        
+        frontend_url = current_app.config.get('FRONTEND_URL', 'https://your-app-name.vercel.app')
+        invitation_link = f"{frontend_url}/accept-invitation/{invitation_token}"
+        
+        msg = Message(
+            subject='Invitation to join Orka Solar Design Platform',
+            sender=current_app.config['MAIL_DEFAULT_SENDER'],
+            recipients=[user.email],
+            html=f"""
+            <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; color: white; text-align: center;">
+                    <h1 style="margin: 0; font-size: 24px;">Welcome to Orka Solar</h1>
+                    <p style="margin: 10px 0 0 0; opacity: 0.9;">Design Platform Invitation</p>
+                </div>
+                
+                <div style="padding: 30px; background: #f9f9f9; border-radius: 10px; margin-top: 20px;">
+                    <h2 style="color: #333; margin-top: 0;">Hi {user.first_name}!</h2>
+                    
+                    <p style="color: #555; line-height: 1.6;">
+                        You've been invited to join the Orka Solar Design Platform. Click the button below to accept your invitation and set up your account.
+                    </p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{invitation_link}" 
+                           style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                  color: white; 
+                                  padding: 15px 30px; 
+                                  text-decoration: none; 
+                                  border-radius: 8px; 
+                                  font-weight: bold; 
+                                  display: inline-block;">
+                            Accept Invitation
+                        </a>
+                    </div>
+                    
+                    <p style="color: #888; font-size: 14px;">
+                        This invitation will expire in 7 days. If you're unable to click the button, copy and paste this link into your browser:
+                    </p>
+                    <p style="color: #667eea; word-break: break-all; font-size: 14px;">
+                        {invitation_link}
+                    </p>
+                </div>
+                
+                <div style="text-align: center; margin-top: 20px; color: #888; font-size: 12px;">
+                    <p>© 2025 Orka Solar. All rights reserved.</p>
+                </div>
+            </body>
+            </html>
+            """
+        )
+        
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Failed to send invitation email: {e}")
+        return False
 
 def validate_email_domain(email):
     """Validate that email belongs to orkasolar.co.za domain"""
@@ -298,14 +361,21 @@ def invite_user():
             'role': role.value
         })
         
-        # TODO: Send invitation email here
-        invitation_link = f"{current_app.config.get('FRONTEND_URL', 'http://localhost:3000')}/accept-invitation/{invitation_token}"
+        # Send invitation email
+        email_sent = send_invitation_email(user, invitation_token)
         
-        return jsonify({
+        response_data = {
             'message': 'User invited successfully',
             'user': user.to_dict(),
-            'invitation_link': invitation_link  # In production, this would be sent via email
-        }), 201
+            'email_sent': email_sent
+        }
+        
+        # Include invitation link in development
+        if current_app.config.get('ENV') == 'development':
+            frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:3000')
+            response_data['invitation_link'] = f"{frontend_url}/accept-invitation/{invitation_token}"
+        
+        return jsonify(response_data), 201
         
     except Exception as e:
         db.session.rollback()

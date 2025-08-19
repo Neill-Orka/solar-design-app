@@ -1018,7 +1018,7 @@ function MainReportContent({
                             {formatValue(data?.project?.panel_kw || 64.41)} <span style={{ fontSize: '14px' }}>kWp</span>
                         </div>
                         <div style={{ fontSize: '14px' }}>
-                            {Math.ceil((data?.project?.panel_kw || 64.41) * 1000 / 565)} panels
+                            {data?.project?.num_panels || Math.ceil((data?.project?.panel_kw || 64.41) * 1000 / 565)} panels
                         </div>
                     </div>
 
@@ -1132,7 +1132,7 @@ function MainReportContent({
                             </tr>
                             <tr>
                                 <td>Number of panels</td>
-                                <td className="text-end">{Math.ceil((data?.project?.panel_kw || 0) * 1000 / 565) || 0}</td>
+                                <td className="text-end">{data?.project?.num_panels || Math.ceil((data?.project?.panel_kw || 0) * 1000 / 565) || 0}</td>
                                 <td>ea</td>
                             </tr>
                             <tr>

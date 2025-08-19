@@ -184,6 +184,53 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
+  // Auto-save BOM when design modifications are detected for standard designs
+  useEffect(() => {
+    const autoSaveBOM = async () => {
+      if (!isStandardDesign || !bomComponents.length) return;
+      
+      const designModified = sessionStorage.getItem(`systemDesignModified_${projectId}`) === 'true';
+      if (designModified) {
+        try {
+          // Auto-save the current BOM state to preserve design changes
+          const parsedExtras = parseFloat(extrasCost || '0') || 0;
+          const isDraft = (quoteStatus === 'draft');
+
+          const components = bomComponents.map(c => {
+            const liveUnit = computeDerivedUnitFromRow(c);
+            const liveCost = computeUnitCost(c.product);
+            return {
+              product_id: c.product.id,
+              quantity: Math.max(1, Number(c.quantity) || 1),
+              override_margin: c.override_margin ?? null,
+              price_at_time: isDraft ? null : (c.price_at_time ?? liveUnit),
+              unit_cost_at_time: isDraft ? null : (c.unit_cost_at_time ?? liveCost)
+            };
+          });
+
+          await axios.post(`${API_URL}/api/projects/${projectId}/bom`, {
+            project_id: projectId,
+            components,
+            extras_cost: parsedExtras,
+            quote_status: quoteStatus,
+            from_standard_template: !!isStandardDesign,
+            template_id: templateInfo?.id || null,
+            template_name: templateInfo?.name || null
+          });
+
+          console.log('Auto-saved BOM with design modifications');
+        } catch (err) {
+          console.warn('Auto-save BOM failed:', err);
+        }
+      }
+    };
+
+    // Only auto-save after initial load is complete
+    if (!loading && bomComponents.length > 0) {
+      autoSaveBOM();
+    }
+  }, [bomComponents, isStandardDesign, projectId, extrasCost, quoteStatus, templateInfo, loading]);
+
   // Fuse instance for fuzzy search
   const fuse = useMemo(() => {
     const options = {
@@ -262,9 +309,8 @@ const overlayFromProject = (items, projectData, productsData) => {
     const prod = productsData.find(p => p.id === projectData.panel_id);
     if (prod) {
       result = result.filter(x => x.product?.category !== 'panel');
-      const qty = (projectData.panel_kw && prod.power_w)
-        ? Math.max(1, Math.ceil((Number(projectData.panel_kw) * 1000) / Number(prod.power_w)))
-        : 1;
+      // Use stored num_panels directly instead of calculating to avoid rounding issues
+      const qty = projectData.num_panels || 1;
       result.push({ product: prod, quantity: qty, price_at_time: null, current_price: computeDerivedUnitFromRow({ product: prod }) });
     }
   }
@@ -306,141 +352,96 @@ const overlayFromProject = (items, projectData, productsData) => {
   return result;
 };
 
-  /* ---------- Loader with single source-of-truth priority ---------- */
+  /* ---------- NEW HYBRID BOM LOADER ---------- */
 const loadProjectBOM = async (pid, productsData, projectData) => {
-  let loaded = false;
-  const designModified = sessionStorage.getItem(`systemDesignModified_${pid}`) === 'true';
+  console.log('Loading BOM with hybrid approach. Project data:', {
+    bom_modified: projectData?.bom_modified,
+    template_id: projectData?.template_id,
+    template_name: projectData?.template_name
+  });
 
-  // Check if this is a standard design (has template info)
-  const isStandardDesign = projectData?.template_id || projectData?.template_name;
+  const CORE_COMPONENTS = ['panel', 'inverter', 'battery']; // Always from SystemDesign
+  let finalComponents = [];
 
-  // For standard designs, always load from template first (to get latest template + design changes)
-  // For custom designs, prioritize saved BOM (to preserve manual changes and margin overrides)
-  
-  if (isStandardDesign) {
-    // STANDARD DESIGN: Load template first, then overlay saved margin overrides
-    try {
-      let tmpl = null;
-      if (projectData.template_id) tmpl = await fetchTemplateById(projectData.template_id);
-      if (!tmpl && projectData.template_name) tmpl = await fetchTemplateByName(projectData.template_name);
-      if (tmpl) {
-        let templateItems = mapTemplateToItems(tmpl, productsData);
-        if (tmpl.extras_cost !== undefined && tmpl.extras_cost !== null) {
-          setExtrasCost(String(tmpl.extras_cost));
+  try {
+    // Step 1: Determine BOM source strategy
+    const hasBOMInDatabase = projectData?.bom_modified === true;
+    const hasTemplate = projectData?.template_id || projectData?.template_name;
+
+    if (hasBOMInDatabase) {
+      // USER HAS MODIFIED BOM: Load from database + overlay core components
+      console.log('Loading from database (user has modified BOM)');
+      
+      try {
+        const bomRes = await axios.get(`${API_URL}/api/projects/${pid}/bom`);
+        const savedComponents = bomRes.data || [];
+        
+        if (savedComponents.length > 0) {
+          // Load saved BOM components
+          finalComponents = savedComponents.map(saved => {
+            const product = productsData.find(p => p.id === saved.product_id);
+            return {
+              product,
+              quantity: saved.quantity,
+              price_at_time: saved.price_at_time,
+              current_price: saved.current_price,
+              override_margin: saved.override_margin
+            };
+          }).filter(item => item.product); // Remove any with missing products
+
+          // Set metadata
+          const meta = savedComponents.find(x => x.quote_status || x.extras_cost);
+          if (meta?.quote_status) setQuoteStatus(meta.quote_status);
+          if (meta?.extras_cost !== undefined) setExtrasCost(String(meta.extras_cost));
         }
+      } catch (e) {
+        console.warn('Failed to load saved BOM:', e);
+      }
+
+      // Overlay core components from SystemDesign
+      finalComponents = overlayFromProject(finalComponents, projectData, productsData);
+
+    } else if (hasTemplate) {
+      // FRESH TEMPLATE: Load template + overlay core components
+      console.log('Loading from template (fresh/unmodified)');
+      
+      try {
+        let tmpl = null;
+        if (projectData.template_id) tmpl = await fetchTemplateById(projectData.template_id);
+        if (!tmpl && projectData.template_name) tmpl = await fetchTemplateByName(projectData.template_name);
         
-        // Apply design modifications (panel/inverter/battery changes)
-        const items = designModified
-          ? overlayFromProject(templateItems, projectData, productsData)
-          : templateItems;
-        
-        // Now overlay any saved margin overrides from the database
-        try {
-          const bomRes = await axios.get(`${API_URL}/api/projects/${pid}/bom`);
-          const savedData = bomRes.data || [];
-          if (savedData.length > 0) {
-            const meta = savedData.find(x => x.quote_status || x.extras_cost);
-            if (meta?.quote_status) setQuoteStatus(meta.quote_status);
-            if (meta?.extras_cost !== undefined && meta?.extras_cost !== null) {
-              setExtrasCost(String(meta.extras_cost));
-            }
-            
-            // Overlay saved margin overrides onto template items
-            items.forEach(item => {
-              const savedItem = savedData.find(saved => saved.product_id === item.product.id);
-              if (savedItem && savedItem.override_margin !== null && savedItem.override_margin !== undefined) {
-                item.override_margin = savedItem.override_margin;
-              }
-            });
+        if (tmpl) {
+          // Load template components
+          finalComponents = mapTemplateToItems(tmpl, productsData);
+          
+          // Set template metadata
+          if (tmpl.extras_cost !== undefined && tmpl.extras_cost !== null) {
+            setExtrasCost(String(tmpl.extras_cost));
           }
-        } catch (e) {
-          console.warn('Failed to load saved margin overrides:', e);
+          
+          // Overlay core components from SystemDesign
+          finalComponents = overlayFromProject(finalComponents, projectData, productsData);
         }
-        
-        setBomComponents(items);
-        loaded = true;
+      } catch (e) {
+        console.warn('Template fetch failed:', e);
       }
-    } catch (e) {
-      console.warn('Template fetch failed:', e);
+    } else {
+      // NO TEMPLATE: Only core components from SystemDesign
+      console.log('Loading core components only (no template)');
+      finalComponents = overlayFromProject([], projectData, productsData);
     }
-  } else {
-    // CUSTOM DESIGN: Prioritize saved BOM data (preserves manual changes and margin overrides)
-    try {
-      const bomRes = await axios.get(`${API_URL}/api/projects/${pid}/bom`);
-      const list = bomRes.data || [];
-      if (list.length) {
-        const meta = list.find(x => x.quote_status || x.extras_cost);
-        if (meta?.quote_status) setQuoteStatus(meta.quote_status);
-        if (meta?.extras_cost !== undefined && meta?.extras_cost !== null) {
-          setExtrasCost(String(meta.extras_cost));
-        }
-        const savedBOM = list.map(row => {
-          const prod = productsData.find(p => p.id === row.product_id);
-          if (!prod) return null;
-          const bomItem = {
-            product: prod,
-            quantity: Number(row.quantity) || 1,
-            override_margin: row.override_margin ?? null,
-            price_at_time: (row.price_at_time ?? null),
-          };
-          // Include override_margin when computing current_price
-          bomItem.current_price = computeDerivedUnitFromRow(bomItem);
-          return bomItem;
-        }).filter(Boolean);
-        
-        if (savedBOM.length > 0) {
-          setBomComponents(savedBOM);
-          loaded = true;
-        }
-      }
-    } catch (e) {
-      console.warn('Saved BOM load failed:', e);
-    }
-  }
 
-  // Last resort: init from SystemDesign (core only)
-  if (!loaded && projectData) {
-    const init = initializeFromSystemDesign(projectData, productsData);
-    setBomComponents(init);
+    // Set the final components
+    setBomComponents(finalComponents);
+    console.log('Final BOM components:', finalComponents.length, 'items');
+
+  } catch (err) {
+    console.error('BOM loading failed:', err);
+    showNotification('Failed to load Bill of Materials', 'danger');
   }
 };
 
-
   /* ---------- Overlay helpers ---------- */
-  const overlayCoreFromSystemDesign = (templateItems, projectData, productsData) => {
-    const result = [...templateItems];
-
-    // Replace inverter lines if provided
-    if (projectData.inverter_ids?.length) {
-      // Remove all inverter items
-      for (let i = result.length - 1; i >= 0; i--) {
-        if (result[i].product?.category === 'inverter') result.splice(i, 1);
-      }
-      // Add selected inverters (1 each by default)
-      projectData.inverter_ids.forEach(id => {
-        const prod = productsData.find(p => p.id === id);
-        if (prod) {
-          result.push({ product: prod, quantity: 1, price_at_time: null, current_price: computeDerivedUnitFromRow({ product: prod }) });
-        }
-      });
-    }
-
-    // Replace battery lines if provided
-    if (projectData.battery_ids?.length) {
-      for (let i = result.length - 1; i >= 0; i--) {
-        if (result[i].product?.category === 'battery') result.splice(i, 1);
-      }
-      projectData.battery_ids.forEach(id => {
-        const prod = productsData.find(p => p.id === id);
-        if (prod) {
-          result.push({ product: prod, quantity: 1, price_at_time: null, current_price: computeDerivedUnitFromRow({ product: prod }) });
-        }
-      });
-    }
-
-    return result;
-  };
-
   const initializeFromSystemDesign = (projectData, productsData) => {
     const items = [];
 
@@ -777,6 +778,16 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
 
   // Add this function to prepare BOM data and navigate to print view
   const handleExportToPdf = async () => {
+    // AUTO-SAVE: Save BOM to database before exporting
+    try {
+      await saveBOM(); // This will mark bom_modified = true
+      showNotification('BOM saved and exported to PDF', 'success');
+    } catch (error) {
+      console.error('Failed to save BOM before export:', error);
+      showNotification('Warning: Failed to save BOM before export', 'warning');
+      // Continue with export even if save fails
+    }
+
     // CRITICAL FIX: Ensure we have the latest BOM data before printing
     // This prevents stale data from being printed when coming from SystemDesign
     
@@ -841,8 +852,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
       categories: categoriesForPrint
     }));
 
-    // Clear the design modified flag since we've now captured the latest state
-    sessionStorage.removeItem(`systemDesignModified_${projectId}`);
+    // DON'T clear the design modified flag here - keep it so design changes persist
+    // sessionStorage.removeItem(`systemDesignModified_${projectId}`);
 
     // Navigate to the print view within the project dashboard if possible, otherwise open in new window
     if (onNavigateToPrintBom) {

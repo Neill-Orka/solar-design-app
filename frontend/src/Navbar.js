@@ -7,6 +7,7 @@ import './Navbar.css';
 const Navbar = () => {
   const { user, logout, canModifyProjects, canModifyProducts } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
 
   const handleLogout = async () => {
@@ -26,11 +27,23 @@ const Navbar = () => {
     setIsDropdownOpen(false);
   };
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         closeDropdown();
+      }
+      // Close mobile menu when clicking outside navbar
+      if (!event.target.closest('.navbar')) {
+        closeMobileMenu();
       }
     };
 
@@ -85,16 +98,15 @@ const Navbar = () => {
         <button
           className="navbar-toggler"
           type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarNav"
+          onClick={toggleMobileMenu}
           aria-controls="navbarNav"
-          aria-expanded="false"
+          aria-expanded={isMobileMenuOpen}
           aria-label="Toggle navigation"
         >
           <span className="navbar-toggler-icon"></span>
         </button>
 
-        <div className="collapse navbar-collapse justify-content-center" id="navbarNav">
+        <div className={`navbar-collapse justify-content-center ${isMobileMenuOpen ? 'show' : 'collapse'}`} id="navbarNav">
           <div className="position-absolute top-1 start-50 translate-middle-x">
             <ul className="navbar-nav">
               {getNavLinks().map(link => (
@@ -105,6 +117,7 @@ const Navbar = () => {
                     className={({ isActive }) =>
                       `nav-link navbar-link ${isActive ? 'active' : ''}`
                     }
+                    onClick={closeMobileMenu}
                   >
                     {link.label}
                   </NavLink>

@@ -154,7 +154,8 @@ export default function ProductsAdmin() {
             // Auto-calculate price when unit_cost or margin changes
             if (k === 'unit_cost' || k === 'margin') {
                 const unitCost = k === 'unit_cost' ? v : prevForm.unit_cost;
-                const margin = k === 'margin' ? formatMarginForBackend(v) : prevForm.margin;
+                // Convert margin to decimal format for calculation
+                const margin = k === 'margin' ? formatMarginForBackend(v) : formatMarginForBackend(prevForm.margin);
                 newForm.price = calculatePrice(unitCost, margin).toFixed(2);
             }
             

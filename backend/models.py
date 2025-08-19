@@ -154,6 +154,7 @@ class Projects(db.Model):
     description = db.Column(db.String(200), nullable=True)
     system_type = db.Column(db.String(20))
     panel_kw = db.Column(db.Float)
+    num_panels = db.Column(db.Integer, nullable=True)  # Store actual panel count
     inverter_kva = db.Column(JSONB)
     battery_kwh = db.Column(JSONB)
     panel_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)
@@ -178,6 +179,7 @@ class Projects(db.Model):
     from_standard_template = db.Column(db.Boolean, default=False)
     template_id = db.Column(db.Integer, nullable=True)
     template_name = db.Column(db.String(100), nullable=True)
+    bom_modified = db.Column(db.Boolean, default=False)  # Track if user has modified BOM
 
     energy_data = db.relationship('EnergyData', backref='project', lazy=True)
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")

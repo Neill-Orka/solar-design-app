@@ -96,7 +96,8 @@ function ExecutiveSummary({ data, pageNumber = 1, totalPages = 24 }) {
   const summary1 = `Orka Solar is pleased to respond to the request for ${typeText}.`;
 
   const PANEL_WATTAGE_W = 565;
-  const num_panels = Math.ceil((project.panel_kw * 1000) / PANEL_WATTAGE_W);
+  // Use stored num_panels if available, otherwise calculate as fallback
+  const num_panels = project.num_panels || Math.ceil((project.panel_kw * 1000) / PANEL_WATTAGE_W);
 
   // Add this helper function after the existing helper functions (around line 35):
   const calculateBatteryAt100 = (batteryKwh) => {

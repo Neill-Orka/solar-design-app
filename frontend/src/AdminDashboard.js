@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { API_URL } from './apiConfig';
 import './AdminDashboard.css';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const AdminDashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const [users, setUsers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteFirstName, setInviteFirstName] = useState('');
+  const [inviteLastName, setInviteLastName] = useState('');
   const [inviteRole, setInviteRole] = useState('design');
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState(false);
@@ -31,7 +32,7 @@ const AdminDashboard = () => {
 
   const fetchUsers = React.useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/admin/users`, {
+      const response = await fetch(`${API_URL}/api/auth/admin/users`, {
         headers: getAuthHeaders()
       });
 
@@ -49,7 +50,7 @@ const AdminDashboard = () => {
 
   const fetchAuditLogs = React.useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/admin/audit-logs`, {
+      const response = await fetch(`${API_URL}/api/auth/admin/audit-logs`, {
         headers: getAuthHeaders()
       });
 
@@ -88,11 +89,13 @@ const AdminDashboard = () => {
     setMessage('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/admin/invite`, {
+      const response = await fetch(`${API_URL}/api/auth/admin/invite`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
           email: inviteEmail,
+          first_name: inviteFirstName,
+          last_name: inviteLastName,
           role: inviteRole
         })
       });
@@ -102,6 +105,8 @@ const AdminDashboard = () => {
       if (response.ok) {
         setMessage(`Invitation sent to ${inviteEmail}`);
         setInviteEmail('');
+        setInviteFirstName('');
+        setInviteLastName('');
         fetchUsers(); // Refresh users list
       } else {
         setMessage(data.message || 'Failed to send invitation');
@@ -117,7 +122,7 @@ const AdminDashboard = () => {
   const handleToggleUserStatus = async (userId, currentStatus) => {
     try {
       const action = currentStatus ? 'deactivate' : 'activate';
-      const response = await fetch(`${API_BASE_URL}/api/auth/admin/users/${userId}/${action}`, {
+      const response = await fetch(`${API_URL}/api/auth/admin/users/${userId}/${action}`, {
         method: 'POST',
         headers: getAuthHeaders()
       });
@@ -198,6 +203,30 @@ const AdminDashboard = () => {
             <h2>Invite New User</h2>
             <form onSubmit={handleInviteUser} className="invite-form">
               <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="firstName">First Name</label>
+                  <input
+                    type="text"
+                    id="firstName"
+                    value={inviteFirstName}
+                    onChange={(e) => setInviteFirstName(e.target.value)}
+                    placeholder="John"
+                    required
+                    disabled={inviting}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="lastName">Last Name</label>
+                  <input
+                    type="text"
+                    id="lastName"
+                    value={inviteLastName}
+                    onChange={(e) => setInviteLastName(e.target.value)}
+                    placeholder="Doe"
+                    required
+                    disabled={inviting}
+                  />
+                </div>
                 <div className="form-group">
                   <label htmlFor="email">Email Address</label>
                   <input
