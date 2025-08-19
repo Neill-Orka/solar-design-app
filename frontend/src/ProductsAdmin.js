@@ -243,7 +243,10 @@ export default function ProductsAdmin() {
             setShowModal(false);
             fetchProducts();
         })
-        .catch(err => setError('Failed to save product'))
+        .catch(err => {
+            const detail = err.response?.data?.details || err.response?.data?.message || err.message;
+            setError('Failed to save product: ' + detail);
+        })
         .finally(() => setLoading(false))
     };
 
