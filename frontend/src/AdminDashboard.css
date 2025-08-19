@@ -327,3 +327,88 @@
     padding: 8px;
   }
 }
+
+/* Token generation styles */
+.token-generation-section {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+}
+
+.token-generation-section h2 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.token-form .form-row {
+  display: flex;
+  gap: 20px;
+  align-items: end;
+}
+
+.generate-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  height: fit-content;
+}
+
+.generate-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.generate-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tokens-list {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tokens-table {
+  overflow-x: auto;
+}
+
+.tokens-table table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.tokens-table th,
+.tokens-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.tokens-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #333;
+}
+
+.tokens-table code {
+  background: #f1f3f4;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.status-badge.used {
+  background: #f8d7da;
+  color: #721c24;
+}

@@ -6,7 +6,7 @@ import ToastNotification from './ToastNotification';
 import ProtectedRoute from './ProtectedRoute';
 import Navbar from './Navbar';
 import Login from './Login';
-import AcceptInvitation from './AcceptInvitation';
+import Registration from './Registration';
 import AdminDashboard from './AdminDashboard';
 import Home from './Home';
 import Clients from './Clients';
@@ -50,7 +50,7 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
+            <Route path="/register" element={<Registration />} />
             <Route path="/*" element={<AuthenticatedApp />} />
           </Routes>
         </Router>

@@ -17,11 +17,8 @@ const Login = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/');
-      }
+      // Always redirect to home page for all users
+      navigate('/');
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -119,7 +116,7 @@ const Login = () => {
 
         <div className="login-footer">
           <p>Only Orka Solar team members can access this system.</p>
-          <p>Need access? Contact your administrator.</p>
+          <p>Need an account? <a href="/register">Register with a token</a></p>
         </div>
       </div>
     </div>

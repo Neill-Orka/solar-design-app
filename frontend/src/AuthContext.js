@@ -56,15 +56,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    const accessToken = localStorage.getItem('access_token');
     const refreshToken = localStorage.getItem('refresh_token');
     
     // Call logout endpoint to invalidate tokens
-    if (refreshToken) {
+    if (refreshToken && accessToken) {
       try {
         await fetch(`${API_URL}/api/auth/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
           },
           body: JSON.stringify({ refresh_token: refreshToken })
         });
@@ -73,6 +75,7 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
+    // Clear user state and tokens
     setUser(null);
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');

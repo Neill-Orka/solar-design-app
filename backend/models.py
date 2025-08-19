@@ -34,14 +34,8 @@ class User(db.Model):
     last_login = db.Column(db.DateTime, nullable=True)
     profile_picture = db.Column(db.String(255), nullable=True)
     
-    # Invitation system
-    invitation_token = db.Column(db.String(255), nullable=True)
-    invitation_expires = db.Column(db.DateTime, nullable=True)
-    invited_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    
     # Relationships
     created_by = db.relationship('User', remote_side=[id], foreign_keys=[created_by_id])
-    invited_by = db.relationship('User', remote_side=[id], foreign_keys=[invited_by_id])
     
     def set_password(self, password):
         """Set password hash"""
@@ -50,18 +44,6 @@ class User(db.Model):
     def check_password(self, password):
         """Check password against hash"""
         return bcrypt.check_password_hash(self.password_hash, password)
-    
-    def generate_invitation_token(self):
-        """Generate secure invitation token"""
-        self.invitation_token = secrets.token_urlsafe(32)
-        self.invitation_expires = datetime.utcnow() + timedelta(days=7)
-        return self.invitation_token
-    
-    def is_invitation_valid(self):
-        """Check if invitation token is still valid"""
-        return (self.invitation_token and 
-                self.invitation_expires and 
-                self.invitation_expires > datetime.utcnow())
     
     @property
     def full_name(self):
@@ -78,9 +60,72 @@ class User(db.Model):
             'is_active': self.is_active,
             'is_email_verified': self.is_email_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None,
-            'profile_picture': self.profile_picture
+            'last_login': self.last_login.isoformat() if self.last_login else None
         }
+
+
+class RegistrationToken(db.Model):
+    __tablename__ = 'registration_tokens'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(64), unique=True, nullable=False)
+    role = db.Column(db.String(10), nullable=False)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    is_used = db.Column(db.Boolean, default=False)
+    used_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    used_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    used_by = db.relationship('User', foreign_keys=[used_by_id])
+    
+    @staticmethod
+    def generate_token():
+        """Generate a secure 8-character token"""
+        import string
+        import secrets
+        alphabet = string.ascii_uppercase + string.digits
+        return ''.join(secrets.choice(alphabet) for _ in range(8))
+    
+    @property
+    def role_enum(self):
+        """Get the role as a UserRole enum"""
+        return UserRole(self.role.lower())  # Convert to lowercase for UserRole enum
+    
+    @role_enum.setter
+    def role_enum(self, value):
+        """Set the role from a UserRole enum"""
+        if isinstance(value, UserRole):
+            self.role = value.value.upper()  # Store uppercase for database constraint
+        else:
+            self.role = str(value).upper()  # Store uppercase for database constraint
+    
+    def is_valid(self):
+        """Check if token is still valid"""
+        return (not self.is_used and 
+                self.expires_at > datetime.utcnow())
+    
+    def use_token(self, user_id):
+        """Mark token as used"""
+        self.is_used = True
+        self.used_by_id = user_id
+        self.used_at = datetime.utcnow()
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'token': self.token,
+            'role': self.role,
+            'created_by': self.created_by.full_name if self.created_by else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'is_used': self.is_used,
+            'used_by': self.used_by.full_name if self.used_by else None,
+            'used_at': self.used_at.isoformat() if self.used_at else None
+        }
+
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
