@@ -1,7 +1,13 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useParams, NavLink } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useParams } from 'react-router-dom';
 import { NotificationProvider } from './NotificationContext';
+import { AuthProvider, useAuth } from './AuthContext';
 import ToastNotification from './ToastNotification';
+import ProtectedRoute from './ProtectedRoute';
+import Navbar from './Navbar';
+import Login from './Login';
+import AcceptInvitation from './AcceptInvitation';
+import AdminDashboard from './AdminDashboard';
 import Home from './Home';
 import Clients from './Clients';
 import ClientForm from './ClientForm';
@@ -21,11 +27,9 @@ import TariffManager from './TariffManager';
 import RuleEditor from './RuleEditor';
 import PrintableBOM from './PrintableBOM';
 
-import logo from './assets/orka_logo_transparent_background.png';
-import './Navbar.css';
-import 'bootstrap/dist/css/bootstrap.min.css'; // Your existing Bootstrap CSS
-import 'bootstrap-icons/font/bootstrap-icons.css'; // Add this
-import './index.css'; // 
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
+import './index.css'; 
 
 // ------ tiny wrappers to inject :id into the components -----------
 function SystemDesignWrapper() {
@@ -41,83 +45,112 @@ function FinancialModelWrapper() {
 
 function App() {
   return (
-    <NotificationProvider>
-      <Router>
-        <ToastNotification />
-        <nav className="navbar navbar-expand-lg navbar-light navbar-glass fixed-top">
-          <div className="container-fluid">
-            {/*  brand logo + text */}
-            <Link to="/" className="navbar-brand-group text-decoration-none">
-              <img src={logo} alt="Orka Logo" className="navbar-logo" />
-              <span>Orka Solar</span>
-            </Link>
+    <AuthProvider>
+      <NotificationProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
+            <Route path="/*" element={<AuthenticatedApp />} />
+          </Routes>
+        </Router>
+      </NotificationProvider>
+    </AuthProvider>
+  );
+}
 
-            <button
-              className="navbar-toggler"
-              type="button"
-              data-bs-toggle="collapse"
-              data-bs-target="#navbarNav"
-              aria-controls="navbarNav"
-              aria-expanded="false"
-              aria-label="Toggle navigation"
-              >
-              <span className="navbar-toggler-icon"></span>
-            </button>
-            <div className="collapse navbar-collapse justify-content-center" id="navbarNav">
-              <div className='position-absolute top-1 start-50 translate-middle-x'>
-                <ul className="navbar-nav">
-                  {[
-                    { to: '/', label: 'Home', exact: true },
-                    { to: '/clients', label: 'Clients' },
-                    { to: '/projects', label: 'Projects' },
-                    { to: '/products-admin', label: 'Products' },
-                    { to: '/system-builder', label: 'System Builder' },
-                    { to: '/load-profile-manager', label: 'Load Profile Manager' },
-                    { to: '/tariffs', label: 'Tariff Manager' },
-                    { to: '/rules', label: 'Engine Rules' },
-                  ].map(link => (
-                    <li className="nav-item" key={link.to}>
-                      <NavLink
-                        to={link.to}
-                        end={link.exact}
-                        className={({ isActive }) =>
-                          `nav-link navbar-link ${isActive ? 'active' : ''}`
-                        }
-                      >
-                        {link.label}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div> 
-          </div>
-        </nav>
+function AuthenticatedApp() {
+  const { loading } = useAuth();
 
-        <div style={{ paddingTop: '72px'}}>
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <ToastNotification />
+      <ProtectedRoute>
+        <Navbar />
+        <div style={{ paddingTop: '72px' }}>
           <Routes>
             <Route path="/" element={<Home />} />
+            
+            {/* Client routes - accessible to all authenticated users */}
             <Route path="/clients" element={<Clients />} />
             <Route path="/clients/add" element={<ClientForm />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/projects/:id" element={<ProjectDashboard />} />
-            <Route path="/projects/:id/system-design" element={<SystemDesignWrapper />} />
-            <Route path="/projects/:id/financial-model" element={<FinancialModelWrapper />} />
             <Route path="/clients/edit/:id" element={<EditClient />} />
-            <Route path="/projects/add" element={<AddProject />} />
-            <Route path="/projects/edit/:id" element={<EditProject />} />
-            <Route path="/products-admin" element={<ProductsAdmin />} />
+            
+            {/* Project routes - only for design team and admin */}
+            <Route path="/projects" element={
+              <ProtectedRoute requiredRole="design">
+                <Projects />
+              </ProtectedRoute>
+            } />
+            <Route path="/projects/add" element={
+              <ProtectedRoute requiredRole="design">
+                <AddProject />
+              </ProtectedRoute>
+            } />
+            <Route path="/projects/edit/:id" element={
+              <ProtectedRoute requiredRole="design">
+                <EditProject />
+              </ProtectedRoute>
+            } />
+            <Route path="/projects/:id" element={
+              <ProtectedRoute requiredRole="design">
+                <ProjectDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/projects/:id/system-design" element={
+              <ProtectedRoute requiredRole="design">
+                <SystemDesignWrapper />
+              </ProtectedRoute>
+            } />
+            <Route path="/projects/:id/financial-model" element={
+              <ProtectedRoute requiredRole="design">
+                <FinancialModelWrapper />
+              </ProtectedRoute>
+            } />
+            <Route path="/projects/:id/optimize" element={
+              <ProtectedRoute requiredRole="design">
+                <Optimize />
+              </ProtectedRoute>
+            } />
+            
+            {/* Product routes - only for sales team and admin */}
+            <Route path="/products-admin" element={
+              <ProtectedRoute requiredRole="sales">
+                <ProductsAdmin />
+              </ProtectedRoute>
+            } />
+            
+            {/* System builder and other tools - accessible to all */}
             <Route path="/system-builder" element={<SystemBuilder />} />
             <Route path="/load-profile-manager" element={<LoadProfileManager />} />
-            <Route path="/projects/:id/optimize" element={<Optimize />} />
-            <Route path="/proposal/:id" element={<ProposalPage />} />
             <Route path="/tariffs" element={<TariffManager />} />
-            <Route path="/rules" element={<RuleEditor />} />
+            <Route path="/proposal/:id" element={<ProposalPage />} />
             <Route path="/printable-bom/:projectId" element={<PrintableBOM />} />
+            
+            {/* Admin only routes */}
+            <Route path="/admin" element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/rules" element={
+              <ProtectedRoute requiredRole="admin">
+                <RuleEditor />
+              </ProtectedRoute>
+            } />
           </Routes>
-          </div>
-      </Router>
-    </NotificationProvider>
+        </div>
+      </ProtectedRoute>
+    </>
   );
 }
 

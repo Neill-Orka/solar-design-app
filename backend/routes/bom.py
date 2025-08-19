@@ -47,6 +47,9 @@ def save_project_bom(project_id):
         if 'template_name' in data and data['template_name']:
             project.template_name = data['template_name']
             
+        # Mark BOM as modified (user has saved/exported)
+        project.bom_modified = True
+            
         db.session.commit()
         return jsonify({'message': 'Bill of Materials saved successfully'}), 200
         
@@ -79,4 +82,26 @@ def get_project_bom(project_id):
         return jsonify(result), 200
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bom_bp.route('/projects/<int:project_id>/bom/clear', methods=['POST'])
+def clear_project_bom(project_id):
+    """Clear BOM when switching templates"""
+    try:
+        # Check if project exists
+        project = Projects.query.get(project_id)
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+            
+        # Delete existing BOM components for this project
+        BOMComponent.query.filter_by(project_id=project_id).delete()
+        
+        # Reset BOM modification flag
+        project.bom_modified = False
+        
+        db.session.commit()
+        return jsonify({'message': 'BOM cleared successfully'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500

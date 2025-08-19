@@ -44,14 +44,14 @@ const CATEGORY_META = {
 };
 
 const EMPTY_PRODUCT = {
-    category: 'Panel', brand: '', model: '',
+    category: 'Panel', component_type: '', brand: '', model: '',
     power_w: '', rating_kva: '', capacity_kwh: '',
     unit_cost: '', margin: '', price: '', warranty_y: '', notes: '', properties: ''
 };
 
 //  Meta for every field we MIGHT display/edit
 const FIELD_META = {
-  category:     { label: "Category", type: "select", options: [
+  category:        { label: "Category", type: "select", options: [
     'Panel', 'Inverter', 'Battery', 'Solar Geyser', 'Inverter Aux', 'Lights', 
     'Transport & Logistics', 'Contactor', 'Enclosure', 'Cable Management', 
     'Human Resources', 'Conductor', 'VSD', 'Change Over Switch', 'HSEQ & Compliance',
@@ -59,16 +59,17 @@ const FIELD_META = {
     'Mounting System', 'Monitoring', 'Auxiliaries', 'Cable', 'Protection',
     'Professional Services'
   ]},
-  brand:        { label: "Brand",          type: "text"   },
-  model:        { label: "Model / SKU",    type: "text"   },
-  unit_cost:    { label: "Unit Cost (R)",  type: "number" },
-  margin:       { label: "Margin (%)",     type: "number" },
-  price:        { label: "Price (R)",      type: "number", readonly: true },
-  power_w:      { label: "Power (W)",      type: "number", category: "Panel"    },
-  rating_kva:   { label: "Rating (kVA)",   type: "number", category: "Inverter" },
-  capacity_kwh: { label: "Capacity (kWh)", type: "number", category: "Battery"  },
-  warranty_y:   { label: "Warranty (y)",   type: "number" },
-  notes:        { label: "Notes",          type: "textarea" },
+  component_type:  { label: "Component Type", type: "text" },
+  brand:           { label: "Brand",          type: "text"   },
+  model:           { label: "Model / SKU",    type: "text"   },
+  unit_cost:       { label: "Unit Cost (R)",  type: "number" },
+  margin:          { label: "Margin (%)",     type: "number" },
+  price:           { label: "Price (R)",      type: "number", readonly: true },
+  power_w:         { label: "Power (W)",      type: "number", category: "Panel"    },
+  rating_kva:      { label: "Rating (kVA)",   type: "number", category: "Inverter" },
+  capacity_kwh:    { label: "Capacity (kWh)", type: "number", category: "Battery"  },
+  warranty_y:      { label: "Warranty (y)",   type: "number" },
+  notes:           { label: "Notes",          type: "textarea" },
 };
 
 // Helper that returns fields based on category and editing context
@@ -153,7 +154,8 @@ export default function ProductsAdmin() {
             // Auto-calculate price when unit_cost or margin changes
             if (k === 'unit_cost' || k === 'margin') {
                 const unitCost = k === 'unit_cost' ? v : prevForm.unit_cost;
-                const margin = k === 'margin' ? formatMarginForBackend(v) : prevForm.margin;
+                // Convert margin to decimal format for calculation
+                const margin = k === 'margin' ? formatMarginForBackend(v) : formatMarginForBackend(prevForm.margin);
                 newForm.price = calculatePrice(unitCost, margin).toFixed(2);
             }
             
@@ -237,7 +239,7 @@ export default function ProductsAdmin() {
         if (products.length === 0) return null;
         
         const options = {
-            keys: ['brand', 'model', 'category'],
+            keys: ['brand', 'model', 'category', 'component_type'],
             threshold: 0.3,
             ignoreLocation: true,
             includeScore: false,
@@ -275,7 +277,8 @@ export default function ProductsAdmin() {
         if (debouncedSearch.length < 2) {
             return products.filter(p => 
                 p.brand?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                p.model?.toLowerCase().includes(debouncedSearch.toLowerCase())
+                p.model?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                p.component_type?.toLowerCase().includes(debouncedSearch.toLowerCase())
             );
         }
         
@@ -428,12 +431,13 @@ export default function ProductsAdmin() {
                                     <Table hover responsive className="mb-0">
                                         <thead className="table-light">
                                             <tr>
-                                                <th className="ps-4" style={{width: "15%"}}>Category</th>
-                                                <th style={{width: "20%"}}>Brand</th>
-                                                <th style={{width: "20%"}}>Model</th>
-                                                <th style={{width: "15%"}}>Specifications</th>
-                                                <th style={{width: "15%"}}>Price</th>
-                                                <th className="text-end pe-4" style={{width: "15%"}}>Actions</th>
+                                                <th className="ps-4" style={{width: "12%"}}>Category</th>
+                                                <th style={{width: "15%"}}>Component Type</th>
+                                                <th style={{width: "18%"}}>Brand</th>
+                                                <th style={{width: "18%"}}>Model</th>
+                                                <th style={{width: "12%"}}>Specifications</th>
+                                                <th style={{width: "12%"}}>Price</th>
+                                                <th className="text-end pe-4" style={{width: "13%"}}>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -448,6 +452,9 @@ export default function ProductsAdmin() {
                                                                 {getCategoryName(product.category)}
                                                             </Badge>
                                                         </div>
+                                                    </td>
+                                                    <td>
+                                                        <span className="text-muted">{product.component_type || '-'}</span>
                                                     </td>
                                                     <td className="fw-semibold">{product.brand}</td>
                                                     <td>{product.model}</td>

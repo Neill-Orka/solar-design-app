@@ -29,11 +29,12 @@ const PANEL_WATTAGE = 565; // JA SOLAR 72S30-565/GR
 // Sub Component for Stage 1: Sizing Mode
 const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, setUsePvgis, profileName, setProfileName, showNotification }) => {
 
-    const persistPanel = async (panelId, panelKw) => {
+    const persistPanel = async (panelId, panelKw, numPanels) => {
         try {
             await axios.put(`${API_URL}/api/projects/${projectId}`, {
                 panel_id: panelId || null,
-                panel_kw: panelKw ? parseFloat(panelKw) : 0
+                panel_kw: panelKw ? parseFloat(panelKw) : 0,
+                num_panels: numPanels ? parseInt(numPanels) : 0
             });
             sessionStorage.setItem(`systemDesignModified_${projectId}`, 'true');
         } catch (e) {
@@ -46,14 +47,14 @@ const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, set
       const kw = e.target.value;
       const panelWattage = design.selectedPanel?.product?.power_w || PANEL_WATTAGE;
       const newNumPanels = (kw && parseFloat(kw) > 0) 
-        ? Math.ceil((parseFloat(kw) * 1000) / panelWattage) 
+        ? Math.max(1, Math.ceil((Math.round(parseFloat(kw) * 1000 * 100) / 100) / panelWattage)) 
         : '';
 
       onDesignChange({ ...design, panelKw: kw, numPanels: newNumPanels });
     
       // persist
       const panelId = design.selectedPanel?.product?.id || null;
-      await persistPanel(panelId, kw || 0);
+      await persistPanel(panelId, kw || 0, newNumPanels || 0);
     };
 
     const handleNumPanelsChange = async (e) => {
@@ -64,7 +65,7 @@ const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, set
 
       // persist
       const panelId = design.selectedPanel?.product?.id || null;
-      await persistPanel(panelId, newKw || 0);
+      await persistPanel(panelId, newKw || 0, panels || 0);
     };
 
     // Handler for react-select components
@@ -607,7 +608,8 @@ function SystemDesign({ projectId }) {
                 products.panels.find(panel => panel.id === defaultPanelId) :
                 products.panels.find(panel => panel.power_w === PANEL_WATTAGE)
 
-            const numPanels = savedKw ? Math.ceil((savedKw * 1000) / (currentPanel?.power_w || PANEL_WATTAGE)) : '';
+            // Use stored num_panels directly instead of calculating to avoid rounding issues
+            const numPanels = p.num_panels || '';
             
             // Find the full product object for the saved inverter
             const inverterInfo = p.inverter_kva && typeof p.inverter_kva === 'object' ? p.inverter_kva : {model: null, capacity: p.inverter_kva, quantity: 1 };
@@ -718,6 +720,7 @@ function SystemDesign({ projectId }) {
             const savePayload = {
                 system_type: newDesign.systemType,
                 panel_kw: parseFloat(newDesign.panelKw),
+                num_panels: parseInt(newDesign.numPanels),
                 surface_tilt: parseFloat(newDesign.tilt),
                 surface_azimuth: parseFloat(newDesign.azimuth),
                 allow_export: newDesign.allowExport,
@@ -747,6 +750,10 @@ function SystemDesign({ projectId }) {
 
             // Save first, then simulate (just like in handleSimulate)
             axios.put(`${API_URL}/api/projects/${projectId}`, savePayload)
+                .then(() => {
+                    // Clear BOM when switching templates (fresh start)
+                    return axios.post(`${API_URL}/api/projects/${projectId}/bom/clear`);
+                })
                 .then(() => {
                     // Now run simulation with the same data
                     const simPayload = {
@@ -962,6 +969,7 @@ function SystemDesign({ projectId }) {
         const savePayload = {
                 system_type: design.systemType,
                 panel_kw: parseFloat(design.panelKw),
+                num_panels: parseInt(design.numPanels),
                 surface_tilt: parseFloat(design.tilt),
                 surface_azimuth: parseFloat(design.azimuth),
                 allow_export: design.allowExport,
