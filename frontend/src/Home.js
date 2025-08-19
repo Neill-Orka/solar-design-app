@@ -5,10 +5,12 @@ import { motion } from 'framer-motion';
 import CountUp from 'react-countup';
 import { FaProjectDiagram, FaUsers, FaTools } from 'react-icons/fa';
 import './Home.css';
+import { useAuth } from './AuthContext';
 import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
 
 function Home() {
   const [stats, setStats] = useState(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     axios.get(`${API_URL}/api/stats`)
@@ -88,23 +90,31 @@ function Home() {
               text: 'Create, simulate and optimise PV systems with ease.',
               link: '/projects',
               color: 'primary',
-              icon: <FaProjectDiagram size={46} />
+              icon: <FaProjectDiagram size={46} />,
+              roles: ['admin','design']
             },
             {
               title: 'Clients',
               text: 'Keep all customer info and site details in one place.',
               link: '/clients',
               color: 'success',
-              icon: <FaUsers size={46} />
+              icon: <FaUsers size={46} />,
+              roles: ['admin','sales','design']
             },
             {
               title: 'Products',
               text: 'Maintain your catalogue of panels, inverters & batteries.',
               link: '/products-admin',
               color: 'warning',
-              icon: <FaTools size={46} />
+              icon: <FaTools size={46} />,
+              roles: ['admin','sales']
             }
-          ].map(card => (
+          ]
+            .filter(card => {
+              if (!user) return false; // no cards until auth resolved
+              return card.roles.includes(user.role);
+            })
+            .map(card => (
             <motion.div
               key={card.title}
               className="col-md-4 mb-4 d-flex"

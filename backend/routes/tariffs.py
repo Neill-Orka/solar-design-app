@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
-from models import db, Tariffs, TariffRates
+from models import db, Tariffs, TariffRates, User, UserRole
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 tariffs_bp = Blueprint('tariffs', __name__)
 
@@ -124,9 +125,16 @@ def update_tariff(id):
 
 # --- DELETE /api/tariffs/<id> (Delete a tariff) ---
 @tariffs_bp.route('/tariffs/<int:id>', methods=['DELETE'])
+@jwt_required()
 def delete_tariff(id):
-    """Deletes a tariff and its associated rates."""
+    """Deletes a tariff and its associated rates (admin only)."""
+    user = User.query.get(get_jwt_identity())
+    if not user or user.role != UserRole.ADMIN:
+        return jsonify({
+            'error': 'forbidden',
+            'message': 'Access Restricted: Only administrators can delete tariffs.'
+        }), 403
     tariff = Tariffs.query.get_or_404(id)
-    db.session.delete(tariff) # The 'cascade' setting in the model will delete all related rates
+    db.session.delete(tariff)  # The 'cascade' setting in the model will delete all related rates
     db.session.commit()
     return jsonify({'message': f'Tariff {id} deleted successfully.'})

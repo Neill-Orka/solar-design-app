@@ -1,6 +1,7 @@
 # routes/clients.py
 from flask import Blueprint, request, jsonify
-from models import db, Clients
+from models import db, Clients, User, UserRole
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy.exc import IntegrityError
 import psycopg2.errors
 
@@ -81,7 +82,14 @@ def update_client(client_id):
 
 
 @clients_bp.route('/clients/<int:client_id>', methods=['DELETE'])
+@jwt_required()
 def delete_client(client_id):
+    user = User.query.get(get_jwt_identity())
+    if not user or user.role != UserRole.ADMIN:
+        return jsonify({
+            'error': 'forbidden',
+            'message': 'Access Restricted: Only administrators can delete clients.'
+        }), 403
     try:
         client = Clients.query.get(client_id)
         if not client:

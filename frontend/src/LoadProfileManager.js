@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useAuth } from './AuthContext';
 import axios from 'axios';
-import { Container, Row, Col, Card, Button, Form, Spinner, Alert, ListGroup, InputGroup, Modal, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Form, Spinner, Alert, ListGroup, Badge } from 'react-bootstrap';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, Filler } from 'chart.js';
 import 'chartjs-adapter-date-fns';
@@ -50,6 +51,8 @@ const ProfileMiniChart = ({ profileData }) => {
 
 
 function LoadProfileManager() {
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
     const [profiles, setProfiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -104,13 +107,17 @@ function LoadProfileManager() {
     };
     
     const handleDelete = (profileId) => {
+        if (!isAdmin) {
+            showNotification('Access Denied: Only administrators can delete load profiles.', 'danger');
+            return;
+        }
         if (window.confirm("Are you sure you want to delete this load profile? This action cannot be undone.")) {
-            axios.delete(`${API_URL}/api/load_profiles/${profileId}`)
+            axios.delete(`${API_URL}/api/load_profiles/${profileId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } })
                 .then(() => {
                     showNotification('Profile deleted successfully!', 'success');
-                    fetchProfiles(); // Refresh the list
+                    fetchProfiles();
                 })
-                .catch(err => alert("Error deleting profile: " + (err.response?.data?.error || err.message)));
+                .catch(err => showNotification(err.response?.data?.message || 'Failed to delete profile', 'danger'));
         }
     };
     
@@ -258,7 +265,7 @@ function LoadProfileManager() {
                                                 <ProfileMiniChart profileData={profile.profile_data} />
                                                 <div className="mt-2">
                                                     <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEditClick(profile)}><i className="bi bi-pencil-fill"></i></Button>
-                                                    <Button variant="outline-danger" size="sm" onClick={() => handleDelete(profile.id)}><i className="bi bi-trash-fill"></i></Button>
+                                                    <Button variant="outline-danger" size="sm" disabled={!isAdmin} title={!isAdmin ? 'Admin only' : 'Delete profile'} onClick={() => handleDelete(profile.id)}><i className="bi bi-trash-fill"></i></Button>
                                                 </div>
                                             </Col>
                                         </Row>

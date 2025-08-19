@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from './AuthContext';
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { Container, Row, Col, Card, Button, Spinner, Alert, Badge, Stack } from 'react-bootstrap';
 import { API_URL } from "./apiConfig";
 
 function Clients() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,21 +30,20 @@ function Clients() {
       .finally(() => setLoading(false));
   };
   const handleDelete = (id) => {
+    if (!isAdmin) {
+      setError('Access Denied: Only administrators can delete clients.');
+      return;
+    }
     if (window.confirm("Are you sure you want to delete this client? This action cannot be undone.")) {
-      axios.delete(`${API_URL}/api/clients/${id}`)
-        .then((response) => {
-          loadClients(); // Reload clients after deletion
-          setError(''); // Clear any previous errors
+      axios.delete(`${API_URL}/api/clients/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } })
+        .then(() => {
+          loadClients();
+          setError('');
         })
         .catch((error) => {
           console.error("Error deleting client:", error);
           const errorResponse = error.response?.data;
-          if (errorResponse && errorResponse.message) {
-            // Show the user-friendly message from backend
-            setError(errorResponse.message);
-          } else {
-            setError("Failed to delete client: " + (errorResponse?.error || error.message));
-          }
+          setError(errorResponse?.message || 'Failed to delete client');
         });
     }
   };
@@ -115,6 +117,8 @@ function Clients() {
                               variant="outline-danger"
                               size="sm"
                               className="flex-fill"
+                              disabled={!isAdmin}
+                              title={!isAdmin ? 'Admin only' : 'Delete client'}
                               onClick={() => handleDelete(client.id)}
                             >
                               <i className="bi bi-trash-fill me-1"></i>Delete

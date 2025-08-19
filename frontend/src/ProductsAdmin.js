@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAuth } from './AuthContext';
 import axios from "axios";
 import { Container, Row, Col, Card, Button, Modal, Form, InputGroup, Badge, Spinner, Alert, ButtonGroup, Table } from "react-bootstrap";
 import { FaTrash, FaEdit, FaPlus } from "react-icons/fa";
@@ -104,6 +105,8 @@ const getCategoryName = (category) => {
 };
 
 export default function ProductsAdmin() {
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
     const [products, setProducts] = useState([]);
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
@@ -196,11 +199,19 @@ export default function ProductsAdmin() {
 
     // ------ delete --------------------------------------
     const deleteProduct = useCallback((id) => {
-        if (!window.confirm('Delete this product?')) return;
-        axios.delete(`${API_URL}/api/products/${id}`)
+        if (!isAdmin) {
+            setError('Access Denied: Only administrators can delete products.');
+            return;
+        }
+        if (!window.confirm('Delete this product? This action cannot be undone.')) return;
+        const token = localStorage.getItem('access_token');
+        axios.delete(`${API_URL}/api/products/${id}`, { headers: { Authorization: `Bearer ${token}` } })
             .then(fetchProducts)
-            .catch(err => setError('Failed to delete product'));
-    }, [fetchProducts]);
+            .catch(err => {
+                const msg = err.response?.data?.message || 'Failed to delete product';
+                setError(msg);
+            });
+    }, [fetchProducts, isAdmin]);
 
     // ------ save (add or update) ---------------------
     const handleSave = () => {
@@ -224,8 +235,10 @@ export default function ProductsAdmin() {
             setLoading(false);
             return;
         }
-        const req = editId ? axios.put(`${API_URL}/api/products/${editId}`, payload) :
-            axios.post(`${API_URL}/api/products`, payload);
+        const token = localStorage.getItem('access_token');
+        const headers = { Authorization: `Bearer ${token}` };
+        const req = editId ? axios.put(`${API_URL}/api/products/${editId}`, payload, { headers }) :
+            axios.post(`${API_URL}/api/products`, payload, { headers });
         req.then(() => {
             setShowModal(false);
             fetchProducts();
@@ -417,6 +430,8 @@ export default function ProductsAdmin() {
                                                             variant="outline-danger" 
                                                             size="sm" 
                                                             className="flex-fill"
+                                                            disabled={!isAdmin}
+                                                            title={!isAdmin ? 'Admin only' : 'Delete product'}
                                                             onClick={() => deleteProduct(product.id)}
                                                         >
                                                             <FaTrash className="me-1" />Delete
@@ -434,12 +449,13 @@ export default function ProductsAdmin() {
                                         <thead className="table-light">
                                             <tr>
                                                 <th className="ps-4" style={{width: "12%"}}>Category</th>
-                                                <th style={{width: "15%"}}>Component Type</th>
-                                                <th style={{width: "18%"}}>Brand</th>
-                                                <th style={{width: "18%"}}>Model</th>
+                                                <th style={{width: "14%"}}>Component Type</th>
+                                                <th style={{width: "12%"}}>Brand</th>
+                                                <th style={{width: "16%"}}>Model</th>
                                                 <th style={{width: "12%"}}>Specifications</th>
                                                 <th style={{width: "12%"}}>Price</th>
-                                                <th className="text-end pe-4" style={{width: "13%"}}>Actions</th>
+                                                <th style={{width: "10%"}}>Last Updated</th>
+                                                <th className="text-end pe-4" style={{width: "12%"}}>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -490,6 +506,17 @@ export default function ProductsAdmin() {
                                                             )}
                                                         </div>
                                                     </td>
+                                                    <td>
+                                                        {product.updated_at ? (
+                                                            <div className="small text-muted" title={product.updated_by ? `By: ${product.updated_by}` : ''}>
+                                                                {new Date(product.updated_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                                                                <br />
+                                                                <span className="text-secondary" style={{fontSize: '0.65rem'}}>{product.updated_by || ''}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted small">—</span>
+                                                        )}
+                                                    </td>
                                                     <td className="text-end pe-4">
                                                         <Button 
                                                             variant="outline-primary" 
@@ -502,6 +529,8 @@ export default function ProductsAdmin() {
                                                         <Button 
                                                             variant="outline-danger" 
                                                             size="sm"
+                                                            disabled={!isAdmin}
+                                                            title={!isAdmin ? 'Admin only' : 'Delete product'}
                                                             onClick={() => deleteProduct(product.id)}
                                                         >
                                                             <FaTrash />
