@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import logo from './assets/orka_logo_transparent_background.png';
 import './Navbar.css';
@@ -9,13 +9,16 @@ const Navbar = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
       await logout();
-      window.location.href = '/login';
+      navigate('/login', { replace: true });
     } catch (error) {
       console.error('Logout error:', error);
+      // Even if logout fails, clear local state and redirect
+      navigate('/login', { replace: true });
     }
   };
 

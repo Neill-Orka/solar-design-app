@@ -4,75 +4,12 @@ from flask_jwt_extended import (
     create_access_token, create_refresh_token, 
     jwt_required, get_jwt_identity, get_jwt
 )
-from flask_mail import Message
-from models import db, User, RefreshToken, AuditLog, UserRole
+from models import db, User, RefreshToken, AuditLog, UserRole, RegistrationToken
 from datetime import datetime, timedelta
 import re
 from functools import wraps
 
 auth_bp = Blueprint('auth', __name__)
-
-def send_invitation_email(user, invitation_token):
-    """Send invitation email to user"""
-    try:
-        from app import mail  # Import mail instance
-        
-        frontend_url = current_app.config.get('FRONTEND_URL', 'https://your-app-name.vercel.app')
-        invitation_link = f"{frontend_url}/accept-invitation/{invitation_token}"
-        
-        msg = Message(
-            subject='Invitation to join Orka Solar Design Platform',
-            sender=current_app.config['MAIL_DEFAULT_SENDER'],
-            recipients=[user.email],
-            html=f"""
-            <html>
-            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; color: white; text-align: center;">
-                    <h1 style="margin: 0; font-size: 24px;">Welcome to Orka Solar</h1>
-                    <p style="margin: 10px 0 0 0; opacity: 0.9;">Design Platform Invitation</p>
-                </div>
-                
-                <div style="padding: 30px; background: #f9f9f9; border-radius: 10px; margin-top: 20px;">
-                    <h2 style="color: #333; margin-top: 0;">Hi {user.first_name}!</h2>
-                    
-                    <p style="color: #555; line-height: 1.6;">
-                        You've been invited to join the Orka Solar Design Platform. Click the button below to accept your invitation and set up your account.
-                    </p>
-                    
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="{invitation_link}" 
-                           style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                                  color: white; 
-                                  padding: 15px 30px; 
-                                  text-decoration: none; 
-                                  border-radius: 8px; 
-                                  font-weight: bold; 
-                                  display: inline-block;">
-                            Accept Invitation
-                        </a>
-                    </div>
-                    
-                    <p style="color: #888; font-size: 14px;">
-                        This invitation will expire in 7 days. If you're unable to click the button, copy and paste this link into your browser:
-                    </p>
-                    <p style="color: #667eea; word-break: break-all; font-size: 14px;">
-                        {invitation_link}
-                    </p>
-                </div>
-                
-                <div style="text-align: center; margin-top: 20px; color: #888; font-size: 12px;">
-                    <p>© 2025 Orka Solar. All rights reserved.</p>
-                </div>
-            </body>
-            </html>
-            """
-        )
-        
-        mail.send(msg)
-        return True
-    except Exception as e:
-        print(f"Failed to send invitation email: {e}")
-        return False
 
 def validate_email_domain(email):
     """Validate that email belongs to orkasolar.co.za domain"""
@@ -304,21 +241,80 @@ def get_current_user():
     except Exception as e:
         return jsonify({'message': str(e)}), 500
 
-@auth_bp.route('/admin/invite', methods=['POST'])
+@auth_bp.route('/admin/generate-token', methods=['POST'])
 @require_role(UserRole.ADMIN)
-def invite_user():
-    """Invite a new user (Admin only)"""
+def generate_registration_token():
+    """Generate a registration token (Admin only)"""
     try:
         current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
+        # Get role (default to DESIGN if not specified)
+        role_value = data.get('role', 'DESIGN').upper()
+        try:
+            role = UserRole(role_value.lower())
+        except ValueError:
+            return jsonify({'message': 'Invalid role'}), 400
+        
+        # Generate token
+        token_string = RegistrationToken.generate_token()
+        
+        # Create registration token (expires in 7 days)
+        registration_token = RegistrationToken(
+            token=token_string,
+            role=role_value,  # Store uppercase role to match database constraint
+            created_by_id=current_user_id,
+            expires_at=datetime.utcnow() + timedelta(days=7)
+        )
+        
+        db.session.add(registration_token)
+        db.session.commit()
+        
+        # Log the action
+        log_user_action(current_user_id, 'CREATE', 'registration_token', registration_token.id, {
+            'token': token_string,
+            'role': role_value
+        })
+        
+        return jsonify({
+            'message': 'Registration token generated successfully',
+            'token': token_string,
+            'role': role.value,
+            'expires_at': registration_token.expires_at.isoformat()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': str(e)}), 500
+
+@auth_bp.route('/admin/tokens', methods=['GET'])
+@require_role(UserRole.ADMIN)
+def get_registration_tokens():
+    """Get all registration tokens (Admin only)"""
+    try:
+        tokens = RegistrationToken.query.order_by(RegistrationToken.created_at.desc()).all()
+        
+        return jsonify({
+            'tokens': [token.to_dict() for token in tokens]
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+
+@auth_bp.route('/register', methods=['POST'])
+def register_with_token():
+    """Register a new user with a token"""
+    try:
+        data = request.get_json()
+        
         # Validate required fields
-        required_fields = ['email', 'first_name', 'last_name', 'role']
+        required_fields = ['email', 'password', 'first_name', 'last_name', 'token']
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'message': f'{field} is required'}), 400
         
         email = data['email'].lower().strip()
+        token_string = data['token'].upper().strip()
         
         # Validate email domain
         if not validate_email_domain(email):
@@ -328,100 +324,75 @@ def invite_user():
         if User.query.filter_by(email=email).first():
             return jsonify({'message': 'User with this email already exists'}), 400
         
-        # Validate role
-        try:
-            role = UserRole(data['role'])
-        except ValueError:
-            return jsonify({'message': 'Invalid role'}), 400
+        # Find and validate token
+        token = RegistrationToken.query.filter_by(token=token_string).first()
         
-        # Create user with invitation
-        user = User(
-            email=email,
-            first_name=data['first_name'],
-            last_name=data['last_name'],
-            role=role,
-            is_active=False,  # Will be activated when they accept invitation
-            invited_by_id=current_user_id,
-            created_by_id=current_user_id
-        )
-        
-        # Generate invitation token
-        invitation_token = user.generate_invitation_token()
-        
-        # Set temporary password (will be changed on first login)
-        user.set_password('TempPassword123!')
-        
-        db.session.add(user)
-        db.session.commit()
-        
-        # Log the action
-        log_user_action(current_user_id, 'CREATE', 'user', user.id, {
-            'type': 'invitation',
-            'invited_email': email,
-            'role': role.value
-        })
-        
-        # Send invitation email
-        email_sent = send_invitation_email(user, invitation_token)
-        
-        response_data = {
-            'message': 'User invited successfully',
-            'user': user.to_dict(),
-            'email_sent': email_sent
-        }
-        
-        # Include invitation link in development
-        if current_app.config.get('ENV') == 'development':
-            frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:3000')
-            response_data['invitation_link'] = f"{frontend_url}/accept-invitation/{invitation_token}"
-        
-        return jsonify(response_data), 201
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'message': str(e)}), 500
-
-@auth_bp.route('/accept-invitation/<token>', methods=['POST'])
-def accept_invitation(token):
-    """Accept user invitation and set password"""
-    try:
-        data = request.get_json()
-        
-        if not data.get('password'):
-            return jsonify({'message': 'Password is required'}), 400
-        
-        # Find user by invitation token
-        user = User.query.filter_by(invitation_token=token).first()
-        
-        if not user or not user.is_invitation_valid():
-            return jsonify({'message': 'Invalid or expired invitation'}), 400
+        if not token or not token.is_valid():
+            return jsonify({'message': 'Invalid or expired registration token'}), 400
         
         # Validate password
         is_valid, msg = validate_password_strength(data['password'])
         if not is_valid:
             return jsonify({'message': msg}), 400
         
-        # Activate user and set password
+        # Create user
+        user = User(
+            email=email,
+            first_name=data['first_name'],
+            last_name=data['last_name'],
+            role=UserRole(token.role.lower()),  # Convert to lowercase for UserRole enum
+            is_active=True,
+            is_email_verified=True,
+            created_by_id=token.created_by_id
+        )
         user.set_password(data['password'])
-        user.is_active = True
-        user.is_email_verified = True
-        user.invitation_token = None
-        user.invitation_expires = None
         
+        # Mark token as used
+        token.use_token(user.id)
+        
+        db.session.add(user)
         db.session.commit()
         
         # Log the action
-        log_user_action(user.id, 'UPDATE', 'user', user.id, {
-            'type': 'invitation_accepted'
+        log_user_action(user.id, 'CREATE', 'user', user.id, {
+            'type': 'token_registration',
+            'token_used': token_string
         })
         
         return jsonify({
-            'message': 'Invitation accepted successfully',
+            'message': 'User registered successfully',
             'user': user.to_dict()
-        }), 200
+        }), 201
         
     except Exception as e:
         db.session.rollback()
+        return jsonify({'message': str(e)}), 500
+
+@auth_bp.route('/validate-token', methods=['POST'])
+def validate_token():
+    """Validate a registration token"""
+    try:
+        data = request.get_json()
+        
+        if not data.get('token'):
+            return jsonify({'message': 'Token is required'}), 400
+        
+        token_string = data['token'].upper().strip()
+        token = RegistrationToken.query.filter_by(token=token_string).first()
+        
+        if not token:
+            return jsonify({'valid': False, 'message': 'Token not found'}), 404
+        
+        if not token.is_valid():
+            return jsonify({'valid': False, 'message': 'Token expired or already used'}), 400
+        
+        return jsonify({
+            'valid': True,
+            'role': token.role,
+            'expires_at': token.expires_at.isoformat()
+        }), 200
+        
+    except Exception as e:
         return jsonify({'message': str(e)}), 500
 
 @auth_bp.route('/admin/users', methods=['GET'])
@@ -484,6 +455,82 @@ def deactivate_user(user_id):
         
         return jsonify({
             'message': 'User deactivated successfully',
+            'user': user.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': str(e)}), 500
+
+@auth_bp.route('/admin/users/<int:user_id>/delete', methods=['DELETE'])
+@require_role(UserRole.ADMIN)
+def delete_user(user_id):
+    """Delete a user (Admin only)"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Prevent self-deletion
+        if current_user_id == user_id:
+            return jsonify({'message': 'Cannot delete your own account'}), 400
+        
+        user = User.query.get_or_404(user_id)
+        
+        # Log the action before deletion
+        log_user_action(current_user_id, 'DELETE', 'user', user.id, {
+            'deleted_user_email': user.email,
+            'deleted_user_role': user.role.value
+        })
+        
+        # Delete the user
+        db.session.delete(user)
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'User {user.email} deleted successfully'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': str(e)}), 500
+
+@auth_bp.route('/admin/users/<int:user_id>/role', methods=['PUT'])
+@require_role(UserRole.ADMIN)
+def change_user_role(user_id):
+    """Change a user's role (Admin only)"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        if not data or 'role' not in data:
+            return jsonify({'message': 'Role is required'}), 400
+        
+        new_role = data['role'].lower()
+        
+        # Validate role
+        valid_roles = [role.value for role in UserRole]
+        if new_role not in valid_roles:
+            return jsonify({'message': f'Invalid role. Must be one of: {valid_roles}'}), 400
+        
+        user = User.query.get_or_404(user_id)
+        old_role = user.role.value
+        
+        # Prevent changing own role from admin
+        if current_user_id == user_id and user.role == UserRole.ADMIN:
+            return jsonify({'message': 'Cannot change your own admin role'}), 400
+        
+        # Update user role
+        user.role = UserRole(new_role)
+        db.session.commit()
+        
+        # Log the action
+        log_user_action(current_user_id, 'UPDATE', 'user', user.id, {
+            'type': 'role_change',
+            'old_role': old_role,
+            'new_role': new_role
+        })
+        
+        return jsonify({
+            'message': f'User role changed from {old_role} to {new_role}',
             'user': user.to_dict()
         }), 200
         

@@ -1,28 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { API_URL } from './apiConfig';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user: currentUser, loading: authLoading } = useAuth();
   const [users, setUsers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteFirstName, setInviteFirstName] = useState('');
-  const [inviteLastName, setInviteLastName] = useState('');
-  const [inviteRole, setInviteRole] = useState('design');
+  const [registrationTokens, setRegistrationTokens] = useState([]);
+  const [tokenRole, setTokenRole] = useState('design');
   const [loading, setLoading] = useState(true);
-  const [inviting, setInviting] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('users');
+  
+  // User management modals
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [newRole, setNewRole] = useState('');
+  const [userActionLoading, setUserActionLoading] = useState(false);
 
-  const [currentUserId, setCurrentUserId] = useState(null);
-
-  useEffect(() => {
-    setCurrentUserId(user?.id);
-  }, [user]);
-
-  const getAuthHeaders = React.useCallback(() => {
+  const getAuthHeaders = useCallback(() => {
     const token = localStorage.getItem('access_token');
     return {
       'Authorization': `Bearer ${token}`,
@@ -30,7 +29,7 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  const fetchUsers = React.useCallback(async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/auth/admin/users`, {
         headers: getAuthHeaders()
@@ -40,15 +39,14 @@ const AdminDashboard = () => {
         const data = await response.json();
         setUsers(data.users);
       } else {
-        setMessage('Failed to fetch users');
+        console.error('Failed to fetch users');
       }
     } catch (error) {
-      setMessage('Error fetching users');
-      console.error('Error:', error);
+      console.error('Error fetching users:', error);
     }
   }, [getAuthHeaders]);
 
-  const fetchAuditLogs = React.useCallback(async () => {
+  const fetchAuditLogs = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/auth/admin/audit-logs`, {
         headers: getAuthHeaders()
@@ -57,98 +55,178 @@ const AdminDashboard = () => {
       if (response.ok) {
         const data = await response.json();
         setAuditLogs(data.logs);
+      } else {
+        console.error('Failed to fetch audit logs');
       }
     } catch (error) {
       console.error('Error fetching audit logs:', error);
     }
   }, [getAuthHeaders]);
 
+  const fetchRegistrationTokens = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/admin/tokens`, {
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRegistrationTokens(data.tokens);
+      } else {
+        console.error('Failed to fetch registration tokens');
+      }
+    } catch (error) {
+      console.error('Error fetching registration tokens:', error);
+    }
+  }, [getAuthHeaders]);
+
   useEffect(() => {
     const loadData = async () => {
-      // Only fetch data if auth is loaded and user is authenticated
-      if (!authLoading && user && user.id) {
-        try {
-          await Promise.all([fetchUsers(), fetchAuditLogs()]);
-        } catch (error) {
-          console.error('Error loading admin data:', error);
-          setMessage('Error loading admin data');
-        } finally {
-          setLoading(false);
-        }
-      } else if (!authLoading) {
-        // Auth is loaded but no user - should not happen in protected route
+      if (currentUser && currentUser.role === 'admin' && !authLoading) {
+        setLoading(true);
+        await Promise.all([
+          fetchUsers(),
+          fetchAuditLogs(),
+          fetchRegistrationTokens()
+        ]);
+        setLoading(false);
+      } else {
         setLoading(false);
       }
     };
-    loadData();
-  }, [fetchUsers, fetchAuditLogs, user, authLoading]);
 
-  const handleInviteUser = async (e) => {
+    loadData();
+  }, [fetchUsers, fetchAuditLogs, fetchRegistrationTokens, currentUser, authLoading]);
+
+  const handleGenerateToken = async (e) => {
     e.preventDefault();
-    setInviting(true);
+    setGenerating(true);
     setMessage('');
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/admin/invite`, {
+      const response = await fetch(`${API_URL}/api/auth/admin/generate-token`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          email: inviteEmail,
-          first_name: inviteFirstName,
-          last_name: inviteLastName,
-          role: inviteRole
+          role: tokenRole
         })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setMessage(`Invitation sent to ${inviteEmail}`);
-        setInviteEmail('');
-        setInviteFirstName('');
-        setInviteLastName('');
-        fetchUsers(); // Refresh users list
+        setMessage(`Registration token generated: ${data.token} (Role: ${data.role}, Expires: ${new Date(data.expires_at).toLocaleDateString()})`);
+        fetchRegistrationTokens();
+        setTokenRole('design');
       } else {
-        setMessage(data.message || 'Failed to send invitation');
+        setMessage(data.message || 'Failed to generate token');
       }
     } catch (error) {
-      setMessage('Error sending invitation');
+      setMessage('Error generating token');
       console.error('Error:', error);
     } finally {
-      setInviting(false);
+      setGenerating(false);
     }
   };
 
   const handleToggleUserStatus = async (userId, currentStatus) => {
+    const action = currentStatus ? 'deactivate' : 'activate';
+    
     try {
-      const action = currentStatus ? 'deactivate' : 'activate';
       const response = await fetch(`${API_URL}/api/auth/admin/users/${userId}/${action}`, {
         method: 'POST',
         headers: getAuthHeaders()
       });
 
       if (response.ok) {
+        fetchUsers();
         setMessage(`User ${action}d successfully`);
-        fetchUsers(); // Refresh users list
       } else {
-        setMessage(`Failed to ${action} user`);
+        const data = await response.json();
+        setMessage(data.message || `Failed to ${action} user`);
       }
     } catch (error) {
-      setMessage('Error updating user status');
+      setMessage(`Error ${action}ing user`);
       console.error('Error:', error);
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+    
+    setUserActionLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/admin/users/${selectedUser.id}/delete`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        fetchUsers();
+        setMessage(`User ${selectedUser.email} deleted successfully`);
+        setShowDeleteModal(false);
+        setSelectedUser(null);
+      } else {
+        const data = await response.json();
+        setMessage(data.message || 'Failed to delete user');
+      }
+    } catch (error) {
+      setMessage('Error deleting user');
+      console.error('Error:', error);
+    } finally {
+      setUserActionLoading(false);
+    }
+  };
+
+  const handleChangeRole = async () => {
+    if (!selectedUser || !newRole) return;
+    
+    setUserActionLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/admin/users/${selectedUser.id}/role`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ role: newRole })
+      });
+
+      if (response.ok) {
+        fetchUsers();
+        setMessage(`User role changed successfully`);
+        setShowRoleModal(false);
+        setSelectedUser(null);
+        setNewRole('');
+      } else {
+        const data = await response.json();
+        setMessage(data.message || 'Failed to change user role');
+      }
+    } catch (error) {
+      setMessage('Error changing user role');
+      console.error('Error:', error);
+    } finally {
+      setUserActionLoading(false);
+    }
+  };
+
+  const openDeleteModal = (user) => {
+    setSelectedUser(user);
+    setShowDeleteModal(true);
+  };
+
+  const openRoleModal = (user) => {
+    setSelectedUser(user);
+    setNewRole(user.role);
+    setShowRoleModal(true);
+  };
+
+  const closeModals = () => {
+    setShowDeleteModal(false);
+    setShowRoleModal(false);
+    setSelectedUser(null);
+    setNewRole('');
+  };
+
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('en-ZA', {
-      timeZone: 'Africa/Johannesburg',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+    return new Date(dateString).toLocaleString();
   };
 
   const getRoleBadgeClass = (role) => {
@@ -173,7 +251,7 @@ const AdminDashboard = () => {
     <div className="admin-dashboard">
       <div className="admin-header">
         <h1>Admin Dashboard</h1>
-        <p>Welcome, {user.first_name}</p>
+        <p>Welcome, {currentUser.first_name}</p>
       </div>
 
       <div className="admin-tabs">
@@ -182,6 +260,12 @@ const AdminDashboard = () => {
           onClick={() => setActiveTab('users')}
         >
           User Management
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'tokens' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tokens')}
+        >
+          Registration Tokens
         </button>
         <button 
           className={`tab-button ${activeTab === 'logs' ? 'active' : ''}`}
@@ -197,68 +281,83 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {activeTab === 'users' && (
-        <div className="users-section">
-          <div className="invite-section">
-            <h2>Invite New User</h2>
-            <form onSubmit={handleInviteUser} className="invite-form">
+      {activeTab === 'tokens' && (
+        <div className="tokens-section">
+          <div className="token-generation-section">
+            <h2>Generate Registration Token</h2>
+            <form onSubmit={handleGenerateToken} className="token-form">
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="firstName">First Name</label>
-                  <input
-                    type="text"
-                    id="firstName"
-                    value={inviteFirstName}
-                    onChange={(e) => setInviteFirstName(e.target.value)}
-                    placeholder="John"
-                    required
-                    disabled={inviting}
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="lastName">Last Name</label>
-                  <input
-                    type="text"
-                    id="lastName"
-                    value={inviteLastName}
-                    onChange={(e) => setInviteLastName(e.target.value)}
-                    placeholder="Doe"
-                    required
-                    disabled={inviting}
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="email">Email Address</label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="user@orkasolar.co.za"
-                    required
-                    disabled={inviting}
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="role">Role</label>
+                  <label htmlFor="tokenRole">Role</label>
                   <select
-                    id="role"
-                    value={inviteRole}
-                    onChange={(e) => setInviteRole(e.target.value)}
-                    disabled={inviting}
+                    id="tokenRole"
+                    value={tokenRole}
+                    onChange={(e) => setTokenRole(e.target.value)}
+                    required
+                    disabled={generating}
                   >
-                    <option value="design">Design Team</option>
-                    <option value="sales">Sales Team</option>
+                    <option value="design">Design</option>
+                    <option value="sales">Sales</option>
                     <option value="admin">Admin</option>
                   </select>
                 </div>
-                <button type="submit" disabled={inviting} className="invite-button">
-                  {inviting ? 'Sending...' : 'Send Invitation'}
-                </button>
+                <div className="form-group">
+                  <button 
+                    type="submit" 
+                    className="generate-button"
+                    disabled={generating}
+                  >
+                    {generating ? 'Generating...' : 'Generate Token'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
 
+          <div className="tokens-list">
+            <h2>Registration Tokens</h2>
+            <div className="tokens-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Token</th>
+                    <th>Role</th>
+                    <th>Created By</th>
+                    <th>Created</th>
+                    <th>Expires</th>
+                    <th>Status</th>
+                    <th>Used By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registrationTokens.map(token => (
+                    <tr key={token.id}>
+                      <td><code>{token.token}</code></td>
+                      <td>
+                        <span className={`role-badge role-${token.role.toLowerCase()}`}>
+                          {token.role}
+                        </span>
+                      </td>
+                      <td>{token.created_by}</td>
+                      <td>{formatDate(token.created_at)}</td>
+                      <td>{formatDate(token.expires_at)}</td>
+                      <td>
+                        <span className={`status-badge ${token.is_used ? 'used' : 'active'}`}>
+                          {token.is_used ? 'Used' : 'Active'}
+                        </span>
+                      </td>
+                      <td>{token.used_by || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'users' && (
+        <div className="users-section">
           <div className="users-list">
             <h2>Current Users</h2>
             <div className="users-table">
@@ -269,14 +368,14 @@ const AdminDashboard = () => {
                     <th>Email</th>
                     <th>Role</th>
                     <th>Status</th>
-                    <th>Last Login</th>
+                    <th>Created</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map(user => (
                     <tr key={user.id}>
-                      <td>{user.first_name}</td>
+                      <td>{user.full_name}</td>
                       <td>{user.email}</td>
                       <td>
                         <span className={`role-badge ${getRoleBadgeClass(user.role)}`}>
@@ -288,15 +387,35 @@ const AdminDashboard = () => {
                           {user.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td>{user.last_login ? formatDate(user.last_login) : 'Never'}</td>
+                      <td>{formatDate(user.created_at)}</td>
                       <td>
-                        <button
-                          onClick={() => handleToggleUserStatus(user.id, user.is_active)}
-                          className={`action-button ${user.is_active ? 'deactivate' : 'activate'}`}
-                          disabled={user.id === currentUserId} // Can't deactivate yourself
-                        >
-                          {user.is_active ? 'Deactivate' : 'Activate'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                          <button
+                            className={`action-button ${user.is_active ? 'deactivate' : 'activate'}`}
+                            onClick={() => handleToggleUserStatus(user.id, user.is_active)}
+                            style={{ fontSize: '12px', padding: '4px 8px' }}
+                          >
+                            {user.is_active ? 'Deactivate' : 'Activate'}
+                          </button>
+                          
+                          <button
+                            className="action-button"
+                            onClick={() => openRoleModal(user)}
+                            style={{ fontSize: '12px', padding: '4px 8px', backgroundColor: '#007bff', borderColor: '#007bff' }}
+                          >
+                            Change Role
+                          </button>
+                          
+                          {user.email !== currentUser.email && (
+                            <button
+                              className="action-button"
+                              onClick={() => openDeleteModal(user)}
+                              style={{ fontSize: '12px', padding: '4px 8px', backgroundColor: '#dc3545', borderColor: '#dc3545' }}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -314,10 +433,10 @@ const AdminDashboard = () => {
             <table>
               <thead>
                 <tr>
-                  <th>Timestamp</th>
+                  <th>Date</th>
                   <th>User</th>
                   <th>Action</th>
-                  <th>Resource Type</th>
+                  <th>Resource</th>
                   <th>Resource ID</th>
                   <th>Details</th>
                 </tr>
@@ -345,6 +464,107 @@ const AdminDashboard = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Modal */}
+      {showDeleteModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="modal-content" style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            maxWidth: '400px',
+            width: '90%'
+          }}>
+            <h3>Delete User</h3>
+            <p>Are you sure you want to delete <strong>{selectedUser?.email}</strong>?</p>
+            <p style={{ color: '#dc3545', fontSize: '14px' }}>This action cannot be undone.</p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={closeModals}
+                disabled={userActionLoading}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-danger" 
+                onClick={handleDeleteUser}
+                disabled={userActionLoading}
+              >
+                {userActionLoading ? 'Deleting...' : 'Delete User'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Role Modal */}
+      {showRoleModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="modal-content" style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            maxWidth: '400px',
+            width: '90%'
+          }}>
+            <h3>Change User Role</h3>
+            <p>Change role for <strong>{selectedUser?.email}</strong></p>
+            <div className="form-group" style={{ marginBottom: '20px' }}>
+              <label htmlFor="roleSelect">New Role:</label>
+              <select 
+                id="roleSelect"
+                className="form-control"
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value)}
+                disabled={userActionLoading}
+              >
+                <option value="admin">Admin</option>
+                <option value="sales">Sales</option>
+                <option value="design">Design</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={closeModals}
+                disabled={userActionLoading}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleChangeRole}
+                disabled={userActionLoading || !newRole}
+              >
+                {userActionLoading ? 'Changing...' : 'Change Role'}
+              </button>
+            </div>
           </div>
         </div>
       )}
