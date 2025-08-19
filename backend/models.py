@@ -254,6 +254,8 @@ class Product(db.Model):
     qty                    = db.Column("QTY",                    db.Integer)
     margin                 = db.Column("Margin",                 db.Float)
     price                  = db.Column("Price",                  db.Float)
+    # Warranty (years) – newly added to persist warranty information for products
+    warranty_y             = db.Column("Warranty (y)",           db.Integer)
 
     # ─── 12‒17 : PV-module electrical  ────────────────────────────────────────
     power_rating_w         = db.Column("Power Rating (W)",       db.Float)
