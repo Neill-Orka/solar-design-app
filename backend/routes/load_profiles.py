@@ -1,6 +1,7 @@
 # routes/load_profiles.py
 from flask import Blueprint, request, jsonify
-from models import db, LoadProfiles
+from models import db, LoadProfiles, User, UserRole
+from flask_jwt_extended import jwt_required, get_jwt_identity
 import pandas as pd
 import io
 
@@ -136,7 +137,14 @@ def update_load_profile(profile_id):
         return jsonify({"error": str(e)}), 500
 
 @load_profiles_bp.route('/load_profiles/<int:profile_id>', methods=['DELETE'])
+@jwt_required()
 def delete_load_profile(profile_id):
+    user = User.query.get(get_jwt_identity())
+    if not user or user.role != UserRole.ADMIN:
+        return jsonify({
+            'error': 'forbidden',
+            'message': 'Access Restricted: Only administrators can delete load profiles.'
+        }), 403
     """ Deletes a load profile. """
     profile = LoadProfiles.query.get_or_404(profile_id)
     try:

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useAuth } from './AuthContext';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { Container, Row, Col, Card, Button, Modal, Badge, Spinner, Alert, Dropdown, Table, InputGroup, ButtonGroup, Form } from 'react-bootstrap';
@@ -16,6 +17,8 @@ const ProjectStat = ({ icon, label, value, variant = "secondary" }) => (
 );
 
 function Projects() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [projects, setProjects] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -56,16 +59,21 @@ function Projects() {
   };
 
   const handleConfirmDelete = () => {
+    if (!isAdmin) {
+      setError('Access Denied: Only administrators can delete projects.');
+      setShowDeleteModal(false);
+      return;
+    }
     if (!projectToDelete) return;
-    axios.delete(`${API_URL}/api/projects/${projectToDelete}`)
+    axios.delete(`${API_URL}/api/projects/${projectToDelete}`, { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } })
       .then(() => {
         setShowDeleteModal(false);
         setProjectToDelete(null);
-        loadProjects(); // Reload projects after deletion
+        loadProjects();
       })
       .catch((err) => {
         console.error('Error deleting project:', err);
-        setError('Failed to delete project: ' + (err.response?.data?.error || err.message));
+        setError(err.response?.data?.message || 'Failed to delete project');
         setShowDeleteModal(false);
       });
   };

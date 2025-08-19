@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
+import { useAuth } from './AuthContext';
 import { Container, Row, Col, Card, Button, Modal, Form, InputGroup, Badge, Accordion, Table, Alert, Spinner, FormControl, Pagination } from 'react-bootstrap';
 import { FaTrash, FaEdit, FaPlus, FaFileAlt, FaSearch } from 'react-icons/fa';
 import axios from 'axios';
@@ -14,6 +15,8 @@ const EMPTY_TARIFF = {
 };
 
 export default function TariffManager() {
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
     const { schedule, setSchedule } = useContext(EscalationContext);
     const [tariffs, setTariffs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -130,12 +133,16 @@ export default function TariffManager() {
     
     // --- UPDATED: handleDelete to use axios.delete ---
     const handleDelete = async (tariffId) => {
-        if (window.confirm('Are you sure you want to delete this tariff?')) {
+        if (!isAdmin) {
+            setError('Access Denied: Only administrators can delete tariffs.');
+            return;
+        }
+        if (window.confirm('Are you sure you want to delete this tariff? This action cannot be undone.')) {
             try {
-                await axios.delete(`${API_URL}/api/tariffs/${tariffId}`);
-                fetchTariffs(); // Refresh the list
+                await axios.delete(`${API_URL}/api/tariffs/${tariffId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
+                fetchTariffs();
             } catch (err) {
-                setError('Failed to delete tariff.');
+                setError(err.response?.data?.message || 'Failed to delete tariff.');
                 console.error(err);
             }
         }
@@ -228,7 +235,7 @@ export default function TariffManager() {
                                             </div>
                                             <div className="tariff-actions">
                                                 <Button variant="outline-primary" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenEditModal(tariff); }}><FaEdit /></Button>
-                                                <Button variant="outline-danger" size="sm" className="ms-2" onClick={(e) => { e.stopPropagation(); handleDelete(tariff.id); }}><FaTrash /></Button>
+                                                <Button variant="outline-danger" size="sm" className="ms-2" disabled={!isAdmin} title={!isAdmin ? 'Admin only' : 'Delete tariff'} onClick={(e) => { e.stopPropagation(); handleDelete(tariff.id); }}><FaTrash /></Button>
                                             </div>
                                         </div>
                                     </Accordion.Header>

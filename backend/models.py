@@ -256,6 +256,10 @@ class Product(db.Model):
     price                  = db.Column("Price",                  db.Float)
     # Warranty (years) – newly added to persist warranty information for products
     warranty_y             = db.Column("Warranty (y)",           db.Integer)
+    # Audit fields
+    updated_at             = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by_id          = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_by             = db.relationship('User', foreign_keys=[updated_by_id])
 
     # ─── 12‒17 : PV-module electrical  ────────────────────────────────────────
     power_rating_w         = db.Column("Power Rating (W)",       db.Float)
@@ -397,6 +401,10 @@ class Product(db.Model):
 
         for k in ("brand_name", "description", "power_rating_w", "power_rating_kva", "usable_rating_kwh"):
             d.pop(k, None)
+
+        # Append audit info in a consistent api shape
+        d["updated_at"] = self.updated_at.isoformat() if getattr(self, 'updated_at', None) else None
+        d["updated_by"] = self.updated_by.full_name if getattr(self, 'updated_by', None) else None
 
         return d
     

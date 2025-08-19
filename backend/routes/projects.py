@@ -1,6 +1,7 @@
 # routes/projects.py
 from flask import Blueprint, request, jsonify
-from models import db, Projects, Clients, LoadProfiles, QuickDesignData, Product, ComponentRule
+from models import db, Projects, Clients, LoadProfiles, QuickDesignData, Product, ComponentRule, User, UserRole
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from .tariffs import serialize_tariff
 
 projects_bp = Blueprint('projects', __name__)
@@ -216,12 +217,18 @@ def update_project(project_id):
 
 
 @projects_bp.route('/projects/<int:project_id>', methods=['DELETE'])
+@jwt_required()
 def delete_project(project_id):
+    user = User.query.get(get_jwt_identity())
+    if not user or user.role != UserRole.ADMIN:
+        return jsonify({
+            'error': 'forbidden',
+            'message': 'Access Restricted: Only administrators can delete projects.'
+        }), 403
     try:
         project = Projects.query.get(project_id)
         if not project:
             return jsonify({'error': 'Project not found'}), 404
-
         db.session.delete(project)
         db.session.commit()
         return jsonify({'message': 'Project deleted successfully!'})
