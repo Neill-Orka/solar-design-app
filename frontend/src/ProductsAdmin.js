@@ -378,7 +378,7 @@ export default function ProductsAdmin() {
 
                                                     <div className="mb-3">
                                                         {getVisibleFields(product).map(({ key, meta }) => (
-                                                          ["power_w","rating_kva","capacity_kwh","unit_cost","margin","price"].includes(key) && (
+                                        ["power_w","rating_kva","capacity_kwh","unit_cost","margin","price","warranty_y"].includes(key) && (
                                                             <div
                                                               key={key}
                                                               className="d-flex justify-content-between align-items-center mb-1"
@@ -390,12 +390,14 @@ export default function ProductsAdmin() {
                                                                 : key === "capacity_kwh" ? "success"
                                                                 : key === "unit_cost" ? "secondary"
                                                                 : key === "margin" ? "info"
+                                            : key === "warranty_y" ? "dark"
                                                                 : "primary"
                                                               } text={key === "power_w" ? "dark" : undefined}>
                                                                 {formatValueForDisplay(key, product[key], product)}
-                                                                {key === "power_w" ? "W" :
+                                            {key === "power_w" ? "W" :
                                                                  key === "rating_kva" ? "kVA" :
-                                                                 key === "capacity_kwh" ? "kWh" : ""}
+                                             key === "capacity_kwh" ? "kWh" :
+                                             key === "warranty_y" ? "y" : ""}
                                                               </Badge>
                                                             </div>
                                                           )
@@ -518,76 +520,145 @@ export default function ProductsAdmin() {
 
             {/* ---------- modal ---------- */}
             <Modal show={showModal} onHide={() => setShowModal(false)} size="lg" centered>
-                <Modal.Header closeButton className="bg-light">
-                    <Modal.Title>
+                <Modal.Header closeButton className="bg-light py-3">
+                    <Modal.Title className="h5 mb-0 d-flex align-items-center">
                         <i className={`bi ${editId ? 'bi-pencil-fill' : 'bi-plus-lg'} me-2`}></i>
                         {editId ? 'Edit Product' : 'Add Product'}
                     </Modal.Title>
                 </Modal.Header>
-                <Modal.Body className="p-4">
+                <Modal.Body className="pt-4 pb-2 px-4">
                     <Form>
-                        {getVisibleFields(form, true).map(({ key, meta }) => (
-                          <Row className="mb-3" key={key}>
-                            <Col md={6}>
-                              <Form.Group>
-                                <Form.Label className="fw-semibold">
-                                  {meta.label}
-                                  {meta.readonly && <small className="text-muted ms-2">(Auto-calculated)</small>}
-                                </Form.Label>
-                                {meta.type === "textarea" ? (
-                                  <Form.Control
-                                    as="textarea"
-                                    rows={3}
-                                    value={form[key] || ""}
-                                    onChange={(e) => handleChange(key, e.target.value)}
-                                    className="rounded-lg"
-                                    readOnly={meta.readonly}
-                                  />
-                                ) : meta.type === "select" ? (
-                                  <Form.Select
-                                    value={form[key] || ""}
-                                    onChange={(e) => handleChange(key, e.target.value)}
-                                    size="lg"
-                                    className="rounded-lg"
-                                  >
-                                    <option value="">Select {meta.label}</option>
-                                    {meta.options.map(option => (
-                                      <option key={option} value={option}>
-                                        {option}
-                                      </option>
-                                    ))}
-                                  </Form.Select>
-                                ) : (
-                                  <Form.Control
-                                    type={meta.type}
-                                    value={form[key] || ""}
-                                    onChange={(e) => handleChange(key, e.target.value)}
-                                    size="lg"
-                                    className="rounded-lg"
-                                    readOnly={meta.readonly}
-                                    style={meta.readonly ? { backgroundColor: '#f8f9fa' } : {}}
-                                  />
+                        {/* General Section */}
+                        <div className="mb-3">
+                            <small className="text-uppercase text-muted fw-semibold d-block mb-2" style={{letterSpacing: '0.05em'}}>General</small>
+                            <Row className="g-3">
+                                {['category','component_type','brand','model','warranty_y'].map(key => {
+                                    const meta = FIELD_META[key];
+                                    return (
+                                        <Col md={6} key={key}>
+                                            <Form.Group>
+                                                <Form.Label className="small fw-semibold mb-1">
+                                                    {meta.label}
+                                                </Form.Label>
+                                                {meta.type === 'select' ? (
+                                                    <Form.Select
+                                                        value={form[key] || ''}
+                                                        onChange={(e) => handleChange(key, e.target.value)}
+                                                        size="sm"
+                                                        className="rounded-lg"
+                                                    >
+                                                        <option value="">Select {meta.label}</option>
+                                                        {meta.options.map(o => <option key={o} value={o}>{o}</option>)}
+                                                    </Form.Select>
+                                                ) : (
+                                                    <Form.Control
+                                                        type={meta.type}
+                                                        value={form[key] || ''}
+                                                        onChange={(e) => handleChange(key, e.target.value)}
+                                                        size="sm"
+                                                        className="rounded-lg"
+                                                    />
+                                                )}
+                                            </Form.Group>
+                                        </Col>
+                                    );
+                                })}
+                            </Row>
+                        </div>
+
+                        {/* Specification Section (conditional fields) */}
+                        <div className="mb-3">
+                            <small className="text-uppercase text-muted fw-semibold d-block mb-2" style={{letterSpacing: '0.05em'}}>Specifications</small>
+                            <Row className="g-3">
+                                {['power_w','rating_kva','capacity_kwh'].filter(k => !FIELD_META[k].category || FIELD_META[k].category === form.category).map(key => {
+                                    const meta = FIELD_META[key];
+                                    return (
+                                        <Col md={4} key={key}>
+                                            <Form.Group>
+                                                <Form.Label className="small fw-semibold mb-1">{meta.label}</Form.Label>
+                                                <Form.Control
+                                                    type={meta.type}
+                                                    value={form[key] || ''}
+                                                    onChange={(e) => handleChange(key, e.target.value)}
+                                                    size="sm"
+                                                    className="rounded-lg"
+                                                />
+                                            </Form.Group>
+                                        </Col>
+                                    );
+                                })}
+                                {(['power_w','rating_kva','capacity_kwh'].filter(k => !FIELD_META[k].category || FIELD_META[k].category === form.category).length === 0) && (
+                                    <Col>
+                                        <div className="text-muted small fst-italic">No specific metrics for this category.</div>
+                                    </Col>
                                 )}
-                              </Form.Group>
-                            </Col>
-                          </Row>
-                        ))}
+                            </Row>
+                        </div>
+
+                        {/* Pricing Section */}
+                        <div className="mb-3">
+                            <small className="text-uppercase text-muted fw-semibold d-block mb-2" style={{letterSpacing: '0.05em'}}>Pricing</small>
+                            <Row className="g-3">
+                                {['unit_cost','margin','price'].map(key => {
+                                    const meta = FIELD_META[key];
+                                    return (
+                                        <Col md={4} key={key}>
+                                            <Form.Group>
+                                                <Form.Label className="small fw-semibold mb-1">
+                                                    {meta.label}
+                                                    {meta.readonly && <span className="text-muted ms-1" style={{fontSize: '0.7rem'}}>(auto)</span>}
+                                                </Form.Label>
+                                                <InputGroup size="sm">
+                                                    {['unit_cost','price'].includes(key) && (
+                                                        <InputGroup.Text className="bg-light px-2 py-1">R</InputGroup.Text>
+                                                    )}
+                                                    <Form.Control
+                                                        type="number"
+                                                        value={form[key] || ''}
+                                                        onChange={(e) => handleChange(key, e.target.value)}
+                                                        readOnly={meta.readonly}
+                                                        className="rounded-lg"
+                                                        style={meta.readonly ? { backgroundColor: '#f8f9fa' } : {}}
+                                                    />
+                                                    {key === 'margin' && <InputGroup.Text className="bg-light px-2 py-1">%</InputGroup.Text>}
+                                                </InputGroup>
+                                                {key === 'margin' && <div className="form-text">Enter markup percentage (e.g. 25)</div>}
+                                            </Form.Group>
+                                        </Col>
+                                    );
+                                })}
+                            </Row>
+                        </div>
+
+                        {/* Notes Section */}
+                        <div className="mb-2">
+                            <small className="text-uppercase text-muted fw-semibold d-block mb-2" style={{letterSpacing: '0.05em'}}>Notes</small>
+                            <Form.Group>
+                                <Form.Control
+                                    as="textarea"
+                                    rows={2}
+                                    value={form.notes || ''}
+                                    onChange={(e) => handleChange('notes', e.target.value)}
+                                    size="sm"
+                                    className="rounded-lg"
+                                    placeholder="Additional details, remarks, etc."
+                                />
+                            </Form.Group>
+                        </div>
                     </Form>
                 </Modal.Body>
-                <Modal.Footer className="bg-light">
-                    <Button variant="outline-secondary" onClick={() => setShowModal(false)} size="lg">
+                <Modal.Footer className="bg-light py-3">
+                    <Button variant="outline-secondary" onClick={() => setShowModal(false)} size="sm">
                         Cancel
                     </Button>
-                    <Button variant="primary" onClick={handleSave} disabled={loading} size="lg">
+                    <Button variant="primary" onClick={handleSave} disabled={loading} size="sm" className="px-4">
                         {loading ? (
                             <>
-                                <Spinner as="span" animation="border" size="sm" className="me-2" />
-                                Saving...
+                                <Spinner as="span" animation="border" size="sm" className="me-2" /> Saving...
                             </>
                         ) : (
                             <>
-                                <i className="bi bi-check-lg me-2"></i>
-                                Save Product
+                                <i className="bi bi-check-lg me-2"></i>Save
                             </>
                         )}
                     </Button>
