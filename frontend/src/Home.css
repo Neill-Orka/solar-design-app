@@ -88,7 +88,79 @@
     background: linear-gradient(60deg, #ffc107, #ffe173);
   }
   
-  
   .glass-card:hover::before { opacity: 1; }
   
+  /* --- Mysterious button --- */
+.mystery-btn {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.85);
+  background: rgba(20,20,20,0.55);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  opacity: 0.65;
+  transition: all 200ms ease;
+  z-index: 20;
+}
+.mystery-btn:hover {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}
+
+/* --- Fullscreen overlay --- */
+.surprise-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+  animation: overlayIn 200ms ease-out;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* --- Video --- */
+.surprise-video {
+  max-width: min(1200px, 96vw);
+  max-height: 90vh;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+/* --- Close button --- */
+.surprise-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  transition: all 160ms ease;
+}
+.surprise-close:hover {
+  background: rgba(255,255,255,0.16);
+  transform: scale(1.05);
+}
+
   
