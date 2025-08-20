@@ -624,7 +624,7 @@ export default function ProductsAdmin() {
                                                     <td>
                                                         <div className="d-flex flex-column">
                                                             <small className="text-muted">
-                                                                {product.updated_at ? new Date(product.updated_at).toLocaleDateString() : '—'}
+                                                                {product.updated_at ? new Date(product.updated_at).toLocaleDateString('en-GB') : '—'}
                                                             </small>
                                                             {product.updated_by && (
                                                                 <small className="text-muted" style={{fontSize: '0.7rem'}}>
