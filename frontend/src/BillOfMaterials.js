@@ -86,6 +86,11 @@ const formatNumber0 = (value) =>
 const toNumber = v => (v === null || v === undefined || v === '') ? 0 : Number(v);
 const DEFAULT_MARGIN_DEC = 0.25;
 
+// Helper function to check if a component is a core component that can only have margin edited
+const isCoreComponent = (category) => {
+  return ['panel', 'inverter', 'battery'].includes(category);
+};
+
 const normalizeMarginToDecimal = (m) => {
   const v = toNumber(m);
   if (!Number.isFinite(v) || v < 0) return DEFAULT_MARGIN_DEC;
@@ -143,6 +148,9 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom }) {
 
   const [extrasCost, setExtrasCost] = useState('0');
   const [quoteStatus, setQuoteStatus] = useState('draft'); // draft | sent | accepted | complete
+  
+  // State for margin editing (allows blank values during editing)
+  const [editingMargins, setEditingMargins] = useState({});
 
   /* ---------- Initial load ---------- */
   useEffect(() => {
@@ -183,6 +191,11 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom }) {
     fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  // Clear editing margins when BOM components change (e.g., on load)
+  useEffect(() => {
+    setEditingMargins({});
+  }, [bomComponents.length]); // Only trigger when the number of components changes
 
   // Auto-save BOM when design modifications are detected for standard designs
   useEffect(() => {
@@ -294,7 +307,8 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom }) {
         product: prod,
         quantity: Number(c.quantity) || 1,
         price_at_time: null,
-        current_price: computeDerivedUnitFromRow({ product: prod })
+        current_price: computeDerivedUnitFromRow({ product: prod }),
+        override_margin: null  // Templates start with no margin override
       };
     }).filter(Boolean);
     return comps;
@@ -308,25 +322,38 @@ const overlayFromProject = (items, projectData, productsData) => {
   if (projectData.panel_id) {
     const prod = productsData.find(p => p.id === projectData.panel_id);
     if (prod) {
+      // Find existing panel component to preserve margin override
+      const existingPanel = result.find(x => x.product?.category === 'panel' && x.product?.id === projectData.panel_id);
       result = result.filter(x => x.product?.category !== 'panel');
       // Use stored num_panels directly instead of calculating to avoid rounding issues
       const qty = projectData.num_panels || 1;
-      result.push({ product: prod, quantity: qty, price_at_time: null, current_price: computeDerivedUnitFromRow({ product: prod }) });
+      result.push({ 
+        product: prod, 
+        quantity: qty, 
+        price_at_time: null, 
+        current_price: computeDerivedUnitFromRow({ product: prod }),
+        override_margin: existingPanel?.override_margin || null  // Preserve margin override
+      });
     }
   }
 
   // Inverters
   if (projectData.inverter_ids?.length) {
+    // Collect existing inverter margins before filtering
+    const existingInverters = result.filter(x => x.product?.category === 'inverter');
     result = result.filter(x => x.product?.category !== 'inverter');
     const qty = Number(projectData.inverter_kva?.quantity) || 1;
     projectData.inverter_ids.forEach((id, idx) => {
       const prod = productsData.find(p => p.id === id);
       if (prod) {
+        // Find existing margin for this specific inverter
+        const existingInverter = existingInverters.find(x => x.product?.id === id);
         result.push({
           product: prod,
           quantity: idx === 0 ? qty : 1,
           price_at_time: null,
-          current_price: computeDerivedUnitFromRow({ product: prod })
+          current_price: computeDerivedUnitFromRow({ product: prod }),
+          override_margin: existingInverter?.override_margin || null  // Preserve margin override
         });
       }
     });
@@ -334,16 +361,21 @@ const overlayFromProject = (items, projectData, productsData) => {
 
   // Batteries
   if (projectData.battery_ids?.length) {
+    // Collect existing battery margins before filtering
+    const existingBatteries = result.filter(x => x.product?.category === 'battery');
     result = result.filter(x => x.product?.category !== 'battery');
     const qty = Number(projectData.battery_kwh?.quantity) || 1;
     projectData.battery_ids.forEach((id, idx) => {
       const prod = productsData.find(p => p.id === id);
       if (prod) {
+        // Find existing margin for this specific battery
+        const existingBattery = existingBatteries.find(x => x.product?.id === id);
         result.push({
           product: prod,
           quantity: idx === 0 ? qty : 1,
           price_at_time: null,
-          current_price: computeDerivedUnitFromRow({ product: prod })
+          current_price: computeDerivedUnitFromRow({ product: prod }),
+          override_margin: existingBattery?.override_margin || null  // Preserve margin override
         });
       }
     });
@@ -360,7 +392,6 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     template_name: projectData?.template_name
   });
 
-  const CORE_COMPONENTS = ['panel', 'inverter', 'battery']; // Always from SystemDesign
   let finalComponents = [];
 
   try {
@@ -480,16 +511,29 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
         product,
         quantity: 1,
         price_at_time: null,
-        current_price: computeDerivedUnitFromRow({ product })
+        current_price: computeDerivedUnitFromRow({ product }),
+        override_margin: null  // New components start with no margin override
       }
     ]);
   };
 
   const removeComponent = (productId) => {
+    // Check if this is a core component that shouldn't be removed
+    const componentToRemove = bomComponents.find(c => c.product.id === productId);
+    if (componentToRemove && isCoreComponent(componentToRemove.product.category)) {
+      showNotification('Core components (Panels, Inverters, Batteries) can only be modified in System Design', 'warning');
+      return;
+    }
     setBomComponents(bomComponents.filter(c => c.product.id !== productId));
   };
 
   const updateQuantity = (productId, quantity) => {
+    // Check if this is a core component that shouldn't have quantity changed
+    const componentToUpdate = bomComponents.find(c => c.product.id === productId);
+    if (componentToUpdate && isCoreComponent(componentToUpdate.product.category)) {
+      showNotification('Core component quantities can only be modified in System Design', 'warning');
+      return;
+    }
     // Allow empty string for better UX, but store the actual value
     setBomComponents(bomComponents.map(c =>
       c.product.id === productId ? { ...c, quantity: quantity } : c
@@ -497,6 +541,11 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
   };
 
   const handleQuantityBlur = (productId, quantity) => {
+    // Check if this is a core component that shouldn't have quantity changed
+    const componentToUpdate = bomComponents.find(c => c.product.id === productId);
+    if (componentToUpdate && isCoreComponent(componentToUpdate.product.category)) {
+      return; // Don't process blur for core components
+    }
     // When field loses focus, ensure we have a valid number
     const q = Math.max(1, parseInt(quantity || 1, 10));
     setBomComponents(bomComponents.map(c =>
@@ -504,11 +553,46 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     ));
   };
 
+  // Helper function to get the display value for margin input
+  const getMarginDisplayValue = (comp) => {
+    const productId = comp.product.id;
+    // If we're editing this margin, show the editing value
+    if (editingMargins.hasOwnProperty(productId)) {
+      return editingMargins[productId];
+    }
+    // Otherwise show the actual margin converted to percentage
+    return Math.round(getRowMarginDecimal(comp) * 100);
+  };
+
   const updateMargin = (productId, marginPct) => {
-    const dec = Math.max(0, Number(marginPct) / 100 || 0);
+    // Store the raw input value to allow empty strings during editing
+    setEditingMargins(prev => ({
+      ...prev,
+      [productId]: marginPct
+    }));
+  };
+
+  const handleMarginBlur = (productId, marginPct) => {
+    // When field loses focus, ensure we have a valid margin or use default
+    const numValue = Number(marginPct);
+    let finalMargin = null; // null means use default 25%
+    
+    if (marginPct !== '' && !isNaN(numValue) && numValue >= 0) {
+      // Valid number entered, convert to decimal
+      finalMargin = Math.max(0, numValue / 100);
+    }
+    
+    // Update the component with the final margin value
     setBomComponents(bomComponents.map(c => 
-      c.product.id === productId ? { ...c, override_margin: dec } : c
+      c.product.id === productId ? { ...c, override_margin: finalMargin } : c
     ));
+    
+    // Clear the editing state
+    setEditingMargins(prev => {
+      const newState = { ...prev };
+      delete newState[productId];
+      return newState;
+    });
   };
 
   /* ---------- Save BOM ---------- */
@@ -999,9 +1083,23 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                             <td className="text-center">
                               {existing ? (
                                 <ButtonGroup size="sm">
-                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, Math.max(1, Number(existing.quantity) - 1))}>-</Button>
+                                  <Button 
+                                    variant="outline-secondary" 
+                                    size="sm" 
+                                    className="py-0 px-1" 
+                                    onClick={() => updateQuantity(product.id, Math.max(1, Number(existing.quantity) - 1))}
+                                    disabled={isCoreComponent(product.category)}
+                                    title={isCoreComponent(product.category) ? "Core component quantities can only be changed in System Design" : "Decrease quantity"}
+                                  >-</Button>
                                   <Button variant="outline-secondary" size="sm" className="py-0 px-1" disabled>{Number(existing.quantity) || 1}</Button>
-                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1" onClick={() => updateQuantity(product.id, Number(existing.quantity) + 1)}>+</Button>
+                                  <Button 
+                                    variant="outline-secondary" 
+                                    size="sm" 
+                                    className="py-0 px-1" 
+                                    onClick={() => updateQuantity(product.id, Number(existing.quantity) + 1)}
+                                    disabled={isCoreComponent(product.category)}
+                                    title={isCoreComponent(product.category) ? "Core component quantities can only be changed in System Design" : "Increase quantity"}
+                                  >+</Button>
                                 </ButtonGroup>
                               ) : (
                                 <Button variant="outline-primary" size="sm" className="py-0" onClick={() => addComponent(product)}>
@@ -1074,12 +1172,21 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                               return (
                                 <tr key={comp.product.id}>
                                   <td>
-                                    <div className="small fw-small">{comp.product.brand} {comp.product.model}</div>
-                                    {priceChanged && (
-                                      <small className="text-danger">
-                                        Price changed: {formatCurrency(comp.price_at_time)} → {formatCurrency(computeDerivedUnitFromRow(comp))}
-                                      </small>
-                                    )}
+                                    <div className="d-flex align-items-center justify-content-between">
+                                      <div>
+                                        <div className="small fw-small">{comp.product.brand} {comp.product.model}</div>
+                                        {priceChanged && (
+                                          <small className="text-danger">
+                                            Price changed: {formatCurrency(comp.price_at_time)} → {formatCurrency(computeDerivedUnitFromRow(comp))}
+                                          </small>
+                                        )}
+                                      </div>
+                                      {isCoreComponent(comp.product.category) && (
+                                        <Badge bg="info" className="ms-2" title="Core component - quantities managed in System Design">
+                                          <i className="bi bi-gear-fill" style={{ fontSize: '0.75em' }}></i>
+                                        </Badge>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className='text-end small'>{formatCurrency(unitCost)}</td>
                                   <td>
@@ -1089,8 +1196,9 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                         type="number"
                                         min="0"
                                         step="1"
-                                        value={Math.round(getRowMarginDecimal(comp) * 100)}
+                                        value={getMarginDisplayValue(comp)}
                                         onChange={e => updateMargin(comp.product.id, e.target.value)}
+                                        onBlur={e => handleMarginBlur(comp.product.id, e.target.value)}
                                         disabled={quoteStatus !== 'draft'}
                                         className="py-0"
                                       />
@@ -1106,12 +1214,21 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                         onChange={e => updateQuantity(comp.product.id, e.target.value)}
                                         onBlur={e => handleQuantityBlur(comp.product.id, e.target.value)}
                                         className="py-0"
+                                        disabled={isCoreComponent(comp.product.category)}
+                                        title={isCoreComponent(comp.product.category) ? "Core component quantities can only be changed in System Design" : ""}
                                       />
                                     </InputGroup>
                                   </td>
                                   <td className='text-end small'>{formatCurrency(line)}</td>
                                   <td className='text-end'>
-                                    <Button variant="outline-danger" size='sm' className="py-0 px-1" onClick={() => removeComponent(comp.product.id)}>
+                                    <Button 
+                                      variant="outline-danger" 
+                                      size='sm' 
+                                      className="py-0 px-1" 
+                                      onClick={() => removeComponent(comp.product.id)}
+                                      disabled={isCoreComponent(comp.product.category)}
+                                      title={isCoreComponent(comp.product.category) ? "Core components cannot be removed - manage in System Design" : "Remove component"}
+                                    >
                                       <i className='bi bi-trash' />
                                     </Button>
                                   </td>

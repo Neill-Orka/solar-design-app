@@ -24,6 +24,10 @@ function MainReportContent({
     const [demandEndDate, setDemandEndDate] = useState(null);
     const [demandData, setDemandData] = useState([]);
     const [yearlyConsumptionData, setYearlyConsumptionData] = useState([]);
+    
+    // State for simulation graph date picker
+    const [simulationStartDate, setSimulationStartDate] = useState(null);
+    const [simulationEndDate, setSimulationEndDate] = useState(null);
 
     // Initialize dates - first clear any existing stored dates
     useEffect(() => {
@@ -242,6 +246,52 @@ function MainReportContent({
         };
     }, [data?.financials?.cost_comparison, data?.financials]);
 
+    // Function to get simulation data for selected date range
+    const getFilteredSimulationData = React.useMemo(() => {
+        if (!data?.simulation?.timestamps || !simulationStartDate || !simulationEndDate) {
+            return {
+                labels: [],
+                demand: [],
+                generation: [],
+                import_from_grid: [],
+                battery_soc: []
+            };
+        }
+
+        const startDate = new Date(simulationStartDate);
+        const endDate = new Date(simulationEndDate);
+        
+        // Find indices for the selected date range
+        let startIndex = -1;
+        let endIndex = -1;
+        
+        for (let i = 0; i < data.simulation.timestamps.length; i++) {
+            const timestamp = new Date(data.simulation.timestamps[i]);
+            
+            if (startIndex === -1 && timestamp >= startDate) {
+                startIndex = i;
+            }
+            
+            if (timestamp <= endDate) {
+                endIndex = i;
+            }
+        }
+        
+        // If we couldn't find the exact range, default to first week
+        if (startIndex === -1 || endIndex === -1) {
+            startIndex = 0;
+            endIndex = Math.min(335, data.simulation.timestamps.length - 1); // 336 points (7 days * 48 points/day)
+        }
+        
+        return {
+            labels: data.simulation.timestamps.slice(startIndex, endIndex + 1).map(t => new Date(t)),
+            demand: data.simulation.demand.slice(startIndex, endIndex + 1),
+            generation: data.simulation.generation.slice(startIndex, endIndex + 1),
+            import_from_grid: data.simulation.import_from_grid.slice(startIndex, endIndex + 1),
+            battery_soc: data.simulation.battery_soc.slice(startIndex, endIndex + 1)
+        };
+    }, [data?.simulation, simulationStartDate, simulationEndDate]);
+
     // Chart options for cost breakdown
     const costBreakdownOptions = {
         responsive: true,
@@ -382,6 +432,30 @@ function MainReportContent({
             sessionStorage.setItem('reportDemandStartDate', demandStartDate.toISOString());
         }
     }, [demandStartDate]);
+
+    // Initialize simulation date range
+    useEffect(() => {
+        const currentYear = new Date().getFullYear(); // 2025
+        const defaultStart = new Date(currentYear, 2, 15); // March 15
+    
+        // Get from session storage if available
+        const savedStart = sessionStorage.getItem('reportSimulationStartDate');
+    
+        const startDate = savedStart ? new Date(savedStart) : defaultStart;
+        setSimulationStartDate(startDate);
+    
+        // Automatically calculate end date (7 days total)
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        setSimulationEndDate(endDate);
+    }, []);
+
+    // Save simulation date selections (only save start date)
+    useEffect(() => {
+        if (simulationStartDate) {
+            sessionStorage.setItem('reportSimulationStartDate', simulationStartDate.toISOString());
+        }
+    }, [simulationStartDate]);
 
     // Add this useEffect to fetch demand data for the selected period
     useEffect(() => {
@@ -844,8 +918,8 @@ function MainReportContent({
             </p>
             
             {/* New compact date picker - hidden when printing */}
-            <div className="chart-header d-flex justify-content-between align-items-center mb-2">
-                <div className="no-print date-picker-wrapper ms-auto">
+            <div className="chart-header d-flex justify-content-end align-items-center mb-2">
+                <div className="no-print d-flex align-items-center" style={{minWidth: '280px'}}>
                     <DatePicker
                         selected={demandStartDate}
                         onChange={(date) => {
@@ -862,12 +936,13 @@ function MainReportContent({
                         }}
                         dateFormat="MMM d, yyyy"
                         className="form-control form-control-sm"
+                        style={{width: '160px'}}
                         popperPlacement="bottom-end"
                         minDate={new Date(new Date().getFullYear(), 0, 1)}
                         maxDate={new Date(new Date().getFullYear(), 11, 31)}
                         placeholderText="Select week start date"
                     />
-                    <small className="text-muted ms-2">(Shows 7-day period)</small>
+                    <small className="text-muted ms-2 text-nowrap">(Shows 7-day period)</small>
                 </div>
             </div>
             
@@ -1299,15 +1374,44 @@ function MainReportContent({
                     post implementation for a number of days in the year.
                 </p>
                 
-                <div className="chart-container" style={{height: "350px"}}>
+            {/* Date picker for simulation graph - hidden when printing */}
+            <div className="chart-header d-flex justify-content-end align-items-center mb-2">
+                <div className="no-print d-flex align-items-center" style={{minWidth: '280px'}}>
+                    <DatePicker
+                        selected={simulationStartDate}
+                        onChange={(date) => {
+                            // Explicitly set to the start of the selected day (midnight)
+                            const selectedDate = new Date(date);
+                            selectedDate.setHours(0, 0, 0, 0);
+                            setSimulationStartDate(selectedDate);
+                            
+                            // End date is 6 days later (7 days total including start date)
+                            const endDate = new Date(selectedDate);
+                            endDate.setDate(selectedDate.getDate() + 6);
+                            endDate.setHours(23, 59, 59, 999); // End of the last day
+                            setSimulationEndDate(endDate);
+                        }}
+                        dateFormat="MMM d, yyyy"
+                        className="form-control form-control-sm"
+                        style={{width: '160px'}}
+                        popperPlacement="bottom-end"
+                        minDate={new Date(new Date().getFullYear(), 0, 1)}
+                        maxDate={new Date(new Date().getFullYear(), 11, 31)}
+                        placeholderText="Select week start date"
+                    />
+                    <small className="text-muted ms-2 text-nowrap">(Shows 7-day period)</small>
+                </div>
+            </div>
+                
+                <div className="chart-container" style={{height: "320px"}}>
                     {data?.simulation?.timestamps ? (
                         <Line 
                             data={{
-                                labels: data.simulation.timestamps.slice(0, 336).map(t => new Date(t)), // First week (336 points)
+                                labels: getFilteredSimulationData.labels,
                                 datasets: [
                                     {
                                         label: 'Load Demand (kW)',
-                                        data: data.simulation.demand.slice(0, 336),
+                                        data: getFilteredSimulationData.demand,
                                         borderColor: '#ff6384',
                                         backgroundColor: 'rgba(255, 99, 132, 0.1)',
                                         tension: 0.3,
@@ -1317,7 +1421,7 @@ function MainReportContent({
                                     },
                                     {
                                         label: 'Solar Generation (kW)',
-                                        data: data.simulation.generation.slice(0, 336),
+                                        data: getFilteredSimulationData.generation,
                                         borderColor: '#ffce56',
                                         backgroundColor: 'rgba(255, 206, 86, 0.1)',
                                         tension: 0.3,
@@ -1326,7 +1430,7 @@ function MainReportContent({
                                     },
                                     {
                                         label: 'Grid Import (kW)',
-                                        data: data.simulation.import_from_grid.slice(0, 336),
+                                        data: getFilteredSimulationData.import_from_grid,
                                         borderColor: '#cc65fe',
                                         backgroundColor: 'rgba(204, 101, 254, 0.1)',
                                         tension: 0.3,
@@ -1336,7 +1440,7 @@ function MainReportContent({
                                     },
                                     {
                                         label: 'Battery SOC (%)',
-                                        data: data.simulation.battery_soc.slice(0, 336),
+                                        data: getFilteredSimulationData.battery_soc,
                                         borderColor: '#36a2eb',
                                         backgroundColor: 'rgba(54, 162, 235, 0.1)',
                                         yAxisID: 'y1',
@@ -1488,8 +1592,8 @@ function MainReportContent({
             </p>
             
             {/* Monthly Cost Comparison Line Chart */}
-            <div className="row mt-4">
-                <div className="col-md-6">
+            <div className="figures-side-by-side mt-4">
+                <div className="figure-left">
                     <p className="small mb-1">Figure 12: Client new monthly utility cost</p>
                     <div className="chart-container" style={{height: "300px"}}>
                         {data?.financials?.cost_comparison?.length > 0 ? (
@@ -1555,7 +1659,7 @@ function MainReportContent({
                 </div>
 
                 {/* Annual Cost Breakdown Bar Chart */}
-                <div className="col-md-6">
+                <div className="figure-right">
                     <p className="small mb-1">Figure 13: Cost saving in year 1</p>
                     <div className="chart-container" style={{height: "300px"}}>
                         {data?.financials?.original_annual_cost && data?.financials?.new_annual_cost ? (
