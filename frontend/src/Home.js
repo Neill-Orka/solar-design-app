@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { motion } from 'framer-motion';
@@ -12,11 +12,42 @@ function Home() {
   const [stats, setStats] = useState(null);
   const { user } = useAuth();
 
+  // NEW JUMPSCARE
+  const [ showSurprise, setShowSurprise ] = useState(false);
+  const videoRef = useRef(null);
+
   useEffect(() => {
     axios.get(`${API_URL}/api/stats`)
          .then(res => setStats(res.data))
          .catch(() => setStats(null));
   }, []);
+
+  // New JUMPSCARE
+  const openSurprise = () => {
+    setShowSurprise(true);
+
+    setTimeout(() => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+        const p = videoRef.current.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      }
+    }, 0);
+  };
+
+  const closeSurprise = () => {
+    if (videoRef.current) videoRef.current.pause();
+    setShowSurprise(false);
+  };
+
+  useEffect(() => {
+    if (!showSurprise) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') closeSurprise();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showSurprise]);
 
   return (
     <>
@@ -134,8 +165,51 @@ function Home() {
             </motion.div>
           ))}
         </motion.div>
-
       </div>
+
+      {/* ---------- Mysterious button ---------- */}
+      <button
+        className="mystery-btn"
+        onClick={openSurprise}
+        aria-haspopup="dialog"
+        aria-controls="surprise-modal"
+        title="Click me"
+      >
+        click me
+      </button>
+
+      {/* ---------- Fullscreen surprise overlay ---------- */}
+      {showSurprise && (
+        <div
+          className="surprise-overlay"
+          role="dialog"
+          aria-modal="true"
+          id="surprise-modal"
+          onClick={closeSurprise}
+        >
+          <button
+            className="surprise-close"
+            onClick={(e) => { e.stopPropagation(); closeSurprise(); }}
+            aria-label="Close"
+            title="Close"
+          >
+            ×
+          </button>
+
+          <video
+            ref={videoRef}
+            className="surprise-video"
+            src="/pranks/surprise.mp4" // place your video in: public/pranks/surprise.mp4
+            controls
+            playsInline
+            preload="auto"
+            onClick={(e) => e.stopPropagation()} // allow UI clicks without closing
+          />
+        </div>
+      )}
+
+
+
     </>
   );
 }
