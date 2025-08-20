@@ -50,7 +50,7 @@ const EMPTY_PRODUCT = {
     brand: '', 
     model: '',
     unit_cost: '', 
-    margin: '', 
+    margin: '25', 
     price: '', 
     warranty_y: '', 
     notes: ''
@@ -566,43 +566,43 @@ export default function ProductsAdmin() {
                             ) : (
                                 // List View
                                 <Card className="shadow-sm border-0 rounded-xl">
-                                    <Table hover responsive className="mb-0">
+                                    <Table hover responsive className="mb-0" size="sm">
                                         <thead className="table-light">
-                                            <tr>
-                                                <th className="ps-4" style={{width: "14%"}}>Category</th>
-                                                <th style={{width: "16%"}}>Component Type</th>
-                                                <th style={{width: "14%"}}>Brand</th>
-                                                <th style={{width: "20%"}}>Model</th>
-                                                <th style={{width: "14%"}}>Price</th>
-                                                <th style={{width: "12%"}}>Last Updated</th>
-                                                <th className="text-end pe-4" style={{width: "10%"}}>Actions</th>
+                                            <tr style={{fontSize: '0.9rem'}}>
+                                                <th className="ps-3" style={{width: "10%"}}>Category</th>
+                                                <th style={{width: "12%"}}>Component Type</th>
+                                                <th style={{width: "10%"}}>Brand</th>
+                                                <th style={{width: "25%"}}>Model</th>
+                                                <th style={{width: "15%"}}>Price</th>
+                                                <th style={{width: "15%"}}>Last Updated</th>
+                                                <th className="text-end pe-3" style={{width: "13%"}}>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {filtered.map(product => (
-                                                <tr key={product.id} style={{ verticalAlign: 'middle' }}>
-                                                    <td className="ps-4">
+                                                <tr key={product.id} style={{ verticalAlign: 'middle', fontSize: '0.85rem' }}>
+                                                    <td className="ps-3 py-2">
                                                         <div className="d-flex align-items-center">
-                                                            <div className={`bg-${getCategoryColor(product.category)} bg-opacity-10 rounded-circle p-2 me-2`} style={{width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center"}}>
-                                                                <i className={`bi ${getCategoryIcon(product.category)} text-${getCategoryColor(product.category)}`}></i>
+                                                            <div className={`bg-${getCategoryColor(product.category)} bg-opacity-10 rounded-circle p-1 me-2`} style={{width: "24px", height: "24px", display: "flex", alignItems: "center", justifyContent: "center"}}>
+                                                                <i className={`bi ${getCategoryIcon(product.category)} text-${getCategoryColor(product.category)}`} style={{fontSize: '0.7rem'}}></i>
                                                             </div>
-                                                            <Badge bg={getCategoryColor(product.category)} className="text-capitalize">
+                                                            <Badge bg={getCategoryColor(product.category)} className="text-capitalize" style={{fontSize: '0.7rem'}}>
                                                                 {getCategoryName(product.category)}
                                                             </Badge>
                                                         </div>
                                                     </td>
-                                                    <td>
-                                                        <span className="text-muted">{product.component_type || '—'}</span>
+                                                    <td className="py-2">
+                                                        <span className="text-muted" style={{fontSize: '0.8rem'}}>{product.component_type || '—'}</span>
                                                     </td>
-                                                    <td className="fw-semibold">{product.brand}</td>
-                                                    <td>
+                                                    <td className="fw-semibold py-2" style={{fontSize: '0.85rem'}}>{product.brand}</td>
+                                                    <td className="py-2">
                                                         <div>
-                                                            <span>{product.model}</span>
+                                                            <span style={{fontSize: '0.9rem'}}>{product.model}</span>
                                                             {getRatingBadge(product)}
                                                         </div>
-                                                        {product.notes && <small className="text-muted d-block">{product.notes}</small>}
+                                                        {/* {product.notes && <small className="text-muted d-block">{product.notes}</small>} */}
                                                     </td>
-                                                    <td>
+                                                    <td className="py-2">
                                                         <div className="d-flex flex-column gap-1">
                                                             {(product.unit_cost && product.margin) ? (
                                                                 <>
@@ -622,15 +622,23 @@ export default function ProductsAdmin() {
                                                         </div>
                                                     </td>
                                                     <td>
-                                                        <small className="text-muted">
-                                                            {product.updated_at ? new Date(product.updated_at).toLocaleDateString() : '—'}
-                                                        </small>
+                                                        <div className="d-flex flex-column">
+                                                            <small className="text-muted">
+                                                                {product.updated_at ? new Date(product.updated_at).toLocaleDateString() : '—'}
+                                                            </small>
+                                                            {product.updated_by && (
+                                                                <small className="text-muted" style={{fontSize: '0.7rem'}}>
+                                                                    by {product.updated_by}
+                                                                </small>
+                                                            )}
+                                                        </div>
                                                     </td>
-                                                    <td className="text-end pe-4">
+                                                    <td className="text-end pe-3 py-2">
                                                         <Button 
                                                             variant="outline-primary" 
                                                             size="sm" 
-                                                            className="me-2"
+                                                            className="me-1"
+                                                            style={{fontSize: '0.75rem', padding: '0.25rem 0.5rem'}}
                                                             onClick={() => openEdit(product)}
                                                         >
                                                             <FaEdit className="me-1" />Edit
@@ -638,6 +646,7 @@ export default function ProductsAdmin() {
                                                         <Button 
                                                             variant="outline-danger" 
                                                             size="sm"
+                                                            style={{fontSize: '0.75rem', padding: '0.25rem 0.5rem'}}
                                                             onClick={() => deleteProduct(product.id)}
                                                         >
                                                             <FaTrash />
@@ -662,7 +671,7 @@ export default function ProductsAdmin() {
                         {editId ? 'Edit Product' : 'Add Product'}
                     </Modal.Title>
                 </Modal.Header>
-                <Modal.Body className="p-4">
+                <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }} className="p-4">
                     {loadingMetadata ? (
                         <div className="text-center py-5">
                             <Spinner animation="border" variant="primary" />
@@ -677,17 +686,49 @@ export default function ProductsAdmin() {
                                         <Accordion.Header>General Information</Accordion.Header>
                                         <Accordion.Body>
                                             <Row className="g-3">
-                                                {Object.entries(fieldMetadata.general.fields).map(([field, meta]) => (
-                                                    <Col md={6} key={field}>
+                                                {/* Render fields in specific order: category and component_type first, notes last */}
+                                                {['category', 'component_type'].map(field => {
+                                                    const meta = fieldMetadata.general.fields[field];
+                                                    if (!meta) return null;
+                                                    return (
+                                                        <Col md={6} key={field}>
+                                                            <Form.Group>
+                                                                <Form.Label className="fw-semibold">
+                                                                    {meta.label}
+                                                                    {meta.readonly && <small className="text-muted ms-2">(Auto-calculated)</small>}
+                                                                </Form.Label>
+                                                                {renderFormField(field, meta)}
+                                                            </Form.Group>
+                                                        </Col>
+                                                    );
+                                                })}
+                                                
+                                                {/* Render all other fields except notes */}
+                                                {Object.entries(fieldMetadata.general.fields)
+                                                    .filter(([field, meta]) => !['category', 'component_type', 'notes'].includes(field))
+                                                    .map(([field, meta]) => (
+                                                        <Col md={6} key={field}>
+                                                            <Form.Group>
+                                                                <Form.Label className="fw-semibold">
+                                                                    {meta.label}
+                                                                    {meta.readonly && <small className="text-muted ms-2">(Auto-calculated)</small>}
+                                                                </Form.Label>
+                                                                {renderFormField(field, meta)}
+                                                            </Form.Group>
+                                                        </Col>
+                                                    ))}
+                                                
+                                                {/* Render notes last, full width */}
+                                                {fieldMetadata.general.fields.notes && (
+                                                    <Col md={12}>
                                                         <Form.Group>
                                                             <Form.Label className="fw-semibold">
-                                                                {meta.label}
-                                                                {meta.readonly && <small className="text-muted ms-2">(Auto-calculated)</small>}
+                                                                {fieldMetadata.general.fields.notes.label}
                                                             </Form.Label>
-                                                            {renderFormField(field, meta)}
+                                                            {renderFormField('notes', fieldMetadata.general.fields.notes)}
                                                         </Form.Group>
                                                     </Col>
-                                                ))}
+                                                )}
                                             </Row>
                                         </Accordion.Body>
                                     </Accordion.Item>
@@ -704,6 +745,53 @@ export default function ProductsAdmin() {
                                                 <Accordion.Header>{category.title}</Accordion.Header>
                                                 <Accordion.Body>
                                                     <Row className="g-3">
+                                                        {/* Add rating fields to specs tab for specific categories */}
+                                                        {categoryKey === 'specs' && form.category === 'Panel' && (
+                                                            <Col md={6}>
+                                                                <Form.Group>
+                                                                    <Form.Label className="fw-semibold">Power (W)</Form.Label>
+                                                                    <Form.Control
+                                                                        type="number"
+                                                                        value={form.power_w || ''}
+                                                                        onChange={e => handleChange('power_w', e.target.value)}
+                                                                        className="rounded"
+                                                                        placeholder="e.g., 400"
+                                                                    />
+                                                                </Form.Group>
+                                                            </Col>
+                                                        )}
+                                                        
+                                                        {categoryKey === 'specs' && form.category === 'Inverter' && (
+                                                            <Col md={6}>
+                                                                <Form.Group>
+                                                                    <Form.Label className="fw-semibold">Rating (kVA)</Form.Label>
+                                                                    <Form.Control
+                                                                        type="number"
+                                                                        value={form.rating_kva || ''}
+                                                                        onChange={e => handleChange('rating_kva', e.target.value)}
+                                                                        className="rounded"
+                                                                        placeholder="e.g., 5"
+                                                                    />
+                                                                </Form.Group>
+                                                            </Col>
+                                                        )}
+                                                        
+                                                        {categoryKey === 'specs' && form.category === 'Battery' && (
+                                                            <Col md={6}>
+                                                                <Form.Group>
+                                                                    <Form.Label className="fw-semibold">Capacity (kWh)</Form.Label>
+                                                                    <Form.Control
+                                                                        type="number"
+                                                                        value={form.capacity_kwh || ''}
+                                                                        onChange={e => handleChange('capacity_kwh', e.target.value)}
+                                                                        className="rounded"
+                                                                        placeholder="e.g., 10"
+                                                                    />
+                                                                </Form.Group>
+                                                            </Col>
+                                                        )}
+                                                        
+                                                        {/* Render other category fields */}
                                                         {Object.entries(category.fields).map(([field, meta]) => (
                                                             <Col md={6} key={field}>
                                                                 <Form.Group>
@@ -721,64 +809,10 @@ export default function ProductsAdmin() {
                                         );
                                     })}
                             </Accordion>
-
-                            {/* Additional fields for specific product categories */}
-                            <Row className="g-3 mt-4">
-                                {/* For Panel products */}
-                                {form.category === 'Panel' && (
-                                  <Col md={4}>
-                                    <Form.Group>
-                                      <Form.Label className="fw-semibold">Power (W)</Form.Label>
-                                      <Form.Control
-                                        type="number"
-                                        value={form.power_w || ''}
-                                        onChange={e => handleChange('power_w', e.target.value)}
-                                        size="lg"
-                                        className="rounded-lg"
-                                        placeholder="e.g., 400"
-                                      />
-                                    </Form.Group>
-                                  </Col>
-                                )}
-
-                                {/* For Inverter products */}
-                                {form.category === 'Inverter' && (
-                                  <Col md={4}>
-                                    <Form.Group>
-                                      <Form.Label className="fw-semibold">Rating (kVA)</Form.Label>
-                                      <Form.Control
-                                        type="number"
-                                        value={form.rating_kva || ''}
-                                        onChange={e => handleChange('rating_kva', e.target.value)}
-                                        size="lg"
-                                        className="rounded-lg"
-                                        placeholder="e.g., 5"
-                                      />
-                                    </Form.Group>
-                                  </Col>
-                                )}
-
-                                {/* For Battery products */}
-                                {form.category === 'Battery' && (
-                                  <Col md={4}>
-                                    <Form.Group>
-                                      <Form.Label className="fw-semibold">Capacity (kWh)</Form.Label>
-                                      <Form.Control
-                                        type="number"
-                                        value={form.capacity_kwh || ''}
-                                        onChange={e => handleChange('capacity_kwh', e.target.value)}
-                                        size="lg"
-                                        className="rounded-lg"
-                                        placeholder="e.g., 10"
-                                      />
-                                    </Form.Group>
-                                  </Col>
-                                )}
-                            </Row>
                         </Form>
                     )}
                 </Modal.Body>
-                <Modal.Footer className="bg-light">
+                <Modal.Footer className="bg-light border-top sticky-bottom">
                     <Button variant="outline-secondary" onClick={() => setShowModal(false)} size="lg">
                         Cancel
                     </Button>

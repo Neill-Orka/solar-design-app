@@ -142,8 +142,8 @@ def get_field_metadata():
                 "brand_name": {"label": "Brand", "type": "text"},
                 "description": {"label": "Model / SKU", "type": "text"},
                 "unit_cost": {"label": "Unit Cost (R)", "type": "number"},
-                "margin": {"label": "Margin (%)", "type": "number"},
                 "price": {"label": "Price (R)", "type": "number", "readonly": True},
+                "margin": {"label": "Margin (%)", "type": "number"},
                 "warranty_y": {"label": "Warranty (y)", "type": "number"},
                 "notes": {"label": "Notes", "type": "textarea"}
             }
