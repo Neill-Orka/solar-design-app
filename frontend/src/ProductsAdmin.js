@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useAuth } from './AuthContext';
 import axios from "axios";
-import { Container, Row, Col, Card, Button, Modal, Form, InputGroup, Badge, Spinner, Alert, ButtonGroup, Table } from "react-bootstrap";
+import { Container, Row, Col, Card, Button, Modal, Form, InputGroup, Badge, Spinner, Alert, ButtonGroup, Table, Accordion } from "react-bootstrap";
 import { FaTrash, FaEdit, FaPlus } from "react-icons/fa";
 import Fuse from 'fuse.js';
 import { API_URL } from "./apiConfig";
@@ -44,69 +43,21 @@ const CATEGORY_META = {
   'accessory':                      { name: 'Accessories',                    icon: 'bi-gear-fill',             color: 'secondary'},
 };
 
+// Default empty product
 const EMPTY_PRODUCT = {
-    category: 'Panel', component_type: '', brand: '', model: '',
-    power_w: '', rating_kva: '', capacity_kwh: '',
-    unit_cost: '', margin: '', price: '', warranty_y: '', notes: '', properties: ''
-};
-
-//  Meta for every field we MIGHT display/edit
-const FIELD_META = {
-  category:        { label: "Category", type: "select", options: [
-    'Panel', 'Inverter', 'Battery', 'Solar Geyser', 'Inverter Aux', 'Lights', 
-    'Transport & Logistics', 'Contactor', 'Enclosure', 'Cable Management', 
-    'Human Resources', 'Conductor', 'VSD', 'Change Over Switch', 'HSEQ & Compliance',
-    'Aux Generator', 'DB', 'Monitoring & Control Equipment', 'S&T', 'MPPT',
-    'Mounting System', 'Monitoring', 'Auxiliaries', 'Cable', 'Protection',
-    'Professional Services'
-  ]},
-  component_type:  { label: "Component Type", type: "text" },
-  brand:           { label: "Brand",          type: "text"   },
-  model:           { label: "Model / SKU",    type: "text"   },
-  unit_cost:       { label: "Unit Cost (R)",  type: "number" },
-  margin:          { label: "Margin (%)",     type: "number" },
-  price:           { label: "Price (R)",      type: "number", readonly: true },
-  power_w:         { label: "Power (W)",      type: "number", category: "Panel"    },
-  rating_kva:      { label: "Rating (kVA)",   type: "number", category: "Inverter" },
-  capacity_kwh:    { label: "Capacity (kWh)", type: "number", category: "Battery"  },
-  warranty_y:      { label: "Warranty (y)",   type: "number" },
-  notes:           { label: "Notes",          type: "textarea" },
-};
-
-// Helper that returns fields based on category and editing context
-const getVisibleFields = (prod, isEditing = false) => {
-    return Object.keys(FIELD_META)
-    .filter((k) => {
-        const catOK = !FIELD_META[k].category || FIELD_META[k].category === prod.category;
-        
-        if (isEditing) {
-            // In editing mode, show all relevant fields regardless of whether they have values
-            return catOK;
-        } else {
-            // In display mode, only show fields that have values
-            const v = prod[k];
-            return catOK && v !== null && v !== undefined && v !== '';
-        }
-    })
-    .map((k) => ({ key: k, meta: FIELD_META[k] }));
-};
-
-
-const getCategoryIcon = (category) => {
-    return CATEGORY_META[category]?.icon || 'bi-gear-fill';
-};
-
-const getCategoryColor = (category) => {
-    return CATEGORY_META[category]?.color || 'secondary';
-};
-
-const getCategoryName = (category) => {
-    return CATEGORY_META[category]?.name || category;
+    category: 'Panel', 
+    component_type: '', 
+    brand: '', 
+    model: '',
+    unit_cost: '', 
+    margin: '', 
+    price: '', 
+    warranty_y: '', 
+    notes: ''
 };
 
 export default function ProductsAdmin() {
-    const { user } = useAuth();
-    const isAdmin = user?.role === 'admin';
+    // Standard state hooks from original implementation
     const [products, setProducts] = useState([]);
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
@@ -114,7 +65,13 @@ export default function ProductsAdmin() {
     const [form, setForm] = useState(EMPTY_PRODUCT);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [viewMode, setViewMode] = useState('list'); // Default to list view
+    const [viewMode, setViewMode] = useState('list');
+
+    // New state hooks for dynamic data
+    const [categories, setCategories] = useState([]);
+    const [componentTypes, setComponentTypes] = useState([]);
+    const [fieldMetadata, setFieldMetadata] = useState({});
+    const [loadingMetadata, setLoadingMetadata] = useState(true);
 
     // Memoized helper functions for price calculation and margin conversion
     const calculatePrice = useCallback((unitCost, margin) => {
@@ -149,6 +106,29 @@ export default function ProductsAdmin() {
         return value;
     }, [calculatePrice, formatMarginForDisplay]);
 
+    // Load metadata (categories, component types, field metadata)
+    useEffect(() => {
+        setLoadingMetadata(true);
+        
+        // Fetch all metadata in parallel
+        Promise.all([
+            axios.get(`${API_URL}/api/products/categories`),
+            axios.get(`${API_URL}/api/products/component-types`),
+            axios.get(`${API_URL}/api/products/field-metadata`)
+        ])
+        .then(([categoriesRes, componentTypesRes, metadataRes]) => {
+            setCategories(categoriesRes.data);
+            setComponentTypes(componentTypesRes.data);
+            setFieldMetadata(metadataRes.data);
+            setLoadingMetadata(false);
+        })
+        .catch(err => {
+            console.error("Failed to load product metadata", err);
+            setError('Failed to load product metadata: ' + (err.message || 'Unknown error'));
+            setLoadingMetadata(false);
+        });
+    }, []);
+
     // Optimized handleChange with debouncing for price calculation
     const handleChange = useCallback((k, v) => {
         setForm(prevForm => {
@@ -166,89 +146,129 @@ export default function ProductsAdmin() {
         });
     }, [calculatePrice, formatMarginForBackend]);
 
-    // ------ load list -----------------------------------
-    const fetchProducts = useCallback(() => 
-        axios.get(`${API_URL}/api/products`)
-            .then(r => {
-                setProducts(r.data);
-                setError('');
-            })
-            .catch(err => setError('Failed to load products')), []);
+    // ------ load products list -------------------------------
+    const fetchProducts = useCallback(() => {
+        const token = localStorage.getItem('access_token');
+        return axios.get(`${API_URL}/api/products`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        .then(r => {
+            setProducts(r.data);
+            setError('');
+        })
+        .catch(err => setError('Failed to load products'));
+    }, []);
 
     useEffect(() => {
         fetchProducts();
     }, [fetchProducts]);
 
-    // ------ open modal ----------------------------------
+    // ------ open modal --------------------------------------
     const openAdd = useCallback(() => { 
         setEditId(null); 
         setForm(EMPTY_PRODUCT); 
         setShowModal(true); 
     }, []);
     
+    // In openEdit function, map fields correctly
     const openEdit = useCallback((p) => { 
-        setEditId(p.id); 
-        // Format margin for display (convert from decimal to percentage)
-        const formData = { 
-            ...p, 
-            margin: p.margin ? formatMarginForDisplay(p.margin) : ''
-        };
-        setForm(formData); 
-        setShowModal(true); 
+      setEditId(p.id);
+      
+      // Map from API field names to form field names
+      const formData = { 
+        ...p,
+        // Ensure form uses the right field names
+        brand: p.brand || p.brand_name,
+        model: p.model || p.description,
+        power_w: p.power_w || p.power_rating_w,
+        rating_kva: p.rating_kva || p.power_rating_kva,
+        capacity_kwh: p.capacity_kwh || p.usable_rating_kwh,
+        margin: p.margin ? formatMarginForDisplay(p.margin) : ''
+      };
+      
+      setForm(formData); 
+      setShowModal(true);
     }, [formatMarginForDisplay]);
 
-    // ------ delete --------------------------------------
+    // ------ delete -----------------------------------------
     const deleteProduct = useCallback((id) => {
-        if (!isAdmin) {
-            setError('Access Denied: Only administrators can delete products.');
-            return;
-        }
-        if (!window.confirm('Delete this product? This action cannot be undone.')) return;
+        if (!window.confirm('Delete this product?')) return;
         const token = localStorage.getItem('access_token');
-        axios.delete(`${API_URL}/api/products/${id}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(fetchProducts)
-            .catch(err => {
-                const msg = err.response?.data?.message || 'Failed to delete product';
-                setError(msg);
-            });
-    }, [fetchProducts, isAdmin]);
+        
+        axios.delete(`${API_URL}/api/products/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        .then(fetchProducts)
+        .catch(err => setError('Failed to delete product'));
+    }, [fetchProducts]);
 
-    // ------ save (add or update) ---------------------
+    // ------ save (add or update) ---------------------------
     const handleSave = () => {
         setLoading(true);
-
-        const payload = { ...form };
+        const token = localStorage.getItem('access_token');
+        
+        // Prepare payload, mapping form fields back to API field names
+        const payload = { 
+          ...form,
+          // These mappings ensure the backend gets the field names it expects
+          brand_name: form.brand,
+          description: form.model,
+          power_rating_w: form.power_w,
+          power_rating_kva: form.rating_kva,
+          usable_rating_kwh: form.capacity_kwh
+        };
 
         // Convert margin from percentage display back to decimal for backend
         if (payload.margin !== null && payload.margin !== undefined && payload.margin !== '') {
             payload.margin = formatMarginForBackend(payload.margin);
         }
 
-        try {
-            if (typeof payload.properties === 'string' && payload.properties.trim()) {
+        // Handle properties field if it exists
+        if (typeof payload.properties === 'string' && payload.properties.trim()) {
+            try {
                 payload.properties = JSON.parse(payload.properties);
-            } else if (!payload.properties) {
-                payload.properties = [];
+            } catch (e) {
+                setError('The format of the Properties field is not valid JSON');
+                setLoading(false);
+                return;
             }
-        } catch (e) {
-            setError('The format of the Properties field is not valid JSON');
-            setLoading(false);
-            return;
+        } else if (!payload.properties) {
+            payload.properties = null;
         }
-        const token = localStorage.getItem('access_token');
-        const headers = { Authorization: `Bearer ${token}` };
-        const req = editId ? axios.put(`${API_URL}/api/products/${editId}`, payload, { headers }) :
-            axios.post(`${API_URL}/api/products`, payload, { headers });
+
+        // Include auth token with request
+        const req = editId 
+            ? axios.put(`${API_URL}/api/products/${editId}`, payload, {
+                headers: { Authorization: `Bearer ${token}` }
+              })
+            : axios.post(`${API_URL}/api/products`, payload, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+
         req.then(() => {
             setShowModal(false);
             fetchProducts();
         })
-        .catch(err => {
-            const detail = err.response?.data?.details || err.response?.data?.message || err.message;
-            setError('Failed to save product: ' + detail);
-        })
-        .finally(() => setLoading(false))
+        .catch(err => setError('Failed to save product: ' + (err.response?.data?.details || err.message)))
+        .finally(() => setLoading(false));
     };
+
+    // Get applicable field categories based on product category
+    const getApplicableFieldCategories = useCallback((product) => {
+        if (!fieldMetadata || !product.category) return ['general'];
+        
+        const applicable = ['general']; // General fields always apply
+        
+        // Add category-specific field groups
+        Object.entries(fieldMetadata).forEach(([key, category]) => {
+            if (key !== 'general' && category.applies_to && 
+                category.applies_to.some(cat => cat.toLowerCase() === product.category.toLowerCase())) {
+                applicable.push(key);
+            }
+        });
+        
+        return applicable;
+    }, [fieldMetadata]);
 
     // Optimized Fuse instance for fuzzy search with memoization
     const fuse = useMemo(() => {
@@ -302,6 +322,99 @@ export default function ProductsAdmin() {
         const searchResults = fuse.search(debouncedSearch);
         return searchResults.map(result => result.item);
     }, [products, debouncedSearch, fuse]);
+
+    // Render the appropriate form field based on type
+    // In renderFormField function, add mapping for field names
+    const renderFormField = (field, meta) => {
+        // Map database field names to API field names for display
+        const fieldMapping = {
+            'brand_name': 'brand',
+            'description': 'model',
+            'power_rating_w': 'power_w',
+            'power_rating_kva': 'rating_kva',
+            'usable_rating_kwh': 'capacity_kwh'
+        };
+        
+        // Use the mapped field name if it exists, otherwise use the original field
+        const formField = fieldMapping[field] || field;
+        
+        switch (meta.type) {
+            case 'select':
+                return (
+                    <Form.Select
+                        value={form[formField] || ''}
+                        onChange={(e) => handleChange(formField, e.target.value)}
+                        size="lg"
+                        className="rounded-lg"
+                    >
+                        <option value="">Select {meta.label}</option>
+                        {meta.source === 'categories' ? 
+                            categories.map(opt => <option key={opt} value={opt}>{opt}</option>) :
+                            meta.source === 'component-types' ?
+                            componentTypes.map(opt => <option key={opt} value={opt}>{opt}</option>) :
+                            meta.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)
+                        }
+                    </Form.Select>
+                );
+                
+            case 'textarea':
+                return (
+                    <Form.Control
+                        as="textarea"
+                        rows={3}
+                        value={form[formField] || ''}
+                        onChange={(e) => handleChange(formField, e.target.value)}
+                        className="rounded-lg"
+                        readOnly={meta.readonly}
+                    />
+                );
+                
+            case 'checkbox':
+                return (
+                    <Form.Check
+                        type="checkbox"
+                        checked={!!form[formField]}
+                        onChange={(e) => handleChange(formField, e.target.checked)}
+                    />
+                );
+                
+            default:
+                return (
+                    <Form.Control
+                        type={meta.type}
+                        value={form[formField] || ''}
+                        onChange={(e) => handleChange(formField, e.target.value)}
+                        size="lg"
+                        className="rounded-lg"
+                        readOnly={meta.readonly}
+                        style={meta.readonly ? { backgroundColor: '#f8f9fa' } : {}}
+                    />
+                );
+        }
+    };
+
+    // Helper function to get the rating badge for panels, inverters, and batteries
+    const getRatingBadge = (product) => {
+        if (product.category === 'Panel' || product.category === 'panel') {
+            const powerValue = product.power_w || product.power_rating_w;
+            if (powerValue && parseFloat(powerValue) > 0) {
+                return <Badge bg="warning" text="dark" className="ms-2">{powerValue}W</Badge>;
+            }
+        } 
+        else if (product.category === 'Inverter' || product.category === 'inverter') {
+            const ratingValue = product.rating_kva || product.power_rating_kva;
+            if (ratingValue && parseFloat(ratingValue) > 0) {
+                return <Badge bg="info" className="ms-2">{ratingValue}kVA</Badge>;
+            }
+        }
+        else if (product.category === 'Battery' || product.category === 'battery') {
+            const capacityValue = product.capacity_kwh || product.usable_rating_kwh;
+            if (capacityValue && parseFloat(capacityValue) > 0) {
+                return <Badge bg="success" className="ms-2">{capacityValue}kWh</Badge>;
+            }
+        }
+        return null;
+    };
 
     return (
         <div className='min-vh-100' style={{ backgroundColor: '#f8f9fa' }}>
@@ -374,7 +487,7 @@ export default function ProductsAdmin() {
                                     )}
                                 </div>
                             ) : viewMode === 'card' ? (
-                                // Card View (your existing implementation)
+                                // Card View
                                 <Row xs={1} md={2} lg={3} xl={4} className="g-4">
                                     {filtered.map(product => (
                                         <Col key={product.id}>
@@ -390,34 +503,41 @@ export default function ProductsAdmin() {
                                                     </div>
 
                                                     <Card.Title className="h5 mb-2">{product.brand}</Card.Title>
-                                                    <Card.Subtitle className="text-muted mb-3">{product.model}</Card.Subtitle>
+                                                    <Card.Subtitle className="text-muted mb-3">
+                                                        {product.model}
+                                                        {getRatingBadge(product)}
+                                                    </Card.Subtitle>
 
                                                     <div className="mb-3">
-                                                        {getVisibleFields(product).map(({ key, meta }) => (
-                                        ["power_w","rating_kva","capacity_kwh","unit_cost","margin","price","warranty_y"].includes(key) && (
-                                                            <div
-                                                              key={key}
-                                                              className="d-flex justify-content-between align-items-center mb-1"
-                                                            >
-                                                              <small className="text-muted">{meta.label.replace(/ \(.+/, "")}:</small>
-                                                              <Badge bg={
-                                                                key === "power_w" ? "warning"
-                                                                : key === "rating_kva" ? "info"
-                                                                : key === "capacity_kwh" ? "success"
-                                                                : key === "unit_cost" ? "secondary"
-                                                                : key === "margin" ? "info"
-                                            : key === "warranty_y" ? "dark"
-                                                                : "primary"
-                                                              } text={key === "power_w" ? "dark" : undefined}>
-                                                                {formatValueForDisplay(key, product[key], product)}
-                                            {key === "power_w" ? "W" :
-                                                                 key === "rating_kva" ? "kVA" :
-                                             key === "capacity_kwh" ? "kWh" :
-                                             key === "warranty_y" ? "y" : ""}
-                                                              </Badge>
+                                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                                            <small className="text-muted">Component Type:</small>
+                                                            <span>{product.component_type || '—'}</span>
+                                                        </div>
+                                                        
+                                                        {product.unit_cost && (
+                                                            <div className="d-flex justify-content-between align-items-center mb-1">
+                                                                <small className="text-muted">Unit Cost:</small>
+                                                                <Badge bg="secondary">
+                                                                    {formatValueForDisplay('unit_cost', product.unit_cost, product)}
+                                                                </Badge>
                                                             </div>
-                                                          )
-                                                        ))}
+                                                        )}
+                                                        
+                                                        {product.margin && (
+                                                            <div className="d-flex justify-content-between align-items-center mb-1">
+                                                                <small className="text-muted">Margin:</small>
+                                                                <Badge bg="info">
+                                                                    {formatValueForDisplay('margin', product.margin, product)}
+                                                                </Badge>
+                                                            </div>
+                                                        )}
+                                                        
+                                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                                            <small className="text-muted">Price:</small>
+                                                            <Badge bg="primary">
+                                                                {formatValueForDisplay('price', product.price, product)}
+                                                            </Badge>
+                                                        </div>
                                                     </div>
 
                                                     <div className="d-flex gap-2 mt-auto">
@@ -433,8 +553,6 @@ export default function ProductsAdmin() {
                                                             variant="outline-danger" 
                                                             size="sm" 
                                                             className="flex-fill"
-                                                            disabled={!isAdmin}
-                                                            title={!isAdmin ? 'Admin only' : 'Delete product'}
                                                             onClick={() => deleteProduct(product.id)}
                                                         >
                                                             <FaTrash className="me-1" />Delete
@@ -446,19 +564,18 @@ export default function ProductsAdmin() {
                                     ))}
                                 </Row>
                             ) : (
-                                // New List View
+                                // List View
                                 <Card className="shadow-sm border-0 rounded-xl">
                                     <Table hover responsive className="mb-0">
                                         <thead className="table-light">
                                             <tr>
-                                                <th className="ps-4" style={{width: "12%"}}>Category</th>
-                                                <th style={{width: "14%"}}>Component Type</th>
-                                                <th style={{width: "12%"}}>Brand</th>
-                                                <th style={{width: "16%"}}>Model</th>
-                                                <th style={{width: "12%"}}>Specifications</th>
-                                                <th style={{width: "12%"}}>Price</th>
-                                                <th style={{width: "10%"}}>Last Updated</th>
-                                                <th className="text-end pe-4" style={{width: "12%"}}>Actions</th>
+                                                <th className="ps-4" style={{width: "14%"}}>Category</th>
+                                                <th style={{width: "16%"}}>Component Type</th>
+                                                <th style={{width: "14%"}}>Brand</th>
+                                                <th style={{width: "20%"}}>Model</th>
+                                                <th style={{width: "14%"}}>Price</th>
+                                                <th style={{width: "12%"}}>Last Updated</th>
+                                                <th className="text-end pe-4" style={{width: "10%"}}>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -475,20 +592,15 @@ export default function ProductsAdmin() {
                                                         </div>
                                                     </td>
                                                     <td>
-                                                        <span className="text-muted">{product.component_type || '-'}</span>
+                                                        <span className="text-muted">{product.component_type || '—'}</span>
                                                     </td>
                                                     <td className="fw-semibold">{product.brand}</td>
-                                                    <td>{product.model}</td>
                                                     <td>
-                                                        {(product.category === 'Panel' || product.category === 'panel') && product.power_w && (
-                                                            <Badge bg="warning" text="dark">{product.power_w}W</Badge>
-                                                        )}
-                                                        {(product.category === 'Inverter' || product.category === 'inverter') && product.rating_kva && (
-                                                            <Badge bg="info">{product.rating_kva}kVA</Badge>
-                                                        )}
-                                                        {product.category === 'Battery' && product.capacity_kwh && (
-                                                            <Badge bg="success">{product.capacity_kwh}kWh</Badge>
-                                                        )}
+                                                        <div>
+                                                            <span>{product.model}</span>
+                                                            {getRatingBadge(product)}
+                                                        </div>
+                                                        {product.notes && <small className="text-muted d-block">{product.notes}</small>}
                                                     </td>
                                                     <td>
                                                         <div className="d-flex flex-column gap-1">
@@ -510,15 +622,9 @@ export default function ProductsAdmin() {
                                                         </div>
                                                     </td>
                                                     <td>
-                                                        {product.updated_at ? (
-                                                            <div className="small text-muted" title={product.updated_by ? `By: ${product.updated_by}` : ''}>
-                                                                {new Date(product.updated_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                                                                <br />
-                                                                <span className="text-secondary" style={{fontSize: '0.65rem'}}>{product.updated_by || ''}</span>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-muted small">—</span>
-                                                        )}
+                                                        <small className="text-muted">
+                                                            {product.updated_at ? new Date(product.updated_at).toLocaleDateString() : '—'}
+                                                        </small>
                                                     </td>
                                                     <td className="text-end pe-4">
                                                         <Button 
@@ -532,8 +638,6 @@ export default function ProductsAdmin() {
                                                         <Button 
                                                             variant="outline-danger" 
                                                             size="sm"
-                                                            disabled={!isAdmin}
-                                                            title={!isAdmin ? 'Admin only' : 'Delete product'}
                                                             onClick={() => deleteProduct(product.id)}
                                                         >
                                                             <FaTrash />
@@ -550,147 +654,144 @@ export default function ProductsAdmin() {
                 </Row>
             </Container>
 
-            {/* ---------- modal ---------- */}
+            {/* Dynamic Product Form Modal */}
             <Modal show={showModal} onHide={() => setShowModal(false)} size="lg" centered>
-                <Modal.Header closeButton className="bg-light py-3">
-                    <Modal.Title className="h5 mb-0 d-flex align-items-center">
+                <Modal.Header closeButton className="bg-light">
+                    <Modal.Title>
                         <i className={`bi ${editId ? 'bi-pencil-fill' : 'bi-plus-lg'} me-2`}></i>
                         {editId ? 'Edit Product' : 'Add Product'}
                     </Modal.Title>
                 </Modal.Header>
-                <Modal.Body className="pt-4 pb-2 px-4">
-                    <Form>
-                        {/* General Section */}
-                        <div className="mb-3">
-                            <small className="text-uppercase text-muted fw-semibold d-block mb-2" style={{letterSpacing: '0.05em'}}>General</small>
-                            <Row className="g-3">
-                                {['category','component_type','brand','model','warranty_y'].map(key => {
-                                    const meta = FIELD_META[key];
-                                    return (
-                                        <Col md={6} key={key}>
-                                            <Form.Group>
-                                                <Form.Label className="small fw-semibold mb-1">
-                                                    {meta.label}
-                                                </Form.Label>
-                                                {meta.type === 'select' ? (
-                                                    <Form.Select
-                                                        value={form[key] || ''}
-                                                        onChange={(e) => handleChange(key, e.target.value)}
-                                                        size="sm"
-                                                        className="rounded-lg"
-                                                    >
-                                                        <option value="">Select {meta.label}</option>
-                                                        {meta.options.map(o => <option key={o} value={o}>{o}</option>)}
-                                                    </Form.Select>
-                                                ) : (
-                                                    <Form.Control
-                                                        type={meta.type}
-                                                        value={form[key] || ''}
-                                                        onChange={(e) => handleChange(key, e.target.value)}
-                                                        size="sm"
-                                                        className="rounded-lg"
-                                                    />
-                                                )}
-                                            </Form.Group>
-                                        </Col>
-                                    );
-                                })}
-                            </Row>
+                <Modal.Body className="p-4">
+                    {loadingMetadata ? (
+                        <div className="text-center py-5">
+                            <Spinner animation="border" variant="primary" />
+                            <p className="mt-3">Loading product fields...</p>
                         </div>
+                    ) : (
+                        <Form>
+                            <Accordion defaultActiveKey="general">
+                                {/* Always render General Information first */}
+                                {fieldMetadata.general && (
+                                    <Accordion.Item eventKey="general">
+                                        <Accordion.Header>General Information</Accordion.Header>
+                                        <Accordion.Body>
+                                            <Row className="g-3">
+                                                {Object.entries(fieldMetadata.general.fields).map(([field, meta]) => (
+                                                    <Col md={6} key={field}>
+                                                        <Form.Group>
+                                                            <Form.Label className="fw-semibold">
+                                                                {meta.label}
+                                                                {meta.readonly && <small className="text-muted ms-2">(Auto-calculated)</small>}
+                                                            </Form.Label>
+                                                            {renderFormField(field, meta)}
+                                                        </Form.Group>
+                                                    </Col>
+                                                ))}
+                                            </Row>
+                                        </Accordion.Body>
+                                    </Accordion.Item>
+                                )}
+                                
+                                {/* Render all other applicable categories alphabetically */}
+                                {getApplicableFieldCategories(form)
+                                    .filter(key => key !== 'general')
+                                    .sort()
+                                    .map(categoryKey => {
+                                        const category = fieldMetadata[categoryKey];
+                                        return (
+                                            <Accordion.Item eventKey={categoryKey} key={categoryKey}>
+                                                <Accordion.Header>{category.title}</Accordion.Header>
+                                                <Accordion.Body>
+                                                    <Row className="g-3">
+                                                        {Object.entries(category.fields).map(([field, meta]) => (
+                                                            <Col md={6} key={field}>
+                                                                <Form.Group>
+                                                                    <Form.Label className="fw-semibold">
+                                                                        {meta.label}
+                                                                        {meta.readonly && <small className="text-muted ms-2">(Auto-calculated)</small>}
+                                                                    </Form.Label>
+                                                                    {renderFormField(field, meta)}
+                                                                </Form.Group>
+                                                            </Col>
+                                                        ))}
+                                                    </Row>
+                                                </Accordion.Body>
+                                            </Accordion.Item>
+                                        );
+                                    })}
+                            </Accordion>
 
-                        {/* Specification Section (conditional fields) */}
-                        <div className="mb-3">
-                            <small className="text-uppercase text-muted fw-semibold d-block mb-2" style={{letterSpacing: '0.05em'}}>Specifications</small>
-                            <Row className="g-3">
-                                {['power_w','rating_kva','capacity_kwh'].filter(k => !FIELD_META[k].category || FIELD_META[k].category === form.category).map(key => {
-                                    const meta = FIELD_META[key];
-                                    return (
-                                        <Col md={4} key={key}>
-                                            <Form.Group>
-                                                <Form.Label className="small fw-semibold mb-1">{meta.label}</Form.Label>
-                                                <Form.Control
-                                                    type={meta.type}
-                                                    value={form[key] || ''}
-                                                    onChange={(e) => handleChange(key, e.target.value)}
-                                                    size="sm"
-                                                    className="rounded-lg"
-                                                />
-                                            </Form.Group>
-                                        </Col>
-                                    );
-                                })}
-                                {(['power_w','rating_kva','capacity_kwh'].filter(k => !FIELD_META[k].category || FIELD_META[k].category === form.category).length === 0) && (
-                                    <Col>
-                                        <div className="text-muted small fst-italic">No specific metrics for this category.</div>
-                                    </Col>
+                            {/* Additional fields for specific product categories */}
+                            <Row className="g-3 mt-4">
+                                {/* For Panel products */}
+                                {form.category === 'Panel' && (
+                                  <Col md={4}>
+                                    <Form.Group>
+                                      <Form.Label className="fw-semibold">Power (W)</Form.Label>
+                                      <Form.Control
+                                        type="number"
+                                        value={form.power_w || ''}
+                                        onChange={e => handleChange('power_w', e.target.value)}
+                                        size="lg"
+                                        className="rounded-lg"
+                                        placeholder="e.g., 400"
+                                      />
+                                    </Form.Group>
+                                  </Col>
+                                )}
+
+                                {/* For Inverter products */}
+                                {form.category === 'Inverter' && (
+                                  <Col md={4}>
+                                    <Form.Group>
+                                      <Form.Label className="fw-semibold">Rating (kVA)</Form.Label>
+                                      <Form.Control
+                                        type="number"
+                                        value={form.rating_kva || ''}
+                                        onChange={e => handleChange('rating_kva', e.target.value)}
+                                        size="lg"
+                                        className="rounded-lg"
+                                        placeholder="e.g., 5"
+                                      />
+                                    </Form.Group>
+                                  </Col>
+                                )}
+
+                                {/* For Battery products */}
+                                {form.category === 'Battery' && (
+                                  <Col md={4}>
+                                    <Form.Group>
+                                      <Form.Label className="fw-semibold">Capacity (kWh)</Form.Label>
+                                      <Form.Control
+                                        type="number"
+                                        value={form.capacity_kwh || ''}
+                                        onChange={e => handleChange('capacity_kwh', e.target.value)}
+                                        size="lg"
+                                        className="rounded-lg"
+                                        placeholder="e.g., 10"
+                                      />
+                                    </Form.Group>
+                                  </Col>
                                 )}
                             </Row>
-                        </div>
-
-                        {/* Pricing Section */}
-                        <div className="mb-3">
-                            <small className="text-uppercase text-muted fw-semibold d-block mb-2" style={{letterSpacing: '0.05em'}}>Pricing</small>
-                            <Row className="g-3">
-                                {['unit_cost','margin','price'].map(key => {
-                                    const meta = FIELD_META[key];
-                                    return (
-                                        <Col md={4} key={key}>
-                                            <Form.Group>
-                                                <Form.Label className="small fw-semibold mb-1">
-                                                    {meta.label}
-                                                    {meta.readonly && <span className="text-muted ms-1" style={{fontSize: '0.7rem'}}>(auto)</span>}
-                                                </Form.Label>
-                                                <InputGroup size="sm">
-                                                    {['unit_cost','price'].includes(key) && (
-                                                        <InputGroup.Text className="bg-light px-2 py-1">R</InputGroup.Text>
-                                                    )}
-                                                    <Form.Control
-                                                        type="number"
-                                                        value={form[key] || ''}
-                                                        onChange={(e) => handleChange(key, e.target.value)}
-                                                        readOnly={meta.readonly}
-                                                        className="rounded-lg"
-                                                        style={meta.readonly ? { backgroundColor: '#f8f9fa' } : {}}
-                                                    />
-                                                    {key === 'margin' && <InputGroup.Text className="bg-light px-2 py-1">%</InputGroup.Text>}
-                                                </InputGroup>
-                                                {key === 'margin' && <div className="form-text">Enter markup percentage (e.g. 25)</div>}
-                                            </Form.Group>
-                                        </Col>
-                                    );
-                                })}
-                            </Row>
-                        </div>
-
-                        {/* Notes Section */}
-                        <div className="mb-2">
-                            <small className="text-uppercase text-muted fw-semibold d-block mb-2" style={{letterSpacing: '0.05em'}}>Notes</small>
-                            <Form.Group>
-                                <Form.Control
-                                    as="textarea"
-                                    rows={2}
-                                    value={form.notes || ''}
-                                    onChange={(e) => handleChange('notes', e.target.value)}
-                                    size="sm"
-                                    className="rounded-lg"
-                                    placeholder="Additional details, remarks, etc."
-                                />
-                            </Form.Group>
-                        </div>
-                    </Form>
+                        </Form>
+                    )}
                 </Modal.Body>
-                <Modal.Footer className="bg-light py-3">
-                    <Button variant="outline-secondary" onClick={() => setShowModal(false)} size="sm">
+                <Modal.Footer className="bg-light">
+                    <Button variant="outline-secondary" onClick={() => setShowModal(false)} size="lg">
                         Cancel
                     </Button>
-                    <Button variant="primary" onClick={handleSave} disabled={loading} size="sm" className="px-4">
+                    <Button variant="primary" onClick={handleSave} disabled={loading || loadingMetadata} size="lg">
                         {loading ? (
                             <>
-                                <Spinner as="span" animation="border" size="sm" className="me-2" /> Saving...
+                                <Spinner as="span" animation="border" size="sm" className="me-2" />
+                                Saving...
                             </>
                         ) : (
                             <>
-                                <i className="bi bi-check-lg me-2"></i>Save
+                                <i className="bi bi-check-lg me-2"></i>
+                                Save Product
                             </>
                         )}
                     </Button>
@@ -699,3 +800,16 @@ export default function ProductsAdmin() {
         </div>
     );
 }
+
+// Helper functions for category display
+const getCategoryIcon = (category) => {
+    return CATEGORY_META[category]?.icon || 'bi-gear-fill';
+};
+
+const getCategoryColor = (category) => {
+    return CATEGORY_META[category]?.color || 'secondary';
+};
+
+const getCategoryName = (category) => {
+    return CATEGORY_META[category]?.name || category;
+};
