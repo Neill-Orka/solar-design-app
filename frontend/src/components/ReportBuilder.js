@@ -9,7 +9,7 @@ import MainReportContent from './sections/MainReportContent';
 import BOMSection from './sections/BOMSection';
 import '../ReportBuilder.css';
 
-function ReportBuilder({ projectId }) {
+function ReportBuilder({ projectId, onNavigateToTab }) {
   const { showNotification } = useNotification();
   // Track which sections to show
   const [sections, setSections] = useState({
@@ -26,6 +26,34 @@ function ReportBuilder({ projectId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [siteLayoutImage, setSiteLayoutImage] = useState(null);
+  const [missingData, setMissingData] = useState([]);
+
+  // Check if required data is available
+  const checkRequiredData = (data) => {
+    const missing = [];
+    
+    // Check for simulation data
+    if (!data?.simulation?.timestamps || data.simulation.timestamps.length === 0) {
+      missing.push({
+        type: 'simulation',
+        title: 'System Simulation',
+        tab: 'design',
+        action: 'Go to System Design'
+      });
+    }
+    
+    // Check for financial data
+    if (!data?.financials?.annual_savings && !data?.financials?.original_annual_cost && !data?.financials?.cost_comparison) {
+      missing.push({
+        type: 'financial',
+        title: 'Financial Modeling',
+        tab: 'finance',
+        action: 'Go to Financial Modeling'
+      });
+    }
+    
+    return missing;
+  };
 
   // Calculate dynamic page numbers
   const calculatePageCounts = () => {
@@ -56,6 +84,35 @@ function ReportBuilder({ projectId }) {
     // This will trigger a re-render when sections change
   }, [sections]);
 
+  // Component for displaying missing data warning
+  const MissingDataWarning = ({ missingItems, onNavigateToTab }) => (
+    <div className="missing-data-warning p-4 m-4">
+      <div className="alert alert-info">
+        <h5 className="alert-heading">
+          <i className="bi bi-info-circle me-2"></i>
+          Simulations Required
+        </h5>
+        <p className="mb-3">
+          Please run the required simulations to generate the report:
+        </p>
+        
+        <div className="missing-items">
+          {missingItems.map((item, index) => (
+            <div key={index} className="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+              <span>{item.title}</span>
+              <button 
+                className="btn btn-primary btn-sm"
+                onClick={() => onNavigateToTab && onNavigateToTab(item.tab)}
+              >
+                {item.action}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   
 
   useEffect(() => {
@@ -69,12 +126,19 @@ function ReportBuilder({ projectId }) {
     // Only fetch the project endpoint that exists
     axios.get(`${API_URL}/api/projects/${projectId}`)
       .then((projectRes) => {
-        setData({
+        const reportData = {
           project: projectRes.data,
           // Set empty placeholders for the data that would come from other endpoints
           simulation: simulationResults,
           financials: financialResults  
-        });
+        };
+        
+        setData(reportData);
+        
+        // Check for missing required data
+        const missing = checkRequiredData(reportData);
+        setMissingData(missing);
+        
         setLoading(false);
       })
       .catch(err => {
@@ -162,6 +226,8 @@ function ReportBuilder({ projectId }) {
         <main className="orka-report-printarea report-content">
           {loading ? (
             <div className="loading-spinner">Loading report data...</div>
+          ) : missingData.length > 0 ? (
+            <MissingDataWarning missingItems={missingData} onNavigateToTab={onNavigateToTab} />
           ) : (
             <>
               {sections.cover && <CoverPage data={data} />}

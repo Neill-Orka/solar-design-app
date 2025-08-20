@@ -294,7 +294,7 @@ function ProjectDashboard() {
           </div>
         )}
         {activeTab === 'optimize' && <Optimize projectId={projectId} />}
-        {activeTab === 'report' && <ReportBuilder projectId={projectId} />}
+        {activeTab === 'report' && <ReportBuilder projectId={projectId} onNavigateToTab={setActiveTab} />}
       </div>
     </div>
   );
