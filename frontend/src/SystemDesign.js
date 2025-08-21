@@ -700,6 +700,14 @@ function SystemDesign({ projectId }) {
         });
 
         setDesign(newDesign);
+        
+        // Update template state immediately to fix banner display
+        setUsingStandardTemplate(true);
+        setStandardTemplateInfo({
+            id: template.id,
+            name: template.name
+        });
+        
         // Switch back to custom design mode to show the populated form
         setDesignMode('custom');
         showNotification(`Applied system template: ${template.name}`, 'success');
@@ -953,6 +961,86 @@ function SystemDesign({ projectId }) {
             });
     };
     
+    // State for modals
+    const [showStopTemplateModal, setShowStopTemplateModal] = useState(false);
+    const [showResetTemplateModal, setShowResetTemplateModal] = useState(false);
+
+    // Function to stop using template
+    const handleStopUsingTemplate = async () => {
+        try {
+            // Clear template flags
+            setUsingStandardTemplate(false);
+            setStandardTemplateInfo(null);
+            
+            // Update the project to remove template information
+            const savePayload = {
+                system_type: design.systemType,
+                panel_kw: parseFloat(design.panelKw),
+                num_panels: parseInt(design.numPanels),
+                surface_tilt: parseFloat(design.tilt),
+                surface_azimuth: parseFloat(design.azimuth),
+                allow_export: design.allowExport,
+                panel_id: design.selectedPanel?.product?.id,
+                inverter_kva: design.selectedInverter ? {
+                    model: design.selectedInverter.product.model,
+                    capacity: design.selectedInverter.product.rating_kva,
+                    quantity: design.inverterQuantity
+                } : null,
+                battery_kwh: design.systemType !== 'grid' && design.selectedBattery ? {
+                    model: design.selectedBattery.product.model,
+                    capacity: design.selectedBattery.product.capacity_kwh,
+                    quantity: design.batteryQuantity
+                } : null,
+                use_pvgis: usePvgis,
+                generation_profile_name: profileName,
+                battery_soc_limit: design.batterySocLimit,
+                inverter_ids: design.selectedInverter ? [design.selectedInverter.product.id] : [],
+                battery_ids: design.systemType !== 'grid' && design.selectedBattery ? [design.selectedBattery.product.id] : [],
+
+                // Clear template information
+                from_standard_template: false,
+                template_id: null,
+                template_name: null
+            };
+
+            // Save project without template info
+            await axios.put(`${API_URL}/api/projects/${projectId}`, savePayload);
+            
+            // Clear non-core components from BOM (keep only panels, inverters, batteries)
+            await axios.post(`${API_URL}/api/projects/${projectId}/bom/clear-template-extras`);
+            
+            // Clear session storage flags
+            sessionStorage.removeItem(`standardTemplateModified_${projectId}`);
+            sessionStorage.setItem(`systemDesignModified_${projectId}`, 'true');
+            
+            setShowStopTemplateModal(false);
+            showNotification("Stopped using template. Core components retained.", "success");
+        } catch (err) {
+            console.error("Error stopping template usage:", err);
+            showNotification("Failed to stop using template", "danger");
+            setShowStopTemplateModal(false);
+        }
+    };
+
+    // Function to reset to template
+    const handleResetToTemplate = async () => {
+        try {
+            // Reset template modifications
+            sessionStorage.removeItem(`systemDesignModified_${projectId}`);
+            sessionStorage.removeItem(`standardTemplateModified_${projectId}`);
+            
+            // Re-fetch the template and apply it
+            const res = await axios.get(`${API_URL}/api/system_templates/${standardTemplateInfo.id}`);
+            handleSelectTemplate(res.data);
+            setShowResetTemplateModal(false);
+            showNotification("Reset to original template components", "success");
+        } catch (err) {
+            console.error("Error resetting to template:", err);
+            showNotification("Failed to reset template", "danger");
+            setShowResetTemplateModal(false);
+        }
+    };
+
     const [usingStandardTemplate, setUsingStandardTemplate] = useState(false);
     const [standardTemplateInfo, setStandardTemplateInfo] = useState(null);
 
@@ -1204,27 +1292,19 @@ function SystemDesign({ projectId }) {
                         <Button 
                             variant="outline-success" 
                             size="sm"
-                            onClick={() => {
-                                if (window.confirm("Reset to original template components? This will discard your changes.")) {
-                                    // Reset template modifications
-                                    sessionStorage.removeItem(`systemDesignModified_${projectId}`);
-                                    sessionStorage.removeItem(`standardTemplateModified_${projectId}`);
-                                    
-                                    // Re-fetch the template and apply it
-                                    axios.get(`${API_URL}/api/system_templates/${standardTemplateInfo.id}`)
-                                        .then(res => {
-                                            handleSelectTemplate(res.data);
-                                            showNotification("Reset to original template components", "success");
-                                        })
-                                        .catch(err => {
-                                            console.error("Error resetting to template:", err);
-                                            showNotification("Failed to reset template", "danger");
-                                        });
-                                }
-                            }}
+                            className="me-2"
+                            onClick={() => setShowResetTemplateModal(true)}
                         >
                             <i className="bi bi-arrow-counterclockwise me-1"></i>
                             Reset to Template
+                        </Button>
+                        <Button 
+                            variant="outline-danger" 
+                            size="sm"
+                            onClick={() => setShowStopTemplateModal(true)}
+                        >
+                            <i className="bi bi-x-circle me-1"></i>
+                            Stop Using Template
                         </Button>
                     </div>
                 </Alert>
@@ -1439,6 +1519,99 @@ function SystemDesign({ projectId }) {
                     </Card>
                 </div>
             )}
+
+            {/* Stop Template Confirmation Modal */}
+            <Modal show={showStopTemplateModal} onHide={() => setShowStopTemplateModal(false)} centered>
+                <Modal.Header closeButton className="border-0 pb-0">
+                    <Modal.Title className="d-flex align-items-center">
+                        {/* <i className="bi bi-exclamation-triangle text-warning me-2"></i> */}
+                        Stop Using Template
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="pt-0">
+                    <div className="mb-3">
+                        <p className="text-muted mb-3">
+                            Are you sure you want to stop using the template "<strong>{standardTemplateInfo?.name}</strong>"?
+                        </p>
+                        <div className="bg-light rounded p-3">
+                            <h6 className="text-success mb-2">
+                                <i className="bi bi-check-circle me-1"></i>
+                                What will be kept:
+                            </h6>
+                            <ul className="list-unstyled mb-3 ps-3">
+                                <li><i className="bi bi-dot text-success"></i>Panels, inverters, and batteries</li>
+                            </ul>
+                            
+                            <h6 className="text-danger mb-2">
+                                <i className="bi bi-x-circle me-1"></i>
+                                What will be removed:
+                            </h6>
+                            <ul className="list-unstyled mb-0 ps-3">
+                                <li><i className="bi bi-dot text-danger"></i>All other template components from BOM</li>
+                            </ul>
+                        </div>
+                    </div>
+                </Modal.Body>
+                <Modal.Footer className="border-0 pt-0">
+                    <Button 
+                        variant="outline-secondary" 
+                        onClick={() => setShowStopTemplateModal(false)}
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        variant="danger" 
+                        onClick={handleStopUsingTemplate}
+                        className="d-flex align-items-center"
+                    >
+                        <i className="bi bi-x-circle me-1"></i>
+                        Stop Using Template
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Reset Template Confirmation Modal */}
+            <Modal show={showResetTemplateModal} onHide={() => setShowResetTemplateModal(false)} centered>
+                <Modal.Header closeButton className="border-0 pb-0">
+                    <Modal.Title className="d-flex align-items-center">
+                        <i className="bi bi-arrow-counterclockwise text-success me-2"></i>
+                        Reset to Template
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="pt-0">
+                    <div className="mb-3">
+                        <p className="text-muted mb-3">
+                            Are you sure you want to reset to the original template: <strong>{standardTemplateInfo?.name}</strong>
+                        </p>
+                        <div className="bg-light rounded p-3">
+                            <h6 className="text-warning mb-2">
+                                <i className="bi bi-exclamation-triangle me-1"></i>
+                                This action will:
+                            </h6>
+                            <ul className="list-unstyled mb-0 ps-3">
+                                <li><i className="bi bi-dot text-danger"></i>Discard all your custom changes</li>
+                                <li><i className="bi bi-dot text-success"></i>Reset BOM to original template</li>
+                            </ul>
+                        </div>
+                    </div>
+                </Modal.Body>
+                <Modal.Footer className="border-0 pt-0">
+                    <Button 
+                        variant="outline-secondary" 
+                        onClick={() => setShowResetTemplateModal(false)}
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        variant="success" 
+                        onClick={handleResetToTemplate}
+                        className="d-flex align-items-center"
+                    >
+                        <i className="bi bi-arrow-counterclockwise me-1"></i>
+                        Reset to Template
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </>
     );
 }    
