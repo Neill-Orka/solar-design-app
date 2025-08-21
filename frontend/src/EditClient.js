@@ -11,6 +11,12 @@ function EditClient() {
   const [clientName, setClientName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState({
+    street: '',
+    town: '',
+    province: '',
+    country: 'South Africa'
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -21,6 +27,7 @@ function EditClient() {
         setClientName(response.data.client_name);
         setEmail(response.data.email);
         setPhone(response.data.phone);
+        setAddress(response.data.address);
       })
       .catch((error) => {
         console.error('Error loading client:', error);
@@ -37,7 +44,8 @@ function EditClient() {
     const payload = {
       client_name: clientName,
       email: email,
-      phone: phone
+      phone: phone,
+      address: address
     };
 
     axios.put(`${API_URL}/api/clients/${id}`, payload)
@@ -119,6 +127,53 @@ function EditClient() {
                         placeholder="+27 12 345 6789"
                         size="lg"
                         required
+                        className="rounded-lg"
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col md={4}>
+                    <Form.Group className="mb-4">
+                      <Form.Label className="fw-semibold">
+                        <i className="bi bi-telephone me-2"></i>Street
+                      </Form.Label>
+                      <Form.Control
+                        type="text"
+                        value={address?.street}
+                        onChange={(e) => setAddress({ ...address, street: e.target.value })}
+                        placeholder="Enter street address"
+                        size="lg"
+                        className="rounded-lg"
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={4}>
+                    <Form.Group className="mb-4">
+                      <Form.Label className="fw-semibold">
+                        <i className="bi bi-telephone me-2"></i>Town
+                      </Form.Label>
+                      <Form.Control
+                        type="text"
+                        value={address?.town}
+                        onChange={(e) => setAddress({ ...address, town: e.target.value })}
+                        placeholder="Enter town"
+                        size="lg"
+                        className="rounded-lg"
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={4}>
+                    <Form.Group className="mb-4">
+                      <Form.Label className="fw-semibold">
+                        <i className="bi bi-telephone me-2"></i>Province
+                      </Form.Label>
+                      <Form.Control
+                        type="text"
+                        value={address?.province}
+                        onChange={(e) => setAddress({ ...address, province: e.target.value })}
+                        placeholder="Enter province"
+                        size="lg"
                         className="rounded-lg"
                       />
                     </Form.Group>

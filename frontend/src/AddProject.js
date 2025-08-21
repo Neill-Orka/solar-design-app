@@ -10,7 +10,14 @@ function AddProject() {
   const [clients, setClients] = useState([]);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [newClientName, setNewClientName] = useState('');
+  const [newClientPhone, setNewClientPhone] = useState('');
   const [newClientEmail, setNewClientEmail] = useState('');
+  const [newClientAddress, setNewClientAddress] = useState({
+    street: '',
+    town: '',
+    province: '',
+    country: 'South Africa'
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [projectData, setProjectData] = useState({
@@ -30,7 +37,6 @@ function AddProject() {
     project_type: 'Commercial',
     tariff_id: null,
     custom_flat_rate: null
-
   });
 
   const navigate = useNavigate();
@@ -112,11 +118,20 @@ function AddProject() {
         const res = await axios.post(`${API_URL}/api/clients`, {
           client_name: newClientName,
           email: newClientEmail,
-          phone: '' // Optional: user can edit phone later
+          phone: newClientPhone,
+          address: newClientAddress
         });
         // Reload clients and set the new one
         clientId = res.data.client_id;
         setSelectedClientId(clientId); 
+
+        if (!projectData.location && newClientAddress.town && newClientAddress.province) {
+          setProjectData(prev => ({
+            ...prev,
+            location: `${newClientAddress.street ?  newClientAddress.street + ', ' : ''}${newClientAddress.town}, ${newClientAddress.province}`
+          }));
+        }
+
       } catch (err) {
         console.error('Error creating client:', err);
         setError('Failed to create new client: ' + (err.response?.data?.error || err.message));
@@ -205,7 +220,7 @@ function AddProject() {
                             onChange={(e) => setSelectedClientId(e.target.value)} 
                             required
                             size="lg"
-                            className="rounded-lg"
+                            className="rounded-md"
                           >
                             <option value="">-- Choose Client --</option>
                             {clients.map(client => (
@@ -220,34 +235,108 @@ function AddProject() {
 
                       {selectedClientId === 'new' && (
                         <>
-                          <Col md={6}>
+                          <Col md={12}>
                             <Form.Group className="mb-3">
-                              <Form.Label className="fw-semibold">New Client Name</Form.Label>
+                              <Form.Label className="fw-semibold">Client Name</Form.Label>
                               <Form.Control 
                                 type="text" 
                                 value={newClientName} 
                                 onChange={(e) => setNewClientName(e.target.value)} 
                                 required 
                                 size="lg"
-                                className="rounded-lg"
+                                className="rounded-md"
                                 placeholder="Enter client full name"
                               />
                             </Form.Group>
                           </Col>
                           <Col md={6}>
                             <Form.Group className="mb-3">
-                              <Form.Label className="fw-semibold">New Client Email</Form.Label>
+                              <Form.Label className="fw-semibold">Client Phone</Form.Label>
+                              <Form.Control
+                                type="text"
+                                value={newClientPhone}
+                                onChange={e => setNewClientPhone(e.target.value)}
+                                size="md"
+                                className="rounded-md"
+                                placeholder="Enter client phone number"
+                                />
+                            </Form.Group>
+                          </Col>
+                          <Col md={6}>
+                            <Form.Group className="mb-3">
+                              <Form.Label className="fw-semibold">Client Email</Form.Label>
                               <Form.Control 
                                 type="email" 
                                 value={newClientEmail} 
                                 onChange={(e) => setNewClientEmail(e.target.value)} 
                                 required 
-                                size="lg"
-                                className="rounded-lg"
+                                size="md"
+                                className="rounded-md"
                                 placeholder="client@email.com"
                               />
                             </Form.Group>
                           </Col>
+                          <Col md={3}>
+                            <Form.Group className="mb-3">
+                              <Form.Label className="fw-semibold">Client Street</Form.Label>
+                              <Form.Control
+                                type="text"
+                                value={newClientAddress.street}
+                                onChange={e => setNewClientAddress({ ...newClientAddress, street: e.target.value })}
+                                size="md"
+                                className="rounded-md"
+                                placeholder="11 Van Riebeeck Street"
+                                />
+                            </Form.Group>
+                          </Col>
+                          <Col md={3}>
+                            <Form.Group className="mb-3">
+                              <Form.Label className="fw-semibold">Client Town</Form.Label>
+                              <Form.Control
+                                type="text"
+                                value={newClientAddress.town}
+                                onChange={e => setNewClientAddress({ ...newClientAddress, town: e.target.value })}
+                                size="md"
+                                className="rounded-md"
+                                placeholder="Potchefstroom"
+                                />
+                            </Form.Group>
+                          </Col>
+                          <Col md={3}>
+                            <Form.Group className="mb-3">
+                              <Form.Label className="fw-semibold">Client Province</Form.Label>
+                              <Form.Select
+                                value={newClientAddress.province}
+                                onChange={e => setNewClientAddress({ ...newClientAddress, province: e.target.value })}
+                                size="md"
+                                className="rounded-md"
+                              >
+                                <option value="">Select Province</option>
+                                <option value="Gauteng">Gauteng</option>
+                                <option value="North West">North West</option>
+                                <option value="Northern Cape">Northern Cape</option>
+                                <option value="Western Cape">Western Cape</option>
+                                <option value="Eastern Cape">Eastern Cape</option>
+                                <option value="Free State">Free State</option>
+                                <option value="KwaZulu-Natal">KwaZulu-Natal</option>
+                                <option value="Mpumalanga">Mpumalanga</option>
+                                <option value="Limpopo">Limpopo</option>
+                              </Form.Select>
+                            </Form.Group>
+                          </Col>
+                          <Col md={3}>
+                            <Form.Group className="mb-3">
+                              <Form.Label className="fw-semibold">Client Country</Form.Label>
+                              <Form.Control
+                                type="text"
+                                value={newClientAddress.country}
+                                onChange={e => setNewClientAddress({ ...newClientAddress, country: e.target.value })}
+                                size="md"
+                                className="rounded-md"
+                                placeholder="South Africa"
+                                />
+                            </Form.Group>
+                          </Col>                                                
                         </>
                       )}
                     </Row>
@@ -286,7 +375,7 @@ function AddProject() {
                           <Form.Control 
                             type="text" 
                             name="location" 
-                            value={projectData.location} 
+                            value={projectData.location}
                             onChange={handleInputChange} 
                             size="lg"
                             className="rounded-lg"

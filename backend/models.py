@@ -187,6 +187,7 @@ class Clients(db.Model):
     client_name = db.Column(db.String(80))
     email = db.Column(db.String(120), unique=True)
     phone = db.Column(db.String(20))
+    address = db.Column(db.JSON, nullable=True)
 
     projects = db.relationship('Projects', backref='client', lazy=True)
 
