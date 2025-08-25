@@ -737,7 +737,14 @@ function MainReportContent({
 
     // Terms and project schedule
     // Use the passed value or fall back to a default
-    const [priceValidUntil, setPriceValidUntil] = useState("30 August 2025");
+    const [priceValidUntil, setPriceValidUntil] = useState(() => {
+        const now = new Date();
+        now.setMonth(now.getMonth() + 1);
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = now.toLocaleString('default', { month: 'long' });
+        const year = now.getFullYear();
+        return `${day} ${month} ${year}`;
+    });
   
     // Initialize with default schedule
     const [projectSchedule, setProjectSchedule] = useState([
@@ -783,14 +790,14 @@ function MainReportContent({
             pageNumber={startPageNumber} // Set an appropriate page number here
             totalPages={totalPages} // Set the total number of pages in your report
         >
-            <h6 className="fw-bold">Site Information</h6>
+            <h4 className="fw-bold">Site Information</h4>
             <div>
                 This site is located at {data?.project?.location}, South Africa: {data?.project?.latitude}, {data?.project?.longitude}.
             </div>
 
             {showSiteLayout && (
                 <div className="site-layout-section mt-4">
-                    <h4>General Site Layout</h4>
+                    <h4 className="fw-bold">General Site Layout</h4>
                     <p>
                         The proposed module layout is shown below, this may change after detailed site visit but has in principle been proposed to the client:
                     </p>
@@ -824,7 +831,7 @@ function MainReportContent({
             pageNumber={startPageNumber + 1} // Set an appropriate page number here
             totalPages={totalPages} // Set the total number of pages in your report        
         >
-            <h6 className="fw-bold">Project Goal</h6>
+            <h4 className="fw-bold">Project Goal</h4>
             <p>{getSystemContent('projectGoal')}</p>
             <p>
                 The following benefits will be achieved:
@@ -835,13 +842,12 @@ function MainReportContent({
                 </ol>                
             </p>
 
-            <h5>Current load profile and electrical consumption</h5>
+            <h5 className="fw-bold">Current load profile and electrical consumption</h5>
             {/* Monthly energy consumption chart */}
             
             <p className="mt-3">
-                The chart above shows the monthly energy consumption profile for {data?.project?.client_name}'s facility. 
-                This data was used as the foundation for designing an optimal solar solution that 
-                aligns with the actual usage patterns of the site.
+                The chart below shows the monthly energy consumption for {data?.project?.client_name}'s facility. 
+                This data was used as the foundation in the design of an optimal solar solution tailored to the actual usage patterns of the site.
             </p>
 
             <div className="chart-container" style={{height: "400px"}}>
@@ -862,9 +868,9 @@ function MainReportContent({
             pageNumber={startPageNumber + 2} // Set an appropriate page number here
             totalPages={totalPages} // Set the total number of pages in your report
         >
-            <h4>Current Electricity Costs</h4>
+            <h5 className="fw-bold">Current Electricity Costs</h5>
             <p>
-                The chart below shows the monthly electricity costs without solar, broken down by component. This analysis helps identify the areas where the solar solution will have the greatest financial impact.
+                The chart below shows the monthly electricity costs without solar. The cost can be divided into an energy and fixed cost component. This analysis helps identify the areas where the solar solution will have the greatest financial impact.
             </p>
             
             <div className="chart-container" style={{height: "400px"}}>
@@ -879,7 +885,7 @@ function MainReportContent({
             
             {data?.financials?.annual_savings && (
                 <div className="mt-4">
-                    <h5>Potential Annual Savings</h5>
+                    <h5 className="fw-bold">Potential Annual Savings</h5>
                     <p>
                         {(() => {
                             // Calculate average and maximum monthly costs
@@ -912,7 +918,7 @@ function MainReportContent({
             pageNumber={startPageNumber + 3} // Set an appropriate page number here
             totalPages={totalPages} // Set the total number of pages in your report
         >
-            <h4>Detailed Load Profile</h4>
+            <h4 className="fw-bold">Detailed Load Profile</h4>
             <p>
                 The client's typical diurnal load profile is shown in the graph below. This visualization helps understand hourly usage patterns and identify opportunities for peak shaving and load management.
             </p>
@@ -1049,13 +1055,13 @@ function MainReportContent({
             pageNumber={startPageNumber + 4} // Set an appropriate page number here
             totalPages={totalPages} // Set the total number of pages in your report
         >
-            <h4>System Design</h4>
+            <h4 className="fw-bold">System Design</h4>
             <p>
                 This section covers the design process and technical data used.
             </p>
 
             <h5>Meteorological Data</h5>
-            <p>The detailed designs were done using our own Solar Design tool which takes into account the site's specific meteorological information to predict the typical generation that can be expected from the specified equipment simulated over 365 days of the year. This enables an accurate analysis of the system yields and in return accurate results on the financial returns.</p>
+            <p>The detailed designs were done using our verified proprietary software which takes into account the site's specific meteorological information to predict the typical generation that can be expected from the specified equipment simulated over 365 days of the year. This enables an accurate analysis of the system yields and in return accurate results on the financial returns.</p>
 
         </StandardPage>
 
@@ -1066,14 +1072,14 @@ function MainReportContent({
             pageNumber={startPageNumber + 5} // Set an appropriate page number here
             totalPages={totalPages} // Set the total number of pages in your report
         >
-            <h4>System's Technical & Financial Information</h4>
+            <h4 className="fw-bold">System's Technical & Financial Information</h4>
             <p>
                 Based on the design and simulation results, the system specifications and financial metrics are as follows:
             </p>
             
             {/* Technical Specifications Banner */}
             <div className="system-specs-banner" style={{
-                background: '#f2f2f2',
+                background: '#cddae6ff',
                 padding: '20px 0',
                 marginTop: '20px',
                 marginBottom: '20px',
@@ -1089,11 +1095,11 @@ function MainReportContent({
                     <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
                         <img src={require('../../assets/panel_icon.png')} alt="Solar PV" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
                         <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Solar PV</div>
-                        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                            {formatValue(data?.project?.panel_kw || 64.41)} <span style={{ fontSize: '14px' }}>kWp</span>
+                        <div style={{ fontSize: '14px' }}>
+                            {formatValue(data?.project?.panel_kw || 0)} <span style={{ fontSize: '14px' }}>kWp</span>
                         </div>
                         <div style={{ fontSize: '14px' }}>
-                            {data?.project?.num_panels || Math.ceil((data?.project?.panel_kw || 64.41) * 1000 / 565)} panels
+                            {data?.project?.num_panels || Math.ceil((data?.project?.panel_kw || 0) * 1000 / 565)} panels
                         </div>
                     </div>
 
@@ -1103,22 +1109,22 @@ function MainReportContent({
                         <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Inverters</div>
                         <div style={{ fontSize: '15px' }}>
                             Total{' '}
-                            <span style={{ fontWeight: 'bold' }}>
+                            <span style={{  }}>
                                 {formatValue(displayValue(data?.project?.inverter_kva, 85, "inverter_kva"))} <span style={{ fontSize: '14px' }}>kVA</span>
                             </span>
                         </div>
-                        <div style={{ fontSize: '15px' }}>
+                        {/* <div style={{ fontSize: '15px' }}>
                             Hybrid{' '}
-                            <span style={{ fontWeight: 'bold' }}>
+                            <span style={{ fontWeight: '' }}>
                                 {formatValue(data?.project?.inverter_hybrid || 0)} <span style={{ fontSize: '14px' }}>kVA</span>
                             </span>
                         </div>
                         <div style={{ fontSize: '15px' }}>
                             Grid{' '}
-                            <span style={{ fontWeight: 'bold' }}>
+                            <span style={{ fontWeight: '' }}>
                                 {formatValue(data?.project?.inverter_grid || 0)} <span style={{ fontSize: '14px' }}>kVA</span>
                             </span>
-                        </div>
+                        </div> */}
                     </div>
 
                     {/* Battery */}
@@ -1129,13 +1135,13 @@ function MainReportContent({
                             Chemistry: {data?.project?.battery_chem || "LiFePO4"}
                         </div>
                         <div style={{ fontSize: '15px' }}>
-                            <span style={{ fontWeight: 'bold' }}>
+                            <span style={{ fontWeight: '' }}>
                                 {formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh"))}
                             </span>{' '}
                             <span style={{ fontSize: '14px' }}>kWh @100%</span>
                         </div>
                         <div style={{ fontSize: '15px' }}>
-                            <span style={{ fontWeight: 'bold' }}>
+                            <span style={{ fontWeight: '' }}>
                                 {formatValue(data?.project?.battery_kwh_80 || (displayValue(data?.project?.battery_kwh, 0, "battery_kwh") * 0.8))}
                             </span>{' '}
                             <span style={{ fontSize: '14px' }}>kWh @80%</span>
@@ -1146,7 +1152,7 @@ function MainReportContent({
                     <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
                         <img src={require('../../assets/yield_icon.png')} alt="Specific Yield" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
                         <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Specific Yield</div>
-                        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                        <div style={{ fontSize: '18px', fontWeight: '' }}>
                             {formatValue(data?.financials?.yield_excl_losses * 365 || 1612)}
                         </div>
                         <div style={{ fontSize: '14px' }}>
@@ -1158,7 +1164,7 @@ function MainReportContent({
                     <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
                         <img src={require('../../assets/utilized_icon.png')} alt="Utilized Energy" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
                         <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Utilized Energy<br />from System</div>
-                        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                        <div style={{ fontSize: '18px', fontWeight: '' }}>
                             {formatValue(data?.financials?.total_generation_kwh || 68166)}
                         </div>
                         <div style={{ fontSize: '14px' }}>
@@ -1167,7 +1173,7 @@ function MainReportContent({
                     </div>
 
                     {/* Load-shedding Backup */}
-                    <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
+                    {/* <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
                         <img src={require('../../assets/loadshedding_icon.png')} alt="Load-shedding Backup" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
                         <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Load-shedding<br />Backup</div>
                         <div style={{ fontSize: '15px' }}>
@@ -1179,7 +1185,7 @@ function MainReportContent({
                         <div style={{ fontSize: '15px' }}>
                             Stg6 4.5hrs: {data?.project?.loadshedding_stg6 || "0%"}
                         </div>
-                    </div>
+                    </div> */}
                 </div>
             </div>
             
@@ -1228,7 +1234,7 @@ function MainReportContent({
                             <tr>
                                 <td>Battery selected</td>
                                 <td className="text-end">{formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh"))}/
-                                    {formatValue(data?.project?.battery_kwh_80 || 0)}</td>
+                                   {formatValue(data?.project?.battery_kwh_80 || (displayValue(data?.project?.battery_kwh, 0, "battery_kwh") * 0.8))}</td>
                                 <td>kWh</td>
                             </tr>
                             <tr>
@@ -1928,7 +1934,7 @@ function MainReportContent({
                     <li>Orka Solar warranty on installation and project performance.</li>
                 </ul>
                 
-                <h6 className="fw-bold">Major Equipment List</h6>
+                {/* <h6 className="fw-bold">Major Equipment List</h6>
                 
                 <p>The major equipment and materials that may be used as part of this project is listed below:</p>
                 
@@ -1942,7 +1948,6 @@ function MainReportContent({
                                     JA Solar/ Jinko Solar
                                 </td>
                                 <td style={{width: '40%', textAlign: 'center'}}>
-                                    {/* Placeholder for JA Solar & Jinko logos */}
                                     <div className="d-flex justify-content-around align-items-center">
                                         <div className="logo-placeholder">JA SOLAR</div>
                                         <div className="logo-placeholder">Jinko Solar</div>
@@ -1953,7 +1958,6 @@ function MainReportContent({
                                 <td>Grid Inverters</td>
                                 <td>Fronius</td>
                                 <td style={{textAlign: 'center'}}>
-                                    {/* Placeholder for inverter logos */}
                                     <div className="d-flex justify-content-around align-items-center">
                                         <div className="logo-placeholder">Fronius</div>
                                         <div className="logo-placeholder">SMA</div>
@@ -1965,7 +1969,6 @@ function MainReportContent({
                                 <td>Hybrid Inverters</td>
                                 <td>Victron Hybrid</td>
                                 <td style={{textAlign: 'center'}}>
-                                    {/* Placeholder for Victron logo */}
                                     <div className="logo-placeholder">victron energy</div>
                                 </td>
                             </tr>
@@ -1975,7 +1978,6 @@ function MainReportContent({
                                     Lumax <sup>®</sup>
                                 </td>
                                 <td style={{textAlign: 'center'}}>
-                                    {/* Placeholder for Lumax logo */}
                                     <div className="logo-placeholder">LUMAX ENERGY</div>
                                 </td>
                             </tr>
@@ -1983,7 +1985,6 @@ function MainReportContent({
                                 <td>Switch Gear</td>
                                 <td>ABB/ Schneider</td>
                                 <td style={{textAlign: 'center'}}>
-                                    {/* Placeholder for Schneider logo */}
                                     <div className="logo-placeholder">Schneider Electric</div>
                                 </td>
                             </tr>
@@ -1994,7 +1995,6 @@ function MainReportContent({
                                     WEST (S Caps)
                                 </td>
                                 <td style={{textAlign: 'center'}}>
-                                    {/* Placeholder for battery logos */}
                                     <div className="d-flex justify-content-around align-items-center">
                                         <div className="logo-placeholder">freedom won</div>
                                         <div className="logo-placeholder">WEST</div>
@@ -2003,7 +2003,7 @@ function MainReportContent({
                             </tr>
                         </tbody>
                     </table>
-                </div>
+                </div> */}
 
                 <h6 className="fw-bold">QUALITY AND WARRANTY</h6>
 
@@ -2040,7 +2040,7 @@ function MainReportContent({
 
                 <p>The project's invoicing will be as follows: 50% deposit on order, 40% on delivery of panels and inverters to site and 10% on project handover certificate sign off.
                 
-                Prices are valid to 30 September 2025. Thereafter, prices may change due to exchange rate fluctuations, inflation (CPI) and/or supplier price changes.
+                Prices are valid to {priceValidUntil}. Thereafter, prices may change due to exchange rate fluctuations, inflation (CPI) and/or supplier price changes.
                 
                 Invoices will be paid on 7 days terms.
                 

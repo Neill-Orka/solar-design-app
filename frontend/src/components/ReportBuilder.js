@@ -232,7 +232,7 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
             <>
               {sections.cover && <CoverPage data={data} />}
               <ExecutiveSummary data={data} pageNumber={pageNumbers.executiveSummary.start} totalPages={pageNumbers.totalPages} />
-              <DesignReportMeta data={data} pageNumber={pageNumbers.designReportMeta.start} totalPages={pageNumbers.totalPages} />
+              {/* <DesignReportMeta data={data} pageNumber={pageNumbers.designReportMeta.start} totalPages={pageNumbers.totalPages} /> */}
               <MainReportContent 
                 data={data} 
                 showSiteLayout={sections.siteLayout} 

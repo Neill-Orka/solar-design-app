@@ -222,6 +222,13 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
         self_consumption_rate = (pv_used_on_site_kwh / potential_generation_kwh) * 100 if total_generation_kwh > 0 else 0
         grid_independence_rate = (pv_used_on_site_kwh / total_demand_kwh) * 100 if total_demand_kwh > 0 else 0
 
+        daytime_indices = [
+            i for i, ts in enumerate(sim_response['timestamps'])
+            if 7 <= datetime.fromisoformat(ts).hour < 18
+        ]
+        daytime_demand_kwh = sum(demand[i] * float(time_interval_hours) for i in daytime_indices)
+        daytime_consumption_pct = (daytime_demand_kwh / total_demand_kwh) * 100 if total_demand_kwh > 0 else 0
+
         maintenance_rate = Decimal('0.01') # 1% of system cost per year
         total_lifetime_cost = Decimal(system_cost) + (Decimal(system_cost) * maintenance_rate * 20) # 20 years of maintenance
         total_lifetime_generation = sum(Decimal(total_generation_kwh) * ((1 - degradation_rate) ** i) for i in range(20))
@@ -234,6 +241,24 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             'worst': {'month': worst_month[0], 'cost': float(round(worst_month[1]['total_new_bill'], 2))},
             'best': {'month': best_month[0], 'cost': float(round(best_month[1]['total_new_bill'], 2))}
         }
+
+        battery_cycles = '-'
+        if project.system_type in ['hybrid', 'off-grid']:
+            battery_soc = sim_response.get('battery_soc', [])
+            # FIX: Handle dict or number for battery_kwh
+            battery_kwh = project.battery_kwh
+            if isinstance(battery_kwh, dict):
+                battery_capacity_kwh = float(battery_kwh.get('capacity', 0)) * float(battery_kwh.get('quantity', 1))
+            else:
+                battery_capacity_kwh = float(battery_kwh or 0)
+            if battery_capacity_kwh > 0 and battery_soc:
+                total_discharge_kwh = 0
+                prev_soc = battery_soc[0]
+                for soc in battery_soc[1:]:
+                    if soc < prev_soc:
+                        total_discharge_kwh += (prev_soc - soc) * battery_capacity_kwh / 100
+                    prev_soc = soc
+                battery_cycles = round(total_discharge_kwh / battery_capacity_kwh, 1) if battery_capacity_kwh > 0 else '-'
 
         # Cashflow analysis
         lifetime_cashflow = [{'year': 0, 'cashflow': -float(system_cost)}]
@@ -273,8 +298,6 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             } for key, value in sorted(monthly_costs.items())
         ]
 
-        
-
         return {
             # Financial KPIs
             "annual_savings": float(round(annual_savings, 2)),
@@ -296,14 +319,16 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             "total_generation_kwh": round(total_generation_kwh),
             "potential_generation_kwh": round(potential_generation_kwh),
             "total_import_kwh": round(total_import_kwh),
+            "daytime_consumption_perc": round(daytime_consumption_pct, 1),
             "self_consumption_rate": round(self_consumption_rate, 1),
             "grid_independence_rate": round(grid_independence_rate, 1),
             "throttling_loss_percent": round(throttling_loss_percent, 1),
             "yield_incl_losses": round(yield_incl_losses, 2),
             "yield_excl_losses": round(yield_excl_losses, 2),
+            "battery_cycles": battery_cycles,
         }
     except Exception as e:
-        print(f"--- EROROR in run quick financials: {e}")
+        print(f"--- ERROR in run quick financials: {e}")
         import traceback
         traceback.print_exc()
         return {"error": "An unexpected error occurred during financial calculation."}

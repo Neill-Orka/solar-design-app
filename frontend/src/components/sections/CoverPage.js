@@ -40,9 +40,11 @@ function CoverPage({ data }) {
     client_name: "Cecil & Bryan Rutherford",
   };
   
-  const dateStr = project.created_at
-    ? new Date(project.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })
-    : "12 March 2025";
+  // const dateStr = project.created_at
+  //   ? new Date(project.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })
+  //   : "12 March 2025";
+
+  const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 
   return (
     <section className="orka-reference-cover">
