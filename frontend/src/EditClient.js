@@ -136,14 +136,14 @@ function EditClient() {
                   <Col md={4}>
                     <Form.Group className="mb-4">
                       <Form.Label className="fw-semibold">
-                        <i className="bi bi-telephone me-2"></i>Street
+                        <i className="bi bi-geo-alt me-2"></i>Street
                       </Form.Label>
                       <Form.Control
                         type="text"
                         value={address?.street}
                         onChange={(e) => setAddress({ ...address, street: e.target.value })}
                         placeholder="Enter street address"
-                        size="lg"
+                        size="md"
                         className="rounded-lg"
                       />
                     </Form.Group>
@@ -151,14 +151,14 @@ function EditClient() {
                   <Col md={4}>
                     <Form.Group className="mb-4">
                       <Form.Label className="fw-semibold">
-                        <i className="bi bi-telephone me-2"></i>Town
+                        <i className="bi bi-geo-alt me-2"></i>Town
                       </Form.Label>
                       <Form.Control
                         type="text"
                         value={address?.town}
                         onChange={(e) => setAddress({ ...address, town: e.target.value })}
                         placeholder="Enter town"
-                        size="lg"
+                        size="md"
                         className="rounded-lg"
                       />
                     </Form.Group>
@@ -166,16 +166,25 @@ function EditClient() {
                   <Col md={4}>
                     <Form.Group className="mb-4">
                       <Form.Label className="fw-semibold">
-                        <i className="bi bi-telephone me-2"></i>Province
+                        <i className="bi bi-geo-alt me-2"></i>Province
                       </Form.Label>
-                      <Form.Control
-                        type="text"
+                      <Form.Select
                         value={address?.province}
-                        onChange={(e) => setAddress({ ...address, province: e.target.value })}
-                        placeholder="Enter province"
-                        size="lg"
+                        onChange={e => setAddress({ ...address, province: e.target.value })}
+                        size="md"
                         className="rounded-lg"
-                      />
+                      >
+                        <option value="">Select Province</option>
+                        <option value="Gauteng">Gauteng</option>
+                        <option value="North West">North West</option>
+                        <option value="Northern Cape">Northern Cape</option>
+                        <option value="Western Cape">Western Cape</option>
+                        <option value="Eastern Cape">Eastern Cape</option>
+                        <option value="Free State">Free State</option>
+                        <option value="KwaZulu-Natal">KwaZulu-Natal</option>
+                        <option value="Mpumalanga">Mpumalanga</option>
+                        <option value="Limpopo">Limpopo</option>
+                      </Form.Select>
                     </Form.Group>
                   </Col>
                 </Row>

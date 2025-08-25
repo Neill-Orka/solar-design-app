@@ -8,6 +8,12 @@ function ClientForm() {
   const [clientName, setClientName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState({
+    street: '',
+    town: '',
+    province: '',
+    country: 'South Africa'
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -23,18 +29,24 @@ function ClientForm() {
     const payload = {
       client_name: clientName,
       email: email,
-      phone: phone
+      phone: phone,
+      address: address
     };
 
     axios.post(`${API_URL}/api/clients`, payload)
       .then((response) => {
-        console.log('Client added:', response.data);
         setSuccess('Client added successfully!');
         setClientName('');
         setEmail('');
         setPhone('');
+        setAddress({
+          street: '',
+          town: '',
+          province: '',
+          country: 'South Africa'
+        });
         // Navigate back after a short delay
-        setTimeout(() => navigate('/clients'), 1500);
+        setTimeout(() => navigate('/clients'), 1000);
       })
       .catch((error) => {
         console.error('Error adding client:', error.response ? error.response.data : error.message);
@@ -54,7 +66,6 @@ function ClientForm() {
                   <i className="bi bi-person-plus-fill text-primary" style={{fontSize: '2rem'}}></i>
                 </div>
                 <h2 className="text-3xl font-bold text-gray-800 mb-1">Add New Client</h2>
-                <p className="text-muted">Create a new client profile for your projects</p>
               </div>
 
               {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
@@ -115,6 +126,63 @@ function ClientForm() {
                     </Form.Group>
                   </Col>
                 </Row>
+                <Row>
+                  <Col md={4}>
+                    <Form.Group className="mb-4">
+                      <Form.Label className="fw-semibold">
+                        <i className="bi bi-geo-alt me-2"></i>Street
+                      </Form.Label>
+                      <Form.Control
+                        type="text"
+                        value={address?.street}
+                        onChange={(e) => setAddress({ ...address, street: e.target.value })}
+                        placeholder="Enter street address"
+                        size="md"
+                        className="rounded-lg"
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={4}>
+                    <Form.Group className="mb-4">
+                      <Form.Label className="fw-semibold">
+                        <i className="bi bi-geo-alt me-2"></i>Town
+                      </Form.Label>
+                      <Form.Control
+                        type="text"
+                        value={address?.town}
+                        onChange={(e) => setAddress({ ...address, town: e.target.value })}
+                        placeholder="Enter town"
+                        size="md"
+                        className="rounded-lg"
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={4}>
+                    <Form.Group className="mb-4">
+                      <Form.Label className="fw-semibold">
+                        <i className="bi bi-geo-alt me-2"></i>Province
+                      </Form.Label>
+                      <Form.Select
+                        value={address?.province}
+                        onChange={e => setAddress({ ...address, province: e.target.value })}
+                        size="md"
+                        className="rounded-lg"
+                      >
+                        <option value="">Select Province</option>
+                        <option value="Gauteng">Gauteng</option>
+                        <option value="North West">North West</option>
+                        <option value="Northern Cape">Northern Cape</option>
+                        <option value="Western Cape">Western Cape</option>
+                        <option value="Eastern Cape">Eastern Cape</option>
+                        <option value="Free State">Free State</option>
+                        <option value="KwaZulu-Natal">KwaZulu-Natal</option>
+                        <option value="Mpumalanga">Mpumalanga</option>
+                        <option value="Limpopo">Limpopo</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+
 
                 <div className="d-grid gap-2 mt-4">
                   <Button 

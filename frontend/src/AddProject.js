@@ -45,6 +45,30 @@ function AddProject() {
     loadClients();
   }, []);
 
+  useEffect(() => {
+    // Only update location if a client is selected and location is empty
+    if (
+      selectedClientId &&
+      selectedClientId !== 'new'
+    ) {
+      const client = clients.find(c => String(c.id) === String(selectedClientId));
+      if (client && client.address) {
+        const { street, town, province } = client.address;
+        const locationStr = [
+          street,
+          town,
+          province
+        ].filter(Boolean).join(', ');
+        setProjectData(prev => ({
+          ...prev,
+          location: locationStr
+        }));
+      }
+    }
+    // Do not overwrite if user has typed something
+    // Do nothing if 'new' client is selected
+  }, [selectedClientId, clients]);
+
   const loadClients = () => {
     axios.get(`${API_URL}/api/clients`)
       .then((res) => setClients(res.data))
@@ -225,7 +249,7 @@ function AddProject() {
                             <option value="">-- Choose Client --</option>
                             {clients.map(client => (
                               <option key={client.id} value={client.id}>
-                                {client.client_name} ({client.email})
+                                {client.client_name} {client.address?.town ? `(${client.address?.town})` : ''}
                               </option>
                             ))}
                             <option value="new">+ Add New Client</option>
@@ -369,7 +393,7 @@ function AddProject() {
                       </Col>
 
                       {/* MODIFIED: Put Location and Coordinates in one row */}
-                      <Col md={4}>
+                      <Col md={12}>
                         <Form.Group className="mb-3">
                           <Form.Label className="fw-semibold">Location</Form.Label>
                           <Form.Control 
@@ -379,13 +403,13 @@ function AddProject() {
                             onChange={handleInputChange} 
                             size="lg"
                             className="rounded-lg"
-                            placeholder="e.g., City, Province"
+                            placeholder="5 Church Street, Potchefstroom, North West"
                           />
                         </Form.Group>
                       </Col>
                           
                       {/* NEW: Latitude input */}
-                      <Col md={4}>
+                      <Col md={6}>
                           <Form.Group className="mb-3">
                           <Form.Label className="fw-semibold">Latitude</Form.Label>
                           <Form.Control
@@ -402,7 +426,7 @@ function AddProject() {
                       </Col>
                           
                       {/* NEW: Longitude input */}
-                      <Col md={4}>
+                      <Col md={6}>
                           <Form.Group className="mb-3">
                           <Form.Label className="fw-semibold">Longitude</Form.Label>
                           <Form.Control
