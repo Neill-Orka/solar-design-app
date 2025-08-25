@@ -119,7 +119,8 @@ function EditProject() {
                       </Col>
                       
                       {/* MODIFIED: Put Location and Coordinates in one row */}
-                      <Col md={4}>
+                      <Row>
+                        <Col md={12}>
                           <Form.Group className="mb-3">
                           <Form.Label className="fw-semibold">Location</Form.Label>
                           <Form.Control 
@@ -131,10 +132,11 @@ function EditProject() {
                               className="rounded-lg"
                           />
                           </Form.Group>
-                      </Col>
+                        </Col>
+                      </Row>
 
                       {/* NEW: Latitude input */}
-                      <Col md={4}>
+                      <Col md={6}>
                           <Form.Group className="mb-3">
                           <Form.Label className="fw-semibold">Latitude</Form.Label>
                           <Form.Control
@@ -150,7 +152,7 @@ function EditProject() {
                       </Col>
 
                       {/* NEW: Longitude input */}
-                      <Col md={4}>
+                      <Col md={6}>
                           <Form.Group className="mb-3">
                           <Form.Label className="fw-semibold">Longitude</Form.Label>
                           <Form.Control

@@ -104,6 +104,10 @@ function Clients() {
                               <i className="bi bi-telephone me-2 text-muted"></i>
                               <small className="text-muted">{client.phone}</small>
                             </div>
+                            <div className="d-flex align-items-center">
+                              <i className="bi bi-geo-alt me-2 text-muted"></i>
+                              <small className="text-muted">{client.address?.town}, {client.address?.province}</small>
+                            </div>
                           </div>
 
                           <Stack direction="horizontal" gap={2} className="mt-auto">

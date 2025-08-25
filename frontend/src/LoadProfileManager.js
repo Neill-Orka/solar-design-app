@@ -76,8 +76,15 @@ function LoadProfileManager() {
     const fetchProfiles = () => {
         setLoading(true);
         axios.get(`${API_URL}/api/load_profiles`)
-            .then(res => setProfiles(res.data))
-            .catch(err => setError("Failed to load existing profiles."))
+            .then(res => setProfiles(Array.isArray(res.data) ? res.data : []))
+            .catch(err => {
+                setError(
+                    err.response?.data?.error ||
+                    err.response?.data?.message ||
+                    'Failed to load existing profiles.'
+                );
+                setProfiles([]); // Prevent crash if response is not an array
+            })
             .finally(() => setLoading(false));
     };
 
@@ -117,7 +124,14 @@ function LoadProfileManager() {
                     showNotification('Profile deleted successfully!', 'success');
                     fetchProfiles();
                 })
-                .catch(err => showNotification(err.response?.data?.message || 'Failed to delete profile', 'danger'));
+                .catch(err => {
+                    showNotification(
+                        err.response?.data?.message ||
+                        err.response?.data?.error ||
+                        'Failed to delete profile',
+                        'danger'
+                    );
+                });
         }
     };
     

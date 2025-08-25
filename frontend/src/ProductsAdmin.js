@@ -72,6 +72,8 @@ export default function ProductsAdmin() {
     const [componentTypes, setComponentTypes] = useState([]);
     const [fieldMetadata, setFieldMetadata] = useState({});
     const [loadingMetadata, setLoadingMetadata] = useState(true);
+    const [loadingProducts, setLoadingProducts] = useState(true);
+    const [initialLoad, setInitialLoad] = useState(true);
 
     // Memoized helper functions for price calculation and margin conversion
     const calculatePrice = useCallback((unitCost, margin) => {
@@ -147,7 +149,8 @@ export default function ProductsAdmin() {
     }, [calculatePrice, formatMarginForBackend]);
 
     // ------ load products list -------------------------------
-    const fetchProducts = useCallback(() => {
+    const fetchProducts = useCallback((showSpinner = false) => {
+        if (showSpinner) setLoadingProducts(true);
         const token = localStorage.getItem('access_token');
         return axios.get(`${API_URL}/api/products`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -155,12 +158,16 @@ export default function ProductsAdmin() {
         .then(r => {
             setProducts(r.data);
             setError('');
+            if (initialLoad) setInitialLoad(false);
         })
-        .catch(err => setError('Failed to load products'));
-    }, []);
+        .catch(err => setError('Failed to load products'))
+        .finally(() => {
+            if (showSpinner) setLoadingProducts(false);
+        });
+    }, [initialLoad]);
 
     useEffect(() => {
-        fetchProducts();
+        fetchProducts(true); // Show spinner on initial load
     }, [fetchProducts]);
 
     // ------ open modal --------------------------------------
@@ -416,6 +423,7 @@ export default function ProductsAdmin() {
         return null;
     };
 
+    // Never block the entire page - always show the page structure
     return (
         <div className='min-vh-100' style={{ backgroundColor: '#f8f9fa' }}>
             <Container fluid className="py-4 py-md-5">
@@ -473,7 +481,34 @@ export default function ProductsAdmin() {
 
                             {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
 
-                            {filtered.length === 0 ? (
+                            {(loadingMetadata || (loadingProducts && initialLoad)) ? (
+                                // Show spinner while loading metadata or initial products
+                                <Card className="shadow-sm border-0 rounded-xl">
+                                    <Table hover responsive className="mb-0" size="sm">
+                                        <thead className="table-light">
+                                            <tr style={{fontSize: '0.9rem'}}>
+                                                <th className="ps-3" style={{width: "10%"}}>Category</th>
+                                                <th style={{width: "12%"}}>Component Type</th>
+                                                <th style={{width: "10%"}}>Brand</th>
+                                                <th style={{width: "25%"}}>Model</th>
+                                                <th style={{width: "15%"}}>Price</th>
+                                                <th style={{width: "15%"}}>Last Updated</th>
+                                                <th className="text-end pe-3" style={{width: "13%"}}>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td colSpan="7" className="text-center py-5">
+                                                    <div className="loading-container">
+                                                        <div className="loading-spinner"></div>
+                                                        <p className="mt-3">{loadingMetadata ? 'Loading products...' : 'Loading products...'}</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </Table>
+                                </Card>
+                            ) : filtered.length === 0 ? (
                                 <div className="text-center py-5">
                                     <i className="bi bi-box" style={{fontSize: '4rem', color: '#9ca3af'}}></i>
                                     <h4 className="mt-3 text-gray-700">No Products Found</h4>
@@ -488,9 +523,17 @@ export default function ProductsAdmin() {
                                 </div>
                             ) : viewMode === 'card' ? (
                                 // Card View
-                                <Row xs={1} md={2} lg={3} xl={4} className="g-4">
-                                    {filtered.map(product => (
-                                        <Col key={product.id}>
+                                (loadingMetadata || (loadingProducts && initialLoad)) ? (
+                                    <div className="text-center py-5">
+                                        <div className="loading-container">
+                                            <div className="loading-spinner"></div>
+                                            <p className="mt-3">{loadingMetadata ? 'Loading products...' : 'Loading products...'}</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <Row xs={1} md={2} lg={3} xl={4} className="g-4">
+                                        {filtered.map(product => (
+                                            <Col key={product.id}>
                                             <Card className="h-100 shadow-sm border-light hover-shadow">
                                                 <Card.Body className="p-4">
                                                     <div className="d-flex align-items-center mb-3">
@@ -563,6 +606,7 @@ export default function ProductsAdmin() {
                                         </Col>
                                     ))}
                                 </Row>
+                                )
                             ) : (
                                 // List View
                                 <Card className="shadow-sm border-0 rounded-xl">

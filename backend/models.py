@@ -187,6 +187,7 @@ class Clients(db.Model):
     client_name = db.Column(db.String(80))
     email = db.Column(db.String(120), unique=True)
     phone = db.Column(db.String(20))
+    address = db.Column(db.JSON, nullable=True)
 
     projects = db.relationship('Projects', backref='client', lazy=True)
 
@@ -226,9 +227,9 @@ class Projects(db.Model):
     template_name = db.Column(db.String(100), nullable=True)
     bom_modified = db.Column(db.Boolean, default=False)  # Track if user has modified BOM
 
-    energy_data = db.relationship('EnergyData', backref='project', lazy=True)
+    energy_data = db.relationship('EnergyData', backref='project', lazy=True, cascade="all, delete-orphan")
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")
-
+    bom_components = db.relationship('BOMComponent', backref='project', lazy=True, cascade="all, delete-orphan")
 
 class EnergyData(db.Model):
     __tablename__ = 'energy_data'
@@ -577,7 +578,6 @@ class BOMComponent(db.Model):
     quote_version = db.Column(db.Integer, default=1)
 
     # Relationships
-    project = db.relationship('Projects', backref=db.backref('bom_components', lazy=True, cascade="all, delete-orphan"))
     product = db.relationship('Product')
 
     def __repr__(self):

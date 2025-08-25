@@ -46,7 +46,11 @@ function Projects() {
       })
       .catch((err) => {
         console.error('Error fetching projects:', err);
-        setError('Failed to load projects. Please ensure the server is running and accessible.');
+        setError(
+          err.response?.data?.error ||
+          'Failed to load projects. Please ensure the server is running and accessible.'
+        );
+        setProjects([]); // Prevent crash if response is not an array
       })
       .finally(() => {
         setLoading(false);
@@ -73,7 +77,11 @@ function Projects() {
       })
       .catch((err) => {
         console.error('Error deleting project:', err);
-        setError(err.response?.data?.message || 'Failed to delete project');
+        setError(
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          'Failed to delete project'
+        );
         setShowDeleteModal(false);
       });
   };

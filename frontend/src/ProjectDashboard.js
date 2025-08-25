@@ -150,8 +150,8 @@ function ProjectDashboard() {
   {
     return(
       // MODIFIED: Apply page background and padding here
-      <div className='min-vh-100 py-4 py-md-5 px-md-3' style={{ backgroundColor: '#f8f9fa' }}> 
-        <div className="container"> {/* Optional: to constrain the width of the header content below */}
+      <div className='min-vh-100 py-4 py-md-5' style={{ backgroundColor: '#f8f9fa' }}> 
+        <div className="project-dashboard-container"> {/* Custom responsive container */}
           <div className="mb-4 p-3 bg-white rounded-lg shadow-sm text-center"> {/* Header card */}
             <h1 className="text-3xl font-bold text-gray-800 mb-1">{project.name} - Quick Design</h1>
             <p className="text-sm text-gray-600">
@@ -216,7 +216,7 @@ function ProjectDashboard() {
   }
 
   return (
-    <div className="container mt-5">
+    <div className="project-dashboard-container mt-5">
       <h2>{project.name}</h2>
       <p>
         <strong>Client:</strong> {project.client_name}<br />

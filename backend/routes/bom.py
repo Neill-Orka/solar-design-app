@@ -105,3 +105,36 @@ def clear_project_bom(project_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@bom_bp.route('/projects/<int:project_id>/bom/clear-template-extras', methods=['POST'])
+def clear_template_extras_from_bom(project_id):
+    """Clear only non-core components from BOM when stopping template usage"""
+    try:
+        # Check if project exists
+        project = Projects.query.get(project_id)
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+            
+        # Get all BOM components for this project
+        components = BOMComponent.query.filter_by(project_id=project_id).all()
+        
+        # Keep only core components (panels, inverters, batteries)
+        core_categories = ['panel', 'inverter', 'battery']
+        
+        for component in components:
+            product = Product.query.get(component.product_id)
+            if product and product.category.lower() not in core_categories:
+                # Delete non-core components
+                db.session.delete(component)
+        
+        # Clear template information from project
+        project.from_standard_template = False
+        project.template_id = None
+        project.template_name = None
+        
+        db.session.commit()
+        return jsonify({'message': 'Template extras cleared from BOM successfully'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
