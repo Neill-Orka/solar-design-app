@@ -1,6 +1,6 @@
 # routes/projects.py
 from flask import Blueprint, request, jsonify
-from models import db, Projects, Clients, LoadProfiles, QuickDesignData, Product, ComponentRule, User, UserRole
+from models import db, Projects, Clients, LoadProfiles, QuickDesignData, Product, ComponentRule, User, UserRole, EnergyData, BOMComponent
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .tariffs import serialize_tariff
 
@@ -229,6 +229,11 @@ def delete_project(project_id):
         project = Projects.query.get(project_id)
         if not project:
             return jsonify({'error': 'Project not found'}), 404
+        # Bulk delete children to avoid per-row cascade overhead
+        db.session.query(EnergyData).filter_by(project_id=project_id).delete(synchronize_session=False)
+        db.session.query(BOMComponent).filter_by(project_id=project_id).delete(synchronize_session=False)
+        db.session.query(QuickDesignData).filter_by(project_id=project_id).delete(synchronize_session=False)
+     
         db.session.delete(project)
         db.session.commit()
         return jsonify({'message': 'Project deleted successfully!'})
