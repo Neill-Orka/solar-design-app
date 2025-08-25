@@ -225,6 +225,8 @@ def simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, invert
             export_to_grid.append(export_kwh / time_interval_hours)
             battery_soc_trace.append((battery_soc_kwh / battery_capacity_kwh * 100) if battery_capacity_kwh > 0 else 0)
 
+        
+
         return {
             "timestamps": [ts.isoformat() for ts in full_30min_index],
             "demand": demand_kw,
