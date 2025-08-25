@@ -1191,7 +1191,7 @@ function MainReportContent({
             
 
             <div className="mt-3">
-                <h6 className="fw-bold">5.1.1 Installed capacity and simulated yield</h6>
+                <h5 className="fw-bold">Installed capacity and simulated yield</h5>
                 <p className="mb-3">Combined installation capacity and yields are shown in the tables below:</p>
                 
                 {/* Table 2: Technical Specifications */}
@@ -1350,7 +1350,7 @@ function MainReportContent({
             pageNumber={startPageNumber + 7} // Set an appropriate page number here
             totalPages={totalPages} // Set the total number of pages in your report
         >
-            <h6 className="fw-bold">Energy Production</h6>
+            <h5 className="fw-bold">Energy Production</h5>
             <p>The below graph shows the potential solar production from the system per month.</p>
 
             {/* Monthly Energy Production Chart */}
@@ -1371,8 +1371,8 @@ function MainReportContent({
                 The system is projected to generate approximately {formatValue(data?.financials?.total_generation_kwh || 0)} kWh per year.
             </p>
 
-            <h6 className="fw-bold">Simulated Profiles</h6>
-            
+            <h5 className="fw-bold">Simulated Profiles</h5>
+
             {/* Simulation Results Graph */}
             <div className="mb-4">
                 <p>
@@ -1518,7 +1518,7 @@ function MainReportContent({
             pageNumber={startPageNumber + 8} // Set an appropriate page number here
             totalPages={totalPages} // Set the total number of pages in your report
         >
-            <h6 className='fw-bold'>Financial Information</h6>
+            <h5 className='fw-bold'>Financial Information</h5>
             <p>The key metrics to evaluate the business case of the project are shown in the table below:</p>
             
             {/* Table 4: Project Business Case Metrics */}
@@ -1913,7 +1913,7 @@ function MainReportContent({
             totalPages={totalPages} // Set the total number of pages in your report
         >
             <div className="scope-of-work">
-                <h6 className="fw-bold">SCOPE OF WORK</h6>
+                <h5 className="fw-bold">Scope of Work</h5>
 
                 <p>The following scope of work will be completed as part of the project and are included in the cost of the proposal:</p>
                 
@@ -2005,7 +2005,7 @@ function MainReportContent({
                     </table>
                 </div> */}
 
-                <h6 className="fw-bold">QUALITY AND WARRANTY</h6>
+                <h5 className="fw-bold">Quality and Warranty</h5>
 
                 <p>
                     Orka Solar is product agnostic and can therefore supply equipment to the client's specification, provided that 
@@ -2036,7 +2036,7 @@ function MainReportContent({
             totalPages={totalPages} // Set the total number of pages in your report
         >
             <div className="terms-of-service">
-                <h6 className="fw-bold">TERMS OF SERVICE</h6>
+                <h5 className="fw-bold">Terms of Service</h5>
 
                 <p>The project's invoicing will be as follows: 50% deposit on order, 40% on delivery of panels and inverters to site and 10% on project handover certificate sign off.
                 
@@ -2046,7 +2046,7 @@ function MainReportContent({
                 
                 Late delivery penalty due to delays caused by the contractor will be 0.5% of project value per week.
                 </p>
-                <h6 className="fw-bold mt-2">PROJECT SCHEDULE</h6>
+                <h5 className="fw-bold">Project Schedule</h5>
 
                 <p>The project timeline is dependent on the date of deposit and availability of key components. An indicative timeline for this project without any delays due to long lead items are shown below:</p>
                 
@@ -2069,7 +2069,7 @@ function MainReportContent({
                     </table>
                 </div>
 
-                <h6 className="fw-bold">STANDARDS AND REGULATIONS</h6>
+                <h5 className="fw-bold">Standards and Regulations</h5>
 
                 <p>Orka Solar installations are completed in compliance with the following standards and regulations where applicable:</p>
                 
@@ -2094,7 +2094,7 @@ function MainReportContent({
             pageNumber={startPageNumber + 12} // Set an appropriate page number here
             totalPages={totalPages} // Set the total number of pages in your report
         >
-            <h6 className="fw-bold">Notable Points</h6>
+            <h5 className="fw-bold">Notable Points</h5>
                 <p>The following assumptions and exclusions were made and form part of this proposal:</p>
                 <ol className="ps-4">
                     <li>Actual consumption data was not used for the design or simulations of the solution. Should the loads change or differ from the data analysed Orka Solar should be notified by the client.</li>

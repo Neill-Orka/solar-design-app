@@ -2,11 +2,11 @@ import React from "react";
 import logo from "../../assets/orka_logo_transparent_background.png";
 import sitePhoto from "../../assets/site_photo.png";
 
-import pvIcon from "../../assets/icon_pv.svg";
-import inverterIcon from "../../assets/icon_inverter.svg";
-import batteryIcon from "../../assets/icon_battery.svg";
-import costIcon from "../../assets/icon_cost.svg";
-import savingsIcon from "../../assets/icon_savings.svg";
+import pvIcon from "../../assets/panel_icon.png";
+import inverterIcon from "../../assets/inverter_icon.png";
+import batteryIcon from "../../assets/battery_icon.png";
+import costIcon from "../../assets/cost_icon.png";
+import savingsIcon from "../../assets/savings_icon.png";
 
 import "../../ReportBuilder.css";
 

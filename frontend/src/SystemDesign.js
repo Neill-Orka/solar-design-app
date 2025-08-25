@@ -330,8 +330,99 @@ const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, set
                     </Card.Body>
                 </Card>
             </div>
+            {/* Card: Generator (Off-Grid) */}
+            {design.systemType === 'off-grid' && (
+                <div className="col-12 mt-4">
+                    <Card className="shadow-sm">
+                        <Card.Body>
+                            <Card.Title as="h5" className="fw-semibold mb-3">
+                                <i className='bi bi-fuel-pump me-2 text-danger'></i>
+                                Generator (Off-Grid)
+                            </Card.Title>
+                            <Row className='g-3'>
+                                <Col md={4}>
+                                    <Form.Group>
+                                        <Form.Label>Enable Generator (Nog nie beskikbaar)</Form.Label>
+                                        <Form.Check
+                                            type="switch"
+                                            id="gen-enabled"
+                                            checked={design.generatorEnabled}
+                                            onChange={e => onDesignChange({ ...design, generatorEnabled: e.target.checked })}
+                                            label={design.generatorEnabled ? "Enabled": "Disabled"}
+                                            disabled
+                                        />
+                                    </Form.Group>
+                                </Col>
+                                <Col md={4}>
+                                  <Form.Group>
+                                    <Form.Label>Rated Power (kVA)</Form.Label>
+                                    <Form.Control
+                                      type="number"
+                                      value={design.generatorKva}
+                                      onChange={e => onDesignChange({ ...design, generatorKva: e.target.value })}
+                                      disabled={!design.generatorEnabled}
+                                      placeholder="e.g., 80"
+                                    />
+                                  </Form.Group>
+                                </Col>
+                                <Col md={4}>
+                                  <Form.Group>
+                                    <Form.Label>Min Loading (%)</Form.Label>
+                                    <Form.Control
+                                      type="number"
+                                      value={design.generatorMinLoading}
+                                      min={0} max={100}
+                                      onChange={e => onDesignChange({ ...design, generatorMinLoading: e.target.value })}
+                                      disabled={!design.generatorEnabled}
+                                    />
+                                  </Form.Group>
+                                </Col>                               
+                            </Row>
+
+                            <Row className="g-3 mt-1">
+                              <Col md={4}>
+                                <Form.Group>
+                                  <Form.Label>Efficiency (kWh / liter)</Form.Label>
+                                  <Form.Control
+                                    type="number"
+                                    step="0.1"
+                                    value={design.generatorEfficiency}
+                                    onChange={e => onDesignChange({ ...design, generatorEfficiency: e.target.value })}
+                                    disabled={!design.generatorEnabled}
+                                  />
+                                </Form.Group>
+                              </Col>
+                              <Col md={4}>
+                                <Form.Group>
+                                  <Form.Label>Diesel Price (R / liter)</Form.Label>
+                                  <Form.Control
+                                    type="number"
+                                    step="0.10"
+                                    value={design.dieselPrice}
+                                    onChange={e => onDesignChange({ ...design, dieselPrice: e.target.value })}
+                                    disabled={!design.generatorEnabled}
+                                  />
+                                </Form.Group>
+                              </Col>
+                              <Col md={4}>
+                                <Form.Group className="mt-md-4">
+                                  <Form.Check
+                                    type="checkbox"
+                                    id="gen-charge-batt"
+                                    label="Charge battery while running"
+                                    checked={design.generatorChargeBattery}
+                                    onChange={e => onDesignChange({ ...design, generatorChargeBattery: e.target.checked })}
+                                    disabled={!design.generatorEnabled}
+                                  />
+                                </Form.Group>
+                              </Col>
+                            </Row>   
+
+                        </Card.Body>
+                    </Card>
+                </div>
+            )}
         </div> 
-        {/* Remove the Button for "Refine Components & Build BOM" */}
     </>
   );
 };
@@ -493,6 +584,14 @@ function SystemDesign({ projectId }) {
         batteryQuantity: 1,
         allowExport: false,
         batterySocLimit: 20,
+
+        // New generator config (only used in off-grid)
+        generatorEnabled: false,
+        generatorKva: '',
+        generatorMinLoading: 30, // %
+        generatorEfficiency: 3.5, // kWh per liter
+        dieselPrice: 24, // R per liter
+        generatorChargeBattery: true,
     });
 
     // State for all calculated metrics from the simulation results
@@ -777,10 +876,17 @@ function SystemDesign({ projectId }) {
                             inverter_kva: (newDesign.selectedInverter?.product?.rating_kva || 0) * newDesign.inverterQuantity,
                             battery_kwh: (newDesign.selectedBattery?.product?.capacity_kwh || 0) * newDesign.batteryQuantity,
                             allow_export: newDesign.allowExport,
-                            battery_soc_limit: newDesign.batterySocLimit
-                            
+                            battery_soc_limit: newDesign.batterySocLimit,
+
+                            generator: {
+                              enabled: newDesign.systemType === 'off-grid' && !!newDesign.generatorEnabled,
+                              kva: parseFloat(newDesign.generatorKva || 0),
+                              min_loading_pct: parseFloat(newDesign.generatorMinLoading || 0),
+                              can_charge_battery: !!newDesign.generatorChargeBattery,
+                              efficiency_kwh_per_liter: parseFloat(newDesign.generatorEfficiency || 3.5),
+                              diesel_price_r_per_liter: parseFloat(newDesign.dieselPrice || 24)
+                            }
                         }
-                        
                     };
 
                     return axios.post(`${API_URL}/api/simulate`, simPayload);
@@ -906,8 +1012,32 @@ function SystemDesign({ projectId }) {
             });            
         }
 
+        if (design.systemType === 'off-grid') {
+            datasets.push({
+              label: 'Generator (kW)',
+              data: sim.generator_kw.slice(startIndex, endIndex),
+              borderColor: '#198754',
+              backgroundColor: '#19875420',
+              tension: 0.3,
+              pointRadius: 0,
+              borderWidth: 2,
+            });
+
+            datasets.push({
+              label: 'Energy Shortfall (kW)',
+              data: sim.shortfall_kw.slice(startIndex, endIndex),
+              borderColor: '#dc3545',
+              backgroundColor: '#dc354540',
+              tension: 0.3,
+              pointRadius: 0,
+              borderWidth: 2,
+              fill: true
+            });
+        }
+
+
         return { labels, datasets };
-    }, [simulationData, startDate, endDate, showLosses]);
+    }, [simulationData, startDate, endDate, showLosses, design.systemType]);
 
     // Chart options (exactly like QuickResults)
     const chartOptions = useMemo(() =>  ({
@@ -1105,7 +1235,16 @@ function SystemDesign({ projectId }) {
                       inverter_kva: (design.selectedInverter?.product.rating_kva || 0) * design.inverterQuantity,
                       battery_kwh: (design.selectedBattery?.product.capacity_kwh || 0) * design.batteryQuantity,
                       allow_export: design.allowExport,
-                      battery_soc_limit: design.batterySocLimit
+                      battery_soc_limit: design.batterySocLimit,
+
+                      generator: {
+                        enabled: design.systemType === 'off-grid' && !!design.generatorEnabled,
+                        kva: parseFloat(design.generatorKva || 0),
+                        min_loading_pct: parseFloat(design.generatorMinLoading || 0),
+                        can_charge_battery: !!design.generatorChargeBattery,
+                        efficiency_kwh_per_liter: parseFloat(design.generatorEfficiency || 3.5),
+                        diesel_price_r_per_liter: parseFloat(design.dieselPrice || 24)
+                      }
                   }
               };
 
@@ -1150,7 +1289,7 @@ function SystemDesign({ projectId }) {
 
         const filtered = {
             timestamps: [], demand: [], generation: [], potential_generation: [],
-            battery_soc: [], import_from_grid: [], export_to_grid: []
+            battery_soc: [], import_from_grid: [], export_to_grid: [], shortfall_kw: [], generator_kw: []
         };
 
         simulationData.timestamps.forEach((ts, i) => {
@@ -1163,6 +1302,8 @@ function SystemDesign({ projectId }) {
                 filtered.battery_soc.push(simulationData.battery_soc[i]);
                 filtered.import_from_grid.push(simulationData.import_from_grid[i]);
                 filtered.export_to_grid.push(simulationData.export_to_grid[i]);
+                filtered.shortfall_kw.push(simulationData.shortfall_kw ? simulationData.shortfall_kw[i]: 0);
+                filtered.generator_kw.push(simulationData.generator_kw ? simulationData.generator_kw[i]: 0);
             }
         });
         return filtered;
@@ -1181,6 +1322,8 @@ function SystemDesign({ projectId }) {
         const totalExportKwh = filteredData.export_to_grid.reduce((sum, val) => sum + (val * timeIntervalHours), 0);
         const pvUsedOnSiteKwh = totalUtlizedGenKwh - totalExportKwh; 
         const pvUtilizationPct = totalUtlizedGenKwh > 0 ? (pvUsedOnSiteKwh/totalPotentialGenKwh) * 100 : 0;
+        const totalShortfallKwh = filteredData.shortfall_kw.reduce((sum, val) => sum + (val * timeIntervalHours), 0);
+        const totalGenKwh = filteredData.generator_kw.reduce((sum, val) => sum + (val * timeIntervalHours), 0);
 
         setMetrics({
             totalPVGeneration: totalPotentialGenKwh.toFixed(0),
@@ -1188,9 +1331,13 @@ function SystemDesign({ projectId }) {
             gridImport: totalImportKwh.toFixed(0),
             gridExport: totalExportKwh.toFixed(0),
             pvUtilization: pvUtilizationPct.toFixed(0),
+
+            energyShortfall: totalShortfallKwh.toFixed(0),
+            generatorEnergy: totalGenKwh.toFixed(0),
+            dieselCost: (simulationData?.diesel_cost_total || 0).toFixed(0)
         });
 
-    }, [filteredData]); // Re-calculate if filtered data or design changes
+    }, [filteredData, simulationData?.diesel_cost_total]); // Re-calculate if filtered data or design changes
 
     // For Annual Metrics
     useEffect(() => {
@@ -1409,6 +1556,13 @@ function SystemDesign({ projectId }) {
                         </Card.Body>
                     </Card>
 
+                    {Number(metrics.energyShortfall || 0) > 0 && (
+                        <Alert variant='danger' className='mb-3'>
+                            <i className='bi bi-exclamation-triangle-fill me-2'></i>
+                            This off-grid design has <b>{metrics.energyShortfall} kWh</b> of energy shortfall. Consider adding PV/battery capacity.
+                        </Alert>
+                    )}
+
                     {/* The Metrics Cards */}
                     <Row className="mb-4 g-3 mt-4" >
                         <Col md={4} lg>
@@ -1442,6 +1596,24 @@ function SystemDesign({ projectId }) {
                             </Card>
                         </Col>
                     </Row>
+                    {simulationData && startDate && design.systemType === 'off-grid' && (
+                    <Row>
+                        <Col md={4} lg>
+                          <Card className="border-start border-4 border-danger bg-white shadow-sm rounded p-3 h-100">
+                            <div className="text-muted small">Energy Shortfall</div>
+                            <div className="fs-4 fw-bold">{metrics.energyShortfall || 0} kWh</div>
+                          </Card>
+                        </Col>
+                        <Col md={4} lg>
+                          <Card className="border-start border-4 border-success bg-white shadow-sm rounded p-3 h-100">
+                            <div className="text-muted small">Generator Energy</div>
+                            <div className="fs-6 fw-bold mb-1">{metrics.generatorEnergy || 0} kWh</div>
+                            <div className="text-muted small">Diesel Cost</div>
+                            <div className="fs-6 fw-bold">R {(metrics.dieselCost || 0).toLocaleString()}</div>
+                          </Card>
+                        </Col>
+                    </Row>
+                    )}
 
                     {/* Advanced System Metrics Table */}
                     <Card className="shadow-sm">

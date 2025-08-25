@@ -26,6 +26,7 @@ def simulate_system():
         allow_export = data["system"].get("allow_export", False)
         profile_name = data.get('profile_name', 'Midrand Azth:east-west Tilt:5')
         battery_soc_limit = data["system"].get("battery_soc_limit", 20)  # Default to 20% if not provided
+        generator_cfg = data["system"].get("generator", None)
 
         # If we get an object instead of number
         if isinstance(inverter_kva, dict):
@@ -43,7 +44,8 @@ def simulate_system():
         # Pass the battery_soc_limit to the simulation function
         result = simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, 
                                       allow_export, tilt, azimuth, use_pvgis, profile_name=profile_name,
-                                      battery_soc_limit=battery_soc_limit)
+                                      battery_soc_limit=battery_soc_limit,
+                                      generator_config=generator_cfg)
         return jsonify(result)
 
     except Exception as e:
