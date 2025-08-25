@@ -473,8 +473,8 @@
 
 .orka-cover-logo-topright {
   position: absolute;
-  top: 2.5cm; right: 2.7cm;
-  width: 4.6cm;
+  top: .5cm; right: 0.7cm;
+  width: 10cm;
   z-index: 2;
 }
 
@@ -725,8 +725,8 @@
   max-width: 7.2cm;
 }
 .orka-summary-icon {
-  width: 40px;
-  height: 40px;
+  width: 70px;
+  height: 70px;
   margin-bottom: 0.11cm;
 }
 .orka-summary-label {

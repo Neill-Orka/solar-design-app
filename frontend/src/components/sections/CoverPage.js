@@ -1,5 +1,5 @@
 import React from "react";
-import logo from "../../assets/orka_logo_transparent_background.png";
+import logo from "../../assets/OrkaLogoWithText.png";
 import panelBg from "../../assets/solar_panel_bg.png";
 
 import "../../ReportBuilder.css";
