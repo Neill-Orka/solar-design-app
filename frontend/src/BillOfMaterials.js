@@ -69,13 +69,16 @@ const slugify = (s) =>
     .trim()
     .replace(/\s+/g, '_');
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(value || 0);
+const formatCurrency = (value) => {
+  const number = (value || 0).toFixed(2);
+  const [integerPart, decimalPart] = number.split('.');
+
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+
+  return `R${formattedInteger}.${decimalPart}`;
+};
+
+
 
 const formatNumber0 = (value) =>
   new Intl.NumberFormat('en-ZA', {
@@ -125,7 +128,7 @@ const getUnitPriceForRow = (row, isDraft) =>
   isDraft ? computeDerivedUnitFromRow(row) : (row.price_at_time ?? computeDerivedUnitFromRow(row));
 
 /* ---------- Component ---------- */
-function BillOfMaterials({ projectId, onNavigateToPrintBom }) {
+function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
   const { showNotification } = useNotification();
 
   // State
@@ -670,6 +673,25 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     }
   };
 
+  const [savingVersion, setSavingVersion] = useState(false);
+
+  const saveAsNewVersionToQuote = async () => {
+    if (!quoteContext?.docId) return;
+    try {
+      setSavingVersion(true);
+      // 1) Make sure latest edits are persisted to the workbench
+      await saveBOM();
+      //2) Snapshot BOM into a new version for this quote
+      await axios.post(`${API_URL}/api/quotes/${quoteContext.docId}/versions`, {});
+      showNotification(`Saved as new version for ${quoteContext.number || `quote #${quoteContext.docId}`}`, 'success');
+    } catch (e) {
+      console.error(e);
+      showNotification('Failed to create new quote version.', 'danger');
+    } finally {
+      setSavingVersion(false);
+    }
+  };
+
   /* ---------- Save as Template ---------- */
   const saveAsTemplate = async () => {
     try {
@@ -1025,14 +1047,14 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                 </>
               )}
             </Button>
-            <Button 
+            {!quoteContext?.docId && (<Button 
               variant="outline-primary"
               className='me-2'
               onClick={createQuote}
               disabled={creatingQuote || savingComponents || !bomComponents.length}
             >
               {creatingQuote ? 'Creating...' : 'Create Quote (v1)'}
-            </Button>
+            </Button>)}
           </Col>
         </Row>
 
@@ -1042,6 +1064,30 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
             Some items have price changes since the BOM was last saved. The saved “unit price” will be respected on export unless you update it.
           </Alert>
         )}
+
+        <Row>
+          <Col>
+            {quoteContext?.docId && (
+              <Alert variant="info" className="d-flex justify-content-between align-items-center">
+                <div>
+                  Editing <b>{quoteContext.number || `quote #${quoteContext.docId}`}</b>
+                  {quoteContext.fromVersion ? <> (loaded from v{quoteContext.fromVersion})</> : null}. 
+                  Changes here are drafts until you “Save as New Version”.
+                </div>
+                <div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={saveAsNewVersionToQuote}
+                    disabled={savingVersion}
+                  >
+                    {savingVersion ? 'Saving…' : 'Save as New Version'}
+                  </Button>
+                </div>
+              </Alert>
+            )}
+          </Col>
+        </Row>
 
         <Row>
           {/* Left: Product browser - Changed from lg={7} to lg={6} */}
@@ -1328,17 +1374,21 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
               </Card.Header>
               <Card.Body>
                 <Row>
-                  <Col sm={4} className="mb-3 text-center">
+                  <Col sm={3} className="mb-3 text-center">
                     <div className="small text-muted">PV Size</div>
                     <div className="fs-4 fw-bold text-warning">{systemSpecs.panelKw} <small>kWp</small></div>
                   </Col>
-                  <Col sm={4} className="mb-3 text-center">
+                  <Col sm={3} className="mb-3 text-center">
                     <div className="small text-muted">Inverter</div>
                     <div className="fs-4 fw-bold text-info">{systemSpecs.inverterKva} <small>kVA</small></div>
                   </Col>
-                  <Col sm={4} className="mb-3 text-center">
+                  <Col sm={3} className="mb-3 text-center">
                     <div className="small text-muted">Battery</div>
                     <div className="fs-4 fw-bold text-success">{systemSpecs.batteryKwh} <small>kWh</small></div>
+                  </Col>
+                  <Col sm={3} className="mb-3 text-center">
+                    <div className="small text-muted">Cost per kWh</div>
+                    <div className="fs-4 fw-bold text-success">{formatCurrency(totals.total_excl_vat / systemSpecs.panelKw)}<small>/kWh</small></div>
                   </Col>
                 </Row>
               </Card.Body>

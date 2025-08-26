@@ -37,7 +37,8 @@ export default function ProjectQuotes({ projectId, API_URL, onOpenQuote }) {
           <tr key={q.id} onClick={() => onOpenQuote?.(q.id)} style={{ cursor: onOpenQuote ? 'pointer' : 'default' }}>
             <td>{q.number}</td>
             <td><Badge bg="secondary">{q.status || 'draft'}</Badge></td>
-            <td>v{q.latest_version_no || 1} ({q.version_count})</td>
+            {/* <td>v{q.latest_version_no || 1} ({q.version_count})</td> */}
+            <td>V{q.version_count || 1}</td>
             <td>{q.latest_totals?.total_incl_vat != null ? fmtZAR(q.latest_totals.total_incl_vat) : '—'}</td>
             <td>{new Date(q.created_at).toLocaleString('en-ZA')}</td>
           </tr>

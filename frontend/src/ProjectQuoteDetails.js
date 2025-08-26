@@ -21,7 +21,7 @@ export default function ProjectQuoteDetails() {
     try {
         await axios.post(`${API_URL}/api/quote-versions/${versionId}/load-to-bom`);
         // Navigate to the BOM so user is immediately in edit mode
-        navigate(`/projects/${projectId}?tab=bom`);
+        navigate(`/projects/${projectId}?tab=bom&quoteDoc=${docId}&quoteNo=${encodeURIComponent(doc.number)}&fromVersion=${selectedVid}`);
     } catch (e) {
         console.error(e);
         alert('Failed to load version into BOM.');

@@ -92,7 +92,7 @@ function ExecutiveSummary({ data, pageNumber = 1, totalPages = 24 }) {
   } else if (project.system_type === "off-grid") {
     typeText = "off-grid solar and battery solution";
   }
-
+ 
   const summary1 = `Orka Solar is pleased to respond to the request for ${typeText}.`;
 
   const PANEL_WATTAGE_W = 565;
@@ -120,7 +120,7 @@ function ExecutiveSummary({ data, pageNumber = 1, totalPages = 24 }) {
       <div className="orka-summary-paragraphs">
         <p>{summary1}</p>
         <p>
-          The proposal is in the form of a full turn key solution. All Engineering, Procurement and Construction (EPC) will be handled by Orka Solar. The client will own the system outright and in return will benefit from the electrical power provided by the system, related cost and taxation benefits as well as meeting their carbon reduction/green energy goals.
+          The proposal is in the form of a full turn key solution. All engineering, procurement and construction (EPC) will be handled by Orka Solar. The client will own the system outright and in return will benefit from the electrical power provided by the system, related cost and taxation benefits as well as meeting their carbon reduction/green energy goals.
         </p>
         <p>
           Orka Solar made use of actual electrical consumption data of this site in the design of this system.
@@ -150,7 +150,7 @@ function ExecutiveSummary({ data, pageNumber = 1, totalPages = 24 }) {
         <div className="orka-summary-icon-col">
           <img src={batteryIcon} className="orka-summary-icon" alt="" />
           <div className="orka-summary-label">Backup</div>
-          <div className="orka-summary-sublabel">Chemistry: {project.battery_chem}</div>
+          <div className="orka-summary-sublabel">Chemistry: {project.battery_chem || 'LFP'}</div>
           <div className="orka-summary-sublabel">{formatValue(calculateBatteryAt100(project.battery_kwh))} kWh @ 100%</div>
           <div className="orka-summary-sublabel">{displayValue(project.battery_kwh, "0", "battery_kwh_80")} kWh @ 80%</div>
         </div>
