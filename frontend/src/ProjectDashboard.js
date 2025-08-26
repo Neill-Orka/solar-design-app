@@ -291,7 +291,17 @@ function ProjectDashboard() {
         {activeTab === 'upload' && <EnergyDataUpload projectId={projectId} />}
         {activeTab === 'analysis' && <EnergyAnalysis projectId={projectId} />}
         {activeTab === 'design' && <SystemDesign projectId={projectId} />}
-        {activeTab === 'bom' && <BillOfMaterials projectId={projectId} onNavigateToPrintBom={() => setActiveTab('printbom')} />}
+        {activeTab === 'bom' && (
+          <BillOfMaterials 
+            projectId={projectId} 
+            onNavigateToPrintBom={() => setActiveTab('printbom')} 
+            quoteContext={{
+              docId: searchParams.get('quoteDoc'),
+              number: searchParams.get('quoteNo'),
+              fromVersion: searchParams.get('fromVersion'),
+            }}  
+          />
+        )}
         {activeTab === 'printbom' && <PrintableBOM projectId={projectId} />}
         {activeTab === 'quotes' && <ProjectQuotes projectId={projectId} API_URL={API_URL} onOpenQuote={openQuote} />}
         {activeTab === 'finance' && <FinancialModeling projectId={projectId} />}

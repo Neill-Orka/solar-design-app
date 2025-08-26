@@ -125,7 +125,7 @@ const getUnitPriceForRow = (row, isDraft) =>
   isDraft ? computeDerivedUnitFromRow(row) : (row.price_at_time ?? computeDerivedUnitFromRow(row));
 
 /* ---------- Component ---------- */
-function BillOfMaterials({ projectId, onNavigateToPrintBom }) {
+function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
   const { showNotification } = useNotification();
 
   // State
@@ -670,6 +670,25 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     }
   };
 
+  const [savingVersion, setSavingVersion] = useState(false);
+
+  const saveAsNewVersionToQuote = async () => {
+    if (!quoteContext?.docId) return;
+    try {
+      setSavingVersion(true);
+      // 1) Make sure latest edits are persisted to the workbench
+      await saveBOM();
+      //2) Snapshot BOM into a new version for this quote
+      await axios.post(`${API_URL}/api/quotes/${quoteContext.docId}/versions`, {});
+      showNotification(`Saved as new version for ${quoteContext.number || `quote #${quoteContext.docId}`}`, 'success');
+    } catch (e) {
+      console.error(e);
+      showNotification('Failed to create new quote version.', 'danger');
+    } finally {
+      setSavingVersion(false);
+    }
+  };
+
   /* ---------- Save as Template ---------- */
   const saveAsTemplate = async () => {
     try {
@@ -1025,14 +1044,14 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                 </>
               )}
             </Button>
-            <Button 
+            {!quoteContext?.docId && (<Button 
               variant="outline-primary"
               className='me-2'
               onClick={createQuote}
               disabled={creatingQuote || savingComponents || !bomComponents.length}
             >
               {creatingQuote ? 'Creating...' : 'Create Quote (v1)'}
-            </Button>
+            </Button>)}
           </Col>
         </Row>
 
@@ -1042,6 +1061,30 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
             Some items have price changes since the BOM was last saved. The saved “unit price” will be respected on export unless you update it.
           </Alert>
         )}
+
+        <Row>
+          <Col>
+            {quoteContext?.docId && (
+              <Alert variant="info" className="d-flex justify-content-between align-items-center">
+                <div>
+                  Editing <b>{quoteContext.number || `quote #${quoteContext.docId}`}</b>
+                  {quoteContext.fromVersion ? <> (loaded from v{quoteContext.fromVersion})</> : null}. 
+                  Changes here are drafts until you “Save as New Version”.
+                </div>
+                <div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={saveAsNewVersionToQuote}
+                    disabled={savingVersion}
+                  >
+                    {savingVersion ? 'Saving…' : 'Save as New Version'}
+                  </Button>
+                </div>
+              </Alert>
+            )}
+          </Col>
+        </Row>
 
         <Row>
           {/* Left: Product browser - Changed from lg={7} to lg={6} */}
