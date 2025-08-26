@@ -289,10 +289,21 @@ export default function ProductsAdmin() {
             minMatchCharLength: 2
         };
 
-        // Pre-process records once
+        // Combine all relevant fields into one string for each product
         const records = products.map(p => ({
             ...p,
-            categoryName: CATEGORY_META[p.category]?.name || p.category
+            categoryName: CATEGORY_META[p.category]?.name || p.category,
+            search_blob: [
+                p.brand,
+                p.model,
+                p.category,
+                p.component_type,
+                p.power_w || '',
+                p.rating_kva || '',
+                p.capacity_kwh || '',
+                p.description || '',
+                p.notes || ''
+            ].join(' ').toLowerCase()
         }));
 
         return new Fuse(records, options);
@@ -316,17 +327,8 @@ export default function ProductsAdmin() {
             return products;
         }
         
-        // Simple string matching for very short queries
-        if (debouncedSearch.length < 2) {
-            return products.filter(p => 
-                p.brand?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                p.model?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                p.component_type?.toLowerCase().includes(debouncedSearch.toLowerCase())
-            );
-        }
-        
         // Use fuzzy search for longer queries
-        const searchResults = fuse.search(debouncedSearch);
+        const searchResults = fuse.search(debouncedSearch.toLowerCase());
         return searchResults.map(result => result.item);
     }, [products, debouncedSearch, fuse]);
 
