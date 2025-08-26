@@ -708,7 +708,7 @@ class DocumentVersion(db.Model):
             "created_at": self.created_at.isoformat() + "Z",
         }
         if include_lines:
-            d["line_items"] = [li.to_dict() for li in self.line_items.all()]
+            d["line_items"] = [li.to_dict() for li in self.line_items]
         return d    
     
 class DocumentLineItem(db.Model):

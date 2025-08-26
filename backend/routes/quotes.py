@@ -14,10 +14,14 @@ from models import (
 quotes_bp = Blueprint("quotes", __name__)
 SA_TZ = ZoneInfo("Africa/Johannesburg")
 
+def _latest_version(doc: Document):
+    # Document.versions is lazy="dynamic"
+    return doc.versions.order_by(DocumentVersion.version_no.desc()).first()
+
 def _generate_quote_number(project: Projects) -> str:
     """ORKA-{ProjId}-{YYYY}-{NNNN} per-project-per-year sequence."""
     year = datetime.now(SA_TZ).year
-    base = f"ORKA-P{project.id}-{year}"
+    base = f"Orka_Solar_QTE_P{project.id}_{year}"
     # Count existing quotes (this year) for this project
     q = (
         Document.query
@@ -198,3 +202,89 @@ def create_quote_from_bom(project_id: int):
         "document": doc.to_dict(),
         "version": version.to_dict(include_lines=True),
     }), 201
+
+@quotes_bp.get("/projects/<int:project_id>/quotes")
+def list_project_quotes(project_id):
+    project = Projects.query.get(project_id)
+    if not project:
+        return jsonify({"error": "Project not found"}), 404
+    
+    docs = (Document.query
+            .filter_by(project_id=project_id, kind=DocumentKind.QUOTE)
+            .order_by(Document.created_at.desc())
+            .all())
+    
+    out = []
+    for d in docs:
+        v = _latest_version(d)
+        updated_at = (v.created_at if v else d.created_at)
+        out.append({
+            "id": d.id,
+            "number": d.number,
+            "status": d.status.value if d.status else None,
+            "created_at": d.created_at.isoformat() + "Z",
+            "updated_at": updated_at.isoformat() + "Z",
+            "version_count": d.versions.count(),                     # dynamic rel
+            "latest_version_no": v.version_no if v else None,
+            "latest_totals": v.totals_json if v else None,
+        })
+    return jsonify(out), 200
+
+@quotes_bp.get("/quotes/<int:document_id>")
+def get_quote(document_id):
+    d = Document.query.get(document_id)
+    if not d:
+        return jsonify({"error": "Quote not found"}), 404
+
+    versions = []
+    for v in d.versions.order_by(DocumentVersion.version_no.asc()).all():
+        versions.append({
+            "id": v.id,
+            "version_no": v.version_no,
+            "created_at": v.created_at.isoformat() + "Z",
+            "status": v.status.value if v.status else None,
+            "totals": v.totals_json,
+            "lines_count": len(v.line_items),
+        })
+
+    return jsonify({
+        "id": d.id,
+        "number": d.number,
+        "status": d.status.value if d.status else None,
+        "project_id": d.project_id,
+        "created_at": d.created_at.isoformat() + "Z",
+        "versions": versions
+    }), 200
+
+@quotes_bp.get("/quote-versions/<int:version_id>")
+def get_quote_version(version_id):
+    v = DocumentVersion.query.get(version_id)
+    if not v:
+        return jsonify({"error": "Version not found"}), 404
+
+    lines = []
+    for li in v.line_items:
+        p = li.product  # may be None if product removed from catalog
+        lines.append({
+            "id": li.id,
+            "product_id": li.product_id,
+            "brand": (p.brand_name if p else (li.product_snapshot_json or {}).get("brand")),
+            "model": (p.description if p else (li.product_snapshot_json or {}).get("model")),
+            "qty": li.qty,
+            "unit_cost_locked": li.unit_cost_locked,
+            "unit_price_locked": li.unit_price_locked,
+            "margin_locked": li.margin_locked,
+            "line_total_locked": li.line_total_locked,
+        })
+
+    return jsonify({
+        "id": v.id,
+        "document_id": v.document_id,
+        "version_no": v.version_no,
+        "created_at": v.created_at.isoformat() + "Z",
+        "status": v.status.value if v.status else None,
+        "totals": v.totals_json,
+        "payload": v.payload_json,
+        "lines": lines,
+        "pdf_path": v.pdf_path,
+    }), 200
