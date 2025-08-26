@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { Container, Row, Col, Card, Table, Badge, Form, Spinner, Button } from "react-bootstrap";
 import { API_URL } from "./apiConfig";
 
@@ -13,6 +13,43 @@ export default function ProjectQuoteDetails() {
   const [selectedVid, setSelectedVid] = useState(null);
   const [vDetail, setVDetail] = useState(null);  // version detail (lines + totals)
   const [vLoading, setVLoading] = useState(false);
+
+  const navigate = useNavigate();
+
+  // Handlers
+  const handleLoadToBOM = async (versionId) => {
+    try {
+        await axios.post(`${API_URL}/api/quote-versions/${versionId}/load-to-bom`);
+        // Navigate to the BOM so user is immediately in edit mode
+        navigate(`/projects/${projectId}?tab=bom`);
+    } catch (e) {
+        console.error(e);
+        alert('Failed to load version into BOM.');
+    }
+  };
+
+  const handleCreateNewVersion = async () => {
+    try { 
+        const res = await axios.post(`${API_URL}/api/quotes/${docId}/versions`, {});
+        const { version_id } = res.data || {};
+
+        // refresh envelope + versions
+        const d = await axios.get(`${API_URL}/api/quotes/${docId}`);
+        setDoc(d.data);
+
+        // select the new version if present; otherwise keep last
+        if (version_id) {
+            setSelectedVid(version_id);
+        } else {
+            const last = d.data.versions?.[d.data.versions.length - 1];
+            if (last) setSelectedVid(last.id);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Failed to create new version. Please try again.");
+    }
+  };
+
 
   // load envelope + version list
   useEffect(() => {
@@ -160,11 +197,11 @@ export default function ProjectQuoteDetails() {
       </Card>
 
       <div className="mt-3 d-flex justify-content-between">
-        <Link to={`/projects/${projectId}`}><Button variant="outline-secondary">Back to Project</Button></Link>
+        <Link to={`/projects/${projectId}?tab=quotes`}><Button variant="outline-secondary">Back to Quotes</Button></Link>
         {/* Future actions (disabled for now) */}
         <div className="d-flex gap-2">
-          <Button variant="outline-primary" disabled title="Coming soon">Load to BOM</Button>
-          <Button variant="primary" disabled title="Coming soon">Create New Version</Button>
+          <Button variant="outline-primary" onClick={() => selectedVid && handleLoadToBOM(selectedVid)} disabled={!selectedVid}>Load to BOM</Button>
+          <Button variant="primary" onClick={handleCreateNewVersion}>Create New Version</Button>
         </div>
       </div>
     </Container>

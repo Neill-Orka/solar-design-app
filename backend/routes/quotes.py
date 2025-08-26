@@ -288,3 +288,167 @@ def get_quote_version(version_id):
         "lines": lines,
         "pdf_path": v.pdf_path,
     }), 200
+
+@quotes_bp.route('/quote-versions/<int:version_id>/load-to-bom', methods=['POST'])
+def load_version_to_bom(version_id):
+    v = DocumentVersion.query.get_or_404(version_id)
+    doc = v.document
+    project_id = doc.project_id
+
+    # Clear current BOM and repopulate from saved version
+    BOMComponent.query.filter_by(project_id=project_id).delete()
+
+    # Grab an extras figure from the version totals if present
+    extras_cost = 0.0
+    try:
+        if v.totals_json and isinstance(v.totals_json, dict):
+            extras_cost = float(v.totals_json.get('extras_excl_vat') or 0)
+    except Exception:
+        extras_cost = 0.0
+
+    # Default to draft so the user can edit margins/qty immediately
+    quote_status = 'draft'
+
+    count = 0
+    for li in v.line_items:
+        # Only map items that still reference a product id
+        if not li.product_id:
+            continue
+        bom = BOMComponent(
+            project_id=project_id,
+            product_id=li.product_id,
+            quantity=li.qty or 1,
+            override_margin=li.margin_locked,      # keep the margin as a starting point
+            unit_cost_at_time=li.unit_cost_locked, # optional, shows old vs live when not draft
+            price_at_time=li.unit_price_locked,    # optional, shows old vs live when not draft
+            quote_status=quote_status,
+            extras_cost=extras_cost
+        )
+        db.session.add(bom)
+        count += 1
+
+    db.session.commit()
+    return jsonify({"message": "Version loaded into BOM", "rows": count}), 200
+
+@quotes_bp.route('/quotes/<int:document_id>/versions', methods=['POST'])
+def create_version_from_bom(document_id):
+    # 1) Load document + project
+    doc = Document.query.get_or_404(document_id)
+    project_id = doc.project_id
+
+    # 2) Load current BOM rows
+    bom_rows = BOMComponent.query.filter_by(project_id=project_id).all()
+    if not bom_rows:
+        return jsonify({"error": "No BOM rows to snapshot"}), 400
+
+    # 3) Identify user (optional)
+    user_id = None
+    try:
+        ident = get_jwt_identity()
+        if ident:
+            u = User.query.get(int(ident))
+            user_id = u.id if u else None
+    except Exception:
+        pass
+
+    # 4) Pricing logic — same precedence as elsewhere
+    DEFAULT_MARGIN = 0.25
+    VAT_PERC = 15.0
+
+    subtotal_items_ex_vat = 0.0
+    subtotal_items_cost = 0.0
+    extras_excl_vat = next((float(r.extras_cost or 0) for r in bom_rows if r.extras_cost is not None), 0.0)
+
+    # 5) Next version number
+    max_no = db.session.query(db.func.max(DocumentVersion.version_no))\
+        .filter_by(document_id=document_id).scalar() or 0
+    v = DocumentVersion(
+        document_id=document_id,
+        version_no=max_no + 1,
+        status=VersionStatus.DRAFT,
+        created_by_id=user_id,
+        payload_json={},   # will set after we compute totals
+        totals_json={}
+    )
+    db.session.add(v)
+    db.session.flush()  # need v.id
+
+    # 6) Snapshot each line
+    for r in bom_rows:
+        p = Product.query.get(r.product_id)
+        if not p:
+            continue
+
+        # precedence: override_margin -> product.margin -> default
+        margin = float(r.override_margin if r.override_margin is not None else (p.margin if p.margin is not None else DEFAULT_MARGIN))
+        unit_cost = float(p.unit_cost or 0)
+        unit_price = unit_cost * (1.0 + margin)
+        qty = float(r.quantity or 1)
+
+        subtotal_items_cost += unit_cost * qty
+        subtotal_items_ex_vat += unit_price * qty
+
+        li = DocumentLineItem(
+            document_version_id=v.id,
+            product_id=p.id,
+            product_snapshot_json={
+                "id": p.id,
+                "category": getattr(p, "category", None),
+                "brand": getattr(p, "brand_name", None),
+                "model": getattr(p, "description", None),
+                "warranty_y": getattr(p, "warranty_y", None),
+                "notes": getattr(p, "notes", None),
+                "supplier": getattr(p, "supplier", None),
+                "power_w": getattr(p, "power_w", None),
+                "rating_kva": getattr(p, "rating_kva", None),
+                "capacity_kwh": getattr(p, "capacity_kwh", None),
+            },
+            qty=qty,
+            margin_locked=margin,
+            unit_cost_locked=unit_cost,
+            unit_price_locked=unit_price,
+            line_total_locked=unit_price * qty,
+        )
+        db.session.add(li)
+
+    # 7) Totals
+    total_excl_vat = subtotal_items_ex_vat + extras_excl_vat
+    vat_price = total_excl_vat * (VAT_PERC / 100.0)
+    total_incl_vat = total_excl_vat + vat_price
+
+    # payload + totals (mirror v1 fields so UI stays consistent)
+    v.payload_json = {
+        "extras_excl_vat": extras_excl_vat,
+        "vat_perc": VAT_PERC,
+        "workbench_quote_status": getattr(bom_rows[0], "quote_status", "draft"),
+        "layout_flags": {},
+        "terms": None,
+        "bank_details": None,
+    }
+    v.totals_json = {
+        "subtotal_items_excl_vat": subtotal_items_ex_vat,
+        "extras_excl_vat": extras_excl_vat,
+        "total_excl_vat": total_excl_vat,
+        "vat_perc": VAT_PERC,
+        "vat_price": vat_price,
+        "total_incl_vat": total_incl_vat,
+        "subtotal_items_cost": subtotal_items_cost,
+        "total_markup": total_excl_vat - subtotal_items_cost,
+    }
+
+    # 8) Update envelope pointer + event
+    doc.current_version_no = v.version_no
+    evt = DocumentEvent(
+        document_version_id=v.id,
+        event="created",
+        meta_json={"source": "workbench_bom_snapshot"},
+        created_by_id=user_id,
+    )
+    db.session.add(evt)
+
+    db.session.commit()
+    return jsonify({
+        "message": "Version created",
+        "version_id": v.id,
+        "version_no": v.version_no
+    }), 201

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import EnergyDataUpload from './EnergyDataUpload';
 import EnergyAnalysis from './EnergyAnalysis';
@@ -38,6 +38,7 @@ function ProjectDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchParams] = useSearchParams();
 
   const openQuote = (docId) => {
     navigate(`/projects/${projectId}/quotes/${docId}`);
@@ -75,6 +76,11 @@ function ProjectDashboard() {
   useEffect(() => {
     fetchProject();
   }, [projectId]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
 
   const handleTariffSave = async (tariffData) => {
       try {
