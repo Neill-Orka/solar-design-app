@@ -1,0 +1,454 @@
+# routes/quotes.py
+from flask import Blueprint, jsonify
+from flask import request
+from flask_jwt_extended import get_jwt_identity, jwt_required
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from models import (
+    db, Projects, Clients, Product, BOMComponent, User,
+    Document, DocumentVersion, DocumentLineItem, DocumentEvent,
+    DocumentKind, DocumentStatus, VersionStatus
+)
+
+quotes_bp = Blueprint("quotes", __name__)
+SA_TZ = ZoneInfo("Africa/Johannesburg")
+
+def _latest_version(doc: Document):
+    # Document.versions is lazy="dynamic"
+    return doc.versions.order_by(DocumentVersion.version_no.desc()).first()
+
+def _generate_quote_number(project: Projects) -> str:
+    """ORKA-{ProjId}-{YYYY}-{NNNN} per-project-per-year sequence."""
+    year = datetime.now(SA_TZ).year
+    base = f"Orka_Solar_QTE_P{project.id}_{year}"
+    # Count existing quotes (this year) for this project
+    q = (
+        Document.query
+        .filter(Document.project_id == project.id)
+        .filter(Document.kind == DocumentKind.QUOTE)
+        .filter(Document.created_at >= datetime(year, 1, 1))
+        .count()
+    )
+    seq = q + 1
+    return f"{base}-{seq:04d}"
+
+def _margin_for(bom_row: BOMComponent, prod: Product) -> float:
+    # margin stored as decimal (0.25 = 25%); fallback to 0 if None
+    if bom_row.override_margin is not None:
+        return float(bom_row.override_margin or 0.0)
+    return float(prod.margin or 0.0)
+
+def _unit_cost_for(bom_row: BOMComponent, prod: Product) -> float:
+    return float((bom_row.unit_cost_at_time if bom_row.unit_cost_at_time is not None else prod.unit_cost) or 0.0)
+
+def _unit_price_locked_for(bom_row: BOMComponent, prod: Product) -> float:
+    # If row already has a locked price, keep it; else derive: cost * (1 + margin) (fallback to prod.price)
+    if bom_row.price_at_time is not None:
+        return float(bom_row.price_at_time)
+    cost = _unit_cost_for(bom_row, prod)
+    m = _margin_for(bom_row, prod)
+    derived = cost * (1.0 + m) if cost > 0 else float(prod.price or 0.0)
+    return float(derived)
+
+def _product_snapshot(prod: Product) -> dict:
+    # Minimal snapshot to reproduce documents even if catalog changes
+    return {
+        "id": prod.id,
+        "category": getattr(prod, "category", None),
+        "brand": getattr(prod, "brand_name", None),
+        "model": getattr(prod, "description", None),
+        "warranty_y": getattr(prod, "warranty_y", None),
+        "notes": getattr(prod, "notes", None),
+        "supplier": getattr(prod, "supplier", None),
+        # useful electricals if present (safe to omit if null)
+        "power_w": getattr(prod, "power_w", None),
+        "rating_kva": getattr(prod, "rating_kva", None),
+        "capacity_kwh": getattr(prod, "capacity_kwh", None),
+    }
+
+@quotes_bp.route("/projects/<int:project_id>/quotes", methods=["POST"])
+@jwt_required(optional=True)  # allow manual testing; we’ll attach user if available
+def create_quote_from_bom(project_id: int):
+    """
+    Create a new Document(kind='quote') + v1 snapshot from the current BOM (workbench).
+    Response: {document, version, line_items, totals}
+    """
+    project = Projects.query.get(project_id)
+    if not project:
+        return jsonify({"error": "Project not found"}), 404
+
+    # Load workbench rows
+    bom_rows = BOMComponent.query.filter_by(project_id=project_id).all()
+    if not bom_rows:
+        return jsonify({"error": "No BOM found for this project"}), 400
+
+    # Extras (single BOM-level number; stored redundantly on rows today)
+    extras_excl_vat = 0.0
+    for r in bom_rows:
+        if getattr(r, "extras_cost", None) is not None:
+            extras_excl_vat = float(r.extras_cost or 0.0)
+            break
+
+    # Build snapshot lines
+    line_items_locked = []
+    subtotal_items_ex_vat = 0.0
+    subtotal_items_cost = 0.0
+
+    # (User for audit)
+    user_id = None
+    try:
+        ident = get_jwt_identity()
+        if ident:
+            user = User.query.get(int(ident))
+            user_id = user.id if user else None
+    except Exception:
+        pass
+
+    for r in bom_rows:
+        prod = Product.query.get(r.product_id)
+        if not prod:
+            # Skip orphaned rows (or raise if you prefer)
+            continue
+
+        unit_cost = _unit_cost_for(r, prod)
+        unit_price_locked = _unit_price_locked_for(r, prod)
+        qty = float(r.quantity or 1)
+
+        subtotal_items_ex_vat += unit_price_locked * qty
+        subtotal_items_cost += unit_cost * qty
+
+        li = DocumentLineItem(
+            product_id=prod.id,
+            product_snapshot_json=_product_snapshot(prod),
+            qty=qty,
+            unit_cost_locked=unit_cost,
+            unit_price_locked=unit_price_locked,
+            margin_locked=_margin_for(r, prod),
+            line_total_locked=unit_price_locked * qty,
+        )
+        line_items_locked.append(li)
+
+    # Totals (15% VAT in SA)
+    vat_perc = 15.0
+    total_excl_vat = subtotal_items_ex_vat + extras_excl_vat
+    vat_price = total_excl_vat * (vat_perc / 100.0)
+    total_incl_vat = total_excl_vat + vat_price
+
+    # Envelope
+    number = _generate_quote_number(project)
+    doc = Document(
+        project_id=project.id,
+        kind=DocumentKind.QUOTE,
+        number=number,
+        current_version_no=1,
+        status=DocumentStatus.OPEN,
+        created_by_id=user_id,
+        client_snapshot_json={
+            "name": project.client.client_name if project.client else None,
+            "email": project.client.email if project.client else None,
+            "phone": project.client.phone if project.client else None,
+            "location": project.location,
+        },
+    )
+    db.session.add(doc)
+    db.session.flush()  # get doc.id
+
+    # Version (v1, draft)
+    version = DocumentVersion(
+        document_id=doc.id,
+        version_no=1,
+        status=VersionStatus.DRAFT,
+        payload_json={
+            "extras_excl_vat": extras_excl_vat,
+            "vat_perc": vat_perc,
+            "workbench_quote_status": getattr(bom_rows[0], "quote_status", "draft"),
+            "layout_flags": {},      # placeholder for PDF/render options
+            "terms": None,           # placeholder
+            "bank_details": None,    # placeholder
+        },
+        totals_json={
+            "subtotal_items_excl_vat": subtotal_items_ex_vat,
+            "extras_excl_vat": extras_excl_vat,
+            "total_excl_vat": total_excl_vat,
+            "vat_perc": vat_perc,
+            "vat_price": vat_price,
+            "total_incl_vat": total_incl_vat,
+            "subtotal_items_cost": subtotal_items_cost,
+            "total_markup": total_excl_vat - subtotal_items_cost,
+        },
+        created_by_id=user_id,
+    )
+    db.session.add(version)
+    db.session.flush()  # get version.id
+
+    # Attach immutable line items
+    for li in line_items_locked:
+        li.document_version_id = version.id
+        db.session.add(li)
+
+    # Event
+    evt = DocumentEvent(
+        document_version_id=version.id,
+        event="created",
+        meta_json={"source": "workbench_bom_snapshot"},
+        created_by_id=user_id,
+    )
+    db.session.add(evt)
+
+    db.session.commit()
+
+    return jsonify({
+        "document": doc.to_dict(),
+        "version": version.to_dict(include_lines=True),
+    }), 201
+
+@quotes_bp.get("/projects/<int:project_id>/quotes")
+def list_project_quotes(project_id):
+    project = Projects.query.get(project_id)
+    if not project:
+        return jsonify({"error": "Project not found"}), 404
+    
+    docs = (Document.query
+            .filter_by(project_id=project_id, kind=DocumentKind.QUOTE)
+            .order_by(Document.created_at.desc())
+            .all())
+    
+    out = []
+    for d in docs:
+        v = _latest_version(d)
+        updated_at = (v.created_at if v else d.created_at)
+        out.append({
+            "id": d.id,
+            "number": d.number,
+            "status": d.status.value if d.status else None,
+            "created_at": d.created_at.isoformat() + "Z",
+            "updated_at": updated_at.isoformat() + "Z",
+            "version_count": d.versions.count(),                     # dynamic rel
+            "latest_version_no": v.version_no if v else None,
+            "latest_totals": v.totals_json if v else None,
+        })
+    return jsonify(out), 200
+
+@quotes_bp.get("/quotes/<int:document_id>")
+def get_quote(document_id):
+    d = Document.query.get(document_id)
+    if not d:
+        return jsonify({"error": "Quote not found"}), 404
+
+    versions = []
+    for v in d.versions.order_by(DocumentVersion.version_no.asc()).all():
+        versions.append({
+            "id": v.id,
+            "version_no": v.version_no,
+            "created_at": v.created_at.isoformat() + "Z",
+            "status": v.status.value if v.status else None,
+            "totals": v.totals_json,
+            "lines_count": len(v.line_items),
+        })
+
+    return jsonify({
+        "id": d.id,
+        "number": d.number,
+        "status": d.status.value if d.status else None,
+        "project_id": d.project_id,
+        "created_at": d.created_at.isoformat() + "Z",
+        "versions": versions
+    }), 200
+
+@quotes_bp.get("/quote-versions/<int:version_id>")
+def get_quote_version(version_id):
+    v = DocumentVersion.query.get(version_id)
+    if not v:
+        return jsonify({"error": "Version not found"}), 404
+
+    lines = []
+    for li in v.line_items:
+        p = li.product  # may be None if product removed from catalog
+        lines.append({
+            "id": li.id,
+            "product_id": li.product_id,
+            "brand": (p.brand_name if p else (li.product_snapshot_json or {}).get("brand")),
+            "model": (p.description if p else (li.product_snapshot_json or {}).get("model")),
+            "qty": li.qty,
+            "unit_cost_locked": li.unit_cost_locked,
+            "unit_price_locked": li.unit_price_locked,
+            "margin_locked": li.margin_locked,
+            "line_total_locked": li.line_total_locked,
+        })
+
+    return jsonify({
+        "id": v.id,
+        "document_id": v.document_id,
+        "version_no": v.version_no,
+        "created_at": v.created_at.isoformat() + "Z",
+        "status": v.status.value if v.status else None,
+        "totals": v.totals_json,
+        "payload": v.payload_json,
+        "lines": lines,
+        "pdf_path": v.pdf_path,
+    }), 200
+
+@quotes_bp.route('/quote-versions/<int:version_id>/load-to-bom', methods=['POST'])
+def load_version_to_bom(version_id):
+    v = DocumentVersion.query.get_or_404(version_id)
+    doc = v.document
+    project_id = doc.project_id
+
+    # Clear current BOM and repopulate from saved version
+    BOMComponent.query.filter_by(project_id=project_id).delete()
+
+    # Grab an extras figure from the version totals if present
+    extras_cost = 0.0
+    try:
+        if v.totals_json and isinstance(v.totals_json, dict):
+            extras_cost = float(v.totals_json.get('extras_excl_vat') or 0)
+    except Exception:
+        extras_cost = 0.0
+
+    # Default to draft so the user can edit margins/qty immediately
+    quote_status = 'draft'
+
+    count = 0
+    for li in v.line_items:
+        # Only map items that still reference a product id
+        if not li.product_id:
+            continue
+        bom = BOMComponent(
+            project_id=project_id,
+            product_id=li.product_id,
+            quantity=li.qty or 1,
+            override_margin=li.margin_locked,      # keep the margin as a starting point
+            unit_cost_at_time=li.unit_cost_locked, # optional, shows old vs live when not draft
+            price_at_time=li.unit_price_locked,    # optional, shows old vs live when not draft
+            quote_status=quote_status,
+            extras_cost=extras_cost
+        )
+        db.session.add(bom)
+        count += 1
+
+    db.session.commit()
+    return jsonify({"message": "Version loaded into BOM", "rows": count}), 200
+
+@quotes_bp.route('/quotes/<int:document_id>/versions', methods=['POST'])
+def create_version_from_bom(document_id):
+    # 1) Load document + project
+    doc = Document.query.get_or_404(document_id)
+    project_id = doc.project_id
+
+    # 2) Load current BOM rows
+    bom_rows = BOMComponent.query.filter_by(project_id=project_id).all()
+    if not bom_rows:
+        return jsonify({"error": "No BOM rows to snapshot"}), 400
+
+    # 3) Identify user (optional)
+    user_id = None
+    try:
+        ident = get_jwt_identity()
+        if ident:
+            u = User.query.get(int(ident))
+            user_id = u.id if u else None
+    except Exception:
+        pass
+
+    # 4) Pricing logic — same precedence as elsewhere
+    DEFAULT_MARGIN = 0.25
+    VAT_PERC = 15.0
+
+    subtotal_items_ex_vat = 0.0
+    subtotal_items_cost = 0.0
+    extras_excl_vat = next((float(r.extras_cost or 0) for r in bom_rows if r.extras_cost is not None), 0.0)
+
+    # 5) Next version number
+    max_no = db.session.query(db.func.max(DocumentVersion.version_no))\
+        .filter_by(document_id=document_id).scalar() or 0
+    v = DocumentVersion(
+        document_id=document_id,
+        version_no=max_no + 1,
+        status=VersionStatus.DRAFT,
+        created_by_id=user_id,
+        payload_json={},   # will set after we compute totals
+        totals_json={}
+    )
+    db.session.add(v)
+    db.session.flush()  # need v.id
+
+    # 6) Snapshot each line
+    for r in bom_rows:
+        p = Product.query.get(r.product_id)
+        if not p:
+            continue
+
+        # precedence: override_margin -> product.margin -> default
+        margin = float(r.override_margin if r.override_margin is not None else (p.margin if p.margin is not None else DEFAULT_MARGIN))
+        unit_cost = float(p.unit_cost or 0)
+        unit_price = unit_cost * (1.0 + margin)
+        qty = float(r.quantity or 1)
+
+        subtotal_items_cost += unit_cost * qty
+        subtotal_items_ex_vat += unit_price * qty
+
+        li = DocumentLineItem(
+            document_version_id=v.id,
+            product_id=p.id,
+            product_snapshot_json={
+                "id": p.id,
+                "category": getattr(p, "category", None),
+                "brand": getattr(p, "brand_name", None),
+                "model": getattr(p, "description", None),
+                "warranty_y": getattr(p, "warranty_y", None),
+                "notes": getattr(p, "notes", None),
+                "supplier": getattr(p, "supplier", None),
+                "power_w": getattr(p, "power_w", None),
+                "rating_kva": getattr(p, "rating_kva", None),
+                "capacity_kwh": getattr(p, "capacity_kwh", None),
+            },
+            qty=qty,
+            margin_locked=margin,
+            unit_cost_locked=unit_cost,
+            unit_price_locked=unit_price,
+            line_total_locked=unit_price * qty,
+        )
+        db.session.add(li)
+
+    # 7) Totals
+    total_excl_vat = subtotal_items_ex_vat + extras_excl_vat
+    vat_price = total_excl_vat * (VAT_PERC / 100.0)
+    total_incl_vat = total_excl_vat + vat_price
+
+    # payload + totals (mirror v1 fields so UI stays consistent)
+    v.payload_json = {
+        "extras_excl_vat": extras_excl_vat,
+        "vat_perc": VAT_PERC,
+        "workbench_quote_status": getattr(bom_rows[0], "quote_status", "draft"),
+        "layout_flags": {},
+        "terms": None,
+        "bank_details": None,
+    }
+    v.totals_json = {
+        "subtotal_items_excl_vat": subtotal_items_ex_vat,
+        "extras_excl_vat": extras_excl_vat,
+        "total_excl_vat": total_excl_vat,
+        "vat_perc": VAT_PERC,
+        "vat_price": vat_price,
+        "total_incl_vat": total_incl_vat,
+        "subtotal_items_cost": subtotal_items_cost,
+        "total_markup": total_excl_vat - subtotal_items_cost,
+    }
+
+    # 8) Update envelope pointer + event
+    doc.current_version_no = v.version_no
+    evt = DocumentEvent(
+        document_version_id=v.id,
+        event="created",
+        meta_json={"source": "workbench_bom_snapshot"},
+        created_by_id=user_id,
+    )
+    db.session.add(evt)
+
+    db.session.commit()
+    return jsonify({
+        "message": "Version created",
+        "version_id": v.id,
+        "version_no": v.version_no
+    }), 201

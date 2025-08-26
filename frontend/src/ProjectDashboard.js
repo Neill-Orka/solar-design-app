@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import EnergyDataUpload from './EnergyDataUpload';
 import EnergyAnalysis from './EnergyAnalysis';
@@ -15,11 +15,13 @@ import SystemSelection from './SystemSelection';
 import QuickResults from './QuickResults';
 import TariffSelector from './TariffSelector';
 import TariffSummary from './TariffSummary';
+import ProjectQuotes from './ProjectQuotes';
 import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
 import { Spinner, Alert } from 'react-bootstrap'; // Import Spinner and Alert for loading/error states
 import { useNotification } from './NotificationContext'; // Import notification context for user feedback
 
 function ProjectDashboard() {
+  const navigate = useNavigate();
   const { id: projectId } = useParams();  // project_id from URL
   const { showNotification } = useNotification();
   const [project, setProject] = useState(null);
@@ -36,6 +38,11 @@ function ProjectDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchParams] = useSearchParams();
+
+  const openQuote = (docId) => {
+    navigate(`/projects/${projectId}/quotes/${docId}`);
+  };
 
   const fetchProject = async () => {
     setLoading(true);
@@ -69,6 +76,11 @@ function ProjectDashboard() {
   useEffect(() => {
     fetchProject();
   }, [projectId]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
 
   const handleTariffSave = async (tariffData) => {
       try {
@@ -262,6 +274,9 @@ function ProjectDashboard() {
           </button>
         </li>
         <li className="nav-item">
+          <button className={`nav-link ${activeTab === 'quotes' ? 'active' : ''}`} onClick={() => setActiveTab('quotes')}>Quotes</button>
+        </li>        
+        <li className="nav-item">
           <button className={`nav-link ${activeTab === 'tariff' ? 'active' : ''}`} onClick={() => setActiveTab('tariff')}>Tariff</button>
         </li>
         <li className="nav-item">
@@ -278,6 +293,7 @@ function ProjectDashboard() {
         {activeTab === 'design' && <SystemDesign projectId={projectId} />}
         {activeTab === 'bom' && <BillOfMaterials projectId={projectId} onNavigateToPrintBom={() => setActiveTab('printbom')} />}
         {activeTab === 'printbom' && <PrintableBOM projectId={projectId} />}
+        {activeTab === 'quotes' && <ProjectQuotes projectId={projectId} API_URL={API_URL} onOpenQuote={openQuote} />}
         {activeTab === 'finance' && <FinancialModeling projectId={projectId} />}
         {activeTab === 'tariff' && (
           <div>

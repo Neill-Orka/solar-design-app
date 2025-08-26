@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, version } from 'react';
 import axios from 'axios';
 import {
   Container, Row, Col, Card, Button, Form, Spinner,
@@ -148,7 +148,8 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom }) {
 
   const [extrasCost, setExtrasCost] = useState('0');
   const [quoteStatus, setQuoteStatus] = useState('draft'); // draft | sent | accepted | complete
-  
+  const [creatingQuote, setCreatingQuote] = useState(false);
+
   // State for margin editing (allows blank values during editing)
   const [editingMargins, setEditingMargins] = useState({});
 
@@ -271,6 +272,28 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom }) {
 
     return new Fuse(records, options);
   }, [products]);  
+
+  const createQuote = async () => {
+    if (!bomComponents.length) return showNotification('Add items to the BOM first.', 'warning');
+    setCreatingQuote(true);
+    try {
+      // ensure the latest BOM is persisted before locking
+      await saveBOM();
+      const res = await axios.post(`${API_URL}/api/projects/${projectId}/quotes`, {
+        tz: 'Africa/Johannesburg'
+      });
+      const { number, version_no } = res.data || {};
+      showNotification(`Quote ${number || ''} created${version_no ? ` (v${version_no})` : ''}.`, 'success');
+
+      // If projectDashboard supports it, jump to the quotes list
+      // if (typeof onNavigateToQuotes === 'function') onNavigateToQuotes();
+    } catch (e) {
+      console.error(e);
+      showNotification('Failed to create quote.', 'danger');
+    } finally {
+      setCreatingQuote(false);
+    }
+  };
 
 
   /* ---------- Template fetch helpers (by id OR by name) ------------ */
@@ -1001,6 +1024,14 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                   Save BOM
                 </>
               )}
+            </Button>
+            <Button 
+              variant="outline-primary"
+              className='me-2'
+              onClick={createQuote}
+              disabled={creatingQuote || savingComponents || !bomComponents.length}
+            >
+              {creatingQuote ? 'Creating...' : 'Create Quote (v1)'}
             </Button>
           </Col>
         </Row>

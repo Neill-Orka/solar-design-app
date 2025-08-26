@@ -63,6 +63,7 @@ from routes.load_profiles import load_profiles_bp
 from routes.tariffs import tariffs_bp
 from routes.rules import rules_bp
 from routes.bom import bom_bp
+from routes.quotes import quotes_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(clients_bp, url_prefix='/api')
@@ -81,6 +82,7 @@ app.register_blueprint(load_profiles_bp, url_prefix='/api')
 app.register_blueprint(tariffs_bp, url_prefix='/api')
 app.register_blueprint(rules_bp, url_prefix='/api')
 app.register_blueprint(bom_bp, url_prefix='/api')
+app.register_blueprint(quotes_bp, url_prefix='/api')
 
 if __name__ == '__main__':
     app.run(debug=True)

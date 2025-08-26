@@ -8,9 +8,16 @@ from sqlalchemy.orm import synonym
 from flask_bcrypt import Bcrypt
 from enum import Enum
 import secrets
+from zoneinfo import ZoneInfo
 
 db = SQLAlchemy()
 bcrypt = Bcrypt()
+
+SA_TZ = ZoneInfo("Africa/Johannesburg")
+
+def sa_year_now() -> int:
+    # Use SA business year for human-friendly numbering
+    return datetime.now(SA_TZ).year
 
 # User roles enum
 class UserRole(Enum):
@@ -582,3 +589,180 @@ class BOMComponent(db.Model):
 
     def __repr__(self):
         return f'<BOMComponent {self.id} for Project {self.project_id}>'
+    
+# Kinds (so Reports can reuse the exact same pipeline later)
+class DocumentKind(Enum):
+    QUOTE = "quote"
+    REPORT = "report"
+    INVOICE = "invoice"
+
+# Envelope-level status (generic; quotes mainly use these)
+class DocumentStatus(Enum):
+    OPEN = "open"               # Draft, being edited
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    CLOSED = "closed"
+
+# Version-level lifecyle (immutable snapshots)
+class VersionStatus(Enum):
+    DRAFT = "draft"
+    SENT = "sent"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    EXPIRED = "expired"
+
+class Document(db.Model):
+    __tablename__ = "documents"
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    kind = db.Column(db.Enum(DocumentKind), nullable=False)
+    number = db.Column(db.String(64), unique=True, index=True)
+    current_version_no = db.Column(db.Integer, nullable=False, default=1)
+    status = db.Column(db.Enum(DocumentStatus), nullable=False, default=DocumentStatus.OPEN)
+
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    client_snapshot_json = db.Column(JSONB, nullable=True)  # Snapshot of client details at time of document creation
+    tags = db.Column(db.String(255), nullable=True)  # Comma-separated tags for categorization
+
+    # relationships
+    project = db.relationship("Projects", backref=db.backref("documents", lazy="dynamic"))
+    created_by = db.relationship("User", foreign_keys=[created_by_id])
+
+    versions = db.relationship(
+        "DocumentVersion",
+        backref="document",
+        cascade="all, delete-orphan",
+        order_by="DocumentVersion.version_no",
+        lazy="dynamic"
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "project_id": self.project_id,
+            "kind": self.kind.value,
+            "number": self.number,
+            "current_version_no": self.current_version_no,
+            "status": self.status.value,
+            "created_by_id": self.created_by_id,
+            "created_at": self.created_at.isoformat() + "Z",
+            "client_snapshot_json": self.client_snapshot_json,
+            "tags": self.tags,
+        }
+    
+class DocumentVersion(db.Model):
+    __tablename__ = "document_versions"
+    __table_args__ = (
+        db.UniqueConstraint('document_id', 'version_no', name='uq_document_version'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    document_id = db.Column(db.Integer, db.ForeignKey("documents.id"), nullable=False)
+    version_no = db.Column(db.Integer, nullable=False)
+
+    status = db.Column(db.Enum(VersionStatus), nullable=False, default=VersionStatus.DRAFT)
+    valid_until = db.Column(db.DateTime, nullable=True)     # set on SENT
+    price_locked_at = db.Column(db.DateTime, nullable=True) # set on SENT/ACCEPTED
+
+    # immutable payloads to fully reproduce the doc
+    payload_json = db.Column(JSONB, nullable=False)  # line items, extras, VAT %, discounts, terms, layout flags
+    totals_json = db.Column(JSONB, nullable=False)   # subtotal, vat, total, deposit breakdown
+    pdf_path = db.Column(db.String(512), nullable=True)
+    html_hash = db.Column(db.String(64), nullable=True)
+
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    created_by = db.relationship("User", foreign_keys=[created_by_id])
+
+    line_items = db.relationship(
+        "DocumentLineItem",
+        backref="version",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+    events = db.relationship(
+        "DocumentEvent",
+        backref="version",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="desc(DocumentEvent.created_at)",
+    )
+
+    def to_dict(self, include_lines=False):
+        d = {
+            "id": self.id,
+            "document_id": self.document_id,
+            "version_no": self.version_no,
+            "status": self.status.value,
+            "valid_until": self.valid_until.isoformat() + "Z" if self.valid_until else None,
+            "price_locked_at": self.price_locked_at.isoformat() + "Z" if self.price_locked_at else None,
+            "payload_json": self.payload_json,
+            "totals_json": self.totals_json,
+            "pdf_path": self.pdf_path,
+            "html_hash": self.html_hash,
+            "created_by_id": self.created_by_id,
+            "created_at": self.created_at.isoformat() + "Z",
+        }
+        if include_lines:
+            d["line_items"] = [li.to_dict() for li in self.line_items]
+        return d    
+    
+class DocumentLineItem(db.Model):
+    __tablename__ = "document_line_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    document_version_id = db.Column(db.Integer, db.ForeignKey("document_versions.id"), nullable=False)
+
+    # optional link to catalog; snapshot always drives rendering
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=True)
+    product_snapshot_json = db.Column(JSONB, nullable=False)
+
+    qty = db.Column(db.Float, nullable=False, default=1.0)
+
+    # locked commercial values
+    unit_cost_locked = db.Column(db.Float, nullable=False)
+    unit_price_locked = db.Column(db.Float, nullable=False)
+    margin_locked = db.Column(db.Float, nullable=True)
+    line_total_locked = db.Column(db.Float, nullable=False)
+
+    product = db.relationship("Product")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "document_version_id": self.document_version_id,
+            "product_id": self.product_id,
+            "product_snapshot_json": self.product_snapshot_json,
+            "qty": self.qty,
+            "unit_cost_locked": self.unit_cost_locked,
+            "unit_price_locked": self.unit_price_locked,
+            "margin_locked": self.margin_locked,
+            "line_total_locked": self.line_total_locked,
+        }
+
+class DocumentEvent(db.Model):
+    __tablename__ = "document_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    document_version_id = db.Column(db.Integer, db.ForeignKey("document_versions.id"), nullable=False)
+    event = db.Column(db.String(32), nullable=False)  # created|sent|viewed|accepted|declined|comment
+    meta_json = db.Column(JSONB, nullable=True)
+
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    created_by = db.relationship("User", foreign_keys=[created_by_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "document_version_id": self.document_version_id,
+            "event": self.event,
+            "meta_json": self.meta_json,
+            "created_by_id": self.created_by_id,
+            "created_at": self.created_at.isoformat() + "Z",
+        }
