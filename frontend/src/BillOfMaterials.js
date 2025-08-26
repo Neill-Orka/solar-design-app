@@ -69,13 +69,16 @@ const slugify = (s) =>
     .trim()
     .replace(/\s+/g, '_');
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(value || 0);
+const formatCurrency = (value) => {
+  const number = (value || 0).toFixed(2);
+  const [integerPart, decimalPart] = number.split('.');
+
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+
+  return `R${formattedInteger}.${decimalPart}`;
+};
+
+
 
 const formatNumber0 = (value) =>
   new Intl.NumberFormat('en-ZA', {
@@ -1371,17 +1374,21 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
               </Card.Header>
               <Card.Body>
                 <Row>
-                  <Col sm={4} className="mb-3 text-center">
+                  <Col sm={3} className="mb-3 text-center">
                     <div className="small text-muted">PV Size</div>
                     <div className="fs-4 fw-bold text-warning">{systemSpecs.panelKw} <small>kWp</small></div>
                   </Col>
-                  <Col sm={4} className="mb-3 text-center">
+                  <Col sm={3} className="mb-3 text-center">
                     <div className="small text-muted">Inverter</div>
                     <div className="fs-4 fw-bold text-info">{systemSpecs.inverterKva} <small>kVA</small></div>
                   </Col>
-                  <Col sm={4} className="mb-3 text-center">
+                  <Col sm={3} className="mb-3 text-center">
                     <div className="small text-muted">Battery</div>
                     <div className="fs-4 fw-bold text-success">{systemSpecs.batteryKwh} <small>kWh</small></div>
+                  </Col>
+                  <Col sm={3} className="mb-3 text-center">
+                    <div className="small text-muted">Cost per kWh</div>
+                    <div className="fs-4 fw-bold text-success">{formatCurrency(totals.total_excl_vat / systemSpecs.panelKw)}<small>/kWh</small></div>
                   </Col>
                 </Row>
               </Card.Body>

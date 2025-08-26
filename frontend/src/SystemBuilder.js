@@ -339,7 +339,7 @@ function SystemBuilder() {
                             <Form>
                                 <Row>
                                     <Col md={6}><Form.Group className="mb-3"><Form.Label>System Name</Form.Label><Form.Control type="text" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g., Commercial 50kW Hybrid" /></Form.Group></Col>
-                                    <Col md={6}><Form.Group className="mb-3"><Form.Label>System Type</Form.Label><Form.Select value={templateType} onChange={e => setTemplateType(e.target.value)}><option>Hybrid</option><option>Grid-Tied</option><option>Off-Grid</option></Form.Select></Form.Group></Col>
+                                    <Col md={6}><Form.Group className="mb-3"><Form.Label>System Type</Form.Label><Form.Select value={templateType} onChange={e => setTemplateType(e.target.value)}><option value="hybrid">Hybrid</option><option value="grid">Grid-Tied</option><option value="off-grid">Off-Grid</option></Form.Select></Form.Group></Col>
                                 </Row>
                                 <Form.Group className="mb-3"><Form.Label>Description</Form.Label><Form.Control as="textarea" rows={2} value={templateDesc} onChange={e => setTemplateDesc(e.target.value)} placeholder="A brief description of the system's purpose or ideal use case." /></Form.Group>
                             </Form>

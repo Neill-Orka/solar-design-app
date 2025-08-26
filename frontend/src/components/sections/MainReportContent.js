@@ -366,7 +366,7 @@ function MainReportContent({
             benefits: [
                 "Cost savings on grid supplied electricity",
                 "Independece from high-cost increases",
-                "Reduced carbon footprint and greenhouse gas emiissions, through reducing ",
+                "Reduced carbon footprint and greenhouse gas emiissions, through reducing use of fossil fuels",
             ],
             systemDescription: "This grid-tied solar PV system is designed to work in conjunction with the utility grid. It produces electricity during daylight hours, reducing dependency on utility power when the sun is shining."
         },
@@ -535,8 +535,8 @@ function MainReportContent({
             datasets: [{
                 label: 'Demand (kW)',
                 data: demandData.map(d => d.demand_kw),
-                borderColor: 'rgb(53, 162, 235)',
-                backgroundColor: 'rgba(53, 162, 235, 0.2)',
+                borderColor: '#18736a',
+                backgroundColor: '#98e7c8',
                 fill: true,
                 tension: 0.1,
                 pointRadius: 0
@@ -592,7 +592,7 @@ function MainReportContent({
         // First try to use simulation data if available
         if (data?.simulation?.timestamps && data?.simulation?.generation) {
             const timestamps = data.simulation.timestamps;
-            const generation = data.simulation.generation;
+            const generation = data.simulation.potential_generation;
             const timeIntervalHours = 0.5; // 30-minute intervals
             
             // Group by month and sum up generation
@@ -885,7 +885,7 @@ function MainReportContent({
             
             {data?.financials?.annual_savings && (
                 <div className="mt-4">
-                    <h5 className="fw-bold">Potential Annual Savings</h5>
+                    <h5 className="fw-bold">Annual Electricity Cost</h5>
                     <p>
                         {(() => {
                             // Calculate average and maximum monthly costs
@@ -920,7 +920,7 @@ function MainReportContent({
         >
             <h4 className="fw-bold">Detailed Load Profile</h4>
             <p>
-                The client's typical diurnal load profile is shown in the graph below. This visualization helps understand hourly usage patterns and identify opportunities for peak shaving and load management.
+                The client's typical diurnal load profile is shown in the graph below. This visualization helps understand hourly usage patterns and identify opportunities for peak saving and load management.
             </p>
             
             {/* New compact date picker - hidden when printing */}
@@ -996,7 +996,7 @@ function MainReportContent({
                             </tr>
                             <tr>
                                 <td className="py-1">Blended Rate</td>
-                                <td className="text-end py-1">R {((data?.financials?.original_annual_cost || 0) / (data?.financials?.total_demand_kwh || 0)).toFixed(2)}</td>
+                                <td className="text-end py-1">R {((data?.financials?.original_annual_cost || 0) / (data?.financials?.total_demand_kwh || 0)).toFixed(2)} /kWh</td>
                             </tr>
                             <tr>
                                 <td className="py-1" style={{backgroundColor: "#f8f9fa"}}><strong>Grid Supply</strong></td>
@@ -1012,7 +1012,7 @@ function MainReportContent({
                             </tr>
                             <tr>
                                 <td className="py-1">Cost per unit (y1 energy only)</td>
-                                <td className="text-end py-1">R {((data?.financials?.original_annual_cost || 0) / ( data?.financials?.total_demand_kwh || 0)).toFixed(2)}</td>
+                                <td className="text-end py-1">R {((data?.financials?.original_annual_cost || 0) / ( data?.financials?.total_demand_kwh || 0)).toFixed(2)} /kWh</td>
                             </tr>
                             {/* <tr>
                                 <td className="py-1" style={{backgroundColor: "#f8f9fa"}}><strong>Diesel Generator</strong></td>
@@ -1060,7 +1060,7 @@ function MainReportContent({
                 This section covers the design process and technical data used.
             </p>
 
-            <h5>Meteorological Data</h5>
+            <h5 className="fw-bold">Meteorological Data</h5>
             <p>The detailed designs were done using our verified proprietary software which takes into account the site's specific meteorological information to predict the typical generation that can be expected from the specified equipment simulated over 365 days of the year. This enables an accurate analysis of the system yields and in return accurate results on the financial returns.</p>
 
         </StandardPage>
@@ -1072,7 +1072,7 @@ function MainReportContent({
             pageNumber={startPageNumber + 5} // Set an appropriate page number here
             totalPages={totalPages} // Set the total number of pages in your report
         >
-            <h4 className="fw-bold">System's Technical & Financial Information</h4>
+            <h5 className="fw-bold">System's Technical & Financial Information</h5>
             <p>
                 Based on the design and simulation results, the system specifications and financial metrics are as follows:
             </p>
@@ -1096,7 +1096,7 @@ function MainReportContent({
                         <img src={require('../../assets/panel_icon.png')} alt="Solar PV" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
                         <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Solar PV</div>
                         <div style={{ fontSize: '14px' }}>
-                            {formatValue(data?.project?.panel_kw || 0)} <span style={{ fontSize: '14px' }}>kWp</span>
+                            {(data?.project?.panel_kw).toFixed(2) || 0} <span style={{ fontSize: '14px' }}>kWp</span>
                         </div>
                         <div style={{ fontSize: '14px' }}>
                             {data?.project?.num_panels || Math.ceil((data?.project?.panel_kw || 0) * 1000 / 565)} panels
@@ -1208,7 +1208,7 @@ function MainReportContent({
                         <tbody className="small">
                             <tr>
                                 <td>PV Array</td>
-                                <td className="text-end">{formatValue(data?.project?.panel_kw || 0)}</td>
+                                <td className="text-end">{(data?.project?.panel_kw || 0).toFixed(2)}</td>
                                 <td>kWp</td>
                             </tr>
                             <tr>
@@ -1331,7 +1331,7 @@ function MainReportContent({
                             <tr>
                                 <td>Specific Yield Excl. Throttling Losses</td>
                                 <td className="text-end">{(data?.financials?.yield_excl_losses || 0)}</td>
-                                <td>kWh/kWp/y</td>
+                                <td>kWh/kWp/day</td>
                             </tr>
                             <tr>
                                 <td>Battery cycles in 1 year</td>
@@ -1368,7 +1368,7 @@ function MainReportContent({
             </div>
 
             <p className="mt-3">
-                The system is projected to generate approximately {formatValue(data?.financials?.total_generation_kwh || 0)} kWh per year.
+                The system is projected to generate approximately {formatValue(data?.financials?.potential_generation_kwh || 0)} kWh per year.
             </p>
 
             <h5 className="fw-bold">Simulated Profiles</h5>
@@ -1750,8 +1750,8 @@ function MainReportContent({
             pageNumber={startPageNumber + 9} // Set an appropriate page number here
             totalPages={totalPages} // Set the total number of pages in your report
         >
-            <p>Post installation cost summary:</p>
-            
+            <h6 className="fw-bold">Post installation cost summary:</h6>
+
             <div className="table-responsive">
                 <p className="small mb-1">Table 5: Cost and Savings Details</p>
                 <table className="table table-bordered table-sm">

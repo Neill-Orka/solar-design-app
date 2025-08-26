@@ -139,6 +139,7 @@ export default function BOMSection({ data, startPageNumber = 16, totalPages = 24
           pageNumber={startPageNumber + idx}
           totalPages={totalPages}
         >
+          <h4 className="fw-bold ">Bill of Materials</h4>
           <div className="table-responsive">
             <table className="bom-compact-table">
               <thead>
