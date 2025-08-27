@@ -11,6 +11,14 @@ import '../ReportBuilder.css';
 
 function ReportBuilder({ projectId, onNavigateToTab }) {
   const { showNotification } = useNotification();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 992px)').matches) {
+      setSidebarOpen(false);
+    }
+  }, []);
+
+
   // Track which sections to show
   const [sections, setSections] = useState({
     cover: true,
@@ -21,6 +29,20 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
     custom: false,
     siteLayout: true,
   });
+
+  const [reportSettings, setReportSettings] = useState({
+    usedActualConsumption: false,
+    threePhase: true,
+    bomPriceMode: 'none',
+    projectSchedule: [
+      { activity: "Deposit received & document compilation", timeline: "Week 1" },
+      { activity: "Equipment procurement & delivery", timeline: "Week 2 (provided no major supplier delays)" },
+      { activity: "Construction & installation", timeline: "Week 2-4" },
+      { activity: "Commissioning", timeline: "Week 5" },
+      { activity: "Training", timeline: "Week 5" },
+      { activity: "Handover", timeline: "Week 6" }
+    ]
+  })
 
   // Load all data once (simulation, financials, BOM, etc)
   const [data, setData] = useState(null);
@@ -51,7 +73,6 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
         action: 'Go to Financial Modeling'
       });
     }
-    
     return missing;
   };
 
@@ -182,10 +203,18 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
   }, [sections]);
 
   return (
-      <div className="report-builder">
+      <div className={`report-builder ${sidebarOpen ? 'sidebar-open' : ''}`}>
 
         <div className="section-controls no-print">
           <div className='section-toggle'>
+            <label>
+              <input 
+                type="checkbox"
+                checked={reportSettings.usedActualConsumption}
+                onChange={() => setReportSettings(prev => ({ ...prev, usedActualConsumption: !prev.usedActualConsumption }))}
+              />
+              Actual data used for sim?
+            </label>            
             <label>
               <input 
                 type="checkbox"
@@ -194,17 +223,6 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
               />
               Show Site Layout
             </label>
-            <label>
-              <input 
-                type="checkbox"
-                checked={sections.bom}
-                onChange={() => setSections(s => ({ ...s, bom: !s.bom }))}
-              />
-              Bill of Materials
-            </label>
-            <button className="export-btn" onClick={() => window.print()}>
-              <span role="img" aria-label="Export">📄</span> Export as PDF
-            </button>
             {sections.siteLayout && (
               <div className='image-upload mt-2'>
                 <label htmlFor='site-layout-image' className='btn btn-sm btn-outline-secondary'>
@@ -217,10 +235,66 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
                   style={{ display: 'none' }}
                   onChange={handleImageUpload}
                 />
-              </div>
+              </div> 
             )}
+            <label>
+              <input 
+                type="checkbox"
+                checked={sections.bom}
+                onChange={() => setSections(s => ({ ...s, bom: !s.bom }))}
+              />
+              Bill of Materials
+            </label>
+            <label>
+              <input 
+                type="checkbox"
+                checked={reportSettings.threePhase}
+                onChange={() => setReportSettings(prev => ({ ...prev, threePhase: !prev.threePhase }))}
+              />
+              Three Phase?
+            </label>  
+            
+            <div>
+              Adjust Project Schedule
+              {reportSettings.projectSchedule.map((item, index) => (
+                <div key={index}>
+                  <label>{item.activity}</label>
+                  <input
+                    type="text"
+                    value={item.timeline}
+                    onChange={(e) => {
+                      const newSchedule = [...reportSettings.projectSchedule];
+                      newSchedule[index].timeline = e.target.value;
+                      setReportSettings(prev => ({
+                        ...prev,
+                        projectSchedule: newSchedule
+                      }));
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+            <label style={{display:'flex',gap:'6px',alignItems:'center',marginTop:8}}>
+              <span style={{minWidth:115}}>BOM prices:</span>
+              <select
+                value={reportSettings.bomPriceMode}
+                onChange={(e)=>setReportSettings(prev=>({...prev,bomPriceMode:e.target.value}))}
+              >
+                <option value="none">Hide all</option>
+                <option value="category">Category totals only</option>
+                <option value="line">Line-item prices</option>
+              </select>
+            </label>            
+            
           </div>
         </div>
+        <button className="orka-sidebar-export-btn" onClick={() => window.print()}>
+          <span role="img" aria-label="Export">📄</span> Export as PDF
+        </button>  
+
+        {/* <div className='orka-sidebar-scrim' onClick={() => setSidebarOpen(false)} />
+        <button className="orka-sidebar-toggle no-print" onClick={() => setSidebarOpen(v => !v)} aria-label="Toggle sidebar">☰</button> */}
+
 
         {/* REPORT CONTENT */}
         <main className="orka-report-printarea report-content">
@@ -231,16 +305,17 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
           ) : (
             <>
               {sections.cover && <CoverPage data={data} />}
-              <ExecutiveSummary data={data} pageNumber={pageNumbers.executiveSummary.start} totalPages={pageNumbers.totalPages} />
+              <ExecutiveSummary data={data} settings={reportSettings} pageNumber={pageNumbers.executiveSummary.start} totalPages={pageNumbers.totalPages} />
               {/* <DesignReportMeta data={data} pageNumber={pageNumbers.designReportMeta.start} totalPages={pageNumbers.totalPages} /> */}
               <MainReportContent 
-                data={data} 
+                data={data}
+                settings={reportSettings}
                 showSiteLayout={sections.siteLayout} 
                 siteLayoutImage={siteLayoutImage}
                 startPageNumber={pageNumbers.mainReportContent.start}
                 totalPages={pageNumbers.totalPages}
               />
-              {sections.bom && <BOMSection data={data} startPageNumber={pageNumbers.bomSection.start} totalPages={pageNumbers.totalPages} />}
+              {sections.bom && <BOMSection data={data} settings={reportSettings} startPageNumber={pageNumbers.bomSection.start} totalPages={pageNumbers.totalPages} />}
             </>
           )}
         </main>

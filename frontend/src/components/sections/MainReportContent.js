@@ -11,6 +11,7 @@ import 'chartjs-adapter-date-fns'
 
 function MainReportContent({ 
   data, 
+  settings,
   showSiteLayout, 
   siteLayoutImage,
   startPageNumber = 3,
@@ -1239,7 +1240,7 @@ function MainReportContent({
                             </tr>
                             <tr>
                                 <td>Distribution</td>
-                                <td className="text-end" colSpan="2">Three Phase</td>
+                                <td className="text-end" colSpan="2">{settings.threePhase ? "Three Phase" : "Single Phase"}</td>
                             </tr>
                             <tr>
                                 <td>Monitoring</td>
@@ -2059,7 +2060,7 @@ function MainReportContent({
                             </tr>
                         </thead>
                         <tbody>
-                            {projectSchedule.map((item, index) => (
+                            {settings.projectSchedule.map((item, index) => (
                                 <tr key={index}>
                                     <td>{item.activity}</td>
                                     <td>{item.timeline}</td>
@@ -2097,7 +2098,7 @@ function MainReportContent({
             <h5 className="fw-bold">Notable Points</h5>
                 <p>The following assumptions and exclusions were made and form part of this proposal:</p>
                 <ol className="ps-4">
-                    <li>Actual consumption data was not used for the design or simulations of the solution. Should the loads change or differ from the data analysed Orka Solar should be notified by the client.</li>
+                    <li>{settings.usedActualConsumption ? "Actual consumption data was used for the design and simulations of the solution." : "Actual consumption data was not used for the design and simulations of the solution."} Should the loads change or differ from the data analysed Orka Solar should be notified by the client.</li>
                     <li>It was assumed that the consumption data is a fair representation of the future consumption.</li>
                     <li>When applicable, in most municipalities there is currently either no regulations around exporting electricity to the grid, or such export is prohibited. For this reason, Orka Solar advise against exporting excess solar energy to the grid without the required permits, although many of Orka Solar' clients have chosen to export where possible. All inverters supplied by Orka Solar conform to internationally recognized grid-export safety regulations.</li>
                     <li>The scope and activities listed as part of this proposal is sufficient so successfully delivery the project. Any additional work, not listed as part of this scope and which could not be taken into account, will be negotiated separately, regarding any additional time and/or materials that may be required.</li>
