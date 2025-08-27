@@ -8,6 +8,7 @@ import { useNotification } from '../../NotificationContext';
 import '../../ReportBuilder.css';
 import StandardPage from "./StandardPage";
 import 'chartjs-adapter-date-fns'
+import { Image } from 'react-bootstrap';
 
 function MainReportContent({ 
   data, 
@@ -1063,6 +1064,8 @@ function MainReportContent({
 
             <h5 className="fw-bold">Meteorological Data</h5>
             <p>The detailed designs were done using our verified proprietary software which takes into account the site's specific meteorological information to predict the typical generation that can be expected from the specified equipment simulated over 365 days of the year. This enables an accurate analysis of the system yields and in return accurate results on the financial returns.</p>
+            <Image width={300} src={require('../../assets/southafrica_ghi_map.png')} alt="Meteorological Data" />
+            <Image align="right" width={375} src={require('../../assets/MeanAnnualRainfall.jpg')} alt="Rainfall Data" />
 
         </StandardPage>
 
