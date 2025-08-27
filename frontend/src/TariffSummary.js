@@ -39,7 +39,7 @@ export default function TariffSummary({ tariff, customRate }) {
                     // Display custom flat rate
                     <div>
                         <h5 className="mb-1">Custom Flat Rate</h5>
-                        <Badge pill bg="success">{customRate} c/kWh</Badge>
+                        <Badge pill bg="success">{customRate} R/kWh</Badge>
                     </div>
                 ) : (
                     // Display if no tariff is set
