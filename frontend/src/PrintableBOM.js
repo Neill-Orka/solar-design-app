@@ -220,7 +220,7 @@ const renderHeader = () => (
       <div className="bom-project-strip">
         {bomData.project?.name} - {bomData.systemSpecs?.panelKw}kW{" "}
         {bomData.systemSpecs?.batteryKwh > 0
-          ? `${bomData.systemSpecs?.batteryKwh}kWh Storage`
+          ? `${(bomData.systemSpecs?.batteryKwh / 0.8).toFixed(0)}kWh Storage`
           : 'System'}
       </div>
     </header>
