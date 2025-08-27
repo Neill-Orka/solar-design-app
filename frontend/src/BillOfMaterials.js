@@ -1387,8 +1387,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                     <div className="fs-4 fw-bold text-success">{systemSpecs.batteryKwh} <small>kWh</small></div>
                   </Col>
                   <Col sm={3} className="mb-3 text-center">
-                    <div className="small text-muted">Cost per kW</div>
-                    <div className="fs-4 fw-bold text-success">{formatCurrency(totals.total_excl_vat / systemSpecs.panelKw)}<small>/kW</small></div>
+                    <div className="small text-muted">Cost per kWp</div>
+                    <div className="fs-4 fw-bold text-success">{formatCurrency(totals.total_excl_vat / systemSpecs.panelKw)}<small>/kWp</small></div>
                   </Col>
                 </Row>
               </Card.Body>
