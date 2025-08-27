@@ -86,11 +86,11 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
 
   let typeText = "";
   if (project.system_type === "grid") {
-    typeText = "grid tied solar PV solution";
+    typeText = "a grid tied solar PV solution";
   } else if (project.system_type === "hybrid") {
-    typeText = "hybrid solar and battery backup system";
+    typeText = "a hybrid solar and battery backup system";
   } else if (project.system_type === "off-grid") {
-    typeText = "off-grid solar and battery solution";
+    typeText = "an off-grid solar and battery solution";
   }
  
   const summary1 = `Orka Solar is pleased to respond to the request for ${typeText}.`;
