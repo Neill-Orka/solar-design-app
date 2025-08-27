@@ -201,19 +201,19 @@ const renderHeader = () => (
           <span className="label">Address:</span> {bomData.project?.location || 'Address'}
         </div>
         <div>
-          <span className="label">Contact Person:</span> Lambrecht Botha
+          <span className="label">Contact Person:</span> Lourens de Jongh
         </div>
         <div>
           <span className="label">Email:</span> {bomData.project?.client_email || '-'}
         </div>
         <div>
-          <span className='label'>Email:</span> lbotha@orkasolar.co.za
+          <span className='label'>Email:</span> lourens@orkasolar.co.za
         </div>
         <div>
           <span className="label">Tel:</span> {bomData.project?.client_phone || '-'}
         </div>
         <div>
-          <span className="label">Tel:</span> 082 832 2236
+          <span className="label">Tel:</span> 082 660 0851
         </div>
         <div />
       </div>
