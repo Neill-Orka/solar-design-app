@@ -10,7 +10,7 @@ import savingsIcon from "../../assets/savings_icon.png";
 
 import "../../ReportBuilder.css";
 
-function ExecutiveSummary({ data, pageNumber = 1, totalPages = 24 }) {
+function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
   // Helper function to safely display numeric values and format them
   const formatValue = (value, defaultValue = 0) => {
     // Check if value exists and is a number
@@ -120,10 +120,12 @@ function ExecutiveSummary({ data, pageNumber = 1, totalPages = 24 }) {
       <div className="orka-summary-paragraphs">
         <p>{summary1}</p>
         <p>
-          The proposal is in the form of a full turn key solution. All engineering, procurement and construction (EPC) will be handled by Orka Solar. The client will own the system outright and in return will benefit from the electrical power provided by the system, related cost and taxation benefits as well as meeting their carbon reduction/green energy goals.
+          The proposal is in the form of a full turn key solution. All engineering, procurement and construction (EPC) will be handled by Orka Solar.
+          The client will own the system outright and in return will benefit from the electrical power provided by the system, related cost and taxation benefits as well as meeting their carbon reduction/green energy goals.
         </p>
-        <p>
-          Orka Solar made use of actual electrical consumption data of this site in the design of this system.
+        <p> {settings.usedActualConsumption ? 
+            "Orka Solar made use of actual electrical consumption data of a similar site in the design of this system." 
+            : "Orka Solar made use of a similar client's electrical consumption data in the design of this system."}
         </p>
         <p>
           The details of the proposal are discussed in this document, with the key figures summarised below:
@@ -182,7 +184,7 @@ function ExecutiveSummary({ data, pageNumber = 1, totalPages = 24 }) {
       <div className="orka-summary-sitephoto-fullwrap">
         <img className="orka-summary-sitephoto-full" src={sitePhoto} alt="Site Photo" />
         <div className="orka-summary-pagenum">Page {pageNumber} of {totalPages}</div>
-        <div className="orka-summary-photocredit">{project.photo_credit}</div>
+        <div className="orka-summary-photocredit">{project.photo_credit || "Orka Solar\nHospital in Potchefstroom\n280 kWp, 260 kVA inverters"}</div>
       </div>
     </section>
   );

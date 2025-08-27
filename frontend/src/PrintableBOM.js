@@ -252,11 +252,12 @@ const renderHeader = () => (
       );
     }
     const { item } = r;
-    const spec =
+    const spec = (
       (item.product.category === 'panel' && item.product.power_w && `${item.product.power_w}W`) ||
       (item.product.category === 'inverter' && item.product.rating_kva && `${item.product.rating_kva}kVA`) ||
       (item.product.category === 'battery' && item.product.capacity_kwh && `${item.product.capacity_kwh}kWh`) ||
-      '';
+      ''
+    );
 
     return (
       <tr className="bom-row" key={`row-${idx}`}>

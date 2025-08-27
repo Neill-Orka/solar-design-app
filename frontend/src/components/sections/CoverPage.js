@@ -55,9 +55,9 @@ function CoverPage({ data }) {
       {/* main text block */}
       <div className="orka-cover-centerblock">
         <div className="orka-cover-mainheading">Design Report and Costing</div>
-        <div className="orka-cover-proposalno">{project.id}</div>
-        <div className="orka-cover-projectname">{project.name}</div>
+        <div className="orka-cover-proposalno">Proposal_270825_{project.id}</div>
         <hr className="orka-cover-line" />
+        <div className="orka-cover-projectname">{project.name}</div>
         <div className="orka-cover-specblock">
           <span>Inverting: <b>{displayValue(project.inverter_kva, "50", "inverter_kva")} kVA</b></span><br />
           <span>ESS: <b>{displayValue(project.battery_kwh, "0", "battery_kwh")} kWh</b></span><br />
