@@ -159,6 +159,22 @@ export default function BOMSection({ data, settings, startPageNumber = 16, total
   const showTotalColumn = priceMode !== 'none';
   const showLineTotals  = priceMode === 'line';
 
+  const totals = useMemo(() => {
+    const total_excl_vat = grouped
+      .filter(r => r.type === 'item')
+      .reduce((sum, r) => sum + r.qty * (r.unitPrice || 0), 0);
+    const vat_perc = 15; // South Africa default
+    const vat_price = total_excl_vat * (vat_perc / 100);
+    const total_incl_vat = total_excl_vat + vat_price;
+    return {
+      total_excl_vat,
+      vat_perc,
+      vat_price,
+      total_incl_vat
+    };
+  }, [grouped]);  
+
+
   // ---- Hidden measurer: full StandardPage shell so we get real content height ----
   const Measurer = () => (
     <div className="bom-measurer no-print" aria-hidden="true"
@@ -227,7 +243,7 @@ export default function BOMSection({ data, settings, startPageNumber = 16, total
           className="bom-dense"
           data={data}
           pageNumber={startPageNumber + idx}
-          totalPages={totalPages}
+          totalPages={totalPages + 1}
         >
           <div className="table-responsive">
             <table className="bom-compact-table">
@@ -270,6 +286,22 @@ export default function BOMSection({ data, settings, startPageNumber = 16, total
                     </tr>
                   );
                 })}
+                {showTotalColumn && idx === pages.length - 1 && (
+                  <>
+                    <tr className="border-top border-dark">
+                      <td className="fw-semibold" colSpan={2}>Total (excl. VAT):</td>
+                      <td className="text-end fw-semibold">{formatCurrency(totals.total_excl_vat)}</td>
+                    </tr>
+                    <tr>
+                      <td className="fw-semibold" colSpan={2}>{totals.vat_perc}% VAT:</td>
+                      <td className="text-end fw-semibold">{formatCurrency(totals.vat_price)}</td>
+                    </tr>
+                    <tr className="border-top border-dark">
+                      <td className="fw-bold" colSpan={2}>Total (incl. VAT):</td>
+                      <td className="text-end fw-bold">{formatCurrency(totals.total_incl_vat)}</td>
+                    </tr>
+                  </>
+                )}
               </tbody>
             </table>
           </div>

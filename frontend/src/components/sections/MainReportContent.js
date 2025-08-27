@@ -1140,13 +1140,13 @@ function MainReportContent({
                         </div>
                         <div style={{ fontSize: '15px' }}>
                             <span style={{ fontWeight: '' }}>
-                                {formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh"))}
+                                {formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh") / 0.8)}
                             </span>{' '}
                             <span style={{ fontSize: '14px' }}>kWh @100%</span>
                         </div>
                         <div style={{ fontSize: '15px' }}>
                             <span style={{ fontWeight: '' }}>
-                                {formatValue(data?.project?.battery_kwh_80 || (displayValue(data?.project?.battery_kwh, 0, "battery_kwh") * 0.8))}
+                                {formatValue(data?.project?.battery_kwh_80 || (displayValue(data?.project?.battery_kwh, 0, "battery_kwh")))}
                             </span>{' '}
                             <span style={{ fontSize: '14px' }}>kWh @80%</span>
                         </div>
@@ -1237,8 +1237,8 @@ function MainReportContent({
                             </tr>
                             <tr>
                                 <td>Battery selected</td>
-                                <td className="text-end">{formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh"))}/
-                                   {formatValue(data?.project?.battery_kwh_80 || (displayValue(data?.project?.battery_kwh, 0, "battery_kwh") * 0.8))}</td>
+                                <td className="text-end">{formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh") / 0.8)}/
+                                   {formatValue(data?.project?.battery_kwh_80 || (displayValue(data?.project?.battery_kwh, 0, "battery_kwh")))}</td>
                                 <td>kWh</td>
                             </tr>
                             <tr>

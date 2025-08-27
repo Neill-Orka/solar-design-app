@@ -10,7 +10,7 @@ import './TariffManager.css';
 const EMPTY_TARIFF = {
     name: '', power_user_type: 'SPU', tariff_category: '', code: '',
     matrix_code: '', structure: 'flat_rate', rates: [
-        { charge_name: 'Energy Charge', charge_category: 'energy', season: 'all', time_of_use: 'all', rate_unit: 'c/kWh', rate_value: '' }
+        { charge_name: 'Energy Charge', charge_category: 'energy', season: 'all', time_of_use: 'all', rate_unit: 'R/kWh', rate_value: '' }
     ]
 };
 
@@ -162,7 +162,7 @@ export default function TariffManager() {
     };
 
     const addRate = () => {
-        const newRate = { charge_name: '', charge_category: 'energy', season: 'all', time_of_use: 'all', rate_unit: 'c/kWh', rate_value: '' };
+        const newRate = { charge_name: '', charge_category: 'energy', season: 'all', time_of_use: 'all', rate_unit: 'R/kWh', rate_value: '' };
         setFormState(prev => ({ ...prev, rates: [...prev.rates, newRate] }));
     };
 

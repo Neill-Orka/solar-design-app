@@ -106,6 +106,11 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
     return kwh / 0.8;
   };
 
+  const vatPerc = 15;
+  const totalExclVat = Number(project.project_value_excl_vat) || 0;
+  const vatAmount = totalExclVat * (vatPerc / 100);
+  const totalInclVat = totalExclVat + vatAmount;
+
   return (
     <section className="orka-exec-summary-page">
       {/* Top bar */}
@@ -162,6 +167,8 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
           <img src={costIcon} className="orka-summary-icon" alt="" />
           <div className="orka-summary-label">Cost</div>
           <div className="orka-summary-value">R {formatValue(project.project_value_excl_vat)} <span className="orka-summary-unit">(excl VAT)</span></div>
+          <div className="orka-summary-sublabel" align='left'>VAT (15%): R {formatValue(vatAmount)}</div>
+          <div className="orka-summary-sublabel" align='left'>Total (incl VAT): R {formatValue(totalInclVat)}</div>
           {/* <div className="orka-summary-sublabel">Effective cost after tax incentive: R {formatValue(project.capex_after_tax)}</div>
           <div className="orka-summary-sublabel">Tax deduction: R {formatValue(project.tax_deduction)}</div> */}
         </div>
