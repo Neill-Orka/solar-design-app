@@ -217,12 +217,16 @@ const renderHeader = () => (
         </div>
         <div />
       </div>
-      <div className="bom-project-strip">
-        {bomData.project?.name} - {bomData.systemSpecs?.panelKw}kW{" "}
-        {bomData.systemSpecs?.batteryKwh > 0
-          ? `${(bomData.systemSpecs?.batteryKwh / 0.8).toFixed(0)}kWh Storage`
-          : 'System'}
-      </div>
+    <div className="bom-project-strip">
+      {bomData.project?.name} - 
+      {bomData.project?.inverter_brand_model ? ` ${bomData.project.inverter_brand_model}` : ""}
+      {bomData.systemSpecs?.inverterKva ? ` ${Number(bomData.systemSpecs.inverterKva).toFixed(0)}kVA` : ""}
+      {bomData.project?.battery_brand_model && bomData.systemSpecs?.batteryKwh > 0
+        ? ` & ${bomData.project.battery_brand_model} ${(bomData.systemSpecs.batteryKwh / 0.8).toFixed(0)}kWh`
+        : bomData.systemSpecs?.batteryKwh > 0
+          ? ` ${(bomData.systemSpecs.batteryKwh / 0.8).toFixed(0)}kWh`
+          : ' System'}
+    </div>
     </header>
   );
 

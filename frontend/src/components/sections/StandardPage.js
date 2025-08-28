@@ -29,7 +29,7 @@ function StandardPage({ header, children, footer, className = "", data, pageNumb
         <section className={`orka-standard-page ${className}`}>
             {/* Header */}
             <div className="orka-summary-headerbar">
-                <div className="orka-summary-project">{project.name} - {displayValue(project.inverter_kva, "0", "inverter_kva")} kVA & {displayValue(project.battery_kwh, "0", "battery_kwh") / 0.8} kWh</div>
+                <div className="orka-summary-project">{project.name} - {displayValue(project.inverter_kva, "0", "inverter_kva")} kVA {Number(displayValue(project.battery_kwh, "0", "battery_kwh")) > 0 && `& ${displayValue(project.battery_kwh, "0", "battery_kwh") / 0.8} kWh`}</div>
                 <img className="orka-summary-logo" src={logo} alt="Orka Solar Logo" />
             </div>
             <hr className="orka-summary-topline" />

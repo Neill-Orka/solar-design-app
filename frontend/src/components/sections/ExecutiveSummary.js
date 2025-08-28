@@ -51,6 +51,7 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
     }
     return value;
   };
+
   
   const project = data?.project || {
     name: "Rutherfords - Grid Tied Solar PV Solution",
@@ -111,11 +112,21 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
   const vatAmount = totalExclVat * (vatPerc / 100);
   const totalInclVat = totalExclVat + vatAmount;
 
+  console.log("EXEC SUMMARY: inverter_brand_model =", project.inverter_brand_model);
+  console.log("EXEC SUMMARY: battery_brand_model =", project.battery_brand_model);
+
   return (
     <section className="orka-exec-summary-page">
       {/* Top bar */}
       <div className="orka-summary-headerbar">
-        <div className="orka-summary-project">{project.name} - {displayValue(project.inverter_kva, "0", "inverter_kva")} kVA & {displayValue(project.battery_kwh, "0", "battery_kwh") / 0.8} kWh</div>
+        <div className="orka-summary-project">
+          {project.name} - 
+          {project.inverter_brand_model ? ` ${project.inverter_brand_model} ` : " "}
+          {displayValue(project.inverter_kva, "0", "inverter_kva")} kVA
+          {Number(displayValue(project.battery_kwh, "0", "battery_kwh")) > 0 && project.battery_brand_model
+            ? ` & ${project.battery_brand_model} ${displayValue(project.battery_kwh, "0", "battery_kwh") / 0.8} kWh`
+            : ""}
+        </div>
         <img className="orka-summary-logo" src={logo} alt="Orka Solar Logo" />
       </div>
       <hr className="orka-summary-topline" />
