@@ -23,71 +23,71 @@ def _serialize_tariff_for_engine(tariff: Tariffs) -> dict:
         ]
     }
 
-def calculate_financial_model(project, sim_response, eskom_tariff, export_enabled, feed_in_tariff):
-    try:
-        demand = sim_response["demand"]
-        export = sim_response["export_to_grid"]
-        import_kw = sim_response["import_from_grid"]
-        timestamps = sim_response["timestamps"]
+# def calculate_financial_model(project, sim_response, eskom_tariff, export_enabled, feed_in_tariff):
+#     try:
+#         demand = sim_response["demand"]
+#         export = sim_response["export_to_grid"]
+#         import_kw = sim_response["import_from_grid"]
+#         timestamps = sim_response["timestamps"]
 
-        degradation_rate = 0.005
-        system_cost = project.project_value_excl_vat or 0
+#         degradation_rate = 0.005
+#         system_cost = project.project_value_excl_vat or 0
 
-        base_savings = 0
-        monthly_costs = {}
+#         base_savings = 0
+#         monthly_costs = {}
 
-        for i in range(len(demand)):
-            ts = datetime.fromisoformat(timestamps[i])
-            month = ts.strftime('%Y-%m')
+#         for i in range(len(demand)):
+#             ts = datetime.fromisoformat(timestamps[i])
+#             month = ts.strftime('%Y-%m')
 
-            base_cost = demand[i] * 0.5 * eskom_tariff
-            import_cost = import_kw[i] * 0.5 * eskom_tariff
-            savings = base_cost - import_cost
+#             base_cost = demand[i] * 0.5 * eskom_tariff
+#             import_cost = import_kw[i] * 0.5 * eskom_tariff
+#             savings = base_cost - import_cost
 
-            if export_enabled:
-                savings += export[i] * 0.5 * feed_in_tariff
+#             if export_enabled:
+#                 savings += export[i] * 0.5 * feed_in_tariff
 
-            base_savings += savings
+#             base_savings += savings
 
-            if month not in monthly_costs:
-                monthly_costs[month] = {"old_cost": 0, "new_cost": 0}
+#             if month not in monthly_costs:
+#                 monthly_costs[month] = {"old_cost": 0, "new_cost": 0}
 
-            monthly_costs[month]["old_cost"] += base_cost
-            monthly_costs[month]["new_cost"] += import_cost - (export[i] * 0.5 * feed_in_tariff if export_enabled else 0)
+#             monthly_costs[month]["old_cost"] += base_cost
+#             monthly_costs[month]["new_cost"] += import_cost - (export[i] * 0.5 * feed_in_tariff if export_enabled else 0)
 
-        yearly_savings = []
-        total_savings = 0
+#         yearly_savings = []
+#         total_savings = 0
 
-        for year in range(2025, 2025 + 20):
-            degraded_savings = base_savings * ((1 - degradation_rate) ** (year - 2025))
-            yearly_savings.append({"year": year, "savings": round(degraded_savings)})
-            total_savings += degraded_savings
+#         for year in range(2025, 2025 + 20):
+#             degraded_savings = base_savings * ((1 - degradation_rate) ** (year - 2025))
+#             yearly_savings.append({"year": year, "savings": round(degraded_savings)})
+#             total_savings += degraded_savings
 
-        roi_20yr = ((total_savings / system_cost) - 1) * 100 if system_cost > 0 else 0
-        payback_years = system_cost / base_savings if base_savings > 0 else 0
+#         roi_20yr = ((total_savings / system_cost) - 1) * 100 if system_cost > 0 else 0
+#         payback_years = system_cost / base_savings if base_savings > 0 else 0
 
-        # Calculate yield_year1 (financial yield) = annual_savings / project_value_excl_vat
-        project_value = project.project_value_excl_vat or system_cost
-        yield_year1 = (base_savings / project_value) * 100 if project_value > 0 else 0
+#         # Calculate yield_year1 (financial yield) = annual_savings / project_value_excl_vat
+#         project_value = project.project_value_excl_vat or system_cost
+#         yield_year1 = (base_savings / project_value) * 100 if project_value > 0 else 0
 
-        cost_comparison = [
-            {"period": month, "old_cost": round(v["old_cost"], 2), "new_cost": round(v["new_cost"], 2)}
-            for month, v in sorted(monthly_costs.items())
-        ]
+#         cost_comparison = [
+#             {"period": month, "old_cost": round(v["old_cost"], 2), "new_cost": round(v["new_cost"], 2)}
+#             for month, v in sorted(monthly_costs.items())
+#         ]
 
-        return {
-            "annual_savings": round(base_savings),
-            "yield_year1": round(yield_year1, 1),
-            "payback_years": payback_years,
-            "roi_20yr": roi_20yr,
-            "yearly_savings": yearly_savings,
-            "cost_comparison": cost_comparison
-        }
+#         return {
+#             "annual_savings": round(base_savings),
+#             "yield_year1": round(yield_year1, 1),
+#             "payback_years": payback_years,
+#             "roi_20yr": roi_20yr,
+#             "yearly_savings": yearly_savings,
+#             "cost_comparison": cost_comparison
+#         }
 
-    except Exception as e:
-        return {"error": str(e)}
+#     except Exception as e:
+#         return {"error": str(e)}
 
-def run_quick_financials(sim_response: dict, system_cost: float, project: 'Projects') -> dict:
+def run_quick_financials(sim_response: dict, system_cost: float, project: 'Projects', escalation_schedule=None) -> dict:
     try:
         # 1 Initiliaze the tariff engine
         tariff_data = {}
@@ -114,6 +114,12 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
         potential_generation = sim_response["potential_generation"]
         panel_kw = sim_response.get("panel_kw", 1)
         timestamps = [datetime.fromisoformat(ts) for ts in sim_response["timestamps"]]
+
+        # Use passed escalation schedule or fallback to hardcoded
+        if escalation_schedule and isinstance(escalation_schedule, list):
+            escalation_rates = [Decimal(str(r)) for r in escalation_schedule]
+        else:
+            escalation_rates = [Decimal('0.12')] * 20  # Default to 12% for 20 years
 
         time_interval_hours = Decimal('0.5')
         degradation_rate = Decimal('0.005')
@@ -186,25 +192,6 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
         project_value = project.project_value_excl_vat or system_cost
         yield_year1 = (annual_savings / Decimal(project_value)) * 100 if project_value > 0 else Decimal('0')
 
-        TARIFF_ESCALATION_RATE = Decimal('0.12') # Hardcoded 12% increase every year
-        yearly_savings = []
-        total_20yr_saving = Decimal(0)
-
-        payback_years = Decimal(system_cost) / annual_savings if annual_savings > 0 else Decimal('inf')
-
-        # Loop for 20 years
-        for i in range(20):
-            escalated_savings = annual_savings * ((1 + TARIFF_ESCALATION_RATE) ** i)
-            degraded_savings = escalated_savings * ((1 - degradation_rate) ** i)
-            
-            total_20yr_saving += degraded_savings
-            yearly_savings.append({
-                "year": 2025 + i,
-                "savings": float(round(degraded_savings, 2))
-            })
-            
-        roi_20yr = ((total_20yr_saving - Decimal(system_cost)) / Decimal(system_cost)) * 100 if system_cost > 0 else Decimal('inf')
-
         # 6 Other values from sim response for meer metrics
         total_demand_kwh = sum(d * float(time_interval_hours) for d in demand)
         total_import_kwh = sum(imp * float(time_interval_hours) for imp in imports)
@@ -260,25 +247,42 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
                     prev_soc = soc
                 battery_cycles = round(total_discharge_kwh / battery_capacity_kwh, 1) if battery_capacity_kwh > 0 else '-'
 
-        # Cashflow analysis
+        # Cashflow analysis and savings
+        yearly_savings = []
+        total_20_yr_saving = Decimal(0)
         lifetime_cashflow = [{'year': 0, 'cashflow': -float(system_cost)}]
         cumulative = Decimal(-system_cost)
 
-        for i in range(1, 21):
-            # escalate savings at 12% and then degrade at 0.5% p.a.
-            escalated = annual_savings * ((1 + TARIFF_ESCALATION_RATE) ** (i - 1))
-            net_savings = escalated * ((1 - degradation_rate) ** (i - 1))
-            cumulative += net_savings
+        for i in range(20):
+            esc_rate = escalation_rates[i] if i < len(escalation_rates) else escalation_rates[-1]
+            escalated_savings = annual_savings * ((1 + esc_rate) ** i)
+            degraded_savings = escalated_savings * ((1 - degradation_rate) ** i)
+
+            total_20_yr_saving += degraded_savings
+            yearly_savings.append({
+                "year": 2025 + i,
+                "savings": float(round(degraded_savings, 2))
+            })
+
+            cumulative += degraded_savings
             lifetime_cashflow.append({
-                'year': i,
+                'year': i + 1,
                 'cashflow': float(round(cumulative, 2))
             })
 
-        yearly_savings = [
-            {"year": 2025 + i,
-             "savings": float(round(annual_savings * ((1 - degradation_rate) ** i), 2))}
-             for i in range(20)
-        ]
+        roi_20yr = ((total_20_yr_saving - Decimal(system_cost)) / Decimal(system_cost)) * 100 if system_cost > 0 else Decimal('inf')
+
+        payback_years = 'N/A'
+        for idx in range(1, len(lifetime_cashflow)):
+            prev = lifetime_cashflow[idx - 1]["cashflow"]
+            curr = lifetime_cashflow[idx]['cashflow']
+            if prev < 0 <= curr:
+                fraction = -prev / (curr - prev) if (curr - prev) != 0 else 0
+                payback_years = round((idx - 1) + fraction, 1)
+                break
+        
+        if payback_years == 'N/A':
+            payback_years = 'N/A'
 
         cost_comparison_data = [
             {
@@ -302,7 +306,7 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             # Financial KPIs
             "annual_savings": float(round(annual_savings, 2)),
             "yield_year1": float(round(yield_year1, 1)),
-            "payback_period": float(round(payback_years, 1)) if payback_years != Decimal('inf') else 'N/A',
+            "payback_period": payback_years,
             "roi": float(round(roi_20yr, 1)) if roi_20yr != Decimal('inf') else 'N/A',
             "original_annual_cost": float(round(original_annual_cost, 2)),
             "new_annual_cost": float(round(new_annual_cost, 2)),

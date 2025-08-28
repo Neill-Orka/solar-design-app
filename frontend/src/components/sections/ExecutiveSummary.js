@@ -79,8 +79,8 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
     capex_after_tax: 0,
     tax_deduction: 0,
     savings_year1: 5000,
-    yield_year1: 60,
-    payback: 60,
+    yield_year1: 0,
+    payback: 0,
     lcoe_25y: 22000
   };
 

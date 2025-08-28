@@ -16,6 +16,7 @@ def financial_model():
         project_id = data.get("project_id")
 
         simulation_data = data.get("simulation_data")
+        escalation_schedule = data.get("escalation_schedule", None)
 
         if not simulation_data or "timestamps" not in simulation_data:
             return jsonify({"error": "Simulation data is required"}), 400
@@ -28,7 +29,7 @@ def financial_model():
         
         system_cost = float(project.project_value_excl_vat)
 
-        result = run_quick_financials(simulation_data, system_cost, project)
+        result = run_quick_financials(simulation_data, system_cost, project, escalation_schedule=escalation_schedule)
 
         if result.get("error"):
             logging.error(f"Financial calculation error: {result['error']}")

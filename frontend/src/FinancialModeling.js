@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useContext } from 'react';
 import axios from 'axios';
 import { Card, Button, Form, Row, Col, Spinner, Table, Badge } from 'react-bootstrap';
 import DatePicker from 'react-datepicker';
@@ -22,6 +22,7 @@ import { API_URL } from './apiConfig';
 import { useNotification } from './NotificationContext';
 import { enZA } from 'date-fns/locale';
 import 'chartjs-adapter-date-fns';
+import { EscalationContext } from './TariffEscalationContext';
 
 ChartJS.register(
   CategoryScale, 
@@ -59,6 +60,8 @@ function FinancialModeling({ projectId }) {
   const [showLosses, setShowLosses] = useState(false);
   const [standardTemplateUsed, setStandardTemplateUsed] = useState(false);
   const [templateInfo, setTemplateInfo] = useState(null);
+
+  const { schedule: escalationSchedule } = useContext(EscalationContext);
 
   // Load project value, simulation data, and financial settings
   useEffect(() => {
@@ -128,7 +131,8 @@ function FinancialModeling({ projectId }) {
       project_id: projectId,
       export_enabled: allowExport,
       feed_in_tariff: parseFloat(feedInTariff),
-      simulation_data: simulationData
+      simulation_data: simulationData,
+      escalation_schedule: escalationSchedule
     })
     .then(res => {
       setFinancialResult(res.data);

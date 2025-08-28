@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify
 from models import db, Product, Projects, OptimizationRun, EnergyData
 from services.simulation_engine import simulate_system_inner
 from datetime import datetime
-from services.financial_calcs import calculate_financial_model
+# from services.financial_calcs import calculate_financial_model
 import math 
 
 optimize_bp = Blueprint("optimize", __name__)
