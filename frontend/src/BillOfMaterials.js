@@ -386,15 +386,14 @@ const overlayFromProject = (items, projectData, productsData) => {
   }
 
   // Batteries
+  result = result.filter(x => x.product?.category !== 'battery');
   if (projectData.battery_ids?.length) {
     // Collect existing battery margins before filtering
-    const existingBatteries = result.filter(x => x.product?.category === 'battery');
-    result = result.filter(x => x.product?.category !== 'battery');
+    const existingBatteries = items.filter(x => x.product?.category === 'battery');
     const qty = Number(projectData.battery_kwh?.quantity) || 1;
     projectData.battery_ids.forEach((id, idx) => {
       const prod = productsData.find(p => p.id === id);
       if (prod) {
-        // Find existing margin for this specific battery
         const existingBattery = existingBatteries.find(x => x.product?.id === id);
         result.push({
           product: prod,
@@ -408,6 +407,11 @@ const overlayFromProject = (items, projectData, productsData) => {
   }
 
   return result;
+};
+
+const getBrandModelCategory = (components, category) => {
+  const comp = components.find(c => c.product?.category === category);
+  return comp ? `${comp.product?.brand || ''}` : '';
 };
 
   /* ---------- NEW HYBRID BOM LOADER ---------- */
@@ -973,6 +977,13 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
       }))
     }));
 
+    project.inverter_brand_model = getBrandModelCategory(bomComponents, 'inverter');
+    project.battery_brand_model = getBrandModelCategory(bomComponents, 'battery');
+
+    console.log("INVERTER BRAND MODEL: ", project.inverter_brand_model);
+    console.log("BATTERY BRAND MODEL: ", project.battery_brand_model);
+
+
     // Store the FRESH data in localStorage for the print view to access
     localStorage.setItem(`printBomData_${projectId}`, JSON.stringify({
       project,
@@ -1272,6 +1283,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                       <Form.Control
                                         type="number"
                                         min="0"
+                                        // size="md"
+                                        style={{ minWidth: 70, maxWidth: 110, fontSize: '0.85rem'}}
                                         step="1"
                                         value={getMarginDisplayValue(comp)}
                                         onChange={e => updateMargin(comp.product.id, e.target.value)}
@@ -1287,6 +1300,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                       <Form.Control 
                                         type="number"
                                         min="0"
+                                        style={{ minWidth: 70, maxWidth: 110, fontSize: '0.85rem'}}
                                         value={comp.quantity}
                                         onChange={e => updateQuantity(comp.product.id, e.target.value)}
                                         onBlur={e => handleQuantityBlur(comp.product.id, e.target.value)}

@@ -18,6 +18,15 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
     }
   }, []);
 
+  const [products, setProducts] = useState([])
+
+  useEffect(() => {
+    axios.get(`${API_URL}/api/products`).then(res => {
+      setProducts(res.data);
+      console.log("REPORT BUILDER: products loaded = ", res.data);
+    });
+  }, []);
+
 
   // Track which sections to show
   const [sections, setSections] = useState({
@@ -146,11 +155,25 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
     // Only fetch the project endpoint that exists
     axios.get(`${API_URL}/api/projects/${projectId}`)
       .then((projectRes) => {
+        const project = projectRes.data;
+
+        // --- Add inverter and battery brand/model from products ---
+        const getBrandModel = (products, ids, category) => {
+          if (!Array.isArray(ids) || !products) return "";
+          const prod = products.find(p => ids.includes(p.id) && p.category === category);
+          return prod ? `${prod.brand}` : "";
+        };
+
+        project.inverter_brand_model = getBrandModel(products, project.inverter_ids, 'Inverter');
+        project.battery_brand_model = getBrandModel(products, project.battery_ids, 'Battery');
+     
+        
         const reportData = {
-          project: projectRes.data,
+          project,
           // Set empty placeholders for the data that would come from other endpoints
           simulation: simulationResults,
-          financials: financialResults  
+          financials: financialResults,
+          products: products,
         };
         
         setData(reportData);
@@ -166,7 +189,7 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
         showNotification('Error loading report data', 'error');
         setLoading(false);
       });
-  }, [projectId, showNotification]);
+  }, [projectId, showNotification, products]);
 
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
