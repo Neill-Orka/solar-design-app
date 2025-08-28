@@ -42,7 +42,7 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
       { activity: "Training", timeline: "Week 5" },
       { activity: "Handover", timeline: "Week 6" }
     ]
-  })
+  });
 
   // Load all data once (simulation, financials, BOM, etc)
   const [data, setData] = useState(null);
@@ -75,6 +75,7 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
     }
     return missing;
   };
+
 
   // Calculate dynamic page numbers
   const calculatePageCounts = () => {
@@ -133,8 +134,6 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
       </div>
     </div>
   );
-
-  
 
   useEffect(() => {
     if (!projectId) return;

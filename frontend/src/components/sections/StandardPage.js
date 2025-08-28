@@ -5,12 +5,31 @@ import logo from "../../assets/orka_logo_transparent_background.png";
 function StandardPage({ header, children, footer, className = "", data, pageNumber, totalPages = 24 }) {
     const project = data?.project || { name: header || "Project Report" };
 
+    // Helper function to safely display JSON fields
+    const displayValue = (value, fallback, field = "") => {
+      if (value === undefined || value === null) return fallback;
+
+      if (typeof value === 'object') {
+        // If it's an object, try to extract capacity or return the first value
+        if (field === "battery_kwh" && value.capacity && value.quantity) {
+          const total = value.capacity * value.quantity;
+          return total.toString();
+        }
+
+        if (value.capacity && value.quantity) {
+          return `${value.capacity * value.quantity}`;
+        }
+        
+        return value.capacity || value.quantity || Object.values(value)[0] || fallback;
+      }
+      return value;
+    };    
     
     return (
         <section className={`orka-standard-page ${className}`}>
             {/* Header */}
             <div className="orka-summary-headerbar">
-                <div className="orka-summary-project">{project.name}</div>
+                <div className="orka-summary-project">{project.name} - {displayValue(project.inverter_kva, "0", "inverter_kva")} kVA & {displayValue(project.battery_kwh, "0", "battery_kwh") / 0.8} kWh</div>
                 <img className="orka-summary-logo" src={logo} alt="Orka Solar Logo" />
             </div>
             <hr className="orka-summary-topline" />

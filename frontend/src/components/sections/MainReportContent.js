@@ -26,7 +26,9 @@ function MainReportContent({
     const [demandEndDate, setDemandEndDate] = useState(null);
     const [demandData, setDemandData] = useState([]);
     const [yearlyConsumptionData, setYearlyConsumptionData] = useState([]);
-    
+
+    const [project_type] = useState(data?.project?.project_type || "Residential");
+
     // State for simulation graph date picker
     const [simulationStartDate, setSimulationStartDate] = useState(null);
     const [simulationEndDate, setSimulationEndDate] = useState(null);
@@ -903,8 +905,8 @@ function MainReportContent({
                             const maxMonthlyCost = oldCosts.length > 0 
                                 ? Math.max(...oldCosts) 
                                 : 0;
-                            
-                            return `Based on this simulation using the client's required energy consumption and tariff, the client's 2025 costs for electricity (grid plus generator) will be on average R ${formatValue(avgMonthlyCost)} per month with a maximum of R ${formatValue(maxMonthlyCost)} (excl. VAT).`;
+
+                            return `Based on this simulation using the client's required energy consumption and tariff, the client's 2025 costs for electricity ${project_type === 'Commercial' ? "(grid plus generator)" : ""} will be on average R ${formatValue(avgMonthlyCost)} per month with a maximum of R ${formatValue(maxMonthlyCost)} (excl. VAT).`;
                         })()}
                         <br/>
                         This equates to an annual electricity cost of approximately <strong>R {formatValue(data.financials.original_annual_cost)}</strong> (excl. VAT).
@@ -1225,7 +1227,7 @@ function MainReportContent({
                                 <td className="text-end">{formatValue(displayValue(data?.project?.inverter_kva, 0, "inverter_kva"))}</td>
                                 <td>kVA</td>
                             </tr>
-                            <tr>
+                            {/* <tr>
                                 <td>Inverter Capacity (hybrid with mppt)</td>
                                 <td className="text-end">{formatValue(data?.project?.inverter_hybrid || 0)}</td>
                                 <td>kVA</td>
@@ -1234,7 +1236,7 @@ function MainReportContent({
                                 <td>Inverter Capacity (dedicated grid invt.)</td>
                                 <td className="text-end">{formatValue(data?.project?.inverter_grid || 0)}</td>
                                 <td>kVA</td>
-                            </tr>
+                            </tr> */}
                             <tr>
                                 <td>Battery selected</td>
                                 <td className="text-end">{formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh") / 0.8)}/
@@ -1624,7 +1626,7 @@ function MainReportContent({
                                             fill: false
                                         },
                                         {
-                                            label: 'New Grid + Generator Cost',
+                                            label: project_type === 'Commercial' ? 'New Grid + Generator Cost' : 'New Grid Cost',
                                             data: data.financials.cost_comparison.map(item => item.new_cost),
                                             borderColor: '#20c997',
                                             borderWidth: 2.5,
@@ -1793,7 +1795,7 @@ function MainReportContent({
                             <td className="text-end">R {formatValue(data?.financials?.new_annual_cost || 0)}</td>
                         </tr>
                         <tr>
-                            <td>Blended Rate</td>
+                            <td>Blended Rate (R/kWh)</td>
                             <td className="text-end">
                                 R {((data?.financials?.new_annual_cost || 0) / (data?.financials?.total_demand_kwh || 1)).toFixed(2)}
                             </td>
@@ -1811,7 +1813,7 @@ function MainReportContent({
                             <td>Grid savings (y1)</td>
                             <td className="text-end">R {formatValue(data?.financials?.annual_savings || 0)}</td>
                         </tr>
-                        {(data?.project?.system_type === 'hybrid' || data?.project?.system_type === 'off-grid') && (
+                        {(data?.project?.system_type === 'hybrid' || data?.project?.system_type === 'off-grid') &&  project_type === 'Commercial' && (
                             <tr>
                                 <td>Generator cost savings (y1)</td>
                                 <td className="text-end">R {formatValue(data?.financials?.generator_cost_savings || 0)}</td>
@@ -1883,7 +1885,7 @@ function MainReportContent({
                         )}
                         
                         {/* Generator Section - Only for hybrid and off-grid */}
-                        {(data?.project?.system_type === 'hybrid' || data?.project?.system_type === 'off-grid') && (
+                        {(data?.project?.system_type === 'hybrid' || data?.project?.system_type === 'off-grid') && project_type === 'Commercial' && (
                             <>
                                 <tr className="bg-light">
                                     <td colSpan="2"><strong>New Diesel Generator</strong></td>
@@ -1900,8 +1902,8 @@ function MainReportContent({
                         )}
                     </tbody>
                 </table>
-                
-                {(data?.project?.system_type === 'hybrid' || data?.project?.system_type === 'off-grid') && (
+
+                {(data?.project?.system_type === 'hybrid' || data?.project?.system_type === 'off-grid') && project_type === 'Commercial' && (
                     <p className="small mt-2 fst-italic">
                         *Generator costs based on simulated load shedding scenarios and quiet hours.
                     </p>
