@@ -115,7 +115,7 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
     <section className="orka-exec-summary-page">
       {/* Top bar */}
       <div className="orka-summary-headerbar">
-        <div className="orka-summary-project">{project.name}</div>
+        <div className="orka-summary-project">{project.name} - {displayValue(project.inverter_kva, "0", "inverter_kva")} kVA & {displayValue(project.battery_kwh, "0", "battery_kwh") / 0.8} kWh</div>
         <img className="orka-summary-logo" src={logo} alt="Orka Solar Logo" />
       </div>
       <hr className="orka-summary-topline" />
@@ -184,14 +184,14 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
 
       {/* Footnote */}
       <div className="orka-summary-footnote">
-        *Tax incentive available to companies, 100% deduction
+        {data?.project?.project_type === 'Commercial' ? "*Tax incentive available to companies, 100% deduction" : ""}
       </div>
 
       {/* Full-width site photo as page background */}
       <div className="orka-summary-sitephoto-fullwrap">
         <img className="orka-summary-sitephoto-full" src={sitePhoto} alt="Site Photo" />
-        <div className="orka-summary-pagenum">Page {pageNumber} of {totalPages}</div>
-        <div className="orka-summary-photocredit">{project.photo_credit || "Orka Solar\nHospital in Potchefstroom\n280 kWp, 260 kVA inverters"}</div>
+        {/* <div className="orka-summary-pagenum">Page {pageNumber} of {totalPages}</div>
+        <div className="orka-summary-photocredit">{project.photo_credit || "Orka Solar\nHospital in Potchefstroom\n280 kWp, 260 kVA inverters"}</div> */}
       </div>
     </section>
   );
