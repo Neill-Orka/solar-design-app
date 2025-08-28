@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import logo from './assets/orka_logo_text.png';
 import './PrintableBOM.css';
@@ -16,6 +16,33 @@ function PrintableBOM({ projectId: propProjectId }) {
   // Retrieve data from localStorage (project-specific key)
   const bomData = JSON.parse(localStorage.getItem(`printBomData_${projectId}`) || '{}');
   const currentDate = new Date().toLocaleDateString('en-ZA');
+
+  const [priceMode, setPriceMode] = useState(() => localStorage.getItem('bomPriceMode') || 'all');
+  useEffect(() => localStorage.setItem('bomPriceMode', priceMode), [priceMode]);
+
+  // category totals for the “category only” mode
+  const categoryTotals = useMemo(() => {
+    const map = {};
+    (bomData.categories || []).forEach(cat => {
+      map[cat.name] = (cat.items || []).reduce((s, it) => s + (it.price || 0) * (it.quantity || 0), 0);
+    });
+    return map;
+  }, [bomData]);  
+
+const [termsPerc, setTermsPerc] = useState(() => {
+  const saved = localStorage.getItem(`bomTermsPerc_${projectId}`);
+  return saved ? JSON.parse(saved) : [65, 25, 10];
+});
+useEffect(() => {
+  localStorage.setItem(`bomTermsPerc_${projectId}`, JSON.stringify(termsPerc));
+}, [termsPerc, projectId]);
+
+const handleTermsChange = (i, val) => {
+  const v = Math.max(0, Math.min(100, parseFloat(val) || 0));
+  setTermsPerc(prev => prev.map((p, idx) => (idx === i ? v : p)));
+};
+const termsSum = useMemo(() => termsPerc.reduce((a,b)=>a+(+b||0),0), [termsPerc]);
+
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat('en-ZA', {
@@ -162,13 +189,22 @@ function PrintableBOM({ projectId: propProjectId }) {
   }, [pages, CONTENT_HEIGHT_PX, COL_HEADER_HEIGHT_PX, ROW_HEIGHT_PX, CAT_ROW_HEIGHT_PX, TOTALS_MIN_HEIGHT_PX]);
 
   // Build pages: either append a dedicated totals page, or render totals inline on the last page
-  const pagesWithKinds = useMemo(() => {
-    const base = pages.map(p => ({ kind: 'rows', rows: p }));
-    if (carryPages.length) {
-        carryPages.forEach(blocks => base.push({ kind: 'totals', blocks }));
-    }
-    return base;
-  }, [pages, carryPages]);
+  // const pagesWithKinds = useMemo(() => {
+  //   const base = pages.map(p => ({ kind: 'rows', rows: p }));
+  //   if (carryPages.length) {
+  //       carryPages.forEach(blocks => base.push({ kind: 'totals', blocks }));
+  //   }
+  //   return base;
+  // }, [pages, carryPages]);
+ const pagesWithKinds = useMemo(() => {
+   const base = pages.map(p => ({ kind: 'rows', rows: p }));
+   // keep bankingAccept in qty mode; drop totals/terms
+   const filteredCarry = carryPages
+     .map(blocks => blocks.filter(k => (priceMode !== 'qty') || k === 'bankingAccept'))
+     .filter(b => b.length);
+   filteredCarry.forEach(blocks => base.push({ kind: 'totals', blocks }));
+   return base;
+ }, [pages, carryPages, priceMode]);
 
   const totalPages = pagesWithKinds.length;
 
@@ -241,40 +277,115 @@ const renderHeader = () => (
       <tr className="bom-thead-row">
         <th className="bom-thead-cell bom-col-desc">Item Description</th>
         <th className="bom-thead-cell bom-col-units">Units</th>
-        <th className="bom-thead-cell bom-col-unitprice">Price per Unit</th>
-        <th className="bom-thead-cell bom-col-total">Total</th>
+        {priceMode === 'all' && (
+          <th className="bom-thead-cell bom-col-unitprice">Price per Unit</th>
+        )}
+        {priceMode !== 'qty' && (
+          <th className="bom-thead-cell bom-col-total">Total</th>
+        )}
       </tr>
     </thead>
+
+    // <thead>
+    //   <tr className="bom-thead-row">
+    //     <th className="bom-thead-cell bom-col-desc">Item Description</th>
+    //     <th className="bom-thead-cell bom-col-units">Units</th>
+    //     <th className="bom-thead-cell bom-col-unitprice">Price per Unit</th>
+    //     <th className="bom-thead-cell bom-col-total">Total</th>
+    //   </tr>
+    // </thead>
   );
 
-  const renderRow = (r, idx) => {
-    if (r.type === 'category') {
+const renderRow = (r, idx) => {
+  if (r.type === 'category') {
+    const catTotal = categoryTotals[r.name] || 0;
+
+    if (priceMode === 'qty') {
       return (
         <tr className="bom-category-row" key={`cat-${idx}`}>
-          <td className="bom-category-cell" colSpan={4}>{r.name}</td>
+          <td className="bom-category-cell" colSpan={2}>{r.name}</td>
         </tr>
       );
     }
-    const { item } = r;
-    const spec = (
-      (item.product.category === 'panel' && item.product.power_w && `${item.product.power_w}W`) ||
-      (item.product.category === 'inverter' && item.product.rating_kva && `${item.product.rating_kva}kVA`) ||
-      (item.product.category === 'battery' && item.product.capacity_kwh && `${item.product.capacity_kwh}kWh`) ||
-      ''
-    );
-
+    // 'all' → [Desc, Units, UnitPrice, Total]  (show total in Total col)
+    // 'category' → [Desc, Units, Total]
+    const preCols = priceMode === 'all' ? 3 : 2;
     return (
-      <tr className="bom-row" key={`row-${idx}`}>
-        <td className="bom-cell bom-col-desc">
-          <div className="bom-item-model">{item.product.brand} {item.product.model}</div>
-          {/* {spec && <div className="bom-item-spec">{spec}</div>} */}
+      <tr className="bom-category-row" key={`cat-${idx}`}>
+        <td className="bom-category-cell" colSpan={preCols}>{r.name}</td>
+        <td className="bom-cell bom-col-total" style={{ textAlign: 'right', fontWeight: 700 }}>
+          {formatCurrency(catTotal)}
         </td>
-        <td className="bom-cell bom-col-units" style={{ textAlign: 'center' }}>{item.quantity}</td>
-        <td className="bom-cell bom-col-unitprice">{formatCurrency(item.price)}</td>
-        <td className="bom-cell bom-col-total">{formatCurrency(item.price * item.quantity)}</td>
       </tr>
     );
-  };
+  }
+
+  const { item } = r;
+  const desc = (
+    <div className="bom-item-model">
+      {item.product.brand} {item.product.model}
+    </div>
+  );
+
+  if (priceMode === 'qty') {
+    return (
+      <tr className="bom-row" key={`row-${idx}`}>
+        <td className="bom-cell bom-col-desc">{desc}</td>
+        <td className="bom-cell bom-col-units" style={{ textAlign: 'center' }}>{item.quantity}</td>
+      </tr>
+    );
+  }
+
+  if (priceMode === 'category') {
+    return (
+      <tr className="bom-row" key={`row-${idx}`}>
+        <td className="bom-cell bom-col-desc">{desc}</td>
+        <td className="bom-cell bom-col-units" style={{ textAlign: 'center' }}>{item.quantity}</td>
+        <td className="bom-cell bom-col-total"></td>
+      </tr>
+    );
+  }
+
+  // 'all'
+  return (
+    <tr className="bom-row" key={`row-${idx}`}>
+      <td className="bom-cell bom-col-desc">{desc}</td>
+      <td className="bom-cell bom-col-units" style={{ textAlign: 'center' }}>{item.quantity}</td>
+      <td className="bom-cell bom-col-unitprice">{formatCurrency(item.price)}</td>
+      <td className="bom-cell bom-col-total">{formatCurrency(item.price * item.quantity)}</td>
+    </tr>
+  );
+};
+
+
+  // const renderRow = (r, idx) => {
+  //   if (r.type === 'category') {
+  //     return (
+  //       <tr className="bom-category-row" key={`cat-${idx}`}>
+  //         <td className="bom-category-cell" colSpan={4}>{r.name}</td>
+  //       </tr>
+  //     );
+  //   }
+  //   const { item } = r;
+  //   const spec = (
+  //     (item.product.category === 'panel' && item.product.power_w && `${item.product.power_w}W`) ||
+  //     (item.product.category === 'inverter' && item.product.rating_kva && `${item.product.rating_kva}kVA`) ||
+  //     (item.product.category === 'battery' && item.product.capacity_kwh && `${item.product.capacity_kwh}kWh`) ||
+  //     ''
+  //   );
+
+  //   return (
+  //     <tr className="bom-row" key={`row-${idx}`}>
+  //       <td className="bom-cell bom-col-desc">
+  //         <div className="bom-item-model">{item.product.brand} {item.product.model}</div>
+  //         {/* {spec && <div className="bom-item-spec">{spec}</div>} */}
+  //       </td>
+  //       <td className="bom-cell bom-col-units" style={{ textAlign: 'center' }}>{item.quantity}</td>
+  //       <td className="bom-cell bom-col-unitprice">{formatCurrency(item.price)}</td>
+  //       <td className="bom-cell bom-col-total">{formatCurrency(item.price * item.quantity)}</td>
+  //     </tr>
+  //   );
+  // };
 
     const TotalsBlock = () => {
       const vatPerc = Number(bomData.totals?.vat_perc ?? 0);
@@ -321,62 +432,65 @@ const renderHeader = () => (
     //   </section>
     // );
 
-    const TermsDepositBlock = () => {
-      const totalIncl = (bomData.totals?.total_incl_vat || 0);
-    
-      return (
-        <section className="bom-block bom-block-termsdeposit">
-          <div className="bom-terms">
-            <p style={{ margin: '5px 0', fontWeight: 700 }}>
-              Please note that a 65% deposit will be required before Orka Solar will commence with any work.
-            </p>
-          </div>
-      
-          <table className="bom-table bom-terms-table" style={{ marginTop: '6px' }}>
-            <colgroup>
-              <col className="col-desc" />
-              <col className="col-perc" />
-              <col className="col-flex" />
-              <col className="col-amount" />
-              <col className="col-incl" />
-            </colgroup>
-            <tbody>
-              <tr className="bom-row-terms">
-                <td className="bom-cell-terms">Deposit</td>
-                <td className="bom-cell-terms">65%</td>
-                <td className="bom-cell-terms"></td>
-                <td className="bom-cell-terms amount">{formatCurrency(totalIncl * 0.65)}</td>
-                <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
-              </tr>
-      
-              <tr className="bom-row-terms">
-                <td className="bom-cell-terms">On delivery of inverters and panels to site</td>
-                <td className="bom-cell-terms">25%</td>
-                <td className="bom-cell-terms"></td>
-                <td className="bom-cell-terms amount">{formatCurrency(totalIncl * 0.25)}</td>
-                <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
-              </tr>
-      
-              <tr className="bom-row-terms">
-                <td className="bom-cell-terms">On project completion</td>
-                <td className="bom-cell-terms">10%</td>
-                <td className="bom-cell-terms"></td>
-                <td className="bom-cell-terms amount">{formatCurrency(totalIncl * 0.10)}</td>
-                <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
-              </tr>
-      
-              <tr className="bom-row-terms grand">
-                <td className="bom-cell-terms" colSpan={3}></td>
-                <td className="bom-cell-terms amount total-amount">
-                  {formatCurrency(totalIncl)}
-                </td>
-                <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-      );
-    };
+const TermsDepositBlock = () => {
+  const totalIncl = (bomData.totals?.total_incl_vat || 0);
+  const [p0, p1, p2] = termsPerc.map(n => +n || 0);
+  const amt = (p) => formatCurrency(totalIncl * (p / 100));
+
+  return (
+    <section className="bom-block bom-block-termsdeposit">
+      <div className="bom-terms">
+        <p style={{ margin: '5px 0', fontWeight: 700 }}>
+          Please note that a {p0}% deposit will be required before Orka Solar will commence with any work.
+        </p>
+      </div>
+
+      <table className="bom-table bom-terms-table" style={{ marginTop: '6px' }}>
+        <colgroup>
+          <col className="col-desc" />
+          <col className="col-perc" />
+          <col className="col-flex" />
+          <col className="col-amount" />
+          <col className="col-incl" />
+        </colgroup>
+        <tbody>
+          <tr className="bom-row-terms">
+            <td className="bom-cell-terms">Deposit</td>
+            <td className="bom-cell-terms">{p0}%</td>
+            <td className="bom-cell-terms"></td>
+            <td className="bom-cell-terms amount">{amt(p0)}</td>
+            <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
+          </tr>
+
+          <tr className="bom-row-terms">
+            <td className="bom-cell-terms">On delivery of inverters and panels to site</td>
+            <td className="bom-cell-terms">{p1}%</td>
+            <td className="bom-cell-terms"></td>
+            <td className="bom-cell-terms amount">{amt(p1)}</td>
+            <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
+          </tr>
+
+          <tr className="bom-row-terms">
+            <td className="bom-cell-terms">On project completion</td>
+            <td className="bom-cell-terms">{p2}%</td>
+            <td className="bom-cell-terms"></td>
+            <td className="bom-cell-terms amount">{amt(p2)}</td>
+            <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
+          </tr>
+
+          <tr className="bom-row-terms grand">
+            <td className="bom-cell-terms" colSpan={3}></td>
+            <td className="bom-cell-terms amount total-amount">
+              {formatCurrency(totalIncl)}
+            </td>
+            <td className="bom-cell-terms incl"><span>Incl. VAT</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  );
+};
+
 
     const BankingAcceptanceBlock = () => (
       <section className="bom-block bom-block-bankingaccept">
@@ -414,6 +528,41 @@ const renderHeader = () => (
       <div className="bom-controls no-print">
         <button className="btn" onClick={() => navigate(-1)}>Back</button>
         <button className="btn" onClick={() => window.print()}>Print</button>
+        <select
+          className="form-select form-select-sm"
+          style={{ width: 260, marginLeft: 8 }}
+          value={priceMode}
+          onChange={(e) => setPriceMode(e.target.value)}
+          aria-label="Price visibility"
+        >
+          <option value="all">Show line & category prices</option>
+          <option value="category">Show category prices only</option>
+          <option value="qty">Hide all prices (qty only)</option>
+        </select>      
+        <div className="d-flex align-items-center" style={{ gap: 8, marginLeft: 8 }}>
+  <label className="form-label mb-0" style={{ fontSize: 12 }}>Deposit %</label>
+  <input type="number" min="0" max="100" step="1"
+    className="form-control form-control-sm" style={{ width: 70 }}
+    value={termsPerc[0]} onChange={e => handleTermsChange(0, e.target.value)} />
+  <label className="form-label mb-0" style={{ fontSize: 12 }}>Delivery %</label>
+  <input type="number" min="0" max="100" step="1"
+    className="form-control form-control-sm" style={{ width: 70 }}
+    value={termsPerc[1]} onChange={e => handleTermsChange(1, e.target.value)} />
+  <label className="form-label mb-0" style={{ fontSize: 12 }}>Completion %</label>
+  <input type="number" min="0" max="100" step="1"
+    className="form-control form-control-sm" style={{ width: 70 }}
+    value={termsPerc[2]} onChange={e => handleTermsChange(2, e.target.value)} />
+  <span className={`badge ${termsSum===100 ? 'bg-success' : 'bg-warning text-dark'}`} title="Percentages should sum to 100%">
+    Sum: {termsSum}%
+  </span>
+  <button
+    type="button"
+    className="btn btn-sm btn-outline-secondary"
+    onClick={() => setTermsPerc([65,25,10])}
+    title="Reset to 65/25/10"
+  >Reset</button>
+</div>
+  
       </div>
 
       <main className="bom-printarea">
@@ -432,8 +581,8 @@ const renderHeader = () => (
               {/* Inline blocks on the last rows page */}
               {pg.kind === 'rows' && pageIndex === (pages.length - 1) && (
                 <>
-                  {totalsPlacement.inlineKeys.includes('totals') && <TotalsBlock />}
-                  {totalsPlacement.inlineKeys.includes('termsDeposit') && <TermsDepositBlock />}
+                  {priceMode !== 'qty' && totalsPlacement.inlineKeys.includes('totals') && <TotalsBlock />}
+                  {priceMode !== 'qty' && totalsPlacement.inlineKeys.includes('termsDeposit') && <TermsDepositBlock />}
                   {totalsPlacement.inlineKeys.includes('bankingAccept') && <BankingAcceptanceBlock />}
                 </>
               )}
@@ -441,8 +590,8 @@ const renderHeader = () => (
               {/* Dedicated totals page for any carried blocks */}
               {pg.kind === 'totals' && (
                 <>
-                  {pg.blocks.includes('totals') && <TotalsBlock />}
-                  {pg.blocks.includes('termsDeposit') && <TermsDepositBlock />}
+                  {priceMode !== 'qty' && pg.blocks.includes('totals') && <TotalsBlock />}
+                  {priceMode !== 'qty' && pg.blocks.includes('termsDeposit') && <TermsDepositBlock />}
                   {pg.blocks.includes('bankingAccept') && <BankingAcceptanceBlock />}
                 </>
               )}
