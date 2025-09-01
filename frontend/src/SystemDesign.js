@@ -349,7 +349,7 @@ const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, set
                                                 value={design.batterySocLimit}
                                                 onChange={e => onDesignChange({...design, batterySocLimit: e.target.value})}
                                                 onBlur={e => onDesignChange({...design, batterySocLimit: Math.max(0, Math.min(50, parseInt(e.target.value) || 0))})}
-                                                disabled={design.systemType === 'grid' || design.systemType === 'off-grid'}
+                                                disabled={design.systemType === 'grid'}
                                             />
                                         </Form.Group>
                                     </Col>
@@ -1613,6 +1613,7 @@ function SystemDesign({ projectId }) {
 
         const daytimeConsumptionPct = totalDemandKwh > 0 ? (daytimeDemandKwh / totalDemandKwh) * 100 : 0;
         const consumptionFromPvPct = totalUtilizedGenKwh > 0 ? (pvUsedOnSiteKwh / totalDemandKwh) * 100 : 0;
+
 
         const daysInSim = data.timestamps.length / 48;
         const potentialGenDaily = totalPotentialGenKwh / daysInSim;

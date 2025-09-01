@@ -110,15 +110,19 @@ class GeneratorController:
     Controls generator operation with realistic start/stop behavior and minimum run time.
     """
     
-    def __init__(self, size_kw, min_loading_pct=25.0, min_run_time_hours=1.0, 
-                 battery_start_soc=20.0, battery_stop_soc=80.0, can_charge_battery=True):
+    def __init__(self, size_kw, min_loading_pct=25.0, min_run_time_hours=0.0, 
+                 battery_start_soc=20.0, battery_stop_soc=100.0, can_charge_battery=True):
         self.size_kw = size_kw
         self.min_loading_pct = max(25.0, min(100.0, min_loading_pct))  # Minimum 25%, max 100%
         self.min_run_time_hours = min_run_time_hours
         self.battery_start_soc = battery_start_soc  # Start generator when battery SOC drops below this
         self.battery_stop_soc = battery_stop_soc    # Stop generator when battery SOC rises above this
         self.can_charge_battery = can_charge_battery
-        
+
+        # Battery rate limits (configurable if needed)
+        self.battery_charge_c_rate = 1.0
+        self.battery_discharge_c_rate = 1.0
+
         # State tracking
         self.is_running = False
         self.run_time_remaining = 0.0  # Hours remaining for minimum run time
@@ -126,39 +130,82 @@ class GeneratorController:
         self.total_energy_kwh = 0.0
         self.total_runtime_hours = 0.0
         
-    def should_start(self, shortfall_kw, battery_soc_pct, time_interval_hours):
+    def should_start(self, shortfall_kw, battery_soc_kwh, battery_capacity_kwh, min_soc_limit_kwh, time_interval_hours):
         """
         Determine if generator should start based on conditions.
         """
         # Don't start if already running
         if self.is_running:
             return False
-            
-        # Start if there's significant shortfall OR battery is low
-        has_shortfall = shortfall_kw > (self.size_kw * 0.1)  # 10% of generator capacity
-        battery_low = battery_soc_pct <= self.battery_start_soc
         
-        return has_shortfall or battery_low
+        if battery_capacity_kwh <= 0:
+            return shortfall_kw > 0
+        
+        soc_pct = (battery_soc_kwh / battery_capacity_kwh) * 100
+        
+        # CRITICAL: Never start if battery is above a healthy level (50%)
+        # The battery should handle loads during nighttime if it's reasonably charged
+        if soc_pct > 50.0:
+            return False
+        
+        # Calculate if battery alone can cover the load without shortfall
+        available_discharge_kwh = max(0.0, battery_soc_kwh - min_soc_limit_kwh)
+        battery_max_discharge_kw = battery_capacity_kwh * self.battery_discharge_c_rate
+        max_discharge_this_interval_kwh = battery_max_discharge_kw * time_interval_hours
+        potential_discharge_kwh = min(available_discharge_kwh, max_discharge_this_interval_kwh)
+
+        shortfall_kwh = shortfall_kw * time_interval_hours
+        net_shortfall_kwh = max(0.0, shortfall_kwh - potential_discharge_kwh)
+        
+        # Start if there would be any shortfall after max battery discharge
+        if net_shortfall_kwh > 0:
+            return True
+        
+        # Primary condition: Start when battery is low
+        battery_low = soc_pct <= self.battery_start_soc
+        
+        return battery_low
     
     def should_stop(self, shortfall_kw, battery_soc_pct, time_interval_hours):
         """
         Determine if generator should stop.
-        For bulk charging mode: Only stop when battery reaches stop_soc AND minimum run time is complete.
+        Logic depends on whether generator can charge battery or not.
         """
         # Don't stop if not running
         if not self.is_running:
             return False
-            
-        # Must run for minimum time
-        if self.run_time_remaining > 0:
-            return False
-            
-        # Stop when battery reaches stop_soc (regardless of demand shortfall)
-        battery_charged = battery_soc_pct >= self.battery_stop_soc
         
-        return battery_charged
+        # Different stop logic based on whether generator can charge battery
+        if self.can_charge_battery:
+            # CASE 1: Generator CAN charge battery
+            # Stop immediately when battery reaches stop_soc (regardless of min run time OR ongoing shortfall)
+            # The battery should take over to supply loads once it's charged
+            battery_charged = battery_soc_pct >= self.battery_stop_soc
+            if battery_charged:
+                return True
+            
+            # Must run for minimum time if battery not yet charged
+            if self.run_time_remaining > 0:
+                return False
+            
+            # After minimum time, continue running until battery is charged
+            # (Don't stop based on shortfall since we're in bulk charging mode)
+            return False
+        
+        else:
+            # CASE 2: Generator CANNOT charge battery
+            # Stop logic should NOT depend on battery SOC since generator can't influence it
+            
+            # Must run for minimum time first
+            if self.run_time_remaining > 0:
+                return False
+            
+            # After minimum run time, stop when there's no significant shortfall
+            # (Let PV + battery handle small loads)
+            no_significant_shortfall = shortfall_kw <= (self.size_kw * 0.1)  # Less than 10% of capacity
+            return no_significant_shortfall
     
-    def get_output(self, demand_shortfall_kw, battery_soc_kwh, battery_capacity_kwh, time_interval_hours, inverter_ac_limit_kw=None):
+    def get_output(self, demand_shortfall_kw, battery_soc_kwh, battery_capacity_kwh, time_interval_hours, min_soc_limit_kwh, inverter_ac_limit_kw=None):
         """
         Calculate generator output and fuel consumption for this time step.
         When ON, generator runs at rated power to bulk-charge battery until stop_soc.
@@ -171,7 +218,7 @@ class GeneratorController:
         
         # Check start/stop conditions
         if not self.is_running:
-            if self.should_start(demand_shortfall_kw, battery_soc_pct, time_interval_hours):
+            if self.should_start(demand_shortfall_kw, battery_soc_kwh, battery_capacity_kwh, min_soc_limit_kwh, time_interval_hours):
                 self.is_running = True
                 self.run_time_remaining = self.min_run_time_hours
         else:
@@ -188,12 +235,17 @@ class GeneratorController:
         # Generator is running - track runtime hours
         self.total_runtime_hours += time_interval_hours
         
-        # Generator is running - run at rated power
+        # ENFORCE MINIMUM LOADING: Gennie must run at min load % when ON
+        min_output_kw = self.size_kw * (self.min_loading_pct / 100.0)
+
         # Apply inverter limit if provided
         target_output_kw = self.size_kw
         if inverter_ac_limit_kw is not None:
             target_output_kw = min(self.size_kw, inverter_ac_limit_kw)
         
+        # Ensure we meet min load requirement
+        target_output_kw = max(min_output_kw, target_output_kw)
+
         # Serve load first
         gen_to_load_kw = min(demand_shortfall_kw, target_output_kw)
         
@@ -207,19 +259,22 @@ class GeneratorController:
                 energy_to_stop_soc_kwh = max(0, (self.battery_stop_soc - battery_soc_pct) * battery_capacity_kwh / 100)
                 
                 # Maximum charge rate based on energy needed and time interval
-                max_charge_kw = energy_to_stop_soc_kwh / time_interval_hours
+                max_charge_kw_energy = energy_to_stop_soc_kwh / time_interval_hours
                 
-                # Battery charging is also limited by battery's maximum charge rate
-                # For simplicity, assume battery can charge at any rate up to remaining capacity
-                battery_max_charge_kw = max_charge_kw  # Could add a separate battery charge rate limit here
+                # Battery maximum charge rate (1C rate = battery kWh capacity in kW)
+                # For example: 30kWh battery can charge at max 30kW
+                battery_max_charge_rate_kw = battery_capacity_kwh * self.battery_charge_c_rate
                 
-                # Use minimum of: remaining generator capacity, battery charge limit, energy needed
-                gen_to_battery_kw = min(remaining_gen_capacity, battery_max_charge_kw)
+                # Use minimum of: remaining generator capacity, battery charge rate limit, energy needed
+                gen_to_battery_kw = min(remaining_gen_capacity, battery_max_charge_rate_kw, max_charge_kw_energy)
                 gen_to_battery_kw = max(0, gen_to_battery_kw)  # Ensure non-negative
         
+        # calculate actual useful output
+        actual_useful_output_kw = gen_to_load_kw + gen_to_battery_kw
+
         # Total actual generator output
-        actual_gen_output_kw = gen_to_load_kw + gen_to_battery_kw
-        
+        actual_gen_output_kw = max(actual_useful_output_kw, min_output_kw)
+
         # For fuel calculation, use the target output (rated power or inverter limit)
         # Even if we can't use all the power, generator still runs at rated capacity
         fuel_load_factor = actual_gen_output_kw / self.size_kw if self.size_kw > 0 else 0
@@ -229,17 +284,6 @@ class GeneratorController:
         # Track totals
         self.total_fuel_liters += fuel_liters_consumed
         self.total_energy_kwh += actual_gen_output_kw * time_interval_hours
-        
-        return gen_to_load_kw, gen_to_battery_kw, fuel_liters_consumed
-        
-        # Calculate fuel consumption
-        load_factor = total_output_kw / self.size_kw if self.size_kw > 0 else 0
-        fuel_consumption_lph = get_fuel_consumption(self.size_kw, load_factor)
-        fuel_liters_consumed = fuel_consumption_lph * time_interval_hours
-        
-        # Track totals
-        self.total_fuel_liters += fuel_liters_consumed
-        self.total_energy_kwh += total_output_kw * time_interval_hours
         
         return gen_to_load_kw, gen_to_battery_kw, fuel_liters_consumed
 
@@ -483,18 +527,19 @@ def simulate_system_inner(
             # 2) Excess PV to battery (hybrid or off-grid)
             pv_to_batt = 0.0
             if excess_pv_kwh > 0 and system_type in ['hybrid', 'off-grid'] and battery_capacity_kwh > 0:
-                pv_to_batt = min(excess_pv_kwh, battery_capacity_kwh - battery_soc_kwh)
+                # Calculate available space in battery
+                available_space_kwh = battery_capacity_kwh - battery_soc_kwh
+                
+                # Battery maximum charge rate (1C rate = battery kWh capacity in kW)
+                battery_max_charge_rate_kw = battery_capacity_kwh
+                max_charge_kwh_this_interval = battery_max_charge_rate_kw * time_interval_hours
+                
+                # Use minimum of: excess PV, available space, charge rate limit
+                pv_to_batt = min(excess_pv_kwh, available_space_kwh, max_charge_kwh_this_interval)
                 battery_soc_kwh += pv_to_batt
-            
-            # 3) Discharge battery to remaining load (respect min SOC)
-            batt_to_load = 0.0
-            if rem_load_kwh > 0 and system_type in ['hybrid', 'off-grid'] and battery_capacity_kwh > 0:
-                available_discharge = max(0.0, battery_soc_kwh - min_soc_limit_kwh)
-                batt_to_load = min(rem_load_kwh, available_discharge)
-                battery_soc_kwh -= batt_to_load
-                rem_load_kwh -= batt_to_load
 
-            # 4) Generator operation for off-grid systems
+
+            # 3) Generator operation for off-grid systems
             gen_to_load_kw = 0.0
             gen_to_batt_kw = 0.0
             fuel_consumed = 0.0
@@ -505,6 +550,7 @@ def simulate_system_inner(
                     battery_soc_kwh=battery_soc_kwh,
                     battery_capacity_kwh=battery_capacity_kwh,
                     time_interval_hours=time_interval_hours,
+                    min_soc_limit_kwh=min_soc_limit_kwh,
                     inverter_ac_limit_kw=inverter_kva
                 )
                 
@@ -520,6 +566,15 @@ def simulate_system_inner(
                     actual_charge = min(gen_to_batt_kwh, battery_capacity_kwh - battery_soc_kwh)
                     battery_soc_kwh += actual_charge
 
+            # 4) Discharge battery to remaining load (respect min SOC)
+            batt_to_load = 0.0
+            if rem_load_kwh > 0 and system_type in ['hybrid', 'off-grid'] and battery_capacity_kwh > 0:
+                available_discharge = max(0.0, battery_soc_kwh - min_soc_limit_kwh)
+                batt_to_load = min(rem_load_kwh, available_discharge)
+                battery_soc_kwh -= batt_to_load
+                rem_load_kwh -= batt_to_load
+
+
             # 5) Handle remaining load based on system type
             if rem_load_kwh > 0:
                 if system_type == 'off-grid':
@@ -534,9 +589,17 @@ def simulate_system_inner(
                 import_from_grid.append(0.0)
                 shortfall_kw.append(0.0)
 
-            # 6) Generator output tracking
-            total_gen_output_kw = gen_to_load_kw + gen_to_batt_kw
-            generator_kw.append(total_gen_output_kw)
+            # 6) Generator Output Tracking - get Actual Output including wasted power
+            if system_type == 'off-grid' and generator:
+                # Get the actual gen output (incl min loading)
+                actual_generator_output_kw = 0.0
+                if generator.is_running:
+                    min_output_kw = generator.size_kw * (generator.min_loading_pct / 100.0)
+                    useful_output_kw = gen_to_load_kw + gen_to_batt_kw
+                    actual_generator_output_kw = max(min_output_kw, useful_output_kw)
+                generator_kw.append(actual_generator_output_kw)
+            else:
+                generator_kw.append(0.0)
 
             # 7) Grid export only if allowed (surplus PV after charging battery)
             export_kwh = 0.0
