@@ -266,48 +266,83 @@ function FinancialModeling({ projectId }) {
     }
     
     const fin = financialResult;
+    const isOffgridWithGenerator = fin.is_offgrid_with_generator;
+    
     const labels = fin.cost_comparison.map(item => 
       new Date(item.month).toLocaleString('default', { month: 'short', year: '2-digit' })
     );
 
-    const allDatasets = [
-      {
-        label: 'Old Bill - Energy',
-        data: fin.cost_comparison.map(item => item.old_bill_breakdown?.energy || 0),
-        backgroundColor: '#f87171',
-        stack: 'Stack 0',
-      },
-      {
-        label: 'Old Bill - Fixed',
-        data: fin.cost_comparison.map(item => item.old_bill_breakdown?.fixed || 0),
-        backgroundColor: '#9ca3af',
-        stack: 'Stack 0',
-      },
-      {
-        label: 'Old Bill - Demand',
-        data: fin.cost_comparison.map(item => item.old_bill_breakdown?.demand || 0),
-        backgroundColor: '#b91c1c',
-        stack: 'Stack 0',
-      },
-      {
-        label: 'New Bill - Energy',
-        data: fin.cost_comparison.map(item => item.new_bill_breakdown?.energy || 0),
-        backgroundColor: '#60a5fa',
-        stack: 'Stack 1',
-      },
-      {
-        label: 'New Bill - Fixed',
-        data: fin.cost_comparison.map(item => item.new_bill_breakdown?.fixed || 0),
-        backgroundColor: '#6b7280',
-        stack: 'Stack 1',
-      },
-      {
-        label: 'New Bill - Demand',
-        data: fin.cost_comparison.map(item => item.new_bill_breakdown?.demand || 0),
-        backgroundColor: '#1d4ed8',
-        stack: 'Stack 1',
-      }
-    ];
+    let allDatasets = [];
+    
+    if (isOffgridWithGenerator) {
+      // Off-grid with generator: Show old grid bill breakdown vs new generator costs
+      allDatasets = [
+        {
+          label: 'Old Bill - Energy',
+          data: fin.cost_comparison.map(item => item.old_bill_breakdown?.energy || 0),
+          backgroundColor: '#f87171',
+          stack: 'Stack 0',
+        },
+        {
+          label: 'Old Bill - Fixed',
+          data: fin.cost_comparison.map(item => item.old_bill_breakdown?.fixed || 0),
+          backgroundColor: '#9ca3af',
+          stack: 'Stack 0',
+        },
+        {
+          label: 'Old Bill - Demand',
+          data: fin.cost_comparison.map(item => item.old_bill_breakdown?.demand || 0),
+          backgroundColor: '#b91c1c',
+          stack: 'Stack 0',
+        },
+        {
+          label: 'New Generator Costs',
+          data: fin.cost_comparison.map(item => item.new_bill_breakdown?.generator || 0),
+          backgroundColor: '#059669',
+          stack: 'Stack 1',
+        }
+      ];
+    } else {
+      // Grid-tied system: Show standard tariff breakdown
+      allDatasets = [
+        {
+          label: 'Old Bill - Energy',
+          data: fin.cost_comparison.map(item => item.old_bill_breakdown?.energy || 0),
+          backgroundColor: '#f87171',
+          stack: 'Stack 0',
+        },
+        {
+          label: 'Old Bill - Fixed',
+          data: fin.cost_comparison.map(item => item.old_bill_breakdown?.fixed || 0),
+          backgroundColor: '#9ca3af',
+          stack: 'Stack 0',
+        },
+        {
+          label: 'Old Bill - Demand',
+          data: fin.cost_comparison.map(item => item.old_bill_breakdown?.demand || 0),
+          backgroundColor: '#b91c1c',
+          stack: 'Stack 0',
+        },
+        {
+          label: 'New Bill - Energy',
+          data: fin.cost_comparison.map(item => item.new_bill_breakdown?.energy || 0),
+          backgroundColor: '#60a5fa',
+          stack: 'Stack 1',
+        },
+        {
+          label: 'New Bill - Fixed',
+          data: fin.cost_comparison.map(item => item.new_bill_breakdown?.fixed || 0),
+          backgroundColor: '#6b7280',
+          stack: 'Stack 1',
+        },
+        {
+          label: 'New Bill - Demand',
+          data: fin.cost_comparison.map(item => item.new_bill_breakdown?.demand || 0),
+          backgroundColor: '#1d4ed8',
+          stack: 'Stack 1',
+        }
+      ];
+    }
 
     return {
       labels,
@@ -445,39 +480,54 @@ function FinancialModeling({ projectId }) {
               </Form.Group>
             </Col>
 
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Allow Export to Grid?</Form.Label>
-                <Form.Check
-                  type="switch"
-                  id="export-switch"
-                  checked={allowExport}
-                  onChange={() => {
-                    const newVal = !allowExport;
-                    setAllowExport(newVal);
-                    sessionStorage.setItem(`allowExport_${projectId}`, newVal);
-                  }}
-                  label={allowExport ? "Enabled" : "Disabled"}
-                />
-              </Form.Group>
-            </Col>
+            {/* Only show export settings for grid-tied systems */}
+            {financialResult?.system_type !== 'off-grid' && (
+              <>
+                <Col md={4}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Allow Export to Grid?</Form.Label>
+                    <Form.Check
+                      type="switch"
+                      id="export-switch"
+                      checked={allowExport}
+                      onChange={() => {
+                        const newVal = !allowExport;
+                        setAllowExport(newVal);
+                        sessionStorage.setItem(`allowExport_${projectId}`, newVal);
+                      }}
+                      label={allowExport ? "Enabled" : "Disabled"}
+                    />
+                  </Form.Group>
+                </Col>
 
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Feed-in Tariff (R/kWh)</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={feedInTariff}
-                  onChange={(e) => {
-                    setFeedInTariff(e.target.value);
-                    sessionStorage.setItem(`feedInTariff_${projectId}`, e.target.value);
-                  }}
-                  step="0.01"
-                  min="0"
-                  disabled={!allowExport}
-                />
-              </Form.Group>
-            </Col>
+                <Col md={4}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Feed-in Tariff (R/kWh)</Form.Label>
+                    <Form.Control
+                      type="number"
+                      value={feedInTariff}
+                      onChange={(e) => {
+                        setFeedInTariff(e.target.value);
+                        sessionStorage.setItem(`feedInTariff_${projectId}`, e.target.value);
+                      }}
+                      step="0.01"
+                      min="0"
+                      disabled={!allowExport}
+                    />
+                  </Form.Group>
+                </Col>
+              </>
+            )}
+
+            {/* Show helpful note for off-grid systems */}
+            {financialResult?.system_type === 'off-grid' && (
+              <Col md={8}>
+                <div className="p-3 bg-info bg-opacity-10 rounded">
+                  <i className="bi bi-info-circle text-info me-2"></i>
+                  <strong>Off-grid System</strong> 
+                </div>
+              </Col>
+            )}
           </Row>
           
           <Button 
@@ -761,38 +811,63 @@ function FinancialModeling({ projectId }) {
             </Col>
           </Row>
 
-          {/* Tariff & cost analysis section */}
+          {/* Cost analysis section */}
           <hr className="my-5" />
           <h2 className="text-2xl font-bold text-gray-700 mb-4 text-center">
-            Tariff & Cost Analysis
+            {financialResult?.is_offgrid_with_generator ? 'Generator Cost Analysis' : 'Tariff & Cost Analysis'}
           </h2>
           <Row>
             <Col lg={4} className="mb-4">
               <Card className="shadow-sm h-100">
                 <Card.Header as="h5">
-                  <i className="bi bi-clock-history me-2"></i>Tariff Rate Sample (First Week)
+                  <i className={`bi ${financialResult?.is_offgrid_with_generator ? 'bi-fuel-pump' : 'bi-clock-history'} me-2`}></i>
+                  {financialResult?.is_offgrid_with_generator ? 'Generator Cost Structure' : 'Tariff Rate Sample (First Week)'}
                 </Card.Header>
                 <Card.Body style={{ height: '450px', overflowY: 'auto' }}>
-                  <Table striped hover size="sm">
-                    <thead>
-                      <tr>
-                        <th>Timestamp</th>
-                        <th className="text-end">Rate (R/kWh)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {financialResult.tariff_sample?.map((item, index) => (
-                        <tr key={index}>
-                          <td>
-                            {new Date(item.timestamp).toLocaleString('en-ZA', { 
-                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-                            })}
-                          </td>
-                          <td className="text-end fw-bold">{item.rate.toFixed(2)}</td>
+                  {financialResult?.is_offgrid_with_generator ? (
+                    // Off-grid generator cost information
+                    <div>
+                      <div className="mb-3 p-3 bg-light rounded">
+                        <h6 className="text-primary mb-2">💡 Cost Comparison</h6>
+                        <p className="small text-muted mb-1">
+                          <strong>Baseline:</strong> Generator supplies 100% of energy needs
+                        </p>
+                        <p className="small text-muted mb-0">
+                          <strong>With Solar:</strong> Generator only runs when needed
+                        </p>
+                      </div>
+                      
+                      <div className="p-3 bg-success bg-opacity-10 rounded">
+                        <h6 className="text-success mb-2">📊 Annual Savings</h6>
+                        <p className="h4 text-success mb-1">{formatCurrency(financialResult.annual_savings)}</p>
+                        <p className="small text-muted mb-0">
+                          Reduced fuel and maintenance costs
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    // Grid-tied tariff information
+                    <Table striped hover size="sm">
+                      <thead>
+                        <tr>
+                          <th>Timestamp</th>
+                          <th className="text-end">Rate (R/kWh)</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </Table>
+                      </thead>
+                      <tbody>
+                        {financialResult.tariff_sample?.map((item, index) => (
+                          <tr key={index}>
+                            <td>
+                              {new Date(item.timestamp).toLocaleString('en-ZA', { 
+                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                              })}
+                            </td>
+                            <td className="text-end fw-bold">{item.rate.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  )}
                 </Card.Body>
               </Card>
             </Col>
@@ -800,7 +875,8 @@ function FinancialModeling({ projectId }) {
             <Col lg={8} className="mb-4">
               <Card className="shadow-sm h-100">
                 <Card.Header as="h5">
-                  <i className="bi bi-pie-chart-fill me-2"></i>Monthly Bill Composition (New Bill)
+                  <i className="bi bi-pie-chart-fill me-2"></i>
+                  {financialResult?.is_offgrid_with_generator ? 'Monthly Generator Cost Comparison' : 'Monthly Bill Composition (New Bill)'}
                 </Card.Header>
                 <Card.Body style={{ height: '450px' }}>
                   <Bar 

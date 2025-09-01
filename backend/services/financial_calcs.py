@@ -89,8 +89,18 @@ def _serialize_tariff_for_engine(tariff: Tariffs) -> dict:
 
 def run_quick_financials(sim_response: dict, system_cost: float, project: 'Projects', escalation_schedule=None) -> dict:
     try:
-        # 1 Initiliaze the tariff engine
+        # Check if this is an off-grid system with generator
+        is_offgrid_with_generator = (
+            project.system_type == 'off-grid' and 
+            sim_response.get('generator_config', {}).get('enabled', False)
+        )
+        
+        # 1 Initialize the tariff engine 
         tariff_data = {}
+        engine = None
+        
+        # For both grid-tied and off-grid systems, we need tariff data
+        # Off-grid systems use it to calculate what they would have paid on grid
         if project.custom_flat_rate is not None:
             tariff_data = {
                 'name': 'Custom Flat Rate',
@@ -99,13 +109,19 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
                     'rate_unit': 'c/kWh', 'season': 'all', 'time_of_use': 'all'
                 }]
             }
-        elif project.tariff_id is not None and project.tariff:
-            tariff_data = _serialize_tariff_for_engine(project.tariff)
+        elif project.tariff_id is not None:
+            # Load the tariff from the database
+            from sqlalchemy.orm import sessionmaker
+            tariff_obj = db.session.get(Tariffs, project.tariff_id)
+            if tariff_obj:
+                tariff_data = _serialize_tariff_for_engine(tariff_obj)
 
-        if not tariff_data.get('rates'):
-            return {"error": "No valid tariff data available for financial calculations."}
-        
-        engine = TariffEngine(tariff_data)
+        # For grid-tied systems, tariff is required. For off-grid, it will be handled in the off-grid section
+        if not is_offgrid_with_generator:
+            if not tariff_data.get('rates'):
+                return {"error": "No valid tariff data available for financial calculations."}
+            
+            engine = TariffEngine(tariff_data)
 
         # 2 Prepare for loop
         imports = sim_response["import_from_grid"]
@@ -114,6 +130,10 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
         potential_generation = sim_response["potential_generation"]
         panel_kw = sim_response.get("panel_kw", 1)
         timestamps = [datetime.fromisoformat(ts) for ts in sim_response["timestamps"]]
+
+        # Generator data (for off-grid systems)
+        generator_kw = sim_response.get("generator_kw", [])
+        generator_config = sim_response.get("generator_config", {})
 
         # Use passed escalation schedule or fallback to hardcoded
         if escalation_schedule and isinstance(escalation_schedule, list):
@@ -129,59 +149,150 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
         monthly_max_demand = {}
         tariff_sample = []
 
-        # 3 Loop through simulation & calculate dynamic costs
-        for i, ts in enumerate(timestamps):
-            month_key = ts.strftime('%Y-%m')
+        if is_offgrid_with_generator:
+            # Off-grid generator financial modeling
+            # Calculate what they would have paid on the grid (using their tariff) 
+            # vs what they pay now with generator only (no grid costs)
+            # This models customers moving FROM grid TO off-grid
+            
+            # Verify we have tariff data for off-grid calculations
+            if not tariff_data.get('rates'):
+                return {"error": "Off-grid financial modeling requires tariff information to calculate grid savings"}
+            
+            # Initialize tariff engine for grid cost calculations
+            engine = TariffEngine(tariff_data)
+            
+            # Get generator configuration
+            from .simulation_engine import get_fuel_consumption
+            gen_size_kw = generator_config.get('kva', 0)
+            diesel_price_r_per_liter = generator_config.get('diesel_price_r_per_liter', 23.50)
+            service_cost = Decimal(str(generator_config.get('service_cost', 1000)))
+            service_interval = Decimal(str(generator_config.get('service_interval_hours', 1000)))
+            
+            # Calculate what they would pay on grid vs what they pay with generator
+            for i, ts in enumerate(timestamps):
+                month_key = ts.strftime('%Y-%m')
+                
+                if month_key not in monthly_costs:
+                    monthly_costs[month_key] = {
+                        'old_energy_cost': Decimal(0),  # Grid energy cost
+                        'new_energy_cost': Decimal(0),  # Generator cost
+                        'old_demand_cost': Decimal(0), # Grid demand cost
+                        'new_demand_cost': Decimal(0), # No demand cost for off-grid
+                        'old_fixed_cost': Decimal(0),  # Grid fixed cost
+                        'new_fixed_cost': Decimal(0),  # No fixed cost for off-grid
+                        'total_old_bill': Decimal(0),  # Total grid bill
+                        'total_new_bill': Decimal(0)   # Total generator cost
+                    }
+                if month_key not in monthly_max_demand:
+                    monthly_max_demand[month_key] = {'old': Decimal(0), 'new': Decimal(0)}
+                
+                # OLD BILL: What they would have paid on the grid
+                demand_kw = Decimal(str(demand[i]))
+                
+                # Energy cost using tariff
+                energy_rate_r_kwh = engine.get_energy_rate_r_per_kwh(ts)
+                energy_kwh = demand_kw * time_interval_hours
+                energy_cost = energy_rate_r_kwh * energy_kwh
+                monthly_costs[month_key]['old_energy_cost'] += energy_cost
+                
+                # Track max demand for demand charges
+                demand_rate_r_kva = engine.get_demand_rate_r_per_kva_per_month(ts)
+                if demand_rate_r_kva > 0:
+                    monthly_max_demand[month_key]['old'] = max(monthly_max_demand[month_key]['old'], demand_kw)
+                
+                # NEW BILL: Only generator costs (no grid costs)
+                if i < len(generator_kw) and generator_kw[i] > 0 and gen_size_kw > 0:
+                    gen_output_kw = generator_kw[i]
+                    load_factor = gen_output_kw / gen_size_kw
+                    fuel_consumption_lph = get_fuel_consumption(gen_size_kw, load_factor)
+                    
+                    fuel_cost_this_interval = Decimal(str(fuel_consumption_lph)) * time_interval_hours * Decimal(str(diesel_price_r_per_liter))
+                    service_cost_this_interval = (time_interval_hours / service_interval) * service_cost
+                    total_gen_cost = fuel_cost_this_interval + service_cost_this_interval
+                    
+                    monthly_costs[month_key]['new_energy_cost'] += total_gen_cost
+                    monthly_costs[month_key]['total_new_bill'] += total_gen_cost
+            
+            # Calculate fixed and demand charges for old bill (grid)
+            daily_fixed_rate = engine.get_fixed_rate_r_per_day()
+            
+            for month_key, values in monthly_costs.items():
+                year, month = int(month_key.split('-')[0]), int(month_key.split('-')[1])
+                days_in_month = monthrange(year, month)[1]
+                
+                # Grid fixed costs (old bill only)
+                monthly_fixed_cost = Decimal(days_in_month) * daily_fixed_rate
+                values['old_fixed_cost'] = monthly_fixed_cost
+                
+                # Grid demand charges (old bill only)
+                if monthly_max_demand[month_key]['old'] > 0:
+                    # Use first day of month to determine season for demand charge
+                    month_start = datetime(year, month, 1)
+                    demand_rate = engine.get_demand_rate_r_per_kva_per_month(month_start)
+                    demand_cost = demand_rate * monthly_max_demand[month_key]['old']
+                    values['old_demand_cost'] = demand_cost
+                
+                # Calculate total old bill (grid costs)
+                values['total_old_bill'] = values['old_energy_cost'] + values['old_fixed_cost'] + values['old_demand_cost']
+            
+        else:
+            # 3B) Grid-tied system: Calculate tariff costs
+            if not engine:
+                return {"error": "No tariff engine available for grid-tied system calculations."}
+                
+            for i, ts in enumerate(timestamps):
+                month_key = ts.strftime('%Y-%m')
 
-            if month_key not in monthly_costs:
-                monthly_costs[month_key] = {
-                    'old_energy_cost': Decimal(0), 'new_energy_cost': Decimal(0),
-                    'old_demand_cost': Decimal(0), 'new_demand_cost': Decimal(0),
-                    'old_fixed_cost': Decimal(0), 'new_fixed_cost': Decimal(0),
-                    'total_old_bill': Decimal(0), 'total_new_bill': Decimal(0)
-                }
-            if month_key not in monthly_max_demand:
-                monthly_max_demand[month_key] = {'old': Decimal(0), 'new': Decimal(0)}
+                if month_key not in monthly_costs:
+                    monthly_costs[month_key] = {
+                        'old_energy_cost': Decimal(0), 'new_energy_cost': Decimal(0),
+                        'old_demand_cost': Decimal(0), 'new_demand_cost': Decimal(0),
+                        'old_fixed_cost': Decimal(0), 'new_fixed_cost': Decimal(0),
+                        'total_old_bill': Decimal(0), 'total_new_bill': Decimal(0)
+                    }
+                if month_key not in monthly_max_demand:
+                    monthly_max_demand[month_key] = {'old': Decimal(0), 'new': Decimal(0)}
 
-            # Get the correct energy rate for the timestamp (ts)
-            energy_rate_r_kwh = engine.get_energy_rate_r_per_kwh(ts)
+                # Get the correct energy rate for the timestamp (ts)
+                energy_rate_r_kwh = engine.get_energy_rate_r_per_kwh(ts)
 
-            ## TESTING -> Populate the tariff sample for the first week (366 half-hours)
-            if i < 366:
-                tariff_sample.append({'timestamp': ts.isoformat(), 'rate': float(round(energy_rate_r_kwh, 4))})
+                ## TESTING -> Populate the tariff sample for the first week (366 half-hours)
+                if i < 366:
+                    tariff_sample.append({'timestamp': ts.isoformat(), 'rate': float(round(energy_rate_r_kwh, 4))})
 
-            # Calculate energy costs for this interval
-            monthly_costs[month_key]['old_energy_cost'] += Decimal(demand[i]) * (time_interval_hours) * energy_rate_r_kwh
-            monthly_costs[month_key]['new_energy_cost'] += Decimal(imports[i]) * (time_interval_hours) * energy_rate_r_kwh
+                # Calculate energy costs for this interval
+                monthly_costs[month_key]['old_energy_cost'] += Decimal(demand[i]) * (time_interval_hours) * energy_rate_r_kwh
+                monthly_costs[month_key]['new_energy_cost'] += Decimal(imports[i]) * (time_interval_hours) * energy_rate_r_kwh
 
-            # Check if a demand charge applies in this ts and update the monthly max demand
-            demand_rate_r_kva = engine.get_demand_rate_r_per_kva_per_month(ts)
-            if demand_rate_r_kva > 0:
-                monthly_max_demand[month_key]['old'] = max(monthly_max_demand[month_key]['old'], Decimal(demand[i]))
-                monthly_max_demand[month_key]['new'] = max(monthly_max_demand[month_key]['new'], Decimal(imports[i]))
+                # Check if a demand charge applies in this ts and update the monthly max demand
+                demand_rate_r_kva = engine.get_demand_rate_r_per_kva_per_month(ts)
+                if demand_rate_r_kva > 0:
+                    monthly_max_demand[month_key]['old'] = max(monthly_max_demand[month_key]['old'], Decimal(demand[i]))
+                    monthly_max_demand[month_key]['new'] = max(monthly_max_demand[month_key]['new'], Decimal(imports[i]))
 
-        # 4 Calculate monthly fixed and demand charges 
-        daily_fixed_rate = engine.get_fixed_rate_r_per_day()
+            # 4 Calculate monthly fixed and demand charges (only for grid-tied)
+            daily_fixed_rate = engine.get_fixed_rate_r_per_day()
 
-        for month_key, values in monthly_costs.items():
-            year, month = int(month_key.split('-')[0]), int(month_key.split('-')[1])
-            days_in_month = monthrange(year, month)[1]
+            for month_key, values in monthly_costs.items():
+                year, month = int(month_key.split('-')[0]), int(month_key.split('-')[1])
+                days_in_month = monthrange(year, month)[1]
 
-            # Calculate fixed costs for the month
-            monthly_fixed_cost = Decimal(days_in_month) * daily_fixed_rate
-            values['old_fixed_cost'] = monthly_fixed_cost
-            values['new_fixed_cost'] = monthly_fixed_cost
+                # Calculate fixed costs for the month
+                monthly_fixed_cost = Decimal(days_in_month) * daily_fixed_rate
+                values['old_fixed_cost'] = monthly_fixed_cost
+                values['new_fixed_cost'] = monthly_fixed_cost
 
-            # Calculate demand costs for the month
-            demand_ts = datetime(year, month, 15, 18, 30)
-            demand_rate = engine.get_demand_rate_r_per_kva_per_month(demand_ts)
+                # Calculate demand costs for the month
+                demand_ts = datetime(year, month, 15, 18, 30)
+                demand_rate = engine.get_demand_rate_r_per_kva_per_month(demand_ts)
 
-            values['old_demand_cost'] = monthly_max_demand[month_key]['old'] * demand_rate
-            values['new_demand_cost'] = monthly_max_demand[month_key]['new'] * demand_rate
+                values['old_demand_cost'] = monthly_max_demand[month_key]['old'] * demand_rate
+                values['new_demand_cost'] = monthly_max_demand[month_key]['new'] * demand_rate
 
-            # Calculate total monthly bills
-            values['total_old_bill'] = values['old_energy_cost'] + values['old_demand_cost'] + values['old_fixed_cost']
-            values['total_new_bill'] = values['new_energy_cost'] + values['new_demand_cost'] + values['new_fixed_cost']
+                # Calculate total monthly bills
+                values['total_old_bill'] = values['old_energy_cost'] + values['old_demand_cost'] + values['old_fixed_cost']
+                values['total_new_bill'] = values['new_energy_cost'] + values['new_demand_cost'] + values['new_fixed_cost']
 
         # 5 Calculate annual savings and ROI
         original_annual_cost = sum(v['total_old_bill'] for v in monthly_costs.values())
@@ -284,23 +395,65 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
         if payback_years == 'N/A':
             payback_years = 'N/A'
 
-        cost_comparison_data = [
-            {
-                "month": key,
-                "old_cost": float(round(value['total_old_bill'], 2)),
-                "new_cost": float(round(value['total_new_bill'], 2)),
-                "old_bill_breakdown": {
-                    "energy": float(round(value['old_energy_cost'], 2)),
-                    "fixed": float(round(value['old_fixed_cost'], 2)),
-                    "demand": float(round(value['old_demand_cost'], 2)),
-                },
-                "new_bill_breakdown": {
-                    "energy": float(round(value['new_energy_cost'], 2)),
-                    "fixed": float(round(value['new_fixed_cost'], 2)),
-                    "demand": float(round(value['new_demand_cost'], 2)),
-                }
-            } for key, value in sorted(monthly_costs.items())
-        ]
+        cost_comparison_data = []
+        for key, value in sorted(monthly_costs.items()):
+            if is_offgrid_with_generator:
+                # For off-grid with generator, show grid costs vs generator costs
+                cost_comparison_data.append({
+                    "month": key,
+                    "old_cost": float(round(value['total_old_bill'], 2)),
+                    "new_cost": float(round(value['total_new_bill'], 2)),
+                    "old_bill_breakdown": {
+                        "energy": float(round(value['old_energy_cost'], 2)),   # Grid energy cost
+                        "fixed": float(round(value['old_fixed_cost'], 2)),    # Grid fixed cost  
+                        "demand": float(round(value['old_demand_cost'], 2)),  # Grid demand cost
+                    },
+                    "new_bill_breakdown": {
+                        "generator": float(round(value['new_energy_cost'], 2)),  # Generator cost
+                        "fixed": 0,
+                        "demand": 0,
+                    }
+                })
+            else:
+                # For grid-tied systems, use standard tariff breakdown
+                cost_comparison_data.append({
+                    "month": key,
+                    "old_cost": float(round(value['total_old_bill'], 2)),
+                    "new_cost": float(round(value['total_new_bill'], 2)),
+                    "old_bill_breakdown": {
+                        "energy": float(round(value['old_energy_cost'], 2)),
+                        "fixed": float(round(value['old_fixed_cost'], 2)),
+                        "demand": float(round(value['old_demand_cost'], 2)),
+                    },
+                    "new_bill_breakdown": {
+                        "energy": float(round(value['new_energy_cost'], 2)),
+                        "fixed": float(round(value['new_fixed_cost'], 2)),
+                        "demand": float(round(value['new_demand_cost'], 2)),
+                    }
+                })
+
+        # Generator metrics for reports
+        generator_energy = 0
+        generator_running_cost = 0
+        generator_cost_savings = 0
+        generator_runtime_hours = 0
+        diesel_cost_total = 0
+        
+        if is_offgrid_with_generator:
+            # Get generator energy from simulation data
+            generator_energy = round(sim_response.get("generator_energy_total_kwh", 0), 2)
+            
+            # Get generator runtime hours
+            generator_runtime_hours = round(sim_response.get("generator_runtime_hours", 0), 2)
+            
+            # Get diesel cost total
+            diesel_cost_total = round(sim_response.get("diesel_cost_total", 0), 2)
+            
+            # Calculate total generator running cost (sum of all new_energy_cost for off-grid)
+            generator_running_cost = round(float(sum(v['new_energy_cost'] for v in monthly_costs.values())), 2)
+            
+            # Generator cost savings = what they would pay on grid - what they pay with generator
+            generator_cost_savings = round(float(original_annual_cost - new_annual_cost), 2)
 
         return {
             # Financial KPIs
@@ -313,10 +466,20 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             "cost_comparison": cost_comparison_data,
             "yearly_savings": yearly_savings,
             "tariff_sample": tariff_sample,
-            "roi": float(round(roi_20yr, 1)) if roi_20yr != Decimal('inf') else 'N/A',
             "lcoe": float(round(lcoe, 2)),
             "bill_fluctuation": bill_fluctuation,
             "lifetime_cashflow": lifetime_cashflow,
+
+            # System information
+            "system_type": project.system_type,
+            "is_offgrid_with_generator": is_offgrid_with_generator,
+
+            # Generator metrics for reports
+            "generator_energy": generator_energy,
+            "generator_running_cost": generator_running_cost,
+            "generator_cost_savings": generator_cost_savings,
+            "generator_runtime_hours": generator_runtime_hours,
+            "diesel_cost_total": diesel_cost_total,
 
             # Technical KPIs
             "total_demand_kwh": round(total_demand_kwh),
