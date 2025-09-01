@@ -438,6 +438,8 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
         generator_cost_savings = 0
         generator_runtime_hours = 0
         diesel_cost_total = 0
+        diesel_price_r_per_liter = 0
+        generator_efficiency_kwh_per_liter = 0
         
         if is_offgrid_with_generator:
             # Get generator energy from simulation data
@@ -448,6 +450,14 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             
             # Get diesel cost total
             diesel_cost_total = round(sim_response.get("diesel_cost_total", 0), 2)
+            
+            # Get diesel price from generator config
+            generator_config = sim_response.get("generator_config", {})
+            diesel_price_r_per_liter = round(generator_config.get("diesel_price_r_per_liter", 23.50), 2)
+            
+            # Calculate generator efficiency (kWh per liter)
+            diesel_liters_total = diesel_cost_total / diesel_price_r_per_liter if diesel_price_r_per_liter > 0 else 0
+            generator_efficiency_kwh_per_liter = round(generator_energy / diesel_liters_total, 2) if diesel_liters_total > 0 else 0
             
             # Calculate total generator running cost (sum of all new_energy_cost for off-grid)
             generator_running_cost = round(float(sum(v['new_energy_cost'] for v in monthly_costs.values())), 2)
@@ -480,6 +490,8 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             "generator_cost_savings": generator_cost_savings,
             "generator_runtime_hours": generator_runtime_hours,
             "diesel_cost_total": diesel_cost_total,
+            "diesel_price_r_per_liter": diesel_price_r_per_liter,
+            "generator_efficiency_kwh_per_liter": generator_efficiency_kwh_per_liter,
 
             # Technical KPIs
             "total_demand_kwh": round(total_demand_kwh),

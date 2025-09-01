@@ -828,12 +828,30 @@ function FinancialModeling({ projectId }) {
                     // Off-grid generator cost information
                     <div>
                       <div className="mb-3 p-3 bg-light rounded">
-                        <h6 className="text-primary mb-2">💡 Cost Comparison</h6>
+                        <h6 className="text-primary mb-2">⛽ Diesel Information</h6>
+                        <div className="row">
+                          <div className="col-6">
+                            <p className="small text-muted mb-1">
+                              <strong>Diesel Price:</strong>
+                            </p>
+                            <p className="h6 mb-2">
+                              R{financialResult.diesel_price_r_per_liter?.toFixed(2) || '23.50'}/L
+                            </p>
+                          </div>
+                          <div className="col-6">
+                            <p className="small text-muted mb-1">
+                              <strong>Generator Efficiency:</strong>
+                            </p>
+                            <p className="h6 mb-2">
+                              {financialResult.generator_efficiency_kwh_per_liter?.toFixed(2) || '0.00'} kWh/L
+                            </p>
+                          </div>
+                        </div>
                         <p className="small text-muted mb-1">
-                          <strong>Baseline:</strong> Generator supplies 100% of energy needs
+                          <strong>Total Generator Energy (Annual):</strong>
                         </p>
-                        <p className="small text-muted mb-0">
-                          <strong>With Solar:</strong> Generator only runs when needed
+                        <p className="h6 mb-0">
+                          {financialResult.generator_energy?.toLocaleString() || '0'} kWh
                         </p>
                       </div>
                       

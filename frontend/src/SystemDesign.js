@@ -726,32 +726,63 @@ function SystemDesign({ projectId }) {
     const { showNotification } = useNotification();
 
     // The single, unified state object for the entire design
-    const [design, setDesign] = useState({
-        systemType: 'grid',
-        panelKw: '',
-        numPanels: '',
-        tilt: '15',
-        azimuth: '0',
-        selectedPanel: null,
-        selectedInverter: null, // Will hold the full { value, label, product } object
-        inverterQuantity: 1,
-        selectedBattery: null,  // Will hold the full { value, label, product } object
-        batteryQuantity: 1,
-        allowExport: false,
-        batterySocLimit: 20,
+    // Load generator settings synchronously from sessionStorage in the initializer
+    const [design, setDesign] = useState(() => {
+            const initial = {
+                systemType: 'grid',
+                panelKw: '',
+                numPanels: '',
+                tilt: '15',
+                azimuth: '0',
+                selectedPanel: null,
+                selectedInverter: null, // Will hold the full { value, label, product } object
+                inverterQuantity: 1,
+                selectedBattery: null,  // Will hold the full { value, label, product } object
+                batteryQuantity: 1,
+                allowExport: false,
+                batterySocLimit: 20,
 
-        // New generator config (only used in off-grid)
-        generatorEnabled: false,
-        generatorKva: 50, // Default to 50kW
-        generatorMinLoading: 25, // % - Default minimum loading
-        dieselPrice: 23.50, // R per liter - Default diesel price
-        generatorChargeBattery: true,
-        generatorMinRunTime: 1.0, // minimum run time in hours (changed from minutes)
-        generatorBatteryStartSoc: 20, // battery SoC when generator starts
-        generatorBatteryStopSoc: 100, // battery SoC when generator stops (changed from 90)
-        generatorServiceCost: 1000, // R - Default service cost
-        generatorServiceInterval: 1000, // hours - Default service interval
-    });
+                // New generator config (only used in off-grid)
+                generatorEnabled: false,
+                generatorKva: 50, // Default to 50kW
+                generatorMinLoading: 25, // % - Default minimum loading
+                dieselPrice: 23.50, // R per liter - Default diesel price
+                generatorChargeBattery: true,
+                generatorMinRunTime: 1.0, // minimum run time in hours (changed from minutes)
+                generatorBatteryStartSoc: 20, // battery SoC when generator starts
+                generatorBatteryStopSoc: 100, // battery SoC when generator stops (changed from 90)
+                generatorServiceCost: 1000, // R - Default service cost
+                generatorServiceInterval: 1000, // hours - Default service interval
+            };
+
+            if (!projectId) return initial;
+
+            const cached = sessionStorage.getItem(`generatorSettings_${projectId}`);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    console.log('Loading cached generator settings in initializer:', parsed);
+                    return {
+                        ...initial,
+                        generatorEnabled: parsed.generatorEnabled ?? initial.generatorEnabled,
+                        generatorKva: parsed.generatorKva ?? initial.generatorKva,
+                        generatorMinLoading: parsed.generatorMinLoading ?? initial.generatorMinLoading,
+                        generatorChargeBattery: parsed.generatorChargeBattery ?? initial.generatorChargeBattery,
+                        dieselPrice: parsed.dieselPrice ?? initial.dieselPrice,
+                        generatorMinRunTime: parsed.generatorMinRunTime ?? initial.generatorMinRunTime,
+                        generatorBatteryStartSoc: parsed.generatorBatteryStartSoc ?? initial.generatorBatteryStartSoc,
+                        generatorBatteryStopSoc: parsed.generatorBatteryStopSoc ?? initial.generatorBatteryStopSoc,
+                        generatorServiceCost: parsed.generatorServiceCost ?? initial.generatorServiceCost,
+                        generatorServiceInterval: parsed.generatorServiceInterval ?? initial.generatorServiceInterval
+                    };
+                } catch (err) {
+                    console.error('Failed to parse cached generator settings in initializer:', err);
+                    sessionStorage.removeItem(`generatorSettings_${projectId}`);
+                }
+            }
+            console.log('No cached generator settings found in initializer for project:', projectId);
+            return initial;
+    });            
 
     // State for all calculated metrics from the simulation results
     const [metrics, setMetrics] = useState({
@@ -839,39 +870,6 @@ function SystemDesign({ projectId }) {
         }
     }, [projectId]);
 
-    // Effect to load cached generator settings from sessionStorage
-    useEffect(() => {
-        if (!projectId) return;
-
-        // Load generator settings from sessionStorage
-        const cachedGeneratorSettings = sessionStorage.getItem(`generatorSettings_${projectId}`);
-        if (cachedGeneratorSettings) {
-            try {
-                const parsed = JSON.parse(cachedGeneratorSettings);
-                console.log('Loading cached generator settings:', parsed);
-                setDesign(prevDesign => ({
-                    ...prevDesign,
-                    generatorEnabled: parsed.generatorEnabled ?? prevDesign.generatorEnabled,
-                    generatorKva: parsed.generatorKva ?? prevDesign.generatorKva,
-                    generatorMinLoading: parsed.generatorMinLoading ?? prevDesign.generatorMinLoading,
-                    generatorChargeBattery: parsed.generatorChargeBattery ?? prevDesign.generatorChargeBattery,
-                    dieselPrice: parsed.dieselPrice ?? prevDesign.dieselPrice,
-                    generatorMinRunTime: parsed.generatorMinRunTime ?? prevDesign.generatorMinRunTime,
-                    generatorBatteryStartSoc: parsed.generatorBatteryStartSoc ?? prevDesign.generatorBatteryStartSoc,
-                    generatorBatteryStopSoc: parsed.generatorBatteryStopSoc ?? prevDesign.generatorBatteryStopSoc,
-                    generatorServiceCost: parsed.generatorServiceCost ?? prevDesign.generatorServiceCost,
-                    generatorServiceInterval: parsed.generatorServiceInterval ?? prevDesign.generatorServiceInterval
-                }));
-                console.log('Loaded cached generator settings for project:', projectId);
-            } catch (err) {
-                console.error('Failed to parse cached generator settings:', err);
-                sessionStorage.removeItem(`generatorSettings_${projectId}`);
-            }
-        } else {
-            console.log('No cached generator settings found for project:', projectId);
-        }
-    }, [projectId]);
-
     // Effect to save generator settings to sessionStorage when they change
     useEffect(() => {
         if (!projectId) return;
@@ -938,9 +936,9 @@ function SystemDesign({ projectId }) {
             setProfileName(p.generation_profile_name || 'midrand_ew_5'); // Default to
 
             // Update the master 'design' state with all the loaded data
-            // Preserve existing generator settings when loading project data
+            // Apply generator settings override if available
             setDesign(prevDesign => ({
-                ...prevDesign, // Preserve existing generator settings
+                ...prevDesign, // Preserve any existing settings
                 systemType: p.system_type || 'grid',
                 panelKw: savedKw,
                 numPanels: numPanels,
