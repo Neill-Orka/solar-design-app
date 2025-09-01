@@ -748,7 +748,7 @@ function SystemDesign({ projectId }) {
         generatorChargeBattery: true,
         generatorMinRunTime: 1.0, // minimum run time in hours (changed from minutes)
         generatorBatteryStartSoc: 20, // battery SoC when generator starts
-        generatorBatteryStopSoc: 80, // battery SoC when generator stops (changed from 90)
+        generatorBatteryStopSoc: 100, // battery SoC when generator stops (changed from 90)
         generatorServiceCost: 1000, // R - Default service cost
         generatorServiceInterval: 1000, // hours - Default service interval
     });
@@ -839,6 +839,63 @@ function SystemDesign({ projectId }) {
         }
     }, [projectId]);
 
+    // Effect to load cached generator settings from sessionStorage
+    useEffect(() => {
+        if (!projectId) return;
+
+        // Load generator settings from sessionStorage
+        const cachedGeneratorSettings = sessionStorage.getItem(`generatorSettings_${projectId}`);
+        if (cachedGeneratorSettings) {
+            try {
+                const parsed = JSON.parse(cachedGeneratorSettings);
+                console.log('Loading cached generator settings:', parsed);
+                setDesign(prevDesign => ({
+                    ...prevDesign,
+                    generatorEnabled: parsed.generatorEnabled ?? prevDesign.generatorEnabled,
+                    generatorKva: parsed.generatorKva ?? prevDesign.generatorKva,
+                    generatorMinLoading: parsed.generatorMinLoading ?? prevDesign.generatorMinLoading,
+                    generatorChargeBattery: parsed.generatorChargeBattery ?? prevDesign.generatorChargeBattery,
+                    dieselPrice: parsed.dieselPrice ?? prevDesign.dieselPrice,
+                    generatorMinRunTime: parsed.generatorMinRunTime ?? prevDesign.generatorMinRunTime,
+                    generatorBatteryStartSoc: parsed.generatorBatteryStartSoc ?? prevDesign.generatorBatteryStartSoc,
+                    generatorBatteryStopSoc: parsed.generatorBatteryStopSoc ?? prevDesign.generatorBatteryStopSoc,
+                    generatorServiceCost: parsed.generatorServiceCost ?? prevDesign.generatorServiceCost,
+                    generatorServiceInterval: parsed.generatorServiceInterval ?? prevDesign.generatorServiceInterval
+                }));
+                console.log('Loaded cached generator settings for project:', projectId);
+            } catch (err) {
+                console.error('Failed to parse cached generator settings:', err);
+                sessionStorage.removeItem(`generatorSettings_${projectId}`);
+            }
+        } else {
+            console.log('No cached generator settings found for project:', projectId);
+        }
+    }, [projectId]);
+
+    // Effect to save generator settings to sessionStorage when they change
+    useEffect(() => {
+        if (!projectId) return;
+
+        const generatorSettings = {
+            generatorEnabled: design.generatorEnabled,
+            generatorKva: design.generatorKva,
+            generatorMinLoading: design.generatorMinLoading,
+            generatorChargeBattery: design.generatorChargeBattery,
+            dieselPrice: design.dieselPrice,
+            generatorMinRunTime: design.generatorMinRunTime,
+            generatorBatteryStartSoc: design.generatorBatteryStartSoc,
+            generatorBatteryStopSoc: design.generatorBatteryStopSoc,
+            generatorServiceCost: design.generatorServiceCost,
+            generatorServiceInterval: design.generatorServiceInterval
+        };
+
+        console.log('Saving generator settings to sessionStorage:', generatorSettings);
+        sessionStorage.setItem(`generatorSettings_${projectId}`, JSON.stringify(generatorSettings));
+    }, [projectId, design.generatorEnabled, design.generatorKva, design.generatorMinLoading, 
+        design.generatorChargeBattery, design.dieselPrice, design.generatorMinRunTime, 
+        design.generatorBatteryStartSoc, design.generatorBatteryStopSoc, 
+        design.generatorServiceCost, design.generatorServiceInterval]);
+
     // Effect to load the specific project's data
     // This runs after the project ID is available and after the products have been loaded
     useEffect(() => {
@@ -881,7 +938,9 @@ function SystemDesign({ projectId }) {
             setProfileName(p.generation_profile_name || 'midrand_ew_5'); // Default to
 
             // Update the master 'design' state with all the loaded data
-            setDesign({
+            // Preserve existing generator settings when loading project data
+            setDesign(prevDesign => ({
+                ...prevDesign, // Preserve existing generator settings
                 systemType: p.system_type || 'grid',
                 panelKw: savedKw,
                 numPanels: numPanels,
@@ -894,7 +953,7 @@ function SystemDesign({ projectId }) {
                 batteryQuantity: batteryInfo.quantity || 1,
                 allowExport: p.allow_export || false,
                 batterySocLimit: p.battery_soc_limit || 20,
-            });
+            }));
         });
     }, [projectId, products]); // Reruns if projectId or the loaded products change
 
@@ -926,8 +985,8 @@ function SystemDesign({ projectId }) {
         const calculatedPanelKw = selectedPanel && panelQuantity > 0 ? 
             ((selectedPanel.power_w * panelQuantity) / 1000) : 0;
 
-        // Update the design state
-        const newDesign = ({
+        // Update the design state while preserving generator settings  
+        const newDesignData = {
             systemType: template.system_type?.toLowerCase() || 'grid',
             panelKw: calculatedPanelKw.toString(),
             numPanels: panelQuantity.toString(),
@@ -955,9 +1014,12 @@ function SystemDesign({ projectId }) {
             from_standard_template: true,
             template_id: template.id,
             template_name: template.name
-        });
+        };
 
-        setDesign(newDesign);
+        setDesign(prevDesign => ({
+            ...prevDesign, // Preserve existing generator settings
+            ...newDesignData
+        }));
         
         // Update template state immediately to fix banner display
         setUsingStandardTemplate(true);
@@ -984,28 +1046,28 @@ function SystemDesign({ projectId }) {
             
             // First, build the save payload (just like in handleSimulate)
             const savePayload = {
-                system_type: newDesign.systemType,
-                panel_kw: parseFloat(newDesign.panelKw),
-                num_panels: parseInt(newDesign.numPanels),
-                surface_tilt: parseFloat(newDesign.tilt),
-                surface_azimuth: parseFloat(newDesign.azimuth),
-                allow_export: newDesign.allowExport,
-                panel_id: newDesign.selectedPanel?.product?.id,
-                inverter_kva: newDesign.selectedInverter ? {
-                    model: newDesign.selectedInverter.product.model,
-                    capacity: newDesign.selectedInverter.product.rating_kva,
-                    quantity: newDesign.inverterQuantity
+                system_type: newDesignData.systemType,
+                panel_kw: parseFloat(newDesignData.panelKw),
+                num_panels: parseInt(newDesignData.numPanels),
+                surface_tilt: parseFloat(newDesignData.tilt),
+                surface_azimuth: parseFloat(newDesignData.azimuth),
+                allow_export: newDesignData.allowExport,
+                panel_id: newDesignData.selectedPanel?.product?.id,
+                inverter_kva: newDesignData.selectedInverter ? {
+                    model: newDesignData.selectedInverter.product.model,
+                    capacity: newDesignData.selectedInverter.product.rating_kva,
+                    quantity: newDesignData.inverterQuantity
                 } : null,
-                inverter_ids: newDesign.selectedInverter ? [newDesign.selectedInverter.product.id] : [],
-                battery_kwh: newDesign.systemType !== 'grid' && newDesign.selectedBattery ? {
-                    model: newDesign.selectedBattery.product.model,
-                    capacity: newDesign.selectedBattery.product.capacity_kwh,
-                    quantity: newDesign.batteryQuantity
+                inverter_ids: newDesignData.selectedInverter ? [newDesignData.selectedInverter.product.id] : [],
+                battery_kwh: newDesignData.systemType !== 'grid' && newDesignData.selectedBattery ? {
+                    model: newDesignData.selectedBattery.product.model,
+                    capacity: newDesignData.selectedBattery.product.capacity_kwh,
+                    quantity: newDesignData.batteryQuantity
                 } : null,
-                battery_ids: newDesign.systemType !== 'grid' && newDesign.selectedBattery ? [newDesign.selectedBattery.product.id] : [],
+                battery_ids: newDesignData.systemType !== 'grid' && newDesignData.selectedBattery ? [newDesignData.selectedBattery.product.id] : [],
                 use_pvgis: usePvgis,
                 generation_profile_name: profileName,
-                battery_soc_limit: newDesign.batterySocLimit,
+                battery_soc_limit: newDesignData.batterySocLimit,
                 project_value_excl_vat: template.total_cost,
                 from_standard_template: true,
                 template_id: template.id,
@@ -1021,31 +1083,33 @@ function SystemDesign({ projectId }) {
                     return axios.post(`${API_URL}/api/projects/${projectId}/bom/clear`);
                 })
                 .then(() => {
-                    // Now run simulation with the same data
+                    // Now run simulation with the current design state (which includes generator settings)
                     const simPayload = {
                         project_id: projectId,
                         use_pvgis: usePvgis,
                         profile_name: profileName,
                         system: {
-                            panel_kw: parseFloat(newDesign.panelKw),
-                            panel_id: newDesign.selectedPanel?.product?.id || null,
-                            tilt: parseFloat(newDesign.tilt),
-                            azimuth: parseFloat(newDesign.azimuth),
-                            system_type: newDesign.systemType,
-                            inverter_kva: (newDesign.selectedInverter?.product?.rating_kva || 0) * newDesign.inverterQuantity,
-                            battery_kwh: (newDesign.selectedBattery?.product?.capacity_kwh || 0) * newDesign.batteryQuantity,
-                            allow_export: newDesign.allowExport,
-                            battery_soc_limit: newDesign.batterySocLimit,
+                            panel_kw: parseFloat(newDesignData.panelKw),
+                            panel_id: newDesignData.selectedPanel?.product?.id || null,
+                            tilt: parseFloat(newDesignData.tilt),
+                            azimuth: parseFloat(newDesignData.azimuth),
+                            system_type: newDesignData.systemType,
+                            inverter_kva: (newDesignData.selectedInverter?.product?.rating_kva || 0) * newDesignData.inverterQuantity,
+                            battery_kwh: (newDesignData.selectedBattery?.product?.capacity_kwh || 0) * newDesignData.batteryQuantity,
+                            allow_export: newDesignData.allowExport,
+                            battery_soc_limit: newDesignData.batterySocLimit,
 
                             generator: {
-                              enabled: newDesign.systemType === 'off-grid' && !!newDesign.generatorEnabled,
-                              kva: parseFloat(newDesign.generatorKva || 0),
-                              min_loading_pct: parseFloat(newDesign.generatorMinLoading || 25),
-                              can_charge_battery: !!newDesign.generatorChargeBattery,
-                              diesel_price_r_per_liter: parseFloat(newDesign.dieselPrice || 23.50),
-                              min_run_time_hours: parseFloat(newDesign.generatorMinRunTime || 1.0),
-                              battery_start_soc: parseFloat(newDesign.generatorBatteryStartSoc || 20),
-                              battery_stop_soc: parseFloat(newDesign.generatorBatteryStopSoc || 80)
+                              enabled: newDesignData.systemType === 'off-grid' && !!design.generatorEnabled,
+                              kva: parseFloat(design.generatorKva || 0),
+                              min_loading_pct: parseFloat(design.generatorMinLoading || 25),
+                              can_charge_battery: !!design.generatorChargeBattery,
+                              diesel_price_r_per_liter: parseFloat(design.dieselPrice || 23.50),
+                              min_run_time_hours: parseFloat(design.generatorMinRunTime || 1.0),
+                              battery_start_soc: parseFloat(design.generatorBatteryStartSoc || 20),
+                              battery_stop_soc: parseFloat(design.generatorBatteryStopSoc || 100),
+                              service_cost: parseFloat(design.generatorServiceCost || 1000),
+                              service_interval_hours: parseFloat(design.generatorServiceInterval || 1000)
                             }
                         }
                     };
@@ -1406,7 +1470,9 @@ function SystemDesign({ projectId }) {
                         diesel_price_r_per_liter: parseFloat(design.dieselPrice || 23.50),
                         min_run_time_hours: parseFloat(design.generatorMinRunTime || 1.0),
                         battery_start_soc: parseFloat(design.generatorBatteryStartSoc || 20),
-                        battery_stop_soc: parseFloat(design.generatorBatteryStopSoc || 80)
+                        battery_stop_soc: parseFloat(design.generatorBatteryStopSoc || 100),
+                        service_cost: parseFloat(design.generatorServiceCost || 1000),
+                        service_interval_hours: parseFloat(design.generatorServiceInterval || 1000)
                       }
                   }
               };
@@ -1814,17 +1880,25 @@ function SystemDesign({ projectId }) {
                       // Calculate annual metrics using full simulation data (not filtered)
                       const timeIntervalHours = 0.5;
                       const annualGenKwh = simulationData.generator_kw?.reduce((sum, val) => sum + (val * timeIntervalHours), 0) || 0;
-                      const annualFuelCost = simulationData.diesel_cost_total || 0;
                       
-                      // Calculate annual service costs
+                      // Calculate annual fuel cost using the same method as period calculation for consistency
+                      const generatorSizeKw = parseFloat(design.generatorKva || 0);
+                      const dieselPrice = parseFloat(design.dieselPrice || 23.50);
                       const serviceCost = parseFloat(design.generatorServiceCost || 1000);
                       const serviceInterval = parseFloat(design.generatorServiceInterval || 1000);
+                      
+                      let annualFuelLiters = 0;
                       let totalAnnualRunningHours = 0;
                       simulationData.generator_kw?.forEach(genKw => {
-                        if (genKw > 0) {
+                        if (genKw > 0 && generatorSizeKw > 0) {
+                          const loadFactor = genKw / generatorSizeKw;
+                          const fuelRateLph = getFuelConsumption(generatorSizeKw, loadFactor);
+                          annualFuelLiters += fuelRateLph * timeIntervalHours;
                           totalAnnualRunningHours += timeIntervalHours;
                         }
                       });
+                      
+                      const annualFuelCost = annualFuelLiters * dieselPrice;
                       const annualServiceCost = (totalAnnualRunningHours / serviceInterval) * serviceCost;
                       const annualTotalCost = annualFuelCost + annualServiceCost;
                       

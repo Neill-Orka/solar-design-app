@@ -124,6 +124,7 @@ class GeneratorController:
         self.run_time_remaining = 0.0  # Hours remaining for minimum run time
         self.total_fuel_liters = 0.0
         self.total_energy_kwh = 0.0
+        self.total_runtime_hours = 0.0
         
     def should_start(self, shortfall_kw, battery_soc_pct, time_interval_hours):
         """
@@ -142,6 +143,7 @@ class GeneratorController:
     def should_stop(self, shortfall_kw, battery_soc_pct, time_interval_hours):
         """
         Determine if generator should stop.
+        For bulk charging mode: Only stop when battery reaches stop_soc AND minimum run time is complete.
         """
         # Don't stop if not running
         if not self.is_running:
@@ -151,15 +153,15 @@ class GeneratorController:
         if self.run_time_remaining > 0:
             return False
             
-        # Stop if no shortfall AND battery is sufficiently charged
-        no_shortfall = shortfall_kw <= (self.size_kw * 0.05)  # Less than 5% of capacity
+        # Stop when battery reaches stop_soc (regardless of demand shortfall)
         battery_charged = battery_soc_pct >= self.battery_stop_soc
         
-        return no_shortfall and battery_charged
+        return battery_charged
     
-    def get_output(self, demand_shortfall_kw, battery_soc_kwh, battery_capacity_kwh, time_interval_hours):
+    def get_output(self, demand_shortfall_kw, battery_soc_kwh, battery_capacity_kwh, time_interval_hours, inverter_ac_limit_kw=None):
         """
         Calculate generator output and fuel consumption for this time step.
+        When ON, generator runs at rated power to bulk-charge battery until stop_soc.
         Returns: (gen_to_load_kw, gen_to_battery_kw, fuel_liters_consumed)
         """
         if self.size_kw <= 0:
@@ -183,40 +185,52 @@ class GeneratorController:
         if not self.is_running:
             return 0.0, 0.0, 0.0
         
-        # Generator is running - determine output
-        min_output_kw = self.size_kw * (self.min_loading_pct / 100.0)
+        # Generator is running - track runtime hours
+        self.total_runtime_hours += time_interval_hours
         
-        # Start with minimum output, add what's needed for shortfall
-        target_output_kw = min_output_kw
-        if demand_shortfall_kw > 0:
-            target_output_kw = max(min_output_kw, min(demand_shortfall_kw, self.size_kw))
+        # Generator is running - run at rated power
+        # Apply inverter limit if provided
+        target_output_kw = self.size_kw
+        if inverter_ac_limit_kw is not None:
+            target_output_kw = min(self.size_kw, inverter_ac_limit_kw)
         
-        # If we can charge battery and have spare capacity, use it
-        gen_to_load_kw = min(target_output_kw, demand_shortfall_kw)
+        # Serve load first
+        gen_to_load_kw = min(demand_shortfall_kw, target_output_kw)
+        
+        # Use remaining capacity for battery charging (if enabled and battery can accept it)
         gen_to_battery_kw = 0.0
-        
         if self.can_charge_battery and battery_capacity_kwh > 0:
-            spare_capacity_kw = target_output_kw - gen_to_load_kw
-            if spare_capacity_kw > 0:
-                # Calculate how much battery can accept
-                battery_space_kwh = battery_capacity_kwh - battery_soc_kwh
-                max_charge_rate_kwh = battery_space_kwh  # Assume battery can charge at any rate up to remaining capacity
-                max_charge_kw = max_charge_rate_kwh / time_interval_hours
+            remaining_gen_capacity = target_output_kw - gen_to_load_kw
+            
+            if remaining_gen_capacity > 0:
+                # Calculate energy needed to reach stop_soc
+                energy_to_stop_soc_kwh = max(0, (self.battery_stop_soc - battery_soc_pct) * battery_capacity_kwh / 100)
                 
-                gen_to_battery_kw = min(spare_capacity_kw, max_charge_kw)
+                # Maximum charge rate based on energy needed and time interval
+                max_charge_kw = energy_to_stop_soc_kwh / time_interval_hours
+                
+                # Battery charging is also limited by battery's maximum charge rate
+                # For simplicity, assume battery can charge at any rate up to remaining capacity
+                battery_max_charge_kw = max_charge_kw  # Could add a separate battery charge rate limit here
+                
+                # Use minimum of: remaining generator capacity, battery charge limit, energy needed
+                gen_to_battery_kw = min(remaining_gen_capacity, battery_max_charge_kw)
+                gen_to_battery_kw = max(0, gen_to_battery_kw)  # Ensure non-negative
         
-        total_output_kw = gen_to_load_kw + gen_to_battery_kw
+        # Total actual generator output
+        actual_gen_output_kw = gen_to_load_kw + gen_to_battery_kw
         
-        # Ensure we meet minimum loading
-        if total_output_kw < min_output_kw:
-            # Run at minimum load even if we don't need all the power (this is realistic)
-            total_output_kw = min_output_kw
-            gen_to_load_kw = min(min_output_kw, demand_shortfall_kw)
-            if self.can_charge_battery and battery_capacity_kwh > 0:
-                remaining_output = min_output_kw - gen_to_load_kw
-                battery_space_kwh = battery_capacity_kwh - battery_soc_kwh
-                max_charge_kw = battery_space_kwh / time_interval_hours
-                gen_to_battery_kw = min(remaining_output, max_charge_kw)
+        # For fuel calculation, use the target output (rated power or inverter limit)
+        # Even if we can't use all the power, generator still runs at rated capacity
+        fuel_load_factor = actual_gen_output_kw / self.size_kw if self.size_kw > 0 else 0
+        fuel_consumption_lph = get_fuel_consumption(self.size_kw, fuel_load_factor)
+        fuel_liters_consumed = fuel_consumption_lph * time_interval_hours
+        
+        # Track totals
+        self.total_fuel_liters += fuel_liters_consumed
+        self.total_energy_kwh += actual_gen_output_kw * time_interval_hours
+        
+        return gen_to_load_kw, gen_to_battery_kw, fuel_liters_consumed
         
         # Calculate fuel consumption
         load_factor = total_output_kw / self.size_kw if self.size_kw > 0 else 0
@@ -432,6 +446,8 @@ def simulate_system_inner(
         gen_min_run_time = float(gen.get('min_run_time_hours', 1.0))
         gen_start_soc = float(gen.get('battery_start_soc', 20))
         gen_stop_soc = float(gen.get('battery_stop_soc', 80))
+        gen_service_cost = float(gen.get('service_cost', 1000))
+        gen_service_interval = float(gen.get('service_interval_hours', 1000))
         diesel_price = float(
             (gen.get('diesel_price_r_per_liter')
              or gen.get('diesel_price_per_l')
@@ -488,7 +504,8 @@ def simulate_system_inner(
                     demand_shortfall_kw=rem_load_kwh / time_interval_hours,
                     battery_soc_kwh=battery_soc_kwh,
                     battery_capacity_kwh=battery_capacity_kwh,
-                    time_interval_hours=time_interval_hours
+                    time_interval_hours=time_interval_hours,
+                    inverter_ac_limit_kw=inverter_kva
                 )
                 
                 # Apply generator output
@@ -539,6 +556,7 @@ def simulate_system_inner(
         diesel_cost_total = diesel_liters_total * diesel_price
         energy_shortfall_total_kwh = sum([x * time_interval_hours for x in shortfall_kw])
         generator_energy_total_kwh = generator.total_energy_kwh if generator else 0.0
+        generator_runtime_hours = generator.total_runtime_hours if generator else 0.0
 
         return {
             "timestamps": [ts.isoformat() for ts in full_30min_index],
@@ -559,6 +577,7 @@ def simulate_system_inner(
             "diesel_cost_total": round(diesel_cost_total, 2),
             "energy_shortfall_total_kwh": round(energy_shortfall_total_kwh, 2),
             "generator_energy_total_kwh": round(generator_energy_total_kwh, 2),
+            "generator_runtime_hours": round(generator_runtime_hours, 2),
             "generator_config": {
                 "enabled": gen_enabled,
                 "kva": gen_kva,
@@ -567,6 +586,8 @@ def simulate_system_inner(
                 "min_run_time_hours": gen_min_run_time,
                 "battery_start_soc": gen_start_soc,
                 "battery_stop_soc": gen_stop_soc,
+                "service_cost": gen_service_cost,
+                "service_interval_hours": gen_service_interval,
                 "diesel_price_r_per_liter": diesel_price,
                 "generator_running_intervals": generator.is_running if generator else False,
                 "generator_total_run_time_hours": (generator.min_run_time_hours - generator.run_time_remaining) if generator else 0
