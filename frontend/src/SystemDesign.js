@@ -26,6 +26,35 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 
 const PANEL_WATTAGE = 565; // JA SOLAR 72S30-565/GR
 
+// Generator sizes from fuel table
+const GENERATOR_SIZES = [
+  { value: 20, label: '20 kW' },
+  { value: 30, label: '30 kW' },
+  { value: 40, label: '40 kW' },
+  { value: 50, label: '50 kW' },
+  { value: 60, label: '60 kW' },
+  { value: 75, label: '75 kW' },
+  { value: 100, label: '100 kW' },
+  { value: 125, label: '125 kW' },
+  { value: 135, label: '135 kW' },
+  { value: 150, label: '150 kW' },
+  { value: 175, label: '175 kW' },
+  { value: 200, label: '200 kW' },
+  { value: 230, label: '230 kW' },
+  { value: 250, label: '250 kW' },
+  { value: 300, label: '300 kW' },
+  { value: 350, label: '350 kW' },
+  { value: 400, label: '400 kW' },
+  { value: 500, label: '500 kW' },
+  { value: 600, label: '600 kW' },
+  { value: 750, label: '750 kW' },
+  { value: 1000, label: '1000 kW' },
+  { value: 1250, label: '1250 kW' },
+  { value: 1500, label: '1500 kW' },
+  { value: 1750, label: '1750 kW' },
+  { value: 2000, label: '2000 kW' }
+];
+
 // Sub Component for Stage 1: Sizing Mode
 const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, setUsePvgis, profileName, setProfileName, showNotification }) => {
 
@@ -342,26 +371,25 @@ const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, set
                             <Row className='g-3'>
                                 <Col md={4}>
                                     <Form.Group>
-                                        <Form.Label>Enable Generator (Nog nie beskikbaar)</Form.Label>
+                                        <Form.Label>Enable Generator</Form.Label>
                                         <Form.Check
                                             type="switch"
                                             id="gen-enabled"
                                             checked={design.generatorEnabled}
                                             onChange={e => onDesignChange({ ...design, generatorEnabled: e.target.checked })}
                                             label={design.generatorEnabled ? "Enabled": "Disabled"}
-                                            disabled
                                         />
                                     </Form.Group>
                                 </Col>
                                 <Col md={4}>
                                   <Form.Group>
-                                    <Form.Label>Rated Power (kVA)</Form.Label>
-                                    <Form.Control
-                                      type="number"
-                                      value={design.generatorKva}
-                                      onChange={e => onDesignChange({ ...design, generatorKva: e.target.value })}
-                                      disabled={!design.generatorEnabled}
-                                      placeholder="e.g., 80"
+                                    <Form.Label>Rated Power (kW)</Form.Label>
+                                    <Select
+                                      value={GENERATOR_SIZES.find(s => s.value === design.generatorKva)}
+                                      onChange={option => onDesignChange({ ...design, generatorKva: option.value })}
+                                      options={GENERATOR_SIZES}
+                                      isDisabled={!design.generatorEnabled}
+                                      placeholder="Select generator size..."
                                     />
                                   </Form.Group>
                                 </Col>
@@ -382,24 +410,24 @@ const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, set
                             <Row className="g-3 mt-1">
                               <Col md={4}>
                                 <Form.Group>
-                                  <Form.Label>Efficiency (kWh / liter)</Form.Label>
-                                  <Form.Control
-                                    type="number"
-                                    step="0.1"
-                                    value={design.generatorEfficiency}
-                                    onChange={e => onDesignChange({ ...design, generatorEfficiency: e.target.value })}
-                                    disabled={!design.generatorEnabled}
-                                  />
-                                </Form.Group>
-                              </Col>
-                              <Col md={4}>
-                                <Form.Group>
                                   <Form.Label>Diesel Price (R / liter)</Form.Label>
                                   <Form.Control
                                     type="number"
                                     step="0.10"
                                     value={design.dieselPrice}
                                     onChange={e => onDesignChange({ ...design, dieselPrice: e.target.value })}
+                                    disabled={!design.generatorEnabled}
+                                  />
+                                </Form.Group>
+                              </Col>
+                              <Col md={4}>
+                                <Form.Group>
+                                  <Form.Label>Min Run Time (hours)</Form.Label>
+                                  <Form.Control
+                                    type="number"
+                                    step="0.1"
+                                    value={design.generatorMinRunTime}
+                                    onChange={e => onDesignChange({ ...design, generatorMinRunTime: e.target.value })}
                                     disabled={!design.generatorEnabled}
                                   />
                                 </Form.Group>
@@ -413,6 +441,64 @@ const SizingView = ({ projectId, design, onDesignChange, products, usePvgis, set
                                     checked={design.generatorChargeBattery}
                                     onChange={e => onDesignChange({ ...design, generatorChargeBattery: e.target.checked })}
                                     disabled={!design.generatorEnabled}
+                                  />
+                                </Form.Group>
+                              </Col>
+                            </Row>   
+
+                            <Row className="g-3 mt-1">
+                              <Col md={4}>
+                                <Form.Group>
+                                  <Form.Label>Battery Start SoC (%)</Form.Label>
+                                  <Form.Control
+                                    type="number"
+                                    value={design.generatorBatteryStartSoc}
+                                    min={0} max={100}
+                                    onChange={e => onDesignChange({ ...design, generatorBatteryStartSoc: e.target.value })}
+                                    disabled={!design.generatorEnabled}
+                                    placeholder="e.g., 20"
+                                  />
+                                </Form.Group>
+                              </Col>
+                              <Col md={4}>
+                                <Form.Group>
+                                  <Form.Label>Battery Stop SoC (%)</Form.Label>
+                                  <Form.Control
+                                    type="number"
+                                    value={design.generatorBatteryStopSoc}
+                                    min={0} max={100}
+                                    onChange={e => onDesignChange({ ...design, generatorBatteryStopSoc: e.target.value })}
+                                    disabled={!design.generatorEnabled}
+                                    placeholder="e.g., 90"
+                                  />
+                                </Form.Group>
+                              </Col>
+                            </Row>   
+
+                            <Row className="g-3 mt-1">
+                              <Col md={4}>
+                                <Form.Group>
+                                  <Form.Label>Service Cost (R)</Form.Label>
+                                  <Form.Control
+                                    type="number"
+                                    step="10"
+                                    value={design.generatorServiceCost}
+                                    onChange={e => onDesignChange({ ...design, generatorServiceCost: e.target.value })}
+                                    disabled={!design.generatorEnabled}
+                                    placeholder="e.g., 1000"
+                                  />
+                                </Form.Group>
+                              </Col>
+                              <Col md={4}>
+                                <Form.Group>
+                                  <Form.Label>Service Interval (hours)</Form.Label>
+                                  <Form.Control
+                                    type="number"
+                                    step="100"
+                                    value={design.generatorServiceInterval}
+                                    onChange={e => onDesignChange({ ...design, generatorServiceInterval: e.target.value })}
+                                    disabled={!design.generatorEnabled}
+                                    placeholder="e.g., 1000"
                                   />
                                 </Form.Group>
                               </Col>
@@ -544,6 +630,75 @@ const formatSystemType = (type) => {
     return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase().replace('-', ' ');
 };
 
+// Helper function to calculate fuel consumption based on generator size and load factor
+const getFuelConsumption = (generatorSizeKw, loadFactor) => {
+    // Fuel table data - match the backend fuel table
+    const FUEL_TABLE = [
+        { size_kw: 20, lph: { 0.25: 2.3, 0.50: 3.4, 0.75: 4.9, 1.00: 6.1 } },
+        { size_kw: 30, lph: { 0.25: 4.9, 0.50: 6.8, 0.75: 9.1, 1.00: 10.0 } },
+        { size_kw: 40, lph: { 0.25: 6.1, 0.50: 8.7, 0.75: 12.0, 1.00: 15.0 } },
+        { size_kw: 50, lph: { 0.25: 6.45, 0.50: 9.8, 0.75: 13.15, 1.00: 16.85 } },
+        { size_kw: 60, lph: { 0.25: 6.8, 0.50: 10.9, 0.75: 14.3, 1.00: 18.7 } },
+        { size_kw: 75, lph: { 0.25: 9.1, 0.50: 12.8, 0.75: 17.4, 1.00: 23.0 } },
+        { size_kw: 100, lph: { 0.25: 9.8, 0.50: 15.5, 0.75: 21.9, 1.00: 28.0 } },
+        { size_kw: 125, lph: { 0.25: 11.7, 0.50: 18.9, 0.75: 26.8, 1.00: 34.4 } },
+        { size_kw: 135, lph: { 0.25: 12.4, 0.50: 20.4, 0.75: 28.7, 1.00: 37.0 } },
+        { size_kw: 150, lph: { 0.25: 13.6, 0.50: 22.3, 0.75: 31.7, 1.00: 41.2 } },
+        { size_kw: 175, lph: { 0.25: 15.5, 0.50: 25.7, 0.75: 36.7, 1.00: 48.0 } },
+        { size_kw: 200, lph: { 0.25: 17.7, 0.50: 29.1, 0.75: 41.6, 1.00: 54.5 } },
+        { size_kw: 230, lph: { 0.25: 20.0, 0.50: 33.3, 0.75: 47.3, 1.00: 62.8 } },
+        { size_kw: 250, lph: { 0.25: 21.5, 0.50: 35.9, 0.75: 51.4, 1.00: 68.1 } },
+        { size_kw: 300, lph: { 0.25: 25.7, 0.50: 42.7, 0.75: 60.9, 1.00: 81.3 } },
+        { size_kw: 350, lph: { 0.25: 29.9, 0.50: 49.5, 0.75: 70.7, 1.00: 95.0 } },
+        { size_kw: 400, lph: { 0.25: 33.6, 0.50: 56.4, 0.75: 80.6, 1.00: 108.2 } },
+        { size_kw: 500, lph: { 0.25: 41.6, 0.50: 70.0, 0.75: 99.9, 1.00: 135.1 } },
+        { size_kw: 600, lph: { 0.25: 49.9, 0.50: 83.2, 0.75: 119.2, 1.00: 182.4 } },
+        { size_kw: 750, lph: { 0.25: 61.7, 0.50: 103.7, 0.75: 148.7, 1.00: 202.1 } },
+        { size_kw: 1000, lph: { 0.25: 81.7, 0.50: 137.7, 0.75: 197.2, 1.00: 269.1 } },
+        { size_kw: 1250, lph: { 0.25: 101.8, 0.50: 171.4, 0.75: 246.0, 1.00: 336.1 } },
+        { size_kw: 1500, lph: { 0.25: 121.8, 0.50: 205.5, 0.75: 294.5, 1.00: 403.1 } },
+        { size_kw: 1750, lph: { 0.25: 141.9, 0.50: 273.0, 0.75: 343.3, 1.00: 470.1 } },
+        { size_kw: 2000, lph: { 0.25: 162.0, 0.50: 273.3, 0.75: 391.7, 1.00: 537.1 } }
+    ];
+
+    if (generatorSizeKw <= 0) return 0.0;
+
+    // Find the fuel data for this generator size
+    const fuelData = FUEL_TABLE.find(entry => entry.size_kw === generatorSizeKw);
+    if (!fuelData) {
+        // If exact match not found, use interpolation logic or closest match
+        const sortedSizes = FUEL_TABLE.map(e => e.size_kw).sort((a, b) => a - b);
+        const closestSize = sortedSizes.reduce((prev, curr) => 
+            Math.abs(curr - generatorSizeKw) < Math.abs(prev - generatorSizeKw) ? curr : prev
+        );
+        const closestData = FUEL_TABLE.find(e => e.size_kw === closestSize);
+        if (closestData) {
+            return interpolateFuelConsumption(closestData.lph, loadFactor);
+        }
+        return 0.0;
+    }
+
+    return interpolateFuelConsumption(fuelData.lph, loadFactor);
+};
+
+const interpolateFuelConsumption = (lphData, loadFactor) => {
+    if (loadFactor <= 0.25) return lphData[0.25];
+    if (loadFactor <= 0.50) {
+        const factor = (loadFactor - 0.25) / 0.25;
+        return lphData[0.25] + factor * (lphData[0.50] - lphData[0.25]);
+    }
+    if (loadFactor <= 0.75) {
+        const factor = (loadFactor - 0.50) / 0.25;
+        return lphData[0.50] + factor * (lphData[0.75] - lphData[0.50]);
+    }
+    if (loadFactor <= 1.00) {
+        const factor = (loadFactor - 0.75) / 0.25;
+        return lphData[0.75] + factor * (lphData[1.00] - lphData[0.75]);
+    }
+    // Over 100% load - extrapolate
+    return lphData[1.00] * loadFactor;
+};
+
 
 
 function SystemDesign({ projectId }) {
@@ -587,11 +742,15 @@ function SystemDesign({ projectId }) {
 
         // New generator config (only used in off-grid)
         generatorEnabled: false,
-        generatorKva: '',
-        generatorMinLoading: 30, // %
-        generatorEfficiency: 3.5, // kWh per liter
-        dieselPrice: 24, // R per liter
+        generatorKva: 50, // Default to 50kW
+        generatorMinLoading: 25, // % - Default minimum loading
+        dieselPrice: 23.50, // R per liter - Default diesel price
         generatorChargeBattery: true,
+        generatorMinRunTime: 1.0, // minimum run time in hours (changed from minutes)
+        generatorBatteryStartSoc: 20, // battery SoC when generator starts
+        generatorBatteryStopSoc: 80, // battery SoC when generator stops (changed from 90)
+        generatorServiceCost: 1000, // R - Default service cost
+        generatorServiceInterval: 1000, // hours - Default service interval
     });
 
     // State for all calculated metrics from the simulation results
@@ -881,10 +1040,12 @@ function SystemDesign({ projectId }) {
                             generator: {
                               enabled: newDesign.systemType === 'off-grid' && !!newDesign.generatorEnabled,
                               kva: parseFloat(newDesign.generatorKva || 0),
-                              min_loading_pct: parseFloat(newDesign.generatorMinLoading || 0),
+                              min_loading_pct: parseFloat(newDesign.generatorMinLoading || 25),
                               can_charge_battery: !!newDesign.generatorChargeBattery,
-                              efficiency_kwh_per_liter: parseFloat(newDesign.generatorEfficiency || 3.5),
-                              diesel_price_r_per_liter: parseFloat(newDesign.dieselPrice || 24)
+                              diesel_price_r_per_liter: parseFloat(newDesign.dieselPrice || 23.50),
+                              min_run_time_hours: parseFloat(newDesign.generatorMinRunTime || 1.0),
+                              battery_start_soc: parseFloat(newDesign.generatorBatteryStartSoc || 20),
+                              battery_stop_soc: parseFloat(newDesign.generatorBatteryStopSoc || 80)
                             }
                         }
                     };
@@ -1240,10 +1401,12 @@ function SystemDesign({ projectId }) {
                       generator: {
                         enabled: design.systemType === 'off-grid' && !!design.generatorEnabled,
                         kva: parseFloat(design.generatorKva || 0),
-                        min_loading_pct: parseFloat(design.generatorMinLoading || 0),
+                        min_loading_pct: parseFloat(design.generatorMinLoading || 25),
                         can_charge_battery: !!design.generatorChargeBattery,
-                        efficiency_kwh_per_liter: parseFloat(design.generatorEfficiency || 3.5),
-                        diesel_price_r_per_liter: parseFloat(design.dieselPrice || 24)
+                        diesel_price_r_per_liter: parseFloat(design.dieselPrice || 23.50),
+                        min_run_time_hours: parseFloat(design.generatorMinRunTime || 1.0),
+                        battery_start_soc: parseFloat(design.generatorBatteryStartSoc || 20),
+                        battery_stop_soc: parseFloat(design.generatorBatteryStopSoc || 80)
                       }
                   }
               };
@@ -1325,6 +1488,31 @@ function SystemDesign({ projectId }) {
         const totalShortfallKwh = filteredData.shortfall_kw.reduce((sum, val) => sum + (val * timeIntervalHours), 0);
         const totalGenKwh = filteredData.generator_kw.reduce((sum, val) => sum + (val * timeIntervalHours), 0);
 
+        // Calculate period-specific diesel cost based on filtered generator data
+        let periodDieselCost = 0;
+        if (design.systemType === 'off-grid' && design.generatorEnabled) {
+            const generatorSizeKw = parseFloat(design.generatorKva || 0);
+            const dieselPrice = parseFloat(design.dieselPrice || 23.50);
+            const serviceCost = parseFloat(design.generatorServiceCost || 1000);
+            const serviceInterval = parseFloat(design.generatorServiceInterval || 1000);
+            
+            // Calculate total fuel consumption and running hours for the filtered period
+            let totalFuelLiters = 0;
+            let totalRunningHours = 0;
+            filteredData.generator_kw.forEach(genKw => {
+                if (genKw > 0 && generatorSizeKw > 0) {
+                    const loadFactor = genKw / generatorSizeKw;
+                    const fuelRateLph = getFuelConsumption(generatorSizeKw, loadFactor);
+                    totalFuelLiters += fuelRateLph * timeIntervalHours;
+                    totalRunningHours += timeIntervalHours;
+                }
+            });
+            
+            const fuelCost = totalFuelLiters * dieselPrice;
+            const serviceCostForPeriod = (totalRunningHours / serviceInterval) * serviceCost;
+            periodDieselCost = fuelCost + serviceCostForPeriod;
+        }
+
         setMetrics({
             totalPVGeneration: totalPotentialGenKwh.toFixed(0),
             utilizedPVGeneration: pvUsedOnSiteKwh.toFixed(0),
@@ -1334,10 +1522,10 @@ function SystemDesign({ projectId }) {
 
             energyShortfall: totalShortfallKwh.toFixed(0),
             generatorEnergy: totalGenKwh.toFixed(0),
-            dieselCost: (simulationData?.diesel_cost_total || 0).toFixed(0)
+            dieselCost: periodDieselCost.toFixed(0)
         });
 
-    }, [filteredData, simulationData?.diesel_cost_total]); // Re-calculate if filtered data or design changes
+    }, [filteredData, design.systemType, design.generatorEnabled, design.generatorKva, design.dieselPrice, design.generatorServiceCost, design.generatorServiceInterval]); // Re-calculate if filtered data or design changes
 
     // For Annual Metrics
     useEffect(() => {
@@ -1601,19 +1789,191 @@ function SystemDesign({ projectId }) {
                         <Col md={4} lg>
                           <Card className="border-start border-4 border-danger bg-white shadow-sm rounded p-3 h-100">
                             <div className="text-muted small">Energy Shortfall</div>
-                            <div className="fs-4 fw-bold">{metrics.energyShortfall || 0} kWh</div>
+                            <div className="fs-6 fw-bold">{metrics.energyShortfall || 0} kWh</div>
                           </Card>
                         </Col>
                         <Col md={4} lg>
                           <Card className="border-start border-4 border-success bg-white shadow-sm rounded p-3 h-100">
-                            <div className="text-muted small">Generator Energy</div>
-                            <div className="fs-6 fw-bold mb-1">{metrics.generatorEnergy || 0} kWh</div>
-                            <div className="text-muted small">Diesel Cost</div>
-                            <div className="fs-6 fw-bold">R {(metrics.dieselCost || 0).toLocaleString()}</div>
+                            <Row>
+                            <Col xs={6}>
+                                <div className="text-muted small">Generator Energy</div>
+                                <div className="fs-6 fw-bold mb-1">{metrics.generatorEnergy || 0} kWh</div>
+                            </Col>
+                            <Col xs={6}>
+                                <div className="text-muted small">Total Cost</div>
+                                <div className="fs-6 fw-bold mb-1">R {(metrics.dieselCost || 0).toLocaleString()}</div>
+                            </Col>
+                            </Row>
                           </Card>
                         </Col>
                     </Row>
                     )}
+
+                    {/* Enhanced Generator Metrics - only for off-grid systems with generator enabled */}
+                    {simulationData && design.systemType === 'off-grid' && design.generatorEnabled && (() => {
+                      // Calculate annual metrics using full simulation data (not filtered)
+                      const timeIntervalHours = 0.5;
+                      const annualGenKwh = simulationData.generator_kw?.reduce((sum, val) => sum + (val * timeIntervalHours), 0) || 0;
+                      const annualFuelCost = simulationData.diesel_cost_total || 0;
+                      
+                      // Calculate annual service costs
+                      const serviceCost = parseFloat(design.generatorServiceCost || 1000);
+                      const serviceInterval = parseFloat(design.generatorServiceInterval || 1000);
+                      let totalAnnualRunningHours = 0;
+                      simulationData.generator_kw?.forEach(genKw => {
+                        if (genKw > 0) {
+                          totalAnnualRunningHours += timeIntervalHours;
+                        }
+                      });
+                      const annualServiceCost = (totalAnnualRunningHours / serviceInterval) * serviceCost;
+                      const annualTotalCost = annualFuelCost + annualServiceCost;
+                      
+                      return (
+                      <Card className="shadow-sm mt-3">
+                        <Card.Header as="h5">
+                          <i className="bi bi-fuel-pump me-2"></i>Generator Performance Analysis - {design.generatorKva}kW Generator
+                        </Card.Header>
+                        <Card.Body>
+                          {/* <Row className="mb-3">
+                            <Col md={6}>
+                              <div className="text-muted small">Selected Period Generator Energy</div>
+                              <div className="fs-5 fw-bold text-success">{metrics.generatorEnergy || 0} kWh</div>
+                            </Col>
+                            <Col md={6}>
+                              <div className="text-muted small">Selected Period Total Cost</div>
+                              <div className="fs-5 fw-bold text-success">R {(metrics.dieselCost || 0).toLocaleString()}</div>
+                            </Col>
+                          </Row> */}
+                          <Row className="mb-3">
+                            <Col md={6}>
+                              <div className="text-muted small">Annual Generator Energy</div>
+                              <div className="fs-5 fw-bold text-primary">{Math.round(annualGenKwh)} kWh/year</div>
+                            </Col>
+                            <Col md={6}>
+                              <div className="text-muted small">Annual Total Cost</div>
+                              <div className="fs-5 fw-bold text-primary">R {Math.round(annualTotalCost).toLocaleString()}/year</div>
+                            </Col>
+                          </Row>
+                          
+                          <h6 className="mt-4 mb-3">Generator Efficiency by Load Factor</h6>
+                          <div className="table-responsive">
+                            <Table size="sm" striped hover>
+                              <thead className="table-light">
+                                <tr>
+                                  <th>Load %</th>
+                                  <th>Output (kW)</th>
+                                  <th>Fuel Rate (L/h)</th>
+                                  <th>Running Cost (R/h)</th>
+                                  <th>Total Cost (R/kWh)</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {[25, 50, 75, 100].map(loadPct => {
+                                  const generatorSizeKw = parseFloat(design.generatorKva) || 0;
+                                  const dieselPriceRPerL = parseFloat(design.dieselPrice) || 23.50;
+                                  const serviceCost = parseFloat(design.generatorServiceCost) || 1000;
+                                  const serviceInterval = parseFloat(design.generatorServiceInterval) || 1000;
+                                  
+                                  const outputKw = (generatorSizeKw * loadPct / 100);
+                                  const fuelRateLph = getFuelConsumption(generatorSizeKw, loadPct / 100);
+                                  const fuelCostPerHour = fuelRateLph * dieselPriceRPerL;
+                                  const serviceCostPerHour = serviceCost / serviceInterval; // R per hour for service
+                                  const totalRunningCostPerHour = fuelCostPerHour + serviceCostPerHour;
+                                  const totalCostPerKwh = outputKw > 0 ? (totalRunningCostPerHour / outputKw) : 0;
+                                  
+                                  return (
+                                    <tr key={loadPct}>
+                                      <td>{loadPct}%</td>
+                                      <td>{outputKw.toFixed(1)} kW</td>
+                                      <td>{fuelRateLph.toFixed(2)} L/h</td>
+                                      <td>R {totalRunningCostPerHour.toFixed(2)}/h</td>
+                                      <td>R {totalCostPerKwh.toFixed(2)}/kWh</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </Table>
+                          </div>
+                          
+                          {/* Average Load Analysis */}
+                          <h6 className="mt-4 mb-3">Average Load Analysis</h6>
+                          <div className="table-responsive">
+                            <Table size="sm" striped hover className="mb-0">
+                              <thead className="table-light">
+                                <tr>
+                                  <th>Metric</th>
+                                  <th>Value</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(() => {
+                                  const generatorSizeKw = parseFloat(design.generatorKva) || 0;
+                                  const dieselPriceRPerL = parseFloat(design.dieselPrice) || 23.50;
+                                  const serviceCost = parseFloat(design.generatorServiceCost) || 1000;
+                                  const serviceInterval = parseFloat(design.generatorServiceInterval) || 1000;
+                                  
+                                  // Calculate average demand for the year
+                                  const generatorKwData = simulationData.generator_kw || [];
+                                  const activeGeneratorData = generatorKwData.filter(kw => kw > 0);
+                                  const averageDemand = activeGeneratorData.length > 0 
+                                    ? activeGeneratorData.reduce((sum, kw) => sum + kw, 0) / activeGeneratorData.length 
+                                    : 0;
+                                  
+                                  // Calculate load percentage
+                                  const loadPercentage = generatorSizeKw > 0 ? (averageDemand / generatorSizeKw) : 0;
+                                  const loadFactor = Math.min(1.0, Math.max(0.25, loadPercentage)); // Clamp between 25% and 100%
+                                  
+                                  // Get fuel consumption at this load
+                                  const fuelRateLph = getFuelConsumption(generatorSizeKw, loadFactor);
+                                  const fuelCostPerHour = fuelRateLph * dieselPriceRPerL;
+                                  const serviceCostPerHour = serviceCost / serviceInterval;
+                                  
+                                  // Get 100% load R/kWh for comparison
+                                  const fuelRateAt100pct = getFuelConsumption(generatorSizeKw, 1.0);
+                                  const costPerKwhAt100pct = generatorSizeKw > 0 ? (fuelRateAt100pct * dieselPriceRPerL / generatorSizeKw) : 0;
+                                  
+                                  // Calculate cost per kWh (excl service)
+                                  const calculatedCostPerKwh = averageDemand > 0 ? (fuelCostPerHour / averageDemand) : 0;
+                                  const costPerKwhExclService = (calculatedCostPerKwh < costPerKwhAt100pct) ? costPerKwhAt100pct : calculatedCostPerKwh;
+                                  
+                                  // Calculate cost per kWh (incl service)
+                                  const totalCostPerHour = fuelCostPerHour + serviceCostPerHour;
+                                  const calculatedTotalCostPerKwh = averageDemand > 0 ? (totalCostPerHour / averageDemand) : 0;
+                                  const totalCostPerKwhAt100pct = generatorSizeKw > 0 ? ((fuelRateAt100pct * dieselPriceRPerL + serviceCostPerHour) / generatorSizeKw) : 0;
+                                  const costPerKwhInclService = (calculatedTotalCostPerKwh < totalCostPerKwhAt100pct) ? totalCostPerKwhAt100pct : calculatedTotalCostPerKwh;
+                                  
+                                  return (
+                                    <>
+                                      <tr>
+                                        <td>Average Generator Demand</td>
+                                        <td>{averageDemand.toFixed(1)} kW</td>
+                                      </tr>
+                                      <tr>
+                                        <td>Average Load Factor</td>
+                                        <td>{(loadPercentage * 100).toFixed(1)}%</td>
+                                      </tr>
+                                      <tr>
+                                        <td>Fuel Rate at Average Load</td>
+                                        <td>{fuelRateLph.toFixed(2)} L/h</td>
+                                      </tr>
+                                      <tr>
+                                        <td>Cost per kWh (excl. service)</td>
+                                        <td><strong>R {costPerKwhExclService.toFixed(2)}/kWh</strong></td>
+                                      </tr>
+                                      <tr>
+                                        <td>Cost per kWh (incl. service)</td>
+                                        <td><strong>R {costPerKwhInclService.toFixed(2)}/kWh</strong></td>
+                                      </tr>
+                                    </>
+                                  );
+                                })()}
+                              </tbody>
+                            </Table>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                      );
+                    })()}
 
                     {/* Advanced System Metrics Table */}
                     <Card className="shadow-sm">
