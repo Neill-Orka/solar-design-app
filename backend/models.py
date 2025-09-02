@@ -40,6 +40,7 @@ class User(db.Model):
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     last_login = db.Column(db.DateTime, nullable=True)
     profile_picture = db.Column(db.String(255), nullable=True)
+    phone = db.Column(db.String(20), nullable=True)
     
     # Relationships
     created_by = db.relationship('User', remote_side=[id], foreign_keys=[created_by_id])
@@ -67,7 +68,8 @@ class User(db.Model):
             'is_active': self.is_active,
             'is_email_verified': self.is_email_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            'phone': self.phone
         }
 
 
