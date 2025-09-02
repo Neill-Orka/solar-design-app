@@ -2,12 +2,14 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import logo from './assets/orka_logo_text.png';
 import './PrintableBOM.css';
+import { useAuth } from './AuthContext';
 
 /**
  * PrintableBOM (paginated, WYSIWYG, print-stable)
  */
 function PrintableBOM({ projectId: propProjectId }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { projectId: urlProjectId } = useParams();
   
   // Use projectId from props if available (when used in ProjectDashboard), otherwise from URL
@@ -237,19 +239,19 @@ const renderHeader = () => (
           <span className="label">Address:</span> {bomData.project?.location || 'Address'}
         </div>
         <div>
-          <span className="label">Contact Person:</span> Lourens de Jongh
+          <span className="label">Contact Person:</span> {user?.first_name || 'Lourens'} {user?.last_name || 'de Jongh'}
         </div>
         <div>
           <span className="label">Email:</span> {bomData.project?.client_email || '-'}
         </div>
         <div>
-          <span className='label'>Email:</span> lourens@orkasolar.co.za
+          <span className='label'>Email:</span> {user?.email || 'lourens@orkasolar.co.za'}
         </div>
         <div>
           <span className="label">Tel:</span> {bomData.project?.client_phone || '-'}
         </div>
         <div>
-          <span className="label">Tel:</span> 082 660 0851
+          <span className="label">Tel:</span> {user?.phone || '082 660 0851'}
         </div>
         <div />
       </div>
