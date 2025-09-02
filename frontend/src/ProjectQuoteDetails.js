@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { Container, Row, Col, Card, Table, Badge, Form, Spinner, Button } from "react-bootstrap";
-import { API_URL } from "./apiConfig";
+import { Container, Row, Col, Card, Table, Badge, Form, Spinner, Button, Alert } from "react-bootstrap";
+import { useNotification } from './NotificationContext';
+import { API_URL } from './apiConfig';
 
 const fmtZAR = v => (new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(v ?? 0)).replace("R", "R ");
 
@@ -13,43 +14,162 @@ export default function ProjectQuoteDetails() {
   const [selectedVid, setSelectedVid] = useState(null);
   const [vDetail, setVDetail] = useState(null);  // version detail (lines + totals)
   const [vLoading, setVLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
 
   // Handlers
   const handleLoadToBOM = async (versionId) => {
     try {
-        await axios.post(`${API_URL}/api/quote-versions/${versionId}/load-to-bom`);
-        // Navigate to the BOM so user is immediately in edit mode
-        navigate(`/projects/${projectId}?tab=bom&quoteDoc=${docId}&quoteNo=${encodeURIComponent(doc.number)}&fromVersion=${selectedVid}`);
+      const response = await axios.post(`${API_URL}/api/quote-versions/${versionId}/load-to-bom`);
+      showNotification('Quote loaded to BOM for editing', 'success');
+      
+      // Check if we have core components data to synchronize SystemDesign
+      if (response.data.core_components) {
+        // Store core components for SystemDesign synchronization
+        sessionStorage.setItem(`quoteLoadCoreComponents_${projectId}`, JSON.stringify(response.data.core_components));
+      }
+      
+      // Navigate to the BOM so user is immediately in edit mode
+      navigate(`/projects/${projectId}?tab=bom&quoteDoc=${doc.id}&quoteNo=${doc.number}&fromVersion=${vDetail.version_no}`);
     } catch (e) {
-        console.error(e);
-        alert('Failed to load version into BOM.');
+      console.error(e);
+      showNotification('Failed to load quote to BOM', 'danger');
     }
   };
 
   const handleCreateNewVersion = async () => {
-    try { 
-        const res = await axios.post(`${API_URL}/api/quotes/${docId}/versions`, {});
-        const { version_id } = res.data || {};
-
-        // refresh envelope + versions
-        const d = await axios.get(`${API_URL}/api/quotes/${docId}`);
-        setDoc(d.data);
-
-        // select the new version if present; otherwise keep last
-        if (version_id) {
-            setSelectedVid(version_id);
-        } else {
-            const last = d.data.versions?.[d.data.versions.length - 1];
-            if (last) setSelectedVid(last.id);
-        }
+    try {
+      await axios.post(`${API_URL}/api/quotes/${docId}/versions`, {});
+      showNotification('New version created from current BOM', 'success');
+      // Reload the quote to show new version
+      window.location.reload();
     } catch (e) {
-        console.error(e);
-        alert("Failed to create new version. Please try again.");
+      console.error(e);
+      showNotification('Failed to create new version', 'danger');
     }
   };
 
+  const handleSendQuote = async () => {
+    if (!window.confirm('Send this quote to the client?')) return;
+    
+    setActionLoading(true);
+    try {
+      console.log('Sending quote...', { docId, vDetail });
+      await axios.post(`${API_URL}/api/quotes/${docId}/send`);
+      showNotification('Quote sent successfully!', 'success');
+      
+      console.log('Quote sent, now preparing print data...', { vDetail });
+      
+      // Transform quote data to PrintableBOM format
+      if (vDetail && vDetail.line_items) {
+        console.log('vDetail found, processing line items:', vDetail.line_items);
+        // Group line items by category
+        const categoryMap = {};
+        
+        vDetail.line_items.forEach(item => {
+          // Use category from product snapshot or default to 'Other'
+          const category = item.category || item.product_snapshot?.category || 'Other';
+          
+          if (!categoryMap[category]) {
+            categoryMap[category] = {
+              name: category,
+              items: []
+            };
+          }
+          
+          categoryMap[category].items.push({
+            brand: item.brand || '',
+            model: item.model || '',
+            quantity: item.qty || 0,
+            cost: item.unit_cost_locked || 0,
+            price: item.unit_price_locked || 0,
+            lineTotal: item.line_total_locked || 0
+          });
+        });
+        
+        // Convert to array format expected by PrintableBOM
+        const categories = Object.values(categoryMap);
+        
+        // Create project data structure expected by PrintableBOM
+        const printData = {
+          project: {
+            id: parseInt(projectId),
+            project_name: `Quote ${doc.number}`,
+            client_name: doc.client_snapshot_json?.name || 'Unknown Client',
+            location: doc.client_snapshot_json?.location || '',
+            created_at: vDetail.created_at,
+            quote_number: doc.number,
+            quote_status: vDetail.status || 'sent'
+          },
+          systemSpecs: {
+            // Add any system specs if available from payload
+            ...vDetail.payload_json
+          },
+          totals: {
+            subtotal_excl_vat: vDetail.totals?.subtotal_items_excl_vat || 0,
+            extras_excl_vat: vDetail.totals?.extras_excl_vat || 0,
+            total_excl_vat: vDetail.totals?.total_excl_vat || 0,
+            vat_perc: vDetail.totals?.vat_perc || 15,
+            vat_price: vDetail.totals?.vat_price || 0,
+            total_incl_vat: vDetail.totals?.total_incl_vat || 0
+          },
+          categories: categories
+        };
+        
+        // Store with quote-specific key for PrintableBOM
+        localStorage.setItem(`quoteData_${docId}`, JSON.stringify(printData));
+        
+        console.log('Print data stored in localStorage:', printData);
+        console.log('Navigating to:', `/projects/${projectId}/printable-bom/${docId}?action=download`);
+        
+        // Navigate to printable BOM with auto-download
+        navigate(`/projects/${projectId}/printable-bom/${docId}?action=download`);
+      } else {
+        console.error('No vDetail or line_items found:', { vDetail });
+        showNotification('No quote data available for printing', 'warning');
+      }
+      
+    } catch (e) {
+      console.error(e);
+      showNotification(e.response?.data?.error || 'Failed to send quote', 'danger');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleMarkAccepted = async () => {
+    if (!window.confirm('Mark this quote as accepted?')) return;
+    
+    setActionLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/quotes/${docId}/accept`);
+      showNotification('Quote marked as accepted!', 'success');
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+      showNotification(e.response?.data?.error || 'Failed to mark quote as accepted', 'danger');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleMarkDeclined = async () => {
+    if (!window.confirm('Mark this quote as declined?')) return;
+    
+    setActionLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/quotes/${docId}/decline`);
+      showNotification('Quote marked as declined', 'info');
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+      showNotification(e.response?.data?.error || 'Failed to mark quote as declined', 'danger');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // load envelope + version list
   useEffect(() => {
@@ -57,10 +177,12 @@ export default function ProjectQuoteDetails() {
     setLoading(true);
     axios.get(`${API_URL}/api/quotes/${docId}`).then(r => {
       if (!mounted) return;
-      setDoc(r.data);
-      // default to latest version
-      const last = r.data.versions?.[r.data.versions.length - 1];
-      if (last) setSelectedVid(last.id);
+      const data = r.data;
+      setDoc(data);
+      // Auto-select latest version
+      if (data.versions?.length > 0) {
+        setSelectedVid(data.versions[data.versions.length - 1].id);
+      }
       setLoading(false);
     }).catch(() => setLoading(false));
     return () => { mounted = false; };
@@ -83,6 +205,11 @@ export default function ProjectQuoteDetails() {
     id: v.id,
     label: `v${v.version_no} • ${new Date(v.created_at).toLocaleString("en-ZA")} • ${v.status || "draft"}`
   })), [doc]);
+
+  // Get current version status
+  const currentVersionStatus = vDetail?.status || 'draft';
+  const isDraft = currentVersionStatus === 'draft';
+  const isSent = currentVersionStatus === 'sent';
 
   if (loading) return <div className="p-3"><Spinner size="sm" /> Loading quote…</div>;
   if (!doc) return <div className="p-3 text-danger">Quote not found.</div>;
@@ -112,6 +239,7 @@ export default function ProjectQuoteDetails() {
                 value={selectedVid || ""}
                 onChange={e => setSelectedVid(Number(e.target.value))}
               >
+                <option value="">Select version...</option>
                 {(versionOptions || []).map(opt => (
                   <option key={opt.id} value={opt.id}>{opt.label}</option>
                 ))}
@@ -122,13 +250,24 @@ export default function ProjectQuoteDetails() {
               {!vLoading && vDetail && (
                 <>
                   <div className="mb-2">
-                    <Badge bg="info" className="me-2">v{vDetail.version_no}</Badge>
+                    <Badge bg={isDraft ? "secondary" : isSent ? "primary" : "success"} className="me-2">
+                      v{vDetail.version_no} • {currentVersionStatus}
+                    </Badge>
                     <span className="text-muted">{new Date(vDetail.created_at).toLocaleString("en-ZA")}</span>
                   </div>
+                  {vDetail.valid_until && (
+                    <div className="small text-muted mb-2">
+                      Valid until: {new Date(vDetail.valid_until).toLocaleDateString("en-ZA")}
+                    </div>
+                  )}
                   <div className="small text-muted">
-                    Status: <b>{vDetail.status || "draft"}</b> {vDetail.pdf_path ? (<>
-                      • <a href={`${API_URL}${vDetail.pdf_path}`} target="_blank" rel="noreferrer">PDF</a>
-                    </>) : null}
+                    {vDetail.pdf_path ? (
+                      <a href={`${API_URL}${vDetail.pdf_path}`} target="_blank" rel="noreferrer" className="text-decoration-none">
+                        <i className="bi bi-file-pdf me-1"></i>View PDF
+                      </a>
+                    ) : isDraft ? (
+                      <span className="text-muted">PDF will be generated when sent</span>
+                    ) : null}
                   </div>
                 </>
               )}
@@ -164,6 +303,48 @@ export default function ProjectQuoteDetails() {
         </Col>
       </Row>
 
+      {/* Action buttons based on status */}
+      {vDetail && (
+        <Row className="mb-3">
+          <Col>
+            <Card>
+              <Card.Header>Actions</Card.Header>
+              <Card.Body>
+                {isDraft && (
+                  <div className="d-flex gap-2 flex-wrap">
+                    <Button variant="outline-primary" onClick={() => handleLoadToBOM(selectedVid)} disabled={actionLoading}>
+                      <i className="bi bi-pencil me-1"></i>Edit in BOM
+                    </Button>
+                    <Button variant="success" onClick={handleSendQuote} disabled={actionLoading}>
+                      <i className="bi bi-send me-1"></i>
+                      {actionLoading ? 'Sending...' : 'Send Quote'}
+                    </Button>
+                  </div>
+                )}
+                {isSent && (
+                  <div className="d-flex gap-2 flex-wrap">
+                    <Button variant="success" onClick={handleMarkAccepted} disabled={actionLoading}>
+                      <i className="bi bi-check-circle me-1"></i>
+                      {actionLoading ? 'Processing...' : 'Mark Accepted'}
+                    </Button>
+                    <Button variant="outline-danger" onClick={handleMarkDeclined} disabled={actionLoading}>
+                      <i className="bi bi-x-circle me-1"></i>
+                      {actionLoading ? 'Processing...' : 'Mark Declined'}
+                    </Button>
+                  </div>
+                )}
+                {(currentVersionStatus === 'accepted' || currentVersionStatus === 'declined') && (
+                  <Alert variant={currentVersionStatus === 'accepted' ? 'success' : 'warning'} className="mb-0">
+                    <i className={`bi ${currentVersionStatus === 'accepted' ? 'bi-check-circle' : 'bi-x-circle'} me-1`}></i>
+                    This quote has been {currentVersionStatus}.
+                  </Alert>
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )}
+
       <Card>
         <Card.Header>Line items</Card.Header>
         <Card.Body className="p-0">
@@ -198,10 +379,10 @@ export default function ProjectQuoteDetails() {
 
       <div className="mt-3 d-flex justify-content-between">
         <Link to={`/projects/${projectId}?tab=quotes`}><Button variant="outline-secondary">Back to Quotes</Button></Link>
-        {/* Future actions (disabled for now) */}
         <div className="d-flex gap-2">
-          <Button variant="outline-primary" onClick={() => selectedVid && handleLoadToBOM(selectedVid)} disabled={!selectedVid}>Load to BOM</Button>
-          <Button variant="primary" onClick={handleCreateNewVersion}>Create New Version</Button>
+          <Button variant="outline-primary" onClick={handleCreateNewVersion} disabled={actionLoading}>
+            <i className="bi bi-plus-circle me-1"></i>Create New Version
+          </Button>
         </div>
       </div>
     </Container>

@@ -955,6 +955,88 @@ function SystemDesign({ projectId }) {
         });
     }, [projectId, products]); // Reruns if projectId or the loaded products change
 
+    // Effect to synchronize SystemDesign with core components from loaded quotes
+    useEffect(() => {
+        if (!projectId || !products.panels.length || !products.inverters.length || !products.batteries.length) return;
+        
+        const coreComponentsKey = `quoteLoadCoreComponents_${projectId}`;
+        const coreComponentsData = sessionStorage.getItem(coreComponentsKey);
+        
+        if (coreComponentsData) {
+            try {
+                const coreComponents = JSON.parse(coreComponentsData);
+                console.log('Found core components from quote load:', coreComponents);
+                
+                // Find the products in our loaded lists
+                let hasChanges = false;
+                
+                // Update panel selection if present
+                if (coreComponents.panel) {
+                    const panelProduct = products.panels.find(p => p.id === coreComponents.panel.id);
+                    if (panelProduct) {
+                        setDesign(prevDesign => ({
+                            ...prevDesign,
+                            selectedPanel: {
+                                value: panelProduct.id,
+                                label: `${panelProduct.brand_name} ${panelProduct.description}`,
+                                product: panelProduct
+                            },
+                            // Calculate panelKw from quantity and power
+                            panelKw: ((coreComponents.panel.quantity * (panelProduct.power_w || PANEL_WATTAGE)) / 1000).toFixed(2),
+                            numPanels: coreComponents.panel.quantity
+                        }));
+                        hasChanges = true;
+                    }
+                }
+                
+                // Update inverter selection if present
+                if (coreComponents.inverter) {
+                    const inverterProduct = products.inverters.find(p => p.id === coreComponents.inverter.id);
+                    if (inverterProduct) {
+                        setDesign(prevDesign => ({
+                            ...prevDesign,
+                            selectedInverter: {
+                                value: inverterProduct.id,
+                                label: `${inverterProduct.description} (${inverterProduct.rating_kva}kVA)`,
+                                product: inverterProduct
+                            },
+                            inverterQuantity: coreComponents.inverter.quantity
+                        }));
+                        hasChanges = true;
+                    }
+                }
+                
+                // Update battery selection if present
+                if (coreComponents.battery) {
+                    const batteryProduct = products.batteries.find(p => p.id === coreComponents.battery.id);
+                    if (batteryProduct) {
+                        setDesign(prevDesign => ({
+                            ...prevDesign,
+                            selectedBattery: {
+                                value: batteryProduct.id,
+                                label: `${batteryProduct.description} (${batteryProduct.capacity_kwh}kWh)`,
+                                product: batteryProduct
+                            },
+                            batteryQuantity: coreComponents.battery.quantity
+                        }));
+                        hasChanges = true;
+                    }
+                }
+                
+                if (hasChanges) {
+                    console.log('Updated SystemDesign with core components from quote');
+                }
+                
+                // Clean up the sessionStorage after using it
+                sessionStorage.removeItem(coreComponentsKey);
+                
+            } catch (error) {
+                console.error('Failed to parse core components data:', error);
+                sessionStorage.removeItem(coreComponentsKey);
+            }
+        }
+    }, [projectId, products]); // Remove design from dependencies to avoid infinite loops
+
     // Logic to load products of the system templates
     const handleSelectTemplate = (template) => {
         setLoading(true);

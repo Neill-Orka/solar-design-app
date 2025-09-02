@@ -41,7 +41,7 @@ function ProjectDashboard() {
   const [searchParams] = useSearchParams();
 
   const openQuote = (docId) => {
-    navigate(`/projects/${projectId}/quotes/${docId}`);
+    navigate(`/projects/${projectId}/quotes/${docId}?from=quotes`);
   };
 
   const fetchProject = async () => {
@@ -303,7 +303,7 @@ function ProjectDashboard() {
           />
         )}
         {activeTab === 'printbom' && <PrintableBOM projectId={projectId} />}
-        {activeTab === 'quotes' && <ProjectQuotes projectId={projectId} API_URL={API_URL} onOpenQuote={openQuote} />}
+        {activeTab === 'quotes' && <ProjectQuotes projectId={projectId} onOpenQuote={openQuote} />}
         {activeTab === 'finance' && <FinancialModeling projectId={projectId} />}
         {activeTab === 'tariff' && (
           <div>
