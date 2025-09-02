@@ -746,9 +746,9 @@ function SystemDesign({ projectId }) {
                 generatorEnabled: false,
                 generatorKva: 50, // Default to 50kW
                 generatorMinLoading: 25, // % - Default minimum loading
-                dieselPrice: 23.50, // R per liter - Default diesel price
+                dieselPrice: 20.4, // R per liter - Default diesel price
                 generatorChargeBattery: true,
-                generatorMinRunTime: 1.0, // minimum run time in hours (changed from minutes)
+                generatorMinRunTime: 0, // minimum run time in hours (changed from minutes)
                 generatorBatteryStartSoc: 20, // battery SoC when generator starts
                 generatorBatteryStopSoc: 100, // battery SoC when generator stops (changed from 90)
                 generatorServiceCost: 1000, // R - Default service cost
