@@ -40,6 +40,7 @@ class User(db.Model):
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     last_login = db.Column(db.DateTime, nullable=True)
     profile_picture = db.Column(db.String(255), nullable=True)
+    phone = db.Column(db.String(20), nullable=True)
     
     # Relationships
     created_by = db.relationship('User', remote_side=[id], foreign_keys=[created_by_id])
