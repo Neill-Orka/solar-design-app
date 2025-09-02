@@ -10,6 +10,9 @@ const slugify = (t) =>
 // nice label for categories stored as slugs
 const pretty = (s) => (s || "").replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
+// Category priority for sorting (panels, inverters, batteries first)
+const CATEGORY_PRIORITY = ['panel', 'inverter', 'battery'];
+
 // Non-breaking space
 const NBSP = "\u00A0";
 
@@ -96,7 +99,20 @@ export default function BOMSection({ data, settings, startPageNumber = 16, total
     }
     // compute category totals (for 'category' mode)
     const out = [];
-    for (const [cat, itemsMap] of Array.from(byCat.entries()).sort((a,b)=>a[0].localeCompare(b[0]))) {
+    for (const [cat, itemsMap] of Array.from(byCat.entries()).sort((a,b) => {
+      // Priority items at the top in specified order
+      const aIndex = CATEGORY_PRIORITY.indexOf(a[0]);
+      const bIndex = CATEGORY_PRIORITY.indexOf(b[0]);
+      
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex; // Both are priority items, sort by priority order
+      }
+      if (aIndex !== -1) return -1; // a is priority, b is not
+      if (bIndex !== -1) return 1;  // b is priority, a is not
+      
+      // Neither are priority items, sort alphabetically
+      return a[0].localeCompare(b[0]);
+    })) {
       const items = Array.from(itemsMap.values()).sort((a,b)=>a.name.localeCompare(b.name));
       const catTotal = items.reduce((s,i)=>s + i.qty * (i.unitPrice||0), 0);
       out.push({ type: 'category', cat, label: pretty(cat), total: catTotal });

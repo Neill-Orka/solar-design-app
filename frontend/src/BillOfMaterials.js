@@ -55,7 +55,6 @@ const CATEGORY_META = {
   other:                 { name: 'Other',                        icon: 'bi-box',                   color: 'secondary'}
 };
 
-// Add this constant near the top of your file, after CATEGORY_META
 const CATEGORY_PRIORITY = ['panel', 'inverter', 'battery'];
 
 
@@ -165,7 +164,8 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
         const productsRes = await axios.get(`${API_URL}/api/products`);
         const normalized = (productsRes.data || []).map(p => ({
           ...p,
-          category: slugify(p.category)
+          originalCategory: p.category, // Preserve original category name
+          category: slugify(p.category)  // Keep slugified for CATEGORY_META key lookup
         }));
         setProducts(normalized);
 
@@ -257,7 +257,7 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
         'category',
         {
           name: 'categoryName',
-          getFn: (product) => CATEGORY_META[product.category]?.name || product.category
+          getFn: (product) => CATEGORY_META[product.category]?.name || product.originalCategory || product.category
         },
         'power_w',
         'rating_kva',
@@ -270,7 +270,7 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
 
     const records = products.map(p => ({
       ...p,
-      categoryName: CATEGORY_META[p.category]?.name || p.category
+      categoryName: CATEGORY_META[p.category]?.name || p.originalCategory || p.category
     }));
 
     return new Fuse(records, options);
@@ -969,7 +969,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     
     // Prepare data structure for the printable view using fresh sorted categories
     const categoriesForPrint = freshSortedCategories.map(cat => ({
-      name: CATEGORY_META[cat]?.name || cat,
+      name: CATEGORY_META[cat]?.name || (freshGrouped[cat][0]?.product?.originalCategory || cat),
       items: freshGrouped[cat].map(comp => ({
         product: comp.product,
         quantity: comp.quantity,
@@ -1154,7 +1154,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                           <tr key={product.id}>
                             <td>
                               <div className="fw-medium small">{product.brand} {product.model}</div>
-                              <div className="text-muted" style={{fontSize: '0.75rem'}}>{CATEGORY_META[product.category]?.name || product.category}</div>
+                              <div className="text-muted" style={{fontSize: '0.75rem'}}>{CATEGORY_META[product.category]?.name || product.originalCategory || product.category}</div>
                             </td>
                             <td>
                               {product.category === 'panel' && product.power_w && (
@@ -1241,7 +1241,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                               <td colSpan={5} className="py-1">
                                 <div className="fw-semibold">
                                   <i className={`bi ${CATEGORY_META[cat]?.icon || 'bi-box'} me-1`} />
-                                  {CATEGORY_META[cat]?.name || cat}
+                                  {CATEGORY_META[cat]?.name || (grouped[cat][0]?.product?.originalCategory || cat)}
                                 </div>
                               </td>
                               <td className="py-1 text-end fw-semibold">
