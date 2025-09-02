@@ -68,7 +68,8 @@ class User(db.Model):
             'is_active': self.is_active,
             'is_email_verified': self.is_email_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            'phone': self.phone
         }
 
 
