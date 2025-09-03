@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, version } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import {
   Container, Row, Col, Card, Button, Form, Spinner,
@@ -104,8 +104,7 @@ const normalizeMarginToDecimal = (m) => {
   return v <= 1 ? v : v / 100;
 }
 
-const computeUnitCost = (product) => toNumber(product?.unit_cost);
-
+const computeUnitCost = (comp) => toNumber(comp.unit_cost_at_time ?? comp.product?.unit_cost);
 const computeMarginPct = (product) => normalizeMarginToDecimal(product?.margin);
 
 // effective margin for a BOM row: override -> product -> default (25%)
@@ -115,10 +114,11 @@ const getRowMarginDecimal = (row) => {
   return Number.isFinite(prodM) && prodM >= 0 ? prodM : DEFAULT_MARGIN_DEC;
 };
 
+// Update to use the new computeUnitCost
 const computeDerivedUnitFromRow = (row) => {
-  const cost = computeUnitCost(row?.product);
+  const cost = computeUnitCost(row);
   const m = getRowMarginDecimal(row);
-  if (Number.isFinite(cost) && Number.isFinite(m)) return cost * (1+m);
+  if (Number.isFinite(cost) && Number.isFinite(m)) return cost * (1 + m);
   return toNumber(row?.product?.price);
 };
 
@@ -154,6 +154,7 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
 
   // State for margin editing (allows blank values during editing)
   const [editingMargins, setEditingMargins] = useState({});
+  const [editingCosts, setEditingCosts] = useState({});
 
   /* ---------- Initial load ---------- */
   useEffect(() => {
@@ -199,6 +200,7 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
   // Clear editing margins when BOM components change (e.g., on load)
   useEffect(() => {
     setEditingMargins({});
+    setEditingCosts({});
   }, [bomComponents.length]); // Only trigger when the number of components changes
 
   // Set quote status when loaded from a quote
@@ -222,7 +224,7 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
 
           const components = bomComponents.map(c => {
             const liveUnit = computeDerivedUnitFromRow(c);
-            const liveCost = computeUnitCost(c.product);
+            const liveCost = computeUnitCost(c);
             return {
               product_id: c.product.id,
               quantity: Math.max(1, Number(c.quantity) || 1),
@@ -456,7 +458,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
               quantity: saved.quantity,
               price_at_time: saved.price_at_time,
               current_price: saved.current_price,
-              override_margin: saved.override_margin
+              override_margin: saved.override_margin,
+              unit_cost_at_time: saved.unit_cost_at_time ?? null
             };
           }).filter(item => item.product); // Remove any with missing products
 
@@ -552,7 +555,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
         quantity: 1,
         price_at_time: null,
         current_price: computeDerivedUnitFromRow({ product }),
-        override_margin: null  // New components start with no margin override
+        override_margin: null,  // New components start with no margin override
+        unit_cost_at_time: null,
       }
     ]);
   };
@@ -635,6 +639,48 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     });
   };
 
+  // Helper to get display value for cost input
+  const getCostDisplayValue = (comp) => {
+    const productId = comp.product.id;
+    // If editing show temp value
+    if (editingCosts.hasOwnProperty(productId)) {
+      return editingCosts[productId];
+    }
+    // Otherwise show the actual cost
+    return computeUnitCost(comp).toFixed(2);
+  };
+
+  const updateCost = (productId, cost) => {
+    // store the raw input for UX (allow empty during edit)
+    setEditingCosts(prev => ({
+      ...prev,
+      [productId]: cost
+    }));
+  };
+
+  const handleCostBlur = (productId, cost) => {
+    // on blur, validate and commit override
+    const numValue = Number(cost);
+    let finalCost = null; // null = use product.unit_cost
+
+    if (cost !== '' && !isNaN(numValue) && numValue >= 0) {
+      finalCost = numValue;
+    }
+
+    // Update bomComponents with override (null if invalid or empty)
+    setBomComponents(bomComponents.map(c => 
+      c.product.id === productId ? { ...c, unit_cost_at_time: finalCost } : c
+    ));
+
+    // Clear temp state
+    setEditingCosts(prev => {
+      const newState = { ...prev };
+      delete newState[productId];
+      return newState;
+    });
+  };
+
+
   /* ---------- Save BOM ---------- */
   const saveBOM = async () => {
     try {
@@ -645,13 +691,13 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
 
       const components = (Array.isArray(bomComponents) ? bomComponents : []).map(c => {
         const liveUnit = computeDerivedUnitFromRow(c);
-        const liveCost = computeUnitCost(c.product);
+        const liveCost = computeUnitCost(c);
         return {
           product_id: c.product.id,
           quantity: Math.max(1, Number(c.quantity) || 1),
           override_margin: c.override_margin ?? null,
           price_at_time: isDraft ? null : (c.price_at_time ?? liveUnit),
-          unit_cost_at_time: isDraft ? null : (c.unit_cost_at_time ?? liveCost)
+          unit_cost_at_time: c.unit_cost_at_time ?? liveCost  // Always save custom costs, even in draft
         };
       });
 
@@ -837,7 +883,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     
     // Calculate cost price total
     const total_cost = list.reduce((sum, c) => {
-      const costPrice = computeUnitCost(c.product);
+      const costPrice = computeUnitCost(c);
       return sum + costPrice * (Number(c.quantity) || 0);
     }, 0);
     
@@ -1074,7 +1120,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                 <Badge bg="success" className="small">{product.capacity_kwh}kWh</Badge>
                               )}
                             </td>
-                            <td className="text-end small">{formatCurrency(computeUnitCost(product))}</td>
+                            <td className="text-end small">{formatCurrency(product.price || 0)}</td>
                             <td className="text-center">
                               {existing ? (
                                 <ButtonGroup size="sm">
@@ -1158,10 +1204,9 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                             </tr>
                             {grouped[cat].map(comp => {
                               const isDraft = (quoteStatus === 'draft');
-                              const unitCost = computeUnitCost(comp.product);
                               const unitPrice = getUnitPriceForRow(comp, isDraft);
                               const line = unitPrice * (Number(comp.quantity) || 0);
-                              const priceChanged = !isDraft && comp.price_at_time != null && 
+                              const priceChanged = !isDraft && comp.price_at_time != null &&
                                 computeDerivedUnitFromRow(comp) !== comp.price_at_time;
 
                               return (
@@ -1183,7 +1228,21 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                       )}
                                     </div>
                                   </td>
-                                  <td className='text-end small'>{formatCurrency(unitCost)}</td>
+                                  <td className='text-end small'>
+                                    <Form.Control 
+                                      type='number'
+                                      min='0'
+                                      step='1'
+                                      style={{ minWidth: 80, maxWidth: 110, fontSize: '0.85rem'}}
+                                      value={getCostDisplayValue(comp)}
+                                      onChange={e => updateCost(comp.product.id, e.target.value)}
+                                      onBlur={e => handleCostBlur(comp.product.id, e.target.value)}
+                                      disabled={quoteStatus !== 'draft'}
+                                      className='py-0 text-end'
+                                      plaintext
+                                      readOnly={false}
+                                    />
+                                  </td>
                                   <td>
                                     <InputGroup size='sm'>
                                       <InputGroup.Text className="py-0 px-1">%</InputGroup.Text>
