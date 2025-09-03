@@ -2,25 +2,52 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Product, User, UserRole
 from sqlalchemy.inspection import inspect
+from sqlalchemy import Float, Integer, Numeric
 
 products_bp = Blueprint('products', __name__)
 
-# ---------- helper --------------------------------------------------------
-def clean_numbers(payload):
-    """Convert empty strings to None and cast numerics."""
-    # Align with API field names actually used by frontend
-    float_fields = [
-        "power_w", "rating_kva", "capacity_kwh",  # synonyms
-        "unit_cost", "margin", "price"
-    ]
-    int_fields   = ["warranty_y"]
-    for f in float_fields:
-        v = payload.get(f)
-        payload[f] = float(v) if v not in (None, "", " ") else None
-    for f in int_fields:
-        v = payload.get(f)
-        payload[f] = int(v) if v not in (None, "", " ") else None
-    return payload
+###############################################
+# Helpers
+###############################################
+
+def dynamic_cast_and_clean(payload):
+    """Lightweight cleaner: blanks -> None, numeric-looking strings -> float/int.
+    Uses a simple allowlist for integer fields; everything else that parses to float becomes float.
+    Synonym field names (brand, model, power_w, rating_kva, capacity_kwh) are preserved for later mapping.
+    """
+    if not payload:
+        return {}
+    int_fields = {
+        'warranty_y','qty','number_of_inputs','number_of_mppt','max_input_current_per_input_a',
+        'max_isc_per_mppt_a','max_dc_input_voltage_per_mppt_v','min_operating_voltage_range_v',
+        'max_operating_voltage_range_v','rated_input_voltage_v','poles','min_current_rating_a',
+        'max_current_rating_a','voltage_rating_v','rated_voltage_v','nominal_current_a','number_of_poles',
+        'cores_ac_cable','number_of_phases'
+    }
+    cleaned = {}
+    for k, v in payload.items():
+        if k in ('id','updated_at','updated_by','updated_by_id'): # skip read-only
+            continue
+        if v in (None, '', ' '):
+            cleaned[k] = None
+            continue
+        # Try int first if designated
+        if k in int_fields:
+            try:
+                cleaned[k] = int(v)
+                continue
+            except (ValueError, TypeError):
+                cleaned[k] = None
+                continue
+        # Fallback float parse
+        if isinstance(v, (int,float)):
+            cleaned[k] = v
+        else:
+            try:
+                cleaned[k] = float(v)
+            except (ValueError, TypeError):
+                cleaned[k] = v  # leave as string
+    return cleaned
 
 @products_bp.route('/products', methods=['GET'])
 def list_products():
@@ -41,10 +68,30 @@ def add_product():
     raw = request.get_json() or {}
     # Remove read-only / relationship fields possibly echoed from frontend
     for k in ('id', 'updated_at', 'updated_by'): raw.pop(k, None)
-    data = clean_numbers(raw)
+    data = dynamic_cast_and_clean(raw)
     user_id = get_jwt_identity()
     try:
-        p = Product(**data)
+        # Translate synonyms to real constructor kwargs
+        synonym_translation = {
+            'brand': 'brand_name',
+            'model': 'description',
+            'power_w': 'power_rating_w',
+            'rating_kva': 'power_rating_kva',
+            'capacity_kwh': 'usable_rating_kwh'
+        }
+        ctor_kwargs = {}
+        for k, v in data.items():
+            real_key = synonym_translation.get(k, k)
+            ctor_kwargs[real_key] = v
+
+        # Margin normalization (percentage to decimal)
+        if 'margin' in ctor_kwargs and ctor_kwargs['margin'] is not None and ctor_kwargs['margin'] > 1:
+            try:
+                ctor_kwargs['margin'] = float(ctor_kwargs['margin']) / 100.0
+            except Exception:
+                pass
+
+        p = Product(**ctor_kwargs)
         p.updated_by_id = user_id
         db.session.add(p)
         db.session.commit()
@@ -58,32 +105,38 @@ def add_product():
 def update_product(pid):
     p = Product.query.get_or_404(pid)
     raw = request.get_json() or {}
-    # Strip read-only / relationship fields that may be sent back from UI
+    # Remove read-only / relationship echoes
     for k in ('id', 'updated_at', 'updated_by'): raw.pop(k, None)
-    data = clean_numbers(raw)
+    data = dynamic_cast_and_clean(raw)
     try:
-        # Normalize margin: if sent as percentage string (e.g. '25') convert to decimal
+        # Margin normalization (percentage to decimal if >1)
         if 'margin' in data and data['margin'] is not None and data['margin'] > 1:
-            # assume user passed 25 meaning 25%
-            data['margin'] = float(data['margin']) / 100.0
+            try:
+                data['margin'] = float(data['margin']) / 100.0
+            except Exception:
+                pass
 
-        # Determine allowed attribute names (column keys + synonyms we expose)
-        # Static allowlist (subset) – expand as needed
-        allowed = {
-            'category','component_type','brand','model','notes','supplier','updated','unit_cost','qty','margin','price','warranty_y',
-            'power_w','rating_kva','capacity_kwh'
+        synonyms = {
+            'brand': 'brand_name',
+            'model': 'description',
+            'power_w': 'power_rating_w',
+            'rating_kva': 'power_rating_kva',
+            'capacity_kwh': 'usable_rating_kwh'
         }
 
-        # Apply incoming fields selectively (skip unknown / protected)
         for k, v in data.items():
-            if k in allowed:
-                setattr(p, k, v)
+            real_key = synonyms.get(k, k) or k
+            if isinstance(real_key, str) and real_key not in ('id','updated_at','updated_by_id') and hasattr(Product, real_key):
+                try:
+                    setattr(p, real_key, v)
+                except Exception:
+                    pass
 
-        # If unit_cost or margin provided but price omitted, auto-calc price for consistency
+        # Auto-calc price if unit_cost or margin changed and price not explicitly provided
         if ('unit_cost' in data or 'margin' in data) and 'price' not in data:
             try:
                 if p.unit_cost is not None and p.margin is not None:
-                    p.price = round(p.unit_cost * (1 + p.margin), 2)
+                    p.price = round(float(p.unit_cost) * (1 + float(p.margin)), 2)
             except Exception:
                 pass
 
@@ -171,8 +224,9 @@ def get_field_metadata():
         # Track which fields have non-NULL values
         for product in products:
             # Get all column attributes
-            for column in inspect(Product).mapper.column_attrs:
-                field_name = column.key
+            # For metadata we keep dynamic behavior; fall back gracefully if inspect fails
+            product_columns = db.inspect(Product).columns
+            for field_name in product_columns.keys():
                 if field_name in skip_fields or field_name in general_fields:
                     continue
                 
@@ -198,14 +252,12 @@ def get_field_metadata():
             }
             
             # Add field metadata for each relevant field
+            product_columns = db.inspect(Product).columns
             for field_name in sorted(relevant_fields.keys()):
-                column = next((c for c in inspect(Product).mapper.column_attrs 
-                              if c.key == field_name), None)
-                if not column:
+                column = product_columns.get(field_name)
+                if column is None:
                     continue
-                
-                # Determine field type based on column type
-                column_type = str(column.expression.type)
+                column_type = str(column.type)
                 field_type = "text"  # Default
                 
                 if "INT" in column_type or "FLOAT" in column_type or "DECIMAL" in column_type:
