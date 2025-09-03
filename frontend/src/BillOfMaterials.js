@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import './BillOfMaterials.css';
 import axios from 'axios';
 import {
   Container, Row, Col, Card, Button, Form, Spinner,
@@ -89,9 +90,7 @@ const toNumber = v => (v === null || v === undefined || v === '') ? 0 : Number(v
 const DEFAULT_MARGIN_DEC = 0.25;
 
 // Helper function to check if a component is a core component that can only have margin edited
-const isCoreComponent = (category) => {
-  return ['panel', 'inverter', 'battery'].includes(category);
-};
+const isCoreComponent = (category) => ['panel', 'inverter', 'battery'].includes(category);
 
 const normalizeMarginToDecimal = (m) => {
   const v = toNumber(m);
@@ -151,10 +150,34 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
   const [extrasCost, setExtrasCost] = useState('0');
   const [quoteStatus, setQuoteStatus] = useState('draft'); // draft | sent | accepted | complete
   const [creatingQuote, setCreatingQuote] = useState(false);
+  // Full System Mode (default) locks core components; Component Quote Mode allows editing/removal
+  const [fullSystemMode, setFullSystemMode] = useState(() => {
+    try {
+      const v = sessionStorage.getItem('bomFullSystemMode');
+      return v === null ? true : v === 'true';
+    } catch { return true; }
+  });
+  const isCoreLocked = (category) => fullSystemMode && isCoreComponent(category);
 
   // State for margin editing (allows blank values during editing)
   const [editingMargins, setEditingMargins] = useState({});
   const [editingCosts, setEditingCosts] = useState({});
+
+  /* ---------- Session persistence ---------- */
+  const SESSION_KEY_COMPONENTS = useMemo(() => `bomSessionComponents_${projectId}`, [projectId]);
+  const persistSessionComponents = useMemo(() => (list) => {
+    try {
+      const lightweight = list.map(c => ({
+        product_id: c.product?.id,
+        quantity: c.quantity,
+        unit_cost_at_time: c.unit_cost_at_time,
+        override_margin: c.override_margin
+      }));
+      sessionStorage.setItem(SESSION_KEY_COMPONENTS, JSON.stringify(lightweight));
+    } catch {}
+  }, [SESSION_KEY_COMPONENTS]);
+
+  useEffect(() => { try { sessionStorage.setItem('bomFullSystemMode', String(fullSystemMode)); } catch {} }, [fullSystemMode]);
 
   /* ---------- Initial load ---------- */
   useEffect(() => {
@@ -186,6 +209,29 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
 
         // dispatch load in correct order
         await loadProjectBOM(projectId, normalized, proj);
+        // Merge session-stored component edits (quantities/costs) after load
+    setBomComponents(prev => {
+          let merged = prev;
+          try {
+            const raw = sessionStorage.getItem(SESSION_KEY_COMPONENTS);
+            if (raw) {
+              const sessionRows = JSON.parse(raw) || [];
+              const byId = Object.fromEntries(merged.map(c => [c.product.id, { ...c }]));
+              sessionRows.forEach(r => {
+                const target = byId[r.product_id];
+                if (target) {
+                  if (Number.isFinite(r.quantity) && r.quantity > 0) target.quantity = r.quantity;
+                  if (r.unit_cost_at_time != null && r.unit_cost_at_time !== '') target.unit_cost_at_time = r.unit_cost_at_time;
+                  if (r.override_margin != null && r.override_margin !== '') target.override_margin = r.override_margin;
+                }
+              });
+      merged = Object.values(byId);
+      // Persist immediately so any normalization is reflected
+      persistSessionComponents(merged);
+            }
+          } catch {}
+          return merged;
+        });
       } catch (err) {
         console.error('Init load error:', err);
         showNotification('Failed to load project or products', 'danger');
@@ -195,7 +241,7 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
     };
     fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  }, [projectId, SESSION_KEY_COMPONENTS]);
 
   // Clear editing margins when BOM components change (e.g., on load)
   useEffect(() => {
@@ -294,7 +340,7 @@ function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
       const res = await axios.post(`${API_URL}/api/projects/${projectId}/quotes`, {
         tz: 'Africa/Johannesburg'
       });
-      const { document, version } = res.data || {};
+  const { document } = res.data || {};
       const docId = document?.id;
       showNotification(`Quote created successfully!`, 'success');
 
@@ -421,10 +467,7 @@ const overlayFromProject = (items, projectData, productsData) => {
   return result;
 };
 
-const getBrandModelCategory = (components, category) => {
-  const comp = components.find(c => c.product?.category === category);
-  return comp ? `${comp.product?.brand || ''}` : '';
-};
+// Removed unused helper getBrandModelCategory
 
   /* ---------- NEW HYBRID BOM LOADER ---------- */
 const loadProjectBOM = async (pid, productsData, projectData) => {
@@ -516,30 +559,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
 };
 
   /* ---------- Overlay helpers ---------- */
-  const initializeFromSystemDesign = (projectData, productsData) => {
-    const items = [];
-
-    // Inverters
-    if (projectData.inverter_ids?.length) {
-      projectData.inverter_ids.forEach(id => {
-        const prod = productsData.find(p => p.id === id);
-        if (prod) items.push({ product: prod, quantity: 1, price_at_time: null, current_price: computeDerivedUnitFromRow({ product: prod }) });
-      });
-    }
-
-    // Batteries
-    if (projectData.battery_ids?.length) {
-      projectData.battery_ids.forEach(id => {
-        const prod = productsData.find(p => p.id === id);
-        if (prod) items.push({ product: prod, quantity: 1, price_at_time: null, current_price: computeDerivedUnitFromRow({ product: prod }) });
-      });
-    }
-
-    // Panels: only possible if you store panel product id — project currently doesn’t.
-    // User can add panels from the left list.
-
-    return items;
-  };
+  // Removed unused initializeFromSystemDesign helper
 
   /* ---------- Item ops ---------- */
   const addComponent = (product) => {
@@ -548,7 +568,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
       updateQuantity(product.id, existing.quantity + 1);
       return;
     }
-    setBomComponents([
+    const addedList = [
       ...bomComponents,
       {
         product,
@@ -558,43 +578,51 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
         override_margin: null,  // New components start with no margin override
         unit_cost_at_time: null,
       }
-    ]);
+    ];
+    setBomComponents(addedList);
+    persistSessionComponents(addedList);
   };
 
   const removeComponent = (productId) => {
     // Check if this is a core component that shouldn't be removed
     const componentToRemove = bomComponents.find(c => c.product.id === productId);
-    if (componentToRemove && isCoreComponent(componentToRemove.product.category)) {
+  if (componentToRemove && isCoreLocked(componentToRemove.product.category)) {
       showNotification('Core components (Panels, Inverters, Batteries) can only be modified in System Design', 'warning');
       return;
     }
-    setBomComponents(bomComponents.filter(c => c.product.id !== productId));
+  const remaining = bomComponents.filter(c => c.product.id !== productId);
+  setBomComponents(remaining);
+  persistSessionComponents(remaining);
   };
 
   const updateQuantity = (productId, quantity) => {
     // Check if this is a core component that shouldn't have quantity changed
     const componentToUpdate = bomComponents.find(c => c.product.id === productId);
-    if (componentToUpdate && isCoreComponent(componentToUpdate.product.category)) {
+  if (componentToUpdate && isCoreLocked(componentToUpdate.product.category)) {
       showNotification('Core component quantities can only be modified in System Design', 'warning');
       return;
     }
     // Allow empty string for better UX, but store the actual value
-    setBomComponents(bomComponents.map(c =>
+    const updated = bomComponents.map(c =>
       c.product.id === productId ? { ...c, quantity: quantity } : c
-    ));
+    );
+    setBomComponents(updated);
+    persistSessionComponents(updated);
   };
 
   const handleQuantityBlur = (productId, quantity) => {
     // Check if this is a core component that shouldn't have quantity changed
     const componentToUpdate = bomComponents.find(c => c.product.id === productId);
-    if (componentToUpdate && isCoreComponent(componentToUpdate.product.category)) {
+  if (componentToUpdate && isCoreLocked(componentToUpdate.product.category)) {
       return; // Don't process blur for core components
     }
     // When field loses focus, ensure we have a valid number
     const q = Math.max(1, parseInt(quantity || 1, 10));
-    setBomComponents(bomComponents.map(c =>
+    const normalizedList = bomComponents.map(c =>
       c.product.id === productId ? { ...c, quantity: q } : c
-    ));
+    );
+    setBomComponents(normalizedList);
+    persistSessionComponents(normalizedList);
   };
 
   // Helper function to get the display value for margin input
@@ -627,9 +655,11 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     }
     
     // Update the component with the final margin value
-    setBomComponents(bomComponents.map(c => 
+    const marginUpdated = bomComponents.map(c => 
       c.product.id === productId ? { ...c, override_margin: finalMargin } : c
-    ));
+    );
+    setBomComponents(marginUpdated);
+    persistSessionComponents(marginUpdated);
     
     // Clear the editing state
     setEditingMargins(prev => {
@@ -668,9 +698,11 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
     }
 
     // Update bomComponents with override (null if invalid or empty)
-    setBomComponents(bomComponents.map(c => 
+    const costUpdated = bomComponents.map(c => 
       c.product.id === productId ? { ...c, unit_cost_at_time: finalCost } : c
-    ));
+    );
+    setBomComponents(costUpdated);
+    persistSessionComponents(costUpdated);
 
     // Clear temp state
     setEditingCosts(prev => {
@@ -932,93 +964,85 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
 
   
   // Helper function to calculate totals for any component list
-  const calculateTotalsForComponents = (components) => {
-    const isDraft = (quoteStatus === 'draft');
-    const list = Array.isArray(components) ? components : [];
-    
-    // Calculate selling price total
-    const total_ex_vat = list.reduce((sum, c) => {
-      const unit = getUnitPriceForRow(c, isDraft);
-      return sum + unit * (Number(c.quantity) || 0);
-    }, 0);
-    
-    // Calculate cost price total
-    const total_cost = list.reduce((sum, c) => {
-      const costPrice = computeUnitCost(c.product);
-      return sum + costPrice * (Number(c.quantity) || 0);
-    }, 0);
-    
-    // Calculate total markup
-    const total_markup = total_ex_vat - total_cost;
-    
-    const vat_perc = 15;
-    const vat_price = total_ex_vat * (vat_perc / 100);
-    const total_in_vat = total_ex_vat * (1 + vat_perc / 100);
-    
-    return { 
-      total_excl_vat: total_ex_vat, 
-      total_cost: total_cost,
-      total_markup: total_markup,
-      vat_perc: vat_perc, 
-      vat_price: vat_price, 
-      total_incl_vat: total_in_vat 
-    };
-  };
+  // Removed unused calculateTotalsForComponents helper
 
   return (
     <div>
       <Container fluid>
         <Row className="mb-3">
           <Col>
-            <h4 className="mb-0">
-              <i className="bi bi-basket3 me-2" />
-              Bill of Materials
-            </h4>
-            <div className="text-muted">
-              Project: <strong>{project?.name}</strong>
-              {isStandardDesign && (
-                <Badge bg="secondary" className="ms-2">
-                  Standard: {templateInfo?.name || 'Template'}
-                </Badge>
-              )}
+            <div className="bom-toolbar-wrapper d-flex flex-column flex-xl-row gap-3 align-items-stretch align-items-xl-center justify-content-between">
+              <div className="bom-heading flex-grow-1">
+                <h4 className="mb-1 d-flex align-items-center fw-semibold">
+                  <i className="bi bi-basket3 me-2 text-primary" />
+                  Bill of Materials
+                </h4>
+                <div className="small text-muted d-flex flex-wrap align-items-center gap-2">
+                  <span>Project: <strong>{project?.name}</strong></span>
+                  {isStandardDesign && (
+                    <Badge bg="secondary" className="rounded-pill px-2 py-1">
+                      Standard: {templateInfo?.name || 'Template'}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <div className="bom-toolbar d-flex flex-wrap align-items-center gap-2">
+                {/* 1. Mode Switch */}
+                <div className="mode-switch card shadow-sm border-0 px-3 py-2 d-flex align-items-center">
+                  <Form.Check
+                    type="switch"
+                    id="bom-mode-switch"
+                    label={fullSystemMode ? 'Full System Mode' : 'Component Quote Mode'}
+                    checked={fullSystemMode}
+                    onChange={() => setFullSystemMode(v => !v)}
+                  />
+                </div>
+
+                {/* 2. Template Button */}
+                <Button
+                  variant="outline-secondary"
+                  className="bom-btn shadow-sm bom-template-btn"
+                  onClick={() => setShowSaveTemplateModal(true)}
+                  disabled={!bomComponents.length || savingComponents}
+                >
+                  <i className="bi bi-save me-1" />
+                  Save Template
+                </Button>
+
+                {/* 3. Save BOM */}
+                <Button
+                  variant="success"
+                  className="bom-btn shadow-sm"
+                  onClick={saveBOM}
+                  disabled={savingComponents}
+                >
+                  {savingComponents ? (
+                    <>
+                      <Spinner size="sm" as="span" animation="border" className="me-2" />
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-check2-circle me-1" />
+                      Save BOM
+                    </>
+                  )}
+                </Button>
+
+                {/* 4. Generate Quote (primary CTA) */}
+                {!quoteContext?.docId && (
+                  <Button
+                    variant="primary"
+                    className="bom-btn shadow-sm bom-generate-btn"
+                    onClick={createQuote}
+                    disabled={creatingQuote || savingComponents || !bomComponents.length}
+                  >
+                    <i className="bi bi-file-earmark-plus me-1" />
+                    {creatingQuote ? 'Generating…' : 'Generate Quote'}
+                  </Button>
+                )}
+              </div>
             </div>
-          </Col>
-          <Col className="text-end">
-            <Button
-              variant="primary"
-              className="me-2"
-              onClick={() => setShowSaveTemplateModal(true)}
-              disabled={!bomComponents.length || savingComponents}
-            >
-              <i className="bi bi-save me-1" />
-              Save as Template
-            </Button>
-            <Button
-              variant="success"
-              onClick={saveBOM}
-              disabled={savingComponents}
-            >
-              {savingComponents ? (
-                <>
-                  <Spinner size="sm" as="span" animation="border" className="me-2" />
-                  Saving…
-                </>
-              ) : (
-                <>
-                  <i className="bi bi-check2-circle me-1" />
-                  Save BOM
-                </>
-              )}
-            </Button>
-            {!quoteContext?.docId && (<Button 
-              variant="success"
-              className='me-2'
-              onClick={createQuote}
-              disabled={creatingQuote || savingComponents || !bomComponents.length}
-            >
-              <i className="bi bi-file-earmark-plus me-1"></i>
-              {creatingQuote ? 'Generating...' : 'Generate Quote'}
-            </Button>)}
           </Col>
         </Row>
 
@@ -1129,8 +1153,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                     size="sm" 
                                     className="py-0 px-1" 
                                     onClick={() => updateQuantity(product.id, Math.max(1, Number(existing.quantity) - 1))}
-                                    disabled={isCoreComponent(product.category)}
-                                    title={isCoreComponent(product.category) ? "Core component quantities can only be changed in System Design" : "Decrease quantity"}
+                                    disabled={isCoreLocked(product.category)}
+                                    title={isCoreLocked(product.category) ? "Core component quantities can only be changed in System Design" : "Decrease quantity"}
                                   >-</Button>
                                   <Button variant="outline-secondary" size="sm" className="py-0 px-1" disabled>{Number(existing.quantity) || 1}</Button>
                                   <Button 
@@ -1138,8 +1162,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                     size="sm" 
                                     className="py-0 px-1" 
                                     onClick={() => updateQuantity(product.id, Number(existing.quantity) + 1)}
-                                    disabled={isCoreComponent(product.category)}
-                                    title={isCoreComponent(product.category) ? "Core component quantities can only be changed in System Design" : "Increase quantity"}
+                                    disabled={isCoreLocked(product.category)}
+                                    title={isCoreLocked(product.category) ? "Core component quantities can only be changed in System Design" : "Increase quantity"}
                                   >+</Button>
                                 </ButtonGroup>
                               ) : (
@@ -1221,7 +1245,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                           </small>
                                         )}
                                       </div>
-                                      {isCoreComponent(comp.product.category) && (
+                                      {isCoreLocked(comp.product.category) && (
                                         <Badge bg="info" className="ms-2" title="Core component - quantities managed in System Design">
                                           <i className="bi bi-gear-fill" style={{ fontSize: '0.75em' }}></i>
                                         </Badge>
@@ -1271,8 +1295,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                         onChange={e => updateQuantity(comp.product.id, e.target.value)}
                                         onBlur={e => handleQuantityBlur(comp.product.id, e.target.value)}
                                         className="py-0"
-                                        disabled={isCoreComponent(comp.product.category)}
-                                        title={isCoreComponent(comp.product.category) ? "Core component quantities can only be changed in System Design" : ""}
+                                        disabled={isCoreLocked(comp.product.category)}
+                                        title={isCoreLocked(comp.product.category) ? "Core component quantities can only be changed in System Design" : ""}
                                       />
                                     </InputGroup>
                                   </td>
@@ -1283,8 +1307,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                                       size='sm' 
                                       className="py-0 px-1" 
                                       onClick={() => removeComponent(comp.product.id)}
-                                      disabled={isCoreComponent(comp.product.category)}
-                                      title={isCoreComponent(comp.product.category) ? "Core components cannot be removed - manage in System Design" : "Remove component"}
+                                      disabled={isCoreLocked(comp.product.category)}
+                                      title={isCoreLocked(comp.product.category) ? "Core components cannot be removed - manage in System Design" : "Remove component"}
                                     >
                                       <i className='bi bi-trash' />
                                     </Button>
@@ -1368,7 +1392,10 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                   </Col>
                   <Col sm={3} className="mb-3 text-center">
                     <div className="small text-muted">Cost per kWp</div>
-                    <div className="fs-4 fw-bold text-success">{formatCurrency(totals.total_excl_vat / systemSpecs.panelKw)}<small>/kWp</small></div>
+                    <div className="fs-4 fw-bold text-success">
+                      {formatCurrency(systemSpecs.panelKw > 0 ? (totals.total_excl_vat / systemSpecs.panelKw) : 0)}
+                      <small>/kWp</small>
+                    </div>
                   </Col>
                 </Row>
               </Card.Body>

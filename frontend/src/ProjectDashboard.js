@@ -280,7 +280,7 @@ function ProjectDashboard() {
         <li className="nav-item">
           <button className={`nav-link ${activeTab === 'bom' ? 'active' : ''}`} onClick={() => handleTabChange('bom')}>Bill of Materials</button>
         </li>        
-        <li className="nav-item">
+        {/* <li className="nav-item">
           <button 
             className="nav-link text-muted" 
             style={{ cursor: 'not-allowed', opacity: 0.6 }}
@@ -289,7 +289,7 @@ function ProjectDashboard() {
           >
             Print BOM
           </button>
-        </li>
+        </li> */}
         <li className="nav-item">
           <button className={`nav-link ${activeTab === 'quotes' ? 'active' : ''}`} onClick={() => handleTabChange('quotes')}>Quotes</button>
         </li>        
