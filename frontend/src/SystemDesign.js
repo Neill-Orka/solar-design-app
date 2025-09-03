@@ -894,12 +894,102 @@ function SystemDesign({ projectId }) {
         design.generatorBatteryStartSoc, design.generatorBatteryStopSoc, 
         design.generatorServiceCost, design.generatorServiceInterval]);
 
-    // Effect to load the specific project's data
+    // Effect to load the specific project's data or core components from quotes
     // This runs after the project ID is available and after the products have been loaded
     useEffect(() => {
         // Wait until we have products before trying to match them
         if (!projectId || products.inverters.length === 0) return;
         
+        // Check for core components from quote first
+        const coreComponentsKey = `quoteLoadCoreComponents_${projectId}`;
+        const coreComponentsData = sessionStorage.getItem(coreComponentsKey);
+        
+        if (coreComponentsData) {
+            // If we have core components from a quote, use those instead of project data
+            try {
+                const coreComponents = JSON.parse(coreComponentsData);
+                console.log('Loading core components from quote instead of project data:', coreComponents);
+                
+                let updates = {};
+                
+                // Update panel selection if present
+                if (coreComponents.panel) {
+                    const panelProduct = products.panels.find(p => p.id === coreComponents.panel.id);
+                    if (panelProduct) {
+                        updates.selectedPanel = {
+                            value: panelProduct.id,
+                            label: `${panelProduct.brand_name} ${panelProduct.description}`,
+                            product: panelProduct
+                        };
+                        updates.panelKw = ((coreComponents.panel.quantity * (panelProduct.power_w || PANEL_WATTAGE)) / 1000).toFixed(2);
+                        updates.numPanels = coreComponents.panel.quantity;
+                    }
+                }
+                
+                // Update inverter selection if present
+                if (coreComponents.inverter) {
+                    console.log('Looking for inverter with ID:', coreComponents.inverter.id, 'in products:', products.inverters.length, 'inverters');
+                    const inverterProduct = products.inverters.find(p => p.id === coreComponents.inverter.id);
+                    console.log('Found inverter product:', inverterProduct);
+                    if (inverterProduct) {
+                        updates.selectedInverter = {
+                            value: inverterProduct.id,
+                            label: `${inverterProduct.description} (${inverterProduct.rating_kva}kVA)`,
+                            product: inverterProduct
+                        };
+                        updates.inverterQuantity = coreComponents.inverter.quantity;
+                        console.log('Set inverter:', updates.selectedInverter, 'quantity:', updates.inverterQuantity);
+                    } else {
+                        console.warn('Inverter product not found with ID:', coreComponents.inverter.id);
+                    }
+                }
+                
+                // Update battery selection if present
+                if (coreComponents.battery) {
+                    const batteryProduct = products.batteries.find(p => p.id === coreComponents.battery.id);
+                    if (batteryProduct) {
+                        updates.selectedBattery = {
+                            value: batteryProduct.id,
+                            label: `${batteryProduct.description} (${batteryProduct.capacity_kwh}kWh)`,
+                            product: batteryProduct
+                        };
+                        updates.batteryQuantity = coreComponents.battery.quantity;
+                    }
+                }
+                
+                if (Object.keys(updates).length > 0) {
+                    setDesign(prevDesign => ({
+                        ...prevDesign,
+                        ...updates
+                    }));
+                    
+                    // Set quote info when loading from quote
+                    setLoadedFromQuote(true);
+                    setQuoteInfo({
+                        name: coreComponents.quote_name || 'Quote Components',
+                        number: coreComponents.quote_number || 'Unknown'
+                    });
+                    
+                    // Clear standard template state since we're now using quote components
+                    setUsingStandardTemplate(false);
+                    setStandardTemplateInfo(null);
+                    
+                    console.log('Updated SystemDesign with core components from quote');
+                }
+                
+                // Clean up the sessionStorage after using it
+                sessionStorage.removeItem(coreComponentsKey);
+                
+            } catch (error) {
+                console.error('Failed to parse core components data:', error);
+                sessionStorage.removeItem(coreComponentsKey);
+            }
+            
+            // Don't continue with normal project loading if we used core components
+            return;
+        }
+        
+        // Normal project data loading (only if no core components from quote)
         axios.get(`${API_URL}/api/projects/${projectId}`).then(res => {
             const p = res.data;
             if (!p) return;
@@ -914,7 +1004,14 @@ function SystemDesign({ projectId }) {
                 });
             }
 
-            // Rest of your existing code for loading project data
+            // Check for core components from quote first - if present, skip normal project loading
+        const coreComponentsKey = `quoteLoadCoreComponents_${projectId}`;
+        const coreComponentsData = sessionStorage.getItem(coreComponentsKey);
+        
+        if (coreComponentsData) {
+            // Core components will be handled by the other effect, skip normal project loading
+            return;
+        }
             const savedKw = p.panel_kw || '';
             const defaultPanelId = p.panel_id;
             const currentPanel = defaultPanelId ?
@@ -1396,6 +1493,8 @@ function SystemDesign({ projectId }) {
 
     const [usingStandardTemplate, setUsingStandardTemplate] = useState(false);
     const [standardTemplateInfo, setStandardTemplateInfo] = useState(null);
+    const [loadedFromQuote, setLoadedFromQuote] = useState(false);
+    const [quoteInfo, setQuoteInfo] = useState(null);
 
     const handleSimulate = () => {
         setLoading(true);
@@ -1678,8 +1777,8 @@ function SystemDesign({ projectId }) {
                 </Card>
             </div>
 
-            {/* Move the standard template alert here, right after the design mode selector */}
-            {usingStandardTemplate && (
+            {/* Template or Quote banner */}
+            {usingStandardTemplate && !loadedFromQuote && (
                 <Alert variant="success" className="d-flex align-items-center mb-4">
                     <div className="d-flex align-items-center flex-grow-1">
                         <i className="bi bi-collection-fill fs-4 me-3"></i>
@@ -1705,6 +1804,33 @@ function SystemDesign({ projectId }) {
                         >
                             <i className="bi bi-x-circle me-1"></i>
                             Stop Using Template
+                        </Button>
+                    </div>
+                </Alert>
+            )}
+            
+            {loadedFromQuote && (
+                <Alert variant="info" className="d-flex align-items-center mb-4">
+                    <div className="d-flex align-items-center flex-grow-1">
+                        <i className="bi bi-file-earmark-text-fill fs-4 me-3"></i>
+                        <div>
+                            <div className="fw-bold">Loaded from Quote</div>
+                            <div>Components loaded from quote: "{quoteInfo?.name}"</div>
+                        </div>
+                    </div>
+                    <div>
+                        <Button 
+                            variant="outline-info" 
+                            size="sm" 
+                            onClick={() => {
+                                setLoadedFromQuote(false);
+                                setQuoteInfo(null);
+                                sessionStorage.removeItem(`quoteComponents_${projectId}`);
+                            }}
+                            className="d-flex align-items-center"
+                        >
+                            <i className="bi bi-x-circle me-1"></i>
+                            Clear Quote Loading
                         </Button>
                     </div>
                 </Alert>

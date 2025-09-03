@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
-import Modal from 'react-bootstrap/Modal';
-import Button from 'react-bootstrap/Button';
-import Form from 'react-bootstrap/Form';
+import { Modal, Button, Form } from 'react-bootstrap';
 // import HeatMap if you need heat map support
 // import HeatMap from '@uiw/react-heat-map';
 import { API_URL } from './apiConfig';
@@ -23,6 +21,9 @@ function EnergyAnalysis({ projectId }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showDateModal, setShowDateModal] = useState(false);
+  const [scaleFactorInput, setScaleFactorInput] = useState('');
+  const [actualScaleFactor, setActualScaleFactor] = useState(1);
+  const [isScaleFactorValid, setIsScaleFactorValid] = useState(true);
 
   // Set default to last 30 days
   useEffect(() => {
@@ -49,13 +50,31 @@ function EnergyAnalysis({ projectId }) {
     }
   }, [startDate, endDate]);
 
+  // Load scale factor from project on mount
+  useEffect(() => {
+    if (!projectId) return;
+    
+    axios.get(`${API_URL}/api/projects/${projectId}`)
+      .then(res => {
+        const scaleFactor = res.data.energy_scale_factor || 1;
+        setActualScaleFactor(scaleFactor);
+        setScaleFactorInput(scaleFactor.toString());
+      })
+      .catch(err => {
+        console.error('Error loading project data:', err);
+        setActualScaleFactor(1);
+        setScaleFactorInput('1');
+      });
+  }, [projectId]);
+
   useEffect(() => {
     if (!projectId || !startDate || !endDate) return;
 
     axios.get(`${API_URL}/api/consumption_data/${projectId}`, {
       params: {
         start_date: startDate,
-        end_date: endDate
+        end_date: endDate,
+        scale_factor: actualScaleFactor
       }
     })
     .then(res => setConsumptionData(res.data))
@@ -63,7 +82,60 @@ function EnergyAnalysis({ projectId }) {
       console.error('Error loading data:', err);
       showNotification('Failed to fetch consumption data', 'danger');
     });
-  }, [projectId, startDate, endDate, showNotification]);
+  }, [projectId, startDate, endDate, actualScaleFactor, showNotification]);
+
+  // Handle scale factor input changes
+  const handleScaleFactorChange = (e) => {
+    const value = e.target.value;
+    setScaleFactorInput(value);
+    
+    // Validate and update actual scale factor
+    if (value === '') {
+      setIsScaleFactorValid(false);
+      return;
+    }
+    
+    const numValue = parseFloat(value);
+    if (isNaN(numValue) || numValue <= 0) {
+      setIsScaleFactorValid(false);
+      return;
+    }
+    
+    setIsScaleFactorValid(true);
+    setActualScaleFactor(numValue);
+  };
+
+  // Handle scale factor input blur (when user clicks out)
+  const handleScaleFactorBlur = async () => {
+    if (scaleFactorInput === '') {
+      showNotification('Scale factor cannot be empty. Please enter a positive number.', 'warning');
+      setScaleFactorInput(actualScaleFactor.toString());
+      setIsScaleFactorValid(true);
+      return;
+    }
+
+    const numValue = parseFloat(scaleFactorInput);
+    if (isNaN(numValue) || numValue <= 0) {
+      showNotification('Scale factor must be a positive number.', 'warning');
+      setScaleFactorInput(actualScaleFactor.toString());
+      setIsScaleFactorValid(true);
+      return;
+    }
+
+    // Save to backend
+    try {
+      await axios.put(`${API_URL}/api/projects/${projectId}`, {
+        energy_scale_factor: numValue
+      });
+      setActualScaleFactor(numValue);
+      setIsScaleFactorValid(true);
+    } catch (err) {
+      console.error('Error saving scale factor:', err);
+      showNotification('Failed to save scale factor', 'danger');
+      setScaleFactorInput(actualScaleFactor.toString());
+      setIsScaleFactorValid(true);
+    }
+  };
 
   const chartData = {
     labels: consumptionData.map(d => new Date(d.timestamp).toLocaleString()),
@@ -256,7 +328,24 @@ function EnergyAnalysis({ projectId }) {
         <>
           <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
             <h5 className="mb-0">Consumption Overview</h5>
-            <div className="btn-group">
+            <div className="d-flex gap-3 align-items-center">
+              {/* Scale Factor Input */}
+              <div className="d-flex align-items-center">
+                <label className="form-label mb-0 me-2 small text-muted">Scale Factor:</label>
+                <input
+                  type="number"
+                  className={`form-control form-control-sm ${!isScaleFactorValid ? 'is-invalid' : ''}`}
+                  style={{ width: '80px' }}
+                  value={scaleFactorInput}
+                  onChange={handleScaleFactorChange}
+                  onBlur={handleScaleFactorBlur}
+                  step="0.01"
+                  placeholder="1.0"
+                />
+              </div>
+              
+              {/* Date Range Buttons */}
+              <div className="btn-group">
               <button className="btn btn-outline-secondary" onClick={() => {
                 const today = new Date();
                 const weekAgo = new Date();
@@ -281,6 +370,7 @@ function EnergyAnalysis({ projectId }) {
               <button className="btn btn-outline-primary" onClick={() => setShowDateModal(true)}>
                 Custom Range
               </button>
+              </div>
             </div>
           </div>
 

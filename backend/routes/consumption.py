@@ -13,6 +13,7 @@ def get_consumption_data(project_id):
 
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
+        scale_factor = float(request.args.get('scale_factor', 1.0))
 
         query = EnergyData.query.filter_by(project_id=project_id)
         if start_date:
@@ -24,7 +25,7 @@ def get_consumption_data(project_id):
         return jsonify([
             {
                 'timestamp': record.timestamp.isoformat(),
-                'demand_kw': record.demand_kw
+                'demand_kw': record.demand_kw * scale_factor
             }
             for record in data
         ])

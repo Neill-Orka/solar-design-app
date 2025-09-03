@@ -1,8 +1,12 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
+import { Button, Badge, Spinner, Alert, Form } from 'react-bootstrap';
 import logo from './assets/orka_logo_text.png';
 import './PrintableBOM.css';
 import { useAuth } from './AuthContext';
+import { useNotification } from './NotificationContext';
+import { API_URL } from './apiConfig';
 
 /**
  * PrintableBOM (paginated, WYSIWYG, print-stable)
@@ -10,14 +14,327 @@ import { useAuth } from './AuthContext';
 function PrintableBOM({ projectId: propProjectId }) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { projectId: urlProjectId } = useParams();
+  const { projectId: urlProjectId, docId } = useParams();
+  const [searchParams] = useSearchParams();
   
   // Use projectId from props if available (when used in ProjectDashboard), otherwise from URL
   const projectId = propProjectId || urlProjectId;
 
-  // Retrieve data from localStorage (project-specific key)
-  const bomData = JSON.parse(localStorage.getItem(`printBomData_${projectId}`) || '{}');
+  // Check if we should auto-download
+  const shouldAutoDownload = searchParams.get('action') === 'download';
+
+  // Determine data source: if docId exists, load quote data; otherwise load BOM data
+  const isQuoteMode = !!docId;
+  
+  // Quote state
+  const [quoteData, setQuoteData] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const { showNotification } = useNotification();
+  
+  // Project state
+  const [projectData, setProjectData] = useState(null);
+  const [projectLoading, setProjectLoading] = useState(false);
+  
+  // Retrieve data from localStorage (project-specific key or quote-specific key)
+  const dataKey = isQuoteMode ? `quoteData_${docId}` : `printBomData_${projectId}`;
+  const [bomData, setBomData] = useState({});
+  
+  // Load data from localStorage initially
+  useEffect(() => {
+    const storedData = localStorage.getItem(dataKey);
+    if (storedData) {
+      try {
+        const parsedData = JSON.parse(storedData);
+        
+        // If we're not in quote mode and don't have brand/model info, extract it from categories
+        if (!isQuoteMode && parsedData.categories && (!parsedData.project?.inverter_brand_model || !parsedData.project?.battery_brand_model)) {
+          let inverterBrandSize = parsedData.project?.inverter_brand_model || '';
+          let batteryBrandSize = parsedData.project?.battery_brand_model || '';
+          
+          parsedData.categories.forEach(cat => {
+            const categoryName = cat.name?.toLowerCase() || '';
+            if (categoryName === 'inverter' && cat.items && cat.items.length > 0 && !inverterBrandSize) {
+              const item = cat.items[0];
+              if (item.product?.brand) {
+                const brand = item.product.brand;
+                const size = item.product?.rating_kva ? `${Number(item.product.rating_kva).toFixed(0)}kVA` : 
+                            item.product?.power_w ? `${Number(item.product.power_w/1000).toFixed(0)}kW` : '';
+                inverterBrandSize = size ? `${brand} ${size}` : brand;
+              }
+            } else if (categoryName === 'battery' && cat.items && cat.items.length > 0 && !batteryBrandSize) {
+              const item = cat.items[0];
+              if (item.product?.brand) {
+                const brand = item.product.brand;
+                const nominalSize = item.product?.capacity_kwh ? `${(Number(item.product.capacity_kwh) / 0.8).toFixed(0)}kWh` : '';
+                batteryBrandSize = nominalSize ? `${brand} ${nominalSize}` : brand;
+              }
+            }
+          });
+          
+          // Update the parsed data with extracted brand/size info
+          if (parsedData.project) {
+            parsedData.project.inverter_brand_model = inverterBrandSize;
+            parsedData.project.battery_brand_model = batteryBrandSize;
+          }
+          
+          // Save back to localStorage
+          localStorage.setItem(dataKey, JSON.stringify(parsedData));
+        }
+        
+        setBomData(parsedData);
+      } catch (error) {
+        console.error('Failed to parse stored data:', error);
+        setBomData({});
+      }
+    }
+  }, [dataKey, isQuoteMode]);
   const currentDate = new Date().toLocaleDateString('en-ZA');
+
+  // Auto-download effect
+  useEffect(() => {
+    if (shouldAutoDownload) {
+      // Wait a bit for the page to render completely, then trigger print
+      const timer = setTimeout(() => {
+        window.print();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [shouldAutoDownload]);
+
+  // Load project data
+  useEffect(() => {
+    const loadProjectData = async () => {
+      if (!projectId) return;
+      setProjectLoading(true);
+      try {
+        const response = await axios.get(`${API_URL}/api/projects/${projectId}`);
+        setProjectData(response.data);
+      } catch (error) {
+        console.error('Failed to load project data:', error);
+        showNotification('Failed to load project data', 'danger');
+      } finally {
+        setProjectLoading(false);
+      }
+    };
+    
+    loadProjectData();
+  }, [projectId, showNotification]);
+
+  // Load quote data from API when in quote mode
+  useEffect(() => {
+    if (isQuoteMode && docId) {
+      const loadQuoteData = async () => {
+        setQuoteLoading(true);
+        try {
+          // Load quote envelope and latest version
+          const quoteResponse = await axios.get(`${API_URL}/api/quotes/${docId}`);
+          const quote = quoteResponse.data;
+          
+          // Get the latest version ID
+          const latestVersion = quote.versions[quote.versions.length - 1];
+          
+          // Load version details with line items
+          const versionResponse = await axios.get(`${API_URL}/api/quote-versions/${latestVersion.id}`);
+          const versionDetail = versionResponse.data;
+          
+          setQuoteData({ quote, version: versionDetail });
+          
+          // Also create the print data format and store in localStorage
+          const categoryMap = {};
+          versionDetail.lines.forEach(item => {
+            const category = item.category || item.product_snapshot?.category || 'Other';
+            if (!categoryMap[category]) {
+              categoryMap[category] = { name: category, items: [] };
+            }
+            categoryMap[category].items.push({
+              product: {
+                brand: item.brand || '',
+                model: item.model || ''
+              },
+              quantity: item.qty || 0,
+              cost: item.unit_cost_locked || 0,
+              price: item.unit_price_locked || 0,
+              lineTotal: item.line_total_locked || 0
+            });
+          });
+          
+          // Extract inverter and battery information for title
+          let inverterBrandSize = '';
+          let batteryBrandSize = '';
+          
+          versionDetail.lines.forEach(item => {
+            const category = (item.category || item.product_snapshot?.category || '').toLowerCase();
+            const brand = item.brand || item.product_snapshot?.brand || '';
+            const power_w = item.product_snapshot?.power_w;
+            const rating_kva = item.product_snapshot?.rating_kva;
+            const capacity_kwh = item.product_snapshot?.capacity_kwh;
+            
+            if (category === 'inverter' && brand) {
+              const size = rating_kva ? `${Number(rating_kva).toFixed(0)}kVA` : 
+                          power_w ? `${Number(power_w/1000).toFixed(0)}kW` : '';
+              inverterBrandSize = size ? `${brand} ${size}` : brand;
+            } else if (category === 'battery' && brand) {
+              const nominalSize = capacity_kwh ? `${(Number(capacity_kwh) / 0.8).toFixed(0)}kWh` : '';
+              batteryBrandSize = nominalSize ? `${brand} ${nominalSize}` : brand;
+            }
+          });
+
+          const printData = {
+            project: {
+              id: parseInt(projectId),
+              project_name: projectData?.name || `Quote ${quote.number}`,
+              name: projectData?.name || `Quote ${quote.number}`,
+              client_name: projectData?.client_name || quote.client_snapshot_json?.name || 'Client Name',
+              client_email: projectData?.client_email || quote.client_snapshot_json?.email || '',
+              client_phone: projectData?.client_phone || quote.client_snapshot_json?.phone || '',
+              location: projectData?.location || quote.client_snapshot_json?.location || '',
+              created_at: versionDetail.created_at,
+              quote_number: quote.number,
+              quote_status: quote.status || 'draft',
+              inverter_brand_model: inverterBrandSize,
+              battery_brand_model: batteryBrandSize
+            },
+            systemSpecs: versionDetail.payload || {},
+            totals: {
+              subtotal_excl_vat: versionDetail.totals?.subtotal_items_excl_vat || 0,
+              extras_excl_vat: versionDetail.totals?.extras_excl_vat || 0,
+              total_excl_vat: versionDetail.totals?.total_excl_vat || 0,
+              vat_perc: versionDetail.totals?.vat_perc || 15,
+              vat_price: versionDetail.totals?.vat_price || 0,
+              total_incl_vat: versionDetail.totals?.total_incl_vat || 0
+            },
+            categories: Object.values(categoryMap)
+          };
+          
+          localStorage.setItem(dataKey, JSON.stringify(printData));
+          setBomData(printData); // Update the state immediately
+          
+        } catch (error) {
+          console.error('Failed to load quote data:', error);
+          showNotification('Failed to load quote data', 'danger');
+        } finally {
+          setQuoteLoading(false);
+        }
+      };
+      
+      loadQuoteData();
+    }
+  }, [isQuoteMode, docId, projectId, dataKey, showNotification, projectData]);
+
+  // Quote action handlers
+  const handleSendQuote = async () => {
+    if (!window.confirm('Send this quote to the client?')) return;
+    setActionLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/quotes/${docId}/send`);
+      showNotification('Quote sent successfully!', 'success');
+      
+      // Reload quote data to get updated status
+      const quoteResponse = await axios.get(`${API_URL}/api/quotes/${docId}`);
+      const quote = quoteResponse.data;
+      console.log('Updated quote status:', quote.status); // Debug log
+      const latestVersion = quote.versions[quote.versions.length - 1];
+      const versionResponse = await axios.get(`${API_URL}/api/quote-versions/${latestVersion.id}`);
+      const versionDetail = versionResponse.data;
+      setQuoteData({ quote, version: versionDetail });
+      
+      // Trigger print after sending
+      setTimeout(() => window.print(), 500);
+    } catch (error) {
+      console.error(error);
+      showNotification(error.response?.data?.error || 'Failed to send quote', 'danger');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAcceptQuote = async () => {
+    if (!window.confirm('Mark this quote as accepted?')) return;
+    setActionLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/quotes/${docId}/accept`);
+      showNotification('Quote accepted!', 'success');
+      
+      // Reload quote data to get updated status
+      const quoteResponse = await axios.get(`${API_URL}/api/quotes/${docId}`);
+      const quote = quoteResponse.data;
+      const latestVersion = quote.versions[quote.versions.length - 1];
+      const versionResponse = await axios.get(`${API_URL}/api/quote-versions/${latestVersion.id}`);
+      const versionDetail = versionResponse.data;
+      setQuoteData({ quote, version: versionDetail });
+    } catch (error) {
+      console.error(error);
+      showNotification(error.response?.data?.error || 'Failed to accept quote', 'danger');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeclineQuote = async () => {
+    if (!window.confirm('Mark this quote as declined?')) return;
+    setActionLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/quotes/${docId}/decline`);
+      showNotification('Quote declined', 'info');
+      
+      // Reload quote data to get updated status
+      const quoteResponse = await axios.get(`${API_URL}/api/quotes/${docId}`);
+      const quote = quoteResponse.data;
+      const latestVersion = quote.versions[quote.versions.length - 1];
+      const versionResponse = await axios.get(`${API_URL}/api/quote-versions/${latestVersion.id}`);
+      const versionDetail = versionResponse.data;
+      setQuoteData({ quote, version: versionDetail });
+    } catch (error) {
+      console.error(error);
+      showNotification(error.response?.data?.error || 'Failed to decline quote', 'danger');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Back button handler - navigate to appropriate tab
+  const handleBack = () => {
+    // If we have propProjectId, we're embedded in ProjectDashboard - don't navigate
+    if (propProjectId) {
+      // We're embedded in ProjectDashboard, don't show back button or do anything
+      return;
+    }
+    
+    // Get the 'from' parameter to determine which tab to return to
+    const fromTab = searchParams.get('from');
+    
+    if (fromTab === 'quotes') {
+      navigate(`/projects/${projectId}?tab=quotes`);
+    } else if (fromTab === 'bom') {
+      navigate(`/projects/${projectId}?tab=bom`);
+    } else {
+      // Default behavior - if coming from quote mode, go to quotes tab, otherwise BOM tab
+      const defaultTab = isQuoteMode ? 'quotes' : 'bom';
+      navigate(`/projects/${projectId}?tab=${defaultTab}`);
+    }
+  };
+
+  const handleEditInBOM = async () => {
+    if (!quoteData) return;
+    try {
+      const latestVersionId = quoteData.version.id;
+      const response = await axios.post(`${API_URL}/api/quote-versions/${latestVersionId}/load-to-bom`);
+      showNotification('Quote loaded to BOM for editing', 'success');
+      
+      // Check if we have core components data to synchronize SystemDesign
+      if (response.data.core_components) {
+        // Store core components for SystemDesign synchronization
+        sessionStorage.setItem(`quoteLoadCoreComponents_${projectId}`, JSON.stringify(response.data.core_components));
+      }
+      
+      navigate(`/projects/${projectId}?tab=bom`);
+    } catch (error) {
+      console.error(error);
+      showNotification('Failed to load quote to BOM', 'danger');
+    }
+  };
 
   const [priceMode, setPriceMode] = useState(() => localStorage.getItem('bomPriceMode') || 'all');
   useEffect(() => localStorage.setItem('bomPriceMode', priceMode), [priceMode]);
@@ -90,7 +407,28 @@ const termsSum = useMemo(() => termsPerc.reduce((a,b)=>a+(+b||0),0), [termsPerc]
   const rows = useMemo(() => {
     const out = [];
     if (Array.isArray(bomData.categories)) {
-      bomData.categories.forEach((category) => {
+      // Sort categories: panel, inverter, battery first, then alphabetical
+      const priorityOrder = ['panel', 'inverter', 'battery'];
+      const sortedCategories = [...bomData.categories].sort((a, b) => {
+        const aName = (a.name || '').toLowerCase();
+        const bName = (b.name || '').toLowerCase();
+        
+        const aPriority = priorityOrder.indexOf(aName);
+        const bPriority = priorityOrder.indexOf(bName);
+        
+        // If both are priority categories, sort by priority order
+        if (aPriority !== -1 && bPriority !== -1) {
+          return aPriority - bPriority;
+        }
+        // If only one is priority, priority comes first
+        if (aPriority !== -1) return -1;
+        if (bPriority !== -1) return 1;
+        
+        // Both are non-priority, sort alphabetically
+        return aName.localeCompare(bName);
+      });
+      
+      sortedCategories.forEach((category) => {
         out.push({ type: 'category', name: category.name });
         (category.items || []).forEach((item) => {
           out.push({ type: 'item', item });
@@ -200,13 +538,13 @@ const termsSum = useMemo(() => termsPerc.reduce((a,b)=>a+(+b||0),0), [termsPerc]
   // }, [pages, carryPages]);
  const pagesWithKinds = useMemo(() => {
    const base = pages.map(p => ({ kind: 'rows', rows: p }));
-   // keep bankingAccept in qty mode; drop totals/terms
+   // Always include all blocks (totals, terms, banking) regardless of price mode
    const filteredCarry = carryPages
-     .map(blocks => blocks.filter(k => (priceMode !== 'qty') || k === 'bankingAccept'))
+     .map(blocks => blocks.filter(k => k === 'bankingAccept' || k === 'totals' || k === 'termsDeposit'))
      .filter(b => b.length);
    filteredCarry.forEach(blocks => base.push({ kind: 'totals', blocks }));
    return base;
- }, [pages, carryPages, priceMode]);
+ }, [pages, carryPages]);
 
   const totalPages = pagesWithKinds.length;
 
@@ -221,34 +559,34 @@ const renderHeader = () => (
           <div>T: 082 660 0851&nbsp; E: info@orkasolar.co.za&nbsp; W: www.orkasolar.co.za</div>
         </div>
       </div>
-      <div className="bom-title">Quotation</div>
+      <div className="bom-title">{isQuoteMode ? 'Quotation' : 'Bill of Materials'}</div>
       <div className="bom-info-grid">
         <div>
-          <span className="label">For attention:</span> {bomData.project?.client_name || 'Client Name'}
+          <span className="label">For attention:</span> {projectData?.client_name || bomData.project?.client_name || 'Client Name'}
         </div>
         <div>
           <span className="label">Date:</span> {currentDate}
         </div>
         <div>
-          <span className="label">Company:</span> {bomData.project?.name || 'Company Name'}
+          <span className="label">Company:</span> {projectData?.client_name || bomData.project?.client_name || 'Company Name'}
         </div>
         <div>
-          <span className="label">Quote number:</span> QTE{(bomData.project?.id || '').toString().padStart(8, '0')}
+          <span className="label">Quote number:</span> {isQuoteMode ? (bomData.project?.quote_number || 'QTE000000') : `QTE${(projectData?.id || bomData.project?.id || '').toString().padStart(8, '0')}`}
         </div>
         <div>
-          <span className="label">Address:</span> {bomData.project?.location || 'Address'}
+          <span className="label">Address:</span> {projectData?.location || bomData.project?.location || 'Address'}
         </div>
         <div>
           <span className="label">Contact Person:</span> {user?.first_name || 'Lourens'} {user?.last_name || 'de Jongh'}
         </div>
         <div>
-          <span className="label">Email:</span> {bomData.project?.client_email || '-'}
+          <span className="label">Email:</span> {projectData?.client_email || bomData.project?.client_email || '-'}
         </div>
         <div>
           <span className='label'>Email:</span> {user?.email || 'lourens@orkasolar.co.za'}
         </div>
         <div>
-          <span className="label">Tel:</span> {bomData.project?.client_phone || '-'}
+          <span className="label">Tel:</span> {projectData?.client_phone || bomData.project?.client_phone || '-'}
         </div>
         <div>
           <span className="label">Tel:</span> {user?.phone || '082 660 0851'}
@@ -256,14 +594,11 @@ const renderHeader = () => (
         <div />
       </div>
     <div className="bom-project-strip">
-      {bomData.project?.name} - 
+      {projectData?.name || bomData.project?.name || bomData.project?.project_name || 'Project Name'} - 
       {bomData.project?.inverter_brand_model ? ` ${bomData.project.inverter_brand_model}` : ""}
-      {bomData.systemSpecs?.inverterKva ? ` ${Number(bomData.systemSpecs.inverterKva).toFixed(0)}kVA` : ""}
-      {bomData.project?.battery_brand_model && bomData.systemSpecs?.batteryKwh > 0
-        ? ` & ${bomData.project.battery_brand_model} ${(bomData.systemSpecs.batteryKwh / 0.8).toFixed(0)}kWh`
-        : bomData.systemSpecs?.batteryKwh > 0
-          ? ` ${(bomData.systemSpecs.batteryKwh / 0.8).toFixed(0)}kWh`
-          : ' System'}
+      {bomData.project?.battery_brand_model 
+        ? ` & ${bomData.project.battery_brand_model}`
+        : ''}
     </div>
     </header>
   );
@@ -323,9 +658,13 @@ const renderRow = (r, idx) => {
   }
 
   const { item } = r;
+  if (!item || !item.product) {
+    return null; // Skip invalid items
+  }
+  
   const desc = (
     <div className="bom-item-model">
-      {item.product.brand} {item.product.model}
+      {item.product.brand || ''} {item.product.model || ''}
     </div>
   );
 
@@ -512,59 +851,335 @@ const TermsDepositBlock = () => {
       </section>
     );
 
-  // If no BOM data exists for this project, show a message
-  if (!bomData.project || !bomData.categories || bomData.categories.length === 0) {
+  // Show loading state for quotes
+  if (isQuoteMode && quoteLoading) {
     return (
       <div className="container mt-5 text-center">
-        <div className="alert alert-info">
-          <h4>No Print Data Available</h4>
-          <p>Please go to the <strong>Bill of Materials</strong> tab and click <strong>"Export to PDF"</strong> to generate the printable BOM for this project.</p>
+        <Spinner animation="border" />
+        <p>Loading quote data...</p>
+      </div>
+    );
+  }
+
+  // If no BOM data exists for this project, show a message
+  if (!bomData || !bomData.project || !bomData.categories || bomData.categories.length === 0) {
+    if (isQuoteMode && !quoteLoading) {
+      return (
+        <div className="container mt-5 text-center">
+          <Alert variant="warning">
+            <h4>Quote Data Not Available</h4>
+            <p>Unable to load quote data. Please try refreshing the page or contact support.</p>
+          </Alert>
         </div>
+      );
+    }
+    
+    if (!isQuoteMode) {
+      return (
+        <div className="container mt-5 text-center">
+          <div className="alert alert-info">
+            <h4>No Print Data Available</h4>
+            <p>Please go to the <strong>Bill of Materials</strong> tab and click <strong>"Generate Quote"</strong> to create a printable quote for this project.</p>
+          </div>
+        </div>
+      );
+    }
+    
+    // Still loading in quote mode
+    return (
+      <div className="container mt-5 text-center">
+        <Spinner animation="border" />
+        <p>Loading quote data...</p>
       </div>
     );
   }
 
   return (
-    <div className="bom-report">
-      {/* Controls */}
-      <div className="bom-controls no-print">
-        <button className="btn" onClick={() => navigate(-1)}>Back</button>
-        <button className="btn" onClick={() => window.print()}>Print</button>
-        <select
-          className="form-select form-select-sm"
-          style={{ width: 260, marginLeft: 8 }}
-          value={priceMode}
-          onChange={(e) => setPriceMode(e.target.value)}
-          aria-label="Price visibility"
+    <div className="bom-report" style={{ position: 'relative' }}>
+      {/* Left Side Controls */}
+      <div className="no-print" style={{
+        position: 'fixed',
+        left: '20px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px'
+      }}>
+        {/* Navigation and Print */}
+        {!propProjectId && (
+          <Button 
+            variant="outline-secondary" 
+            size="sm" 
+            onClick={handleBack}
+            style={{ 
+              color: '#495057', 
+              borderColor: '#6c757d',
+              backgroundColor: 'white',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              border: '1px solid #dee2e6'
+            }}
+            title="Back to Project Dashboard"
+          >
+            <i className="bi bi-arrow-left"></i>
+          </Button>
+        )}
+        <Button 
+          variant="primary" 
+          size="sm" 
+          onClick={() => window.print()}
+          style={{ 
+            backgroundColor: '#0d6efd', 
+            borderColor: '#0d6efd',
+            color: 'white',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+          }}
+          title="Print Document"
         >
-          <option value="all">Show line & category prices</option>
-          <option value="category">Show category prices only</option>
-          <option value="qty">Hide all prices (qty only)</option>
-        </select>      
-        <div className="d-flex align-items-center" style={{ gap: 8, marginLeft: 8 }}>
-  <label className="form-label mb-0" style={{ fontSize: 12 }}>Deposit %</label>
-  <input type="number" min="0" max="100" step="1"
-    className="form-control form-control-sm" style={{ width: 70 }}
-    value={termsPerc[0]} onChange={e => handleTermsChange(0, e.target.value)} />
-  <label className="form-label mb-0" style={{ fontSize: 12 }}>Delivery %</label>
-  <input type="number" min="0" max="100" step="1"
-    className="form-control form-control-sm" style={{ width: 70 }}
-    value={termsPerc[1]} onChange={e => handleTermsChange(1, e.target.value)} />
-  <label className="form-label mb-0" style={{ fontSize: 12 }}>Completion %</label>
-  <input type="number" min="0" max="100" step="1"
-    className="form-control form-control-sm" style={{ width: 70 }}
-    value={termsPerc[2]} onChange={e => handleTermsChange(2, e.target.value)} />
-  <span className={`badge ${termsSum===100 ? 'bg-success' : 'bg-warning text-dark'}`} title="Percentages should sum to 100%">
-    Sum: {termsSum}%
-  </span>
-  <button
-    type="button"
-    className="btn btn-sm btn-outline-secondary"
-    onClick={() => setTermsPerc([65,25,10])}
-    title="Reset to 65/25/10"
-  >Reset</button>
-</div>
-  
+          <i className="bi bi-printer"></i>
+        </Button>
+        
+        {/* Price Mode Selector */}
+        <div style={{ 
+          backgroundColor: 'white',
+          padding: '8px',
+          borderRadius: '6px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          border: '1px solid #dee2e6'
+        }}>
+          <Form.Select
+            size="sm"
+            style={{ width: '180px', fontSize: '0.75rem' }}
+            value={priceMode}
+            onChange={(e) => setPriceMode(e.target.value)}
+            aria-label="Price visibility"
+          >
+            <option value="all">Show all prices</option>
+            <option value="category">Category prices</option>
+            <option value="qty">Qty only</option>
+          </Form.Select>
+        </div>
+      </div>
+
+      {/* Right Side Controls */}
+      <div className="no-print" style={{
+        position: 'fixed',
+        right: '20px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px'
+      }}>
+        {/* Quote Actions */}
+        {isQuoteMode && quoteData && (
+          <>
+            {/* Status Badge */}
+            <div style={{ 
+              backgroundColor: 'white',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              border: '1px solid #dee2e6',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '0.75rem', color: '#6c757d', marginBottom: '4px' }}>Status</div>
+              <Badge bg={quoteData.quote.status === 'sent' ? 'success' : quoteData.quote.status === 'accepted' ? 'primary' : quoteData.quote.status === 'declined' ? 'danger' : 'secondary'}>
+                {quoteData.quote.status || 'draft'}
+              </Badge>
+              {/* Debug info - remove this later */}
+              <div style={{ fontSize: '0.6rem', color: '#999', marginTop: '2px' }}>
+                Debug: {JSON.stringify(quoteData.quote.status)}
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            {(quoteData.quote.status !== 'sent' && quoteData.quote.status !== 'accepted' && quoteData.quote.status !== 'declined') && (
+              <Button 
+                variant="success" 
+                size="sm" 
+                onClick={handleSendQuote}
+                disabled={actionLoading}
+                style={{ 
+                  backgroundColor: actionLoading ? '#6c757d' : '#198754', 
+                  borderColor: actionLoading ? '#6c757d' : '#198754',
+                  color: 'white',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  opacity: actionLoading ? 0.8 : 1
+                }}
+                title={actionLoading ? "Sending quote..." : "Send Quote to Client"}
+              >
+                {actionLoading ? (
+                  <>
+                    <Spinner animation="border" size="sm" className="me-1" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-send me-1"></i>Send
+                  </>
+                )}
+              </Button>
+            )}
+            
+            {quoteData.quote.status === 'sent' && (
+              <>
+                <Button 
+                  variant="success" 
+                  size="sm" 
+                  disabled
+                  style={{ 
+                    backgroundColor: '#6c757d', 
+                    borderColor: '#6c757d',
+                    color: 'white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    opacity: 0.8
+                  }}
+                  title="Quote has been sent"
+                >
+                  <i className="bi bi-check2 me-1"></i>Sent
+                </Button>
+                
+                <Button 
+                  variant="success" 
+                  size="sm" 
+                  onClick={handleAcceptQuote}
+                  disabled={actionLoading}
+                  style={{ 
+                    backgroundColor: '#198754', 
+                    borderColor: '#198754',
+                    color: 'white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                  }}
+                  title="Accept Quote"
+                >
+                  <i className="bi bi-check-circle me-1"></i>Accept
+                </Button>
+                <Button 
+                  variant="outline-danger" 
+                  size="sm" 
+                  onClick={handleDeclineQuote}
+                  disabled={actionLoading}
+                  style={{ 
+                    color: '#dc3545', 
+                    borderColor: '#dc3545',
+                    backgroundColor: 'white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                  }}
+                  title="Decline Quote"
+                >
+                  <i className="bi bi-x-circle me-1"></i>Decline
+                </Button>
+              </>
+            )}
+            
+            <Button 
+              variant="outline-secondary" 
+              size="sm" 
+              onClick={handleEditInBOM}
+              disabled={actionLoading}
+              style={{ 
+                color: '#495057', 
+                borderColor: '#6c757d',
+                backgroundColor: 'white',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }}
+              title="Edit in BOM"
+            >
+              <i className="bi bi-pencil me-1"></i>Edit
+            </Button>
+          </>
+        )}
+        
+        {/* Payment Terms Controls */}
+        <div style={{ 
+          backgroundColor: 'white',
+          padding: '12px',
+          borderRadius: '6px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          border: '1px solid #dee2e6',
+          maxWidth: '200px'
+        }}>
+          <div style={{ fontSize: '0.75rem', color: '#6c757d', fontWeight: '600', marginBottom: '8px', textAlign: 'center' }}>
+            Payment Terms
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ fontSize: '0.7rem', color: '#6c757d', margin: 0, minWidth: '50px' }}>Deposit</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <Form.Control
+                  type="number"
+                  size="sm"
+                  min="0"
+                  max="100"
+                  step="1"
+                  style={{ width: '50px', fontSize: '0.7rem' }}
+                  value={termsPerc[0]}
+                  onChange={e => handleTermsChange(0, e.target.value)}
+                />
+                <span style={{ fontSize: '0.7rem', color: '#6c757d' }}>%</span>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ fontSize: '0.7rem', color: '#6c757d', margin: 0, minWidth: '50px' }}>Delivery</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <Form.Control
+                  type="number"
+                  size="sm"
+                  min="0"
+                  max="100"
+                  step="1"
+                  style={{ width: '50px', fontSize: '0.7rem' }}
+                  value={termsPerc[1]}
+                  onChange={e => handleTermsChange(1, e.target.value)}
+                />
+                <span style={{ fontSize: '0.7rem', color: '#6c757d' }}>%</span>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ fontSize: '0.7rem', color: '#6c757d', margin: 0, minWidth: '50px' }}>Complete</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <Form.Control
+                  type="number"
+                  size="sm"
+                  min="0"
+                  max="100"
+                  step="1"
+                  style={{ width: '50px', fontSize: '0.7rem' }}
+                  value={termsPerc[2]}
+                  onChange={e => handleTermsChange(2, e.target.value)}
+                />
+                <span style={{ fontSize: '0.7rem', color: '#6c757d' }}>%</span>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+              <Badge bg={termsSum === 100 ? 'success' : 'warning'} style={{ fontSize: '0.65rem' }}>
+                Sum: {termsSum}%
+              </Badge>
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={() => setTermsPerc([65, 25, 10])}
+                title="Reset to default: 65% / 25% / 10%"
+                style={{ 
+                  fontSize: '0.65rem', 
+                  padding: '2px 6px',
+                  color: '#495057', 
+                  borderColor: '#6c757d',
+                  backgroundColor: 'transparent'
+                }}
+              >
+                Reset
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <main className="bom-printarea">
@@ -583,8 +1198,8 @@ const TermsDepositBlock = () => {
               {/* Inline blocks on the last rows page */}
               {pg.kind === 'rows' && pageIndex === (pages.length - 1) && (
                 <>
-                  {priceMode !== 'qty' && totalsPlacement.inlineKeys.includes('totals') && <TotalsBlock />}
-                  {priceMode !== 'qty' && totalsPlacement.inlineKeys.includes('termsDeposit') && <TermsDepositBlock />}
+                  {totalsPlacement.inlineKeys.includes('totals') && <TotalsBlock />}
+                  {totalsPlacement.inlineKeys.includes('termsDeposit') && <TermsDepositBlock />}
                   {totalsPlacement.inlineKeys.includes('bankingAccept') && <BankingAcceptanceBlock />}
                 </>
               )}
@@ -592,8 +1207,8 @@ const TermsDepositBlock = () => {
               {/* Dedicated totals page for any carried blocks */}
               {pg.kind === 'totals' && (
                 <>
-                  {priceMode !== 'qty' && pg.blocks.includes('totals') && <TotalsBlock />}
-                  {priceMode !== 'qty' && pg.blocks.includes('termsDeposit') && <TermsDepositBlock />}
+                  {pg.blocks.includes('totals') && <TotalsBlock />}
+                  {pg.blocks.includes('termsDeposit') && <TermsDepositBlock />}
                   {pg.blocks.includes('bankingAccept') && <BankingAcceptanceBlock />}
                 </>
               )}

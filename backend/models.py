@@ -235,6 +235,7 @@ class Projects(db.Model):
     template_id = db.Column(db.Integer, nullable=True)
     template_name = db.Column(db.String(100), nullable=True)
     bom_modified = db.Column(db.Boolean, default=False)  # Track if user has modified BOM
+    energy_scale_factor = db.Column(db.Float, default=1.0)  # Scale factor for energy consumption data
 
     energy_data = db.relationship('EnergyData', backref='project', lazy=True, cascade="all, delete-orphan")
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")
@@ -640,6 +641,71 @@ class Document(db.Model):
         order_by="DocumentVersion.version_no",
         lazy="dynamic"
     )
+
+    def mark_sent(self, user_id=None):
+        """Mark quote as sent, lock current version, set valid_until=30 days"""
+        if self.status != DocumentStatus.OPEN:
+            raise ValueError(f"Cannot send quote with status {self.status.value}")
+        
+        current_version = self.versions.filter_by(version_no=self.current_version_no).first()
+        if not current_version:
+            raise ValueError("No current version found")
+        
+        if current_version.status != VersionStatus.DRAFT:
+            raise ValueError(f"Cannot send version with status {current_version.status.value}")
+        
+        # Lock the version
+        current_version.status = VersionStatus.SENT
+        current_version.valid_until = datetime.utcnow() + timedelta(days=30)
+        current_version.price_locked_at = datetime.utcnow()
+        
+        # Update document status  
+        self.status = DocumentStatus.OPEN  # Keep as OPEN when sent
+        
+        # Add event
+        event = DocumentEvent(
+            document_version_id=current_version.id,
+            event="sent",
+            meta_json={"valid_until": current_version.valid_until.isoformat()},
+            created_by_id=user_id
+        )
+        db.session.add(event)
+        
+    def mark_accepted(self, user_id=None):
+        """Mark quote as accepted"""
+        current_version = self.versions.filter_by(version_no=self.current_version_no).first()
+        if not current_version or current_version.status != VersionStatus.SENT:
+            raise ValueError("Can only accept sent quotes")
+        
+        current_version.status = VersionStatus.ACCEPTED
+        self.status = DocumentStatus.ACCEPTED
+        
+        # Add event
+        event = DocumentEvent(
+            document_version_id=current_version.id,
+            event="accepted",
+            meta_json={},
+            created_by_id=user_id
+        )
+        db.session.add(event)
+        
+    def mark_declined(self, user_id=None):
+        """Mark quote as declined"""
+        current_version = self.versions.filter_by(version_no=self.current_version_no).first()
+        if not current_version or current_version.status != VersionStatus.SENT:
+            raise ValueError("Can only decline sent quotes")
+        
+        current_version.status = VersionStatus.DECLINED
+        self.status = DocumentStatus.DECLINED
+        
+        # Add event
+        event = DocumentEvent(
+            document_version_id=current_version.id,
+            event="declined",
+            meta_json={},
+            created_by_id=user_id
+        )
+        db.session.add(event)
 
     def to_dict(self):
         return {

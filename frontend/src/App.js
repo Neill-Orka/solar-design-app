@@ -26,7 +26,6 @@ import LoadProfileManager from './LoadProfileManager';
 import TariffManager from './TariffManager';
 import RuleEditor from './RuleEditor';
 import PrintableBOM from './PrintableBOM';
-import ProjectQuoteDetails from './ProjectQuoteDetails';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
@@ -136,7 +135,8 @@ function AuthenticatedApp() {
             <Route path="/tariffs" element={<TariffManager />} />
             <Route path="/proposal/:id" element={<ProposalPage />} />
             <Route path="/printable-bom/:projectId" element={<PrintableBOM />} />
-            <Route path="/projects/:projectId/quotes/:docId" element={<ProjectQuoteDetails />} />
+            <Route path="/projects/:projectId/printable-bom/:docId" element={<PrintableBOM />} />
+            <Route path="/projects/:projectId/quotes/:docId" element={<PrintableBOM />} />
 
             {/* Admin only routes */}
             <Route path="/admin" element={

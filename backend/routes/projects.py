@@ -116,6 +116,7 @@ def get_project_by_id(project_id):
             'template_id': template_id,
             'template_name': template_name,
             'bom_modified': bom_modified,
+            'energy_scale_factor': getattr(project, 'energy_scale_factor', 1.0),
         })
     except Exception as e:
         # Add better error logging

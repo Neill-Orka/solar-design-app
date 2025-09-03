@@ -218,10 +218,19 @@ def list_project_quotes(project_id):
     for d in docs:
         v = _latest_version(d)
         updated_at = (v.created_at if v else d.created_at)
+        
+        # Get current version status for the quote status display
+        current_version = d.versions.filter_by(version_no=d.current_version_no).first()
+        display_status = d.status.value if d.status else None
+        
+        # If document is open but current version is sent, show 'sent' status
+        if d.status.value == "open" and current_version and current_version.status.value == "sent":
+            display_status = "sent"
+        
         out.append({
             "id": d.id,
             "number": d.number,
-            "status": d.status.value if d.status else None,
+            "status": display_status,
             "created_at": d.created_at.isoformat() + "Z",
             "updated_at": updated_at.isoformat() + "Z",
             "version_count": d.versions.count(),                     # dynamic rel
@@ -232,7 +241,7 @@ def list_project_quotes(project_id):
 
 @quotes_bp.get("/quotes/<int:document_id>")
 def get_quote(document_id):
-    d = Document.query.get(document_id)
+    d = Document.query.filter_by(id=document_id, kind=DocumentKind.QUOTE).first()
     if not d:
         return jsonify({"error": "Quote not found"}), 404
 
@@ -247,10 +256,18 @@ def get_quote(document_id):
             "lines_count": len(v.line_items),
         })
 
+    # Get current version status for the quote status display
+    current_version = d.versions.filter_by(version_no=d.current_version_no).first()
+    display_status = d.status.value if d.status else None
+    
+    # If document is open but current version is sent, show 'sent' status
+    if d.status.value == "open" and current_version and current_version.status.value == "sent":
+        display_status = "sent"
+
     return jsonify({
         "id": d.id,
         "number": d.number,
-        "status": d.status.value if d.status else None,
+        "status": display_status,
         "project_id": d.project_id,
         "created_at": d.created_at.isoformat() + "Z",
         "versions": versions
@@ -265,16 +282,19 @@ def get_quote_version(version_id):
     lines = []
     for li in v.line_items:
         p = li.product  # may be None if product removed from catalog
+        snapshot = li.product_snapshot_json or {}
         lines.append({
             "id": li.id,
             "product_id": li.product_id,
-            "brand": (p.brand_name if p else (li.product_snapshot_json or {}).get("brand")),
-            "model": (p.description if p else (li.product_snapshot_json or {}).get("model")),
+            "category": (p.category if p else snapshot.get("category")),
+            "brand": (p.brand_name if p else snapshot.get("brand")),
+            "model": (p.description if p else snapshot.get("model")),
             "qty": li.qty,
             "unit_cost_locked": li.unit_cost_locked,
             "unit_price_locked": li.unit_price_locked,
             "margin_locked": li.margin_locked,
             "line_total_locked": li.line_total_locked,
+            "product_snapshot": snapshot,
         })
 
     return jsonify({
@@ -309,11 +329,44 @@ def load_version_to_bom(version_id):
     # Default to draft so the user can edit margins/qty immediately
     quote_status = 'draft'
 
+    # Track core components for SystemDesign synchronization
+    core_components = {
+        'panel': None,
+        'inverter': None,
+        'battery': None
+    }
+
     count = 0
     for li in v.line_items:
         # Only map items that still reference a product id
         if not li.product_id:
             continue
+        
+        # Get product and snapshot for core component detection
+        product = li.product
+        snapshot = li.product_snapshot_json or {}
+        category = (product.category if product else snapshot.get("category", "")).lower()
+        
+        # Track core components with their quantities
+        if category == 'panel':
+            core_components['panel'] = {
+                'product_id': li.product_id,
+                'quantity': li.qty or 1,
+                'product': product
+            }
+        elif category == 'inverter':
+            core_components['inverter'] = {
+                'product_id': li.product_id,
+                'quantity': li.qty or 1,
+                'product': product
+            }
+        elif category == 'battery':
+            core_components['battery'] = {
+                'product_id': li.product_id,
+                'quantity': li.qty or 1,
+                'product': product
+            }
+        
         bom = BOMComponent(
             project_id=project_id,
             product_id=li.product_id,
@@ -328,12 +381,77 @@ def load_version_to_bom(version_id):
         count += 1
 
     db.session.commit()
-    return jsonify({"message": "Version loaded into BOM", "rows": count}), 200
+    
+    # Update the project's core components to match the quote
+    project = Projects.query.get(project_id)
+    if project:
+        # Update panel_id
+        if core_components['panel'] and core_components['panel']['product']:
+            project.panel_id = core_components['panel']['product_id']
+            project.num_panels = core_components['panel']['quantity']
+            panel_power_w = getattr(core_components['panel']['product'], 'power_w', None)
+            if panel_power_w:
+                project.panel_kw = panel_power_w * core_components['panel']['quantity'] / 1000.0
+        
+        # Update inverter_ids (stored as JSON array) and inverter_kva with quantity
+        if core_components['inverter'] and core_components['inverter']['product']:
+            project.inverter_ids = [core_components['inverter']['product_id']]
+            inverter_product = core_components['inverter']['product']
+            inverter_rating = getattr(inverter_product, 'rating_kva', None)
+            if inverter_rating:
+                project.inverter_kva = {
+                    'model': getattr(inverter_product, 'description', ''),
+                    'capacity': inverter_rating * core_components['inverter']['quantity'],
+                    'quantity': core_components['inverter']['quantity']
+                }
+        
+        # Update battery_ids (stored as JSON array) and battery_kwh with quantity
+        if core_components['battery'] and core_components['battery']['product']:
+            project.battery_ids = [core_components['battery']['product_id']]
+            battery_product = core_components['battery']['product']
+            battery_capacity = getattr(battery_product, 'capacity_kwh', None)
+            if battery_capacity:
+                project.battery_kwh = {
+                    'model': getattr(battery_product, 'description', ''),
+                    'capacity': battery_capacity,
+                    'quantity': core_components['battery']['quantity']
+                }
+        
+        project.bom_modified = True
+        db.session.commit()
+    
+    # Return core components info for frontend synchronization
+    response_data = {
+        "message": "Version loaded into BOM",
+        "rows": count,
+        "core_components": {
+            "quote_name": f"{doc.number}",
+            "quote_number": doc.number
+        }
+    }
+    
+    # Add core component details to response
+    for comp_type, comp_data in core_components.items():
+        if comp_data and comp_data['product']:
+            product = comp_data['product']
+            response_data["core_components"][comp_type] = {
+                'id': product.id,
+                'quantity': comp_data['quantity'],
+                'brand': getattr(product, 'brand_name', ''),
+                'model': getattr(product, 'description', ''),
+                'power_w': getattr(product, 'power_w', None),
+                'rating_kva': getattr(product, 'rating_kva', None),
+                'capacity_kwh': getattr(product, 'capacity_kwh', None),
+            }
+    
+    return jsonify(response_data), 200
 
 @quotes_bp.route('/quotes/<int:document_id>/versions', methods=['POST'])
 def create_version_from_bom(document_id):
     # 1) Load document + project
-    doc = Document.query.get_or_404(document_id)
+    doc = Document.query.filter_by(id=document_id, kind=DocumentKind.QUOTE).first()
+    if not doc:
+        return jsonify({"error": "Quote not found"}), 404
     project_id = doc.project_id
 
     # 2) Load current BOM rows
@@ -452,3 +570,170 @@ def create_version_from_bom(document_id):
         "version_id": v.id,
         "version_no": v.version_no
     }), 201
+
+
+@quotes_bp.route('/quotes/<int:document_id>/send', methods=['POST'])
+@jwt_required(optional=True)
+def send_quote(document_id):
+    """Send a quote (mark as sent, lock version, set valid_until)"""
+    user_id = None
+    try:
+        user_id = get_jwt_identity()
+    except Exception:
+        pass
+    
+    doc = Document.query.filter_by(id=document_id, kind=DocumentKind.QUOTE).first()
+    if not doc:
+        return jsonify({"error": "Quote not found"}), 404
+    
+    try:
+        doc.mark_sent(user_id)
+        db.session.commit()
+        return jsonify({
+            "message": "Quote sent successfully",
+            "status": doc.status.value
+        })
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to send quote"}), 500
+
+
+@quotes_bp.route('/quotes/<int:document_id>/accept', methods=['POST'])
+@jwt_required(optional=True)
+def accept_quote(document_id):
+    """Mark a quote as accepted"""
+    user_id = None
+    try:
+        user_id = get_jwt_identity()
+    except Exception:
+        pass
+    
+    doc = Document.query.filter_by(id=document_id, kind=DocumentKind.QUOTE).first()
+    if not doc:
+        return jsonify({"error": "Quote not found"}), 404
+    
+    try:
+        doc.mark_accepted(user_id)
+        db.session.commit()
+        return jsonify({
+            "message": "Quote accepted",
+            "status": doc.status.value
+        })
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to accept quote"}), 500
+
+
+@quotes_bp.route('/quotes/<int:document_id>/decline', methods=['POST'])
+@jwt_required(optional=True)
+def decline_quote(document_id):
+    """Mark a quote as declined"""
+    user_id = None
+    try:
+        user_id = get_jwt_identity()
+    except Exception:
+        pass
+    
+    doc = Document.query.filter_by(id=document_id, kind=DocumentKind.QUOTE).first()
+    if not doc:
+        return jsonify({"error": "Quote not found"}), 404
+    
+    try:
+        doc.mark_declined(user_id)
+        db.session.commit()
+        return jsonify({
+            "message": "Quote declined",
+            "status": doc.status.value
+        })
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to decline quote"}), 500
+
+
+@quotes_bp.route('/quotes/<int:document_id>', methods=['DELETE'])
+@jwt_required(optional=True)
+def delete_quote(document_id):
+    """Delete a quote and all its versions"""
+    user_id = None
+    try:
+        user_id = get_jwt_identity()
+    except Exception:
+        pass
+    
+    doc = Document.query.filter_by(id=document_id, kind=DocumentKind.QUOTE).first()
+    if not doc:
+        return jsonify({"error": "Quote not found"}), 404
+    
+    try:
+        # Delete all versions and their line items (CASCADE should handle this)
+        # Delete all events related to this document's versions
+        for version in doc.versions:
+            DocumentEvent.query.filter_by(document_version_id=version.id).delete()
+            DocumentLineItem.query.filter_by(document_version_id=version.id).delete()
+        
+        DocumentVersion.query.filter_by(document_id=document_id).delete()
+        
+        # Delete the document
+        db.session.delete(doc)
+        db.session.commit()
+        
+        return jsonify({"message": "Quote deleted successfully"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to delete quote"}), 500
+
+
+@quotes_bp.route('/quotes/<int:document_id>/rename', methods=['PATCH'])
+@jwt_required(optional=True)
+def rename_quote(document_id):
+    """Rename a quote by updating its number (keeping the sequence number)"""
+    user_id = None
+    try:
+        user_id = get_jwt_identity()
+    except Exception:
+        pass
+    
+    doc = Document.query.filter_by(id=document_id, kind=DocumentKind.QUOTE).first()
+    if not doc:
+        return jsonify({"error": "Quote not found"}), 404
+    
+    data = request.get_json()
+    new_prefix = data.get('new_prefix', '').strip()
+    
+    if not new_prefix:
+        return jsonify({"error": "New prefix is required"}), 400
+    
+    try:
+        # Extract the sequence number from the current quote number
+        # Use regex to find the last sequence of digits
+        import re
+        current_number = doc.number
+        match = re.search(r'(\d+)$', current_number)
+        if match:
+            sequence_part = match.group(1)
+            new_number = f"{new_prefix}{sequence_part}"
+        else:
+            return jsonify({"error": "No numeric sequence found in quote number"}), 400
+        
+        # Check if the new number already exists
+        existing = Document.query.filter_by(number=new_number, kind=DocumentKind.QUOTE).filter(Document.id != document_id).first()
+        if existing:
+            return jsonify({"error": "Quote number already exists"}), 400
+        
+        # Update the quote number
+        doc.number = new_number
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Quote renamed successfully",
+            "new_number": new_number
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to rename quote"}), 500
