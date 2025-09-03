@@ -11,6 +11,26 @@ from flask_migrate import Migrate
 import logging
 import sys
 
+# Import and register blueprints
+from routes.auth import auth_bp
+from routes.clients import clients_bp
+from routes.projects import projects_bp
+from routes.simulation import simulation_bp
+from routes.financial import financial_bp
+from routes.consumption import consumption_bp
+from routes.optimize import optimize_bp
+from routes.products import products_bp
+from routes.energy_data import energy_data_bp
+from routes.system_templates import system_templates_bp
+from routes.system_builder import system_builder_bp
+from routes.quick_design import quick_design_bp
+from routes.proposal_data import proposal_data_bp
+from routes.load_profiles import load_profiles_bp
+from routes.tariffs import tariffs_bp
+from routes.rules import rules_bp
+from routes.bom import bom_bp
+from routes.quotes import quotes_bp
+
 # Initialize app
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -45,25 +65,7 @@ def missing_token_callback(error):
 def token_not_fresh_callback(jwt_header, jwt_payload):
     return {'message': 'Fresh token required'}, 401
 
-# Import and register blueprints
-from routes.auth import auth_bp
-from routes.clients import clients_bp
-from routes.projects import projects_bp
-from routes.simulation import simulation_bp
-from routes.financial import financial_bp
-from routes.consumption import consumption_bp
-from routes.optimize import optimize_bp
-from routes.products import products_bp
-from routes.energy_data import energy_data_bp
-from routes.system_templates import system_templates_bp
-from routes.system_builder import system_builder_bp
-from routes.quick_design import quick_design_bp
-from routes.proposal_data import proposal_data_bp
-from routes.load_profiles import load_profiles_bp
-from routes.tariffs import tariffs_bp
-from routes.rules import rules_bp
-from routes.bom import bom_bp
-from routes.quotes import quotes_bp
+
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(clients_bp, url_prefix='/api')
