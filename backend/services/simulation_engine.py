@@ -314,6 +314,9 @@ def simulate_system_inner(
         if not records:
             return {"error": "No energy data found for project"}
 
+        # Get the energy scale factor from the project
+        energy_scale_factor = getattr(project, 'energy_scale_factor', 1.0) or 1.0
+
         latitude, longitude = project.latitude, project.longitude
         
         sim_year = records[0].timestamp.year
@@ -461,7 +464,8 @@ def simulate_system_inner(
         generation_kw_series.name = 'generation_kw'
         
         # Now, align the generated series with the actual record timestamps
-        demand_values = [r.demand_kw for r in records]
+        # Apply energy scale factor to demand values
+        demand_values = [r.demand_kw * energy_scale_factor for r in records]
         demand_kw_series = pd.Series(demand_values, index=full_30min_index, name='demand_kw')
         
         sim_df = pd.DataFrame(demand_kw_series).join(generation_kw_series).fillna(0)
