@@ -382,11 +382,52 @@ def load_version_to_bom(version_id):
 
     db.session.commit()
     
+    # Update the project's core components to match the quote
+    project = Projects.query.get(project_id)
+    if project:
+        # Update panel_id
+        if core_components['panel'] and core_components['panel']['product']:
+            project.panel_id = core_components['panel']['product_id']
+            project.num_panels = core_components['panel']['quantity']
+            panel_power_w = getattr(core_components['panel']['product'], 'power_w', None)
+            if panel_power_w:
+                project.panel_kw = panel_power_w * core_components['panel']['quantity'] / 1000.0
+        
+        # Update inverter_ids (stored as JSON array) and inverter_kva with quantity
+        if core_components['inverter'] and core_components['inverter']['product']:
+            project.inverter_ids = [core_components['inverter']['product_id']]
+            inverter_product = core_components['inverter']['product']
+            inverter_rating = getattr(inverter_product, 'rating_kva', None)
+            if inverter_rating:
+                project.inverter_kva = {
+                    'model': getattr(inverter_product, 'description', ''),
+                    'capacity': inverter_rating * core_components['inverter']['quantity'],
+                    'quantity': core_components['inverter']['quantity']
+                }
+        
+        # Update battery_ids (stored as JSON array) and battery_kwh with quantity
+        if core_components['battery'] and core_components['battery']['product']:
+            project.battery_ids = [core_components['battery']['product_id']]
+            battery_product = core_components['battery']['product']
+            battery_capacity = getattr(battery_product, 'capacity_kwh', None)
+            if battery_capacity:
+                project.battery_kwh = {
+                    'model': getattr(battery_product, 'description', ''),
+                    'capacity': battery_capacity,
+                    'quantity': core_components['battery']['quantity']
+                }
+        
+        project.bom_modified = True
+        db.session.commit()
+    
     # Return core components info for frontend synchronization
     response_data = {
         "message": "Version loaded into BOM",
         "rows": count,
-        "core_components": {}
+        "core_components": {
+            "quote_name": f"{doc.number}",
+            "quote_number": doc.number
+        }
     }
     
     # Add core component details to response
@@ -613,3 +654,86 @@ def decline_quote(document_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "Failed to decline quote"}), 500
+
+
+@quotes_bp.route('/quotes/<int:document_id>', methods=['DELETE'])
+@jwt_required(optional=True)
+def delete_quote(document_id):
+    """Delete a quote and all its versions"""
+    user_id = None
+    try:
+        user_id = get_jwt_identity()
+    except Exception:
+        pass
+    
+    doc = Document.query.filter_by(id=document_id, kind=DocumentKind.QUOTE).first()
+    if not doc:
+        return jsonify({"error": "Quote not found"}), 404
+    
+    try:
+        # Delete all versions and their line items (CASCADE should handle this)
+        # Delete all events related to this document's versions
+        for version in doc.versions:
+            DocumentEvent.query.filter_by(document_version_id=version.id).delete()
+            DocumentLineItem.query.filter_by(document_version_id=version.id).delete()
+        
+        DocumentVersion.query.filter_by(document_id=document_id).delete()
+        
+        # Delete the document
+        db.session.delete(doc)
+        db.session.commit()
+        
+        return jsonify({"message": "Quote deleted successfully"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to delete quote"}), 500
+
+
+@quotes_bp.route('/quotes/<int:document_id>/rename', methods=['PATCH'])
+@jwt_required(optional=True)
+def rename_quote(document_id):
+    """Rename a quote by updating its number (keeping the sequence number)"""
+    user_id = None
+    try:
+        user_id = get_jwt_identity()
+    except Exception:
+        pass
+    
+    doc = Document.query.filter_by(id=document_id, kind=DocumentKind.QUOTE).first()
+    if not doc:
+        return jsonify({"error": "Quote not found"}), 404
+    
+    data = request.get_json()
+    new_prefix = data.get('new_prefix', '').strip()
+    
+    if not new_prefix:
+        return jsonify({"error": "New prefix is required"}), 400
+    
+    try:
+        # Extract the sequence number from the current quote number
+        # Use regex to find the last sequence of digits
+        import re
+        current_number = doc.number
+        match = re.search(r'(\d+)$', current_number)
+        if match:
+            sequence_part = match.group(1)
+            new_number = f"{new_prefix}{sequence_part}"
+        else:
+            return jsonify({"error": "No numeric sequence found in quote number"}), 400
+        
+        # Check if the new number already exists
+        existing = Document.query.filter_by(number=new_number, kind=DocumentKind.QUOTE).filter(Document.id != document_id).first()
+        if existing:
+            return jsonify({"error": "Quote number already exists"}), 400
+        
+        # Update the quote number
+        doc.number = new_number
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Quote renamed successfully",
+            "new_number": new_number
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to rename quote"}), 500

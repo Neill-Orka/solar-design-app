@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import EnergyDataUpload from './EnergyDataUpload';
@@ -25,7 +25,13 @@ function ProjectDashboard() {
   const { id: projectId } = useParams();  // project_id from URL
   const { showNotification } = useNotification();
   const [project, setProject] = useState(null);
-  const [activeTab, setActiveTab] = useState('upload');
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Initialize activeTab from URL or default to 'upload'
+  const [activeTab, setActiveTab] = useState(() => {
+    return searchParams.get('tab') || 'upload';
+  });
+  
   const [currentStep, setCurrentStep] = useState(1); // Tracks quick design step
   const [quickDesignData, setQuickDesignData] = useState({
     consumption: '',
@@ -38,13 +44,21 @@ function ProjectDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [searchParams] = useSearchParams();
+
+  // Function to handle tab changes with URL updates
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    // Update URL with new tab parameter
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('tab', newTab);
+    setSearchParams(newSearchParams);
+  };
 
   const openQuote = (docId) => {
     navigate(`/projects/${projectId}/quotes/${docId}?from=quotes`);
   };
 
-  const fetchProject = async () => {
+  const fetchProject = useCallback(async () => {
     setLoading(true);
     try {
       const projectRes = await axios.get(`${API_URL}/api/projects/${projectId}`);
@@ -71,16 +85,19 @@ function ProjectDashboard() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchProject();
   }, [projectId]);
 
   useEffect(() => {
+    fetchProject();
+  }, [fetchProject]);
+
+  // Update activeTab when URL changes (e.g., back/forward browser navigation)
+  useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab) setActiveTab(tab);
-  }, [searchParams]);
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams, activeTab]);
 
   const handleTariffSave = async (tariffData) => {
       try {
@@ -249,19 +266,19 @@ function ProjectDashboard() {
       
       <ul className="nav nav-tabs mt-4">
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'upload' ? 'active' : ''}`} onClick={() => setActiveTab('upload')}>Energy Upload</button>
+          <button className={`nav-link ${activeTab === 'upload' ? 'active' : ''}`} onClick={() => handleTabChange('upload')}>Energy Upload</button>
         </li>
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'analysis' ? 'active' : ''}`} onClick={() => setActiveTab('analysis')}>Energy Analysis</button>
+          <button className={`nav-link ${activeTab === 'analysis' ? 'active' : ''}`} onClick={() => handleTabChange('analysis')}>Energy Analysis</button>
         </li>
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'design' ? 'active' : ''}`} onClick={() => setActiveTab('design')}>System Design</button>
+          <button className={`nav-link ${activeTab === 'design' ? 'active' : ''}`} onClick={() => handleTabChange('design')}>System Design</button>
         </li>
         {/* <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'optimize' ? 'active' : ''}`} onClick={() => setActiveTab('optimize')}>Optimize System</button>
+          <button className={`nav-link ${activeTab === 'optimize' ? 'active' : ''}`} onClick={() => handleTabChange('optimize')}>Optimize System</button>
         </li> */}
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'bom' ? 'active' : ''}`} onClick={() => setActiveTab('bom')}>Bill of Materials</button>
+          <button className={`nav-link ${activeTab === 'bom' ? 'active' : ''}`} onClick={() => handleTabChange('bom')}>Bill of Materials</button>
         </li>        
         <li className="nav-item">
           <button 
@@ -274,16 +291,16 @@ function ProjectDashboard() {
           </button>
         </li>
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'quotes' ? 'active' : ''}`} onClick={() => setActiveTab('quotes')}>Quotes</button>
+          <button className={`nav-link ${activeTab === 'quotes' ? 'active' : ''}`} onClick={() => handleTabChange('quotes')}>Quotes</button>
         </li>        
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'tariff' ? 'active' : ''}`} onClick={() => setActiveTab('tariff')}>Tariff</button>
+          <button className={`nav-link ${activeTab === 'tariff' ? 'active' : ''}`} onClick={() => handleTabChange('tariff')}>Tariff</button>
         </li>
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => setActiveTab('finance')}>Financial Modeling</button>
+          <button className={`nav-link ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => handleTabChange('finance')}>Financial Modeling</button>
         </li>
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'report' ? 'active' : ''}`} onClick={() => setActiveTab('report')}>Reporting</button>
+          <button className={`nav-link ${activeTab === 'report' ? 'active' : ''}`} onClick={() => handleTabChange('report')}>Reporting</button>
         </li>
       </ul>
 
@@ -294,7 +311,7 @@ function ProjectDashboard() {
         {activeTab === 'bom' && (
           <BillOfMaterials 
             projectId={projectId} 
-            onNavigateToPrintBom={() => setActiveTab('printbom')} 
+            onNavigateToPrintBom={() => handleTabChange('printbom')} 
             quoteContext={{
               docId: searchParams.get('quoteDoc'),
               number: searchParams.get('quoteNo'),
@@ -320,7 +337,7 @@ function ProjectDashboard() {
           </div>
         )}
         {activeTab === 'optimize' && <Optimize projectId={projectId} />}
-        {activeTab === 'report' && <ReportBuilder projectId={projectId} onNavigateToTab={setActiveTab} />}
+        {activeTab === 'report' && <ReportBuilder projectId={projectId} onNavigateToTab={handleTabChange} />}
       </div>
     </div>
   );
