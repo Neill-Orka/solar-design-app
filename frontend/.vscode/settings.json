@@ -1,0 +1,6 @@
+{
+  "javascript.suggest.autoImports": true,
+  "javascript.suggest.completeFunctionCalls": true,
+  "eslint.validate": ["javascript", "javascriptreact"],
+  "editor.defaultFormatter": "esbenp.prettier-vscode"
+}
