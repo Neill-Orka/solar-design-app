@@ -1080,6 +1080,13 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
         <Row>
           {/* Left: Product browser - Changed from lg={7} to lg={6} */}
           <Col lg={6}>
+            <div style={{ 
+              position: 'sticky', 
+              top: 'max(20px, calc(50vh - 40vh))', 
+              zIndex: 1000,
+              maxHeight: '80vh',
+              overflow: 'visible'
+            }}>
             <Card className="shadow-sm mb-4">
               <Card.Header as="h5" className="py-2">
                 <i className="bi bi-list-ul me-2" />
@@ -1185,6 +1192,7 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                 </div>
               </Card.Body>
             </Card>
+            </div>
           </Col>
 
           {/* Right: BOM + specs - Changed from lg={5} to lg={6} */}
