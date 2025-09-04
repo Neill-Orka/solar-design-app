@@ -113,7 +113,7 @@ function Projects() {
     <div className='min-vh-100' style={{ backgroundColor: '#f8f9fa' }}>
       <Container fluid className="py-4 py-md-5">
         <Row className="justify-content-center">
-          <Col lg={12} xl={10}>
+          <Col lg={12} xl={12}>
             <Card className="shadow-lg border-0 rounded-xl p-4 p-md-5">
               <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
@@ -167,7 +167,7 @@ function Projects() {
               {/* Filter Controls */}
               <Card className='shadow-sm border-0 rounded-xl p-3 mb-4'>
                 <Row className='g-3'>
-                  <Col lg={3} md={6}>
+                  <Col lg={4} md={6}>
                     <div className="mb-2">
                       <small className="text-muted fw-bold">Design Type</small>
                     </div>
@@ -193,7 +193,7 @@ function Projects() {
                     </ButtonGroup>
                   </Col>
                   
-                  <Col lg={3} md={6}>
+                  <Col lg={4} md={6}>
                     <div className="mb-2">
                       <small className="text-muted fw-bold">System Type</small>
                     </div>
@@ -216,10 +216,16 @@ function Projects() {
                       >
                         Hybrid
                       </Button>
+                      <Button 
+                        variant={activeFilters.systemType === 'off-grid' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setActiveFilters(prev => ({...prev, systemType: 'off-grid'}))}
+                      >
+                        Off-Grid
+                      </Button>                      
                     </ButtonGroup>
                   </Col>
 
-                  <Col lg={3} md={6}>
+                  <Col lg={4} md={6}>
                     <div className="mb-2">
                       <small className="text-muted fw-bold">Project Type</small>
                     </div>
@@ -244,7 +250,7 @@ function Projects() {
                       </Button>
                     </ButtonGroup>
                   </Col>
-
+{/* 
                   <Col lg={3} md={6}>
                     <div className="mb-2">
                       <small className="text-muted fw-bold">Status</small>
@@ -269,7 +275,7 @@ function Projects() {
                         Completed
                       </Button>
                     </ButtonGroup>
-                  </Col>
+                  </Col> */}
                 </Row>
               </Card>
 

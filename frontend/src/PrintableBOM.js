@@ -110,7 +110,56 @@ function PrintableBOM({ projectId: propProjectId }) {
       setProjectLoading(true);
       try {
         const response = await axios.get(`${API_URL}/api/projects/${projectId}`);
-        setProjectData(response.data);
+        const data = response.data;
+        console.log('Fetched project data:', data);
+
+        // Extract inverter ID
+        const inverterIds = data.inverter_ids || [];
+
+        // if we have inverter ID, fetch details
+        if (inverterIds.length > 0) {
+          const inverterId = inverterIds[0]; // Only using first inverter
+          const inverterResponse = await axios.get(`${API_URL}/api/products/${inverterId}`);
+          const inverterData = inverterResponse.data;
+          console.log('Fetched inverter data:', inverterData);
+
+          if (inverterData) {
+            const brand_name = inverterData.brand || '';
+            const inverter_quantity = data.inverter_kva.quantity || 1;
+            const power_rating_kva = inverterData.rating_kva ? `${Number(inverterData.rating_kva).toFixed(2) * inverter_quantity}kVA` : '';
+            console.log('Inverter brand and capacity:', brand_name, power_rating_kva);
+
+            // Store in project data for title display
+            data.inverter_brand_model = power_rating_kva ? `${brand_name} ${power_rating_kva}` : brand_name;
+          }
+        }        
+
+        // Extract battery ID
+        const batteryIds = data.battery_ids || [];
+
+        // if we have battery ID, fetch details
+        if (batteryIds.length > 0) {
+          const batteryId = batteryIds[0]; // Only using first battery
+          const batteryResponse = await axios.get(`${API_URL}/api/products/${batteryId}`);
+          const batteryData = batteryResponse.data;
+          console.log('Fetched battery data:', batteryData);
+
+          if (batteryData) {
+            const brand_name = batteryData.brand || '';
+            const battery_quantity = data.battery_kwh.quantity || 1;
+            const nominal_capacity_kwh = batteryData.nominal_rating_kwh ? `${Number(batteryData.nominal_rating_kwh).toFixed(2) * battery_quantity}kWh` : '';
+            console.log('Battery brand and capacity:', brand_name, nominal_capacity_kwh);
+
+            console.log('Battery quantity from project data:', battery_quantity);
+
+            // Store in project data for title display
+            data.battery_brand_model = nominal_capacity_kwh ? `${brand_name} ${nominal_capacity_kwh}` : brand_name;
+          }
+
+        }
+
+        setProjectData(data);
+
       } catch (error) {
         console.error('Failed to load project data:', error);
         showNotification('Failed to load project data', 'danger');
@@ -221,7 +270,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       
       loadQuoteData();
     }
-  }, [isQuoteMode, docId, projectId, dataKey, showNotification, projectData]);
+  }, [isQuoteMode, docId, projectId, dataKey, showNotification]);
 
   // Quote action handlers
   const handleSendQuote = async () => {
@@ -595,9 +644,9 @@ const renderHeader = () => (
       </div>
     <div className="bom-project-strip">
       {projectData?.name || bomData.project?.name || bomData.project?.project_name || 'Project Name'} - 
-      {bomData.project?.inverter_brand_model ? ` ${bomData.project.inverter_brand_model}` : ""}
-      {bomData.project?.battery_brand_model 
-        ? ` & ${bomData.project.battery_brand_model}`
+      {projectData?.inverter_brand_model ? ` ${projectData.inverter_brand_model}` : ""}
+      {projectData?.battery_brand_model 
+        ? ` & ${projectData.battery_brand_model}`
         : ''}
     </div>
     </header>

@@ -232,6 +232,7 @@ const AdminDashboard = () => {
   const getRoleBadgeClass = (role) => {
     switch (role) {
       case 'admin': return 'role-admin';
+      case 'manager': return 'role-manager';
       case 'sales': return 'role-sales';
       case 'design': return 'role-design';
       default: return 'role-default';
@@ -296,9 +297,10 @@ const AdminDashboard = () => {
                     required
                     disabled={generating}
                   >
+                    <option value="manager">Manager</option>
+                    <option value="admin">Admin</option>
                     <option value="design">Design</option>
                     <option value="sales">Sales</option>
-                    <option value="admin">Admin</option>
                   </select>
                 </div>
                 <div className="form-group">
@@ -545,6 +547,7 @@ const AdminDashboard = () => {
                 disabled={userActionLoading}
               >
                 <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
                 <option value="sales">Sales</option>
                 <option value="design">Design</option>
               </select>
