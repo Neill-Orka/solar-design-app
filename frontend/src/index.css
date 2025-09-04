@@ -266,7 +266,7 @@ code {
 
 @media (min-width: 992px) {
   .project-dashboard-container {
-    max-width: 90%;
+    max-width: 95%;
     padding-left: 2.5rem;
     padding-right: 2.5rem;
   }
@@ -274,7 +274,7 @@ code {
 
 @media (min-width: 1200px) {
   .project-dashboard-container {
-    max-width: 85%;
+    max-width: 95%;
     padding-left: 3rem;
     padding-right: 3rem;
   }
@@ -282,7 +282,7 @@ code {
 
 @media (min-width: 1400px) {
   .project-dashboard-container {
-    max-width: 80%;
+    max-width: 95%;
     padding-left: 3.5rem;
     padding-right: 3.5rem;
   }

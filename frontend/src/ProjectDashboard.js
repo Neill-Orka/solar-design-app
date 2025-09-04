@@ -251,17 +251,33 @@ function ProjectDashboard() {
         <strong>Client:</strong> {project.client_name}<br />
         <strong>Location:</strong> {project.location}<br />
         <strong>System Type:</strong> {project.system_type || 'Not set'}<br />
-        <strong>Size:</strong> {project.panel_kw || '-'} kWp,{' '}
-        {typeof project.inverter_kva === 'object'
-          ? `${project.inverter_kva.capacity} kVA (x${project.inverter_kva.quantity})`
-          : (project.inverter_kva || '-')} kVA
-        {project.system_type !== 'grid' && project.battery_kwh && (
-          <> | Battery:{' '}
-            {typeof project.battery_kwh === 'object'
-              ? `${project.battery_kwh.capacity} kWh (x${project.battery_kwh.quantity})`
-              : project.battery_kwh} kWh
-          </>
-        )}
+        <strong>Size:</strong> {(project.panel_kw ?? '-') || '-'} kWp,{' '}
+        {(() => {
+          const inv = project.inverter_kva;
+          if (inv == null) return '- kVA';
+          if (typeof inv === 'object') {
+            const cap = inv?.capacity ?? '-';
+            const qty = inv?.quantity ?? (inv?.qty ?? '-');
+            return `${cap} kVA (x${qty})`;
+          }
+          if (typeof inv === 'number' || typeof inv === 'string') return `${inv} kVA`;
+          return '- kVA';
+        })()}
+        {(() => {
+          // Only show battery info for non-grid systems IF we actually have battery data
+            if (project.system_type === 'grid') return null;
+            const bat = project.battery_kwh;
+            if (bat == null || bat === 0) return null; // nothing to show
+            if (typeof bat === 'object') {
+              const cap = bat?.capacity ?? '-';
+              const qty = bat?.quantity ?? (bat?.qty ?? '-');
+              return <> | Battery: {cap} kWh (x{qty})</>;
+            }
+            if (typeof bat === 'number' || typeof bat === 'string') {
+              return <> | Battery: {bat} kWh</>;
+            }
+            return null;
+        })()}
       </p>
       
       <ul className="nav nav-tabs mt-4">
