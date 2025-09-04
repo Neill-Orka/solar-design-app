@@ -62,22 +62,28 @@ const Navbar = () => {
       { to: '/clients', label: 'Clients' },
     ];
 
-    // Only show Projects if user can modify them (design team or admin)
-    if (canModifyProjects()) {
+    // Only show Projects if user can modify them (design team, manager, or admin)
+    if (user && (user.role === 'admin' || user.role === 'design' || user.role === 'manager')) {
       baseLinks.push({ to: '/projects', label: 'Projects' });
     }
 
-    // Only show Products if user can modify them (sales team or admin)
-    if (canModifyProducts()) {
+    // Only show Products if user can modify them (sales team, manager, or admin)
+    if (user && (user.role === 'admin' || user.role === 'sales' || user.role === 'manager')) {
       baseLinks.push({ to: '/products-admin', label: 'Products' });
     }
 
-    // Add other links that everyone can access
-    baseLinks.push(
-      { to: '/system-builder', label: 'System Builder' },
-      { to: '/load-profile-manager', label: 'Load Profile Manager' },
-      { to: '/tariffs', label: 'Tariff Manager' }
-    );
+    // Update System Builder access (everyone except sales)
+    if (user && user.role !== 'sales') {
+      baseLinks.push({ to: '/system-builder', label: 'System Builder' });
+    }
+    
+    // Update Load Profile Manager access (everyone except sales)
+    if (user && user.role !== 'sales') {
+      baseLinks.push({ to: '/load-profile-manager', label: 'Load Profile Manager' });
+    }
+
+    // Tariff Manager is still accessible to all
+    baseLinks.push({ to: '/tariffs', label: 'Tariff Manager' });
 
     // Only show admin features to admins
     if (user?.role === 'admin') {

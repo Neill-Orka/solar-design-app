@@ -24,6 +24,7 @@ class UserRole(Enum):
     ADMIN = "admin"
     SALES = "sales"
     DESIGN = "design"
+    MANAGER = "manager"
 
 class User(db.Model):
     __tablename__ = 'users'

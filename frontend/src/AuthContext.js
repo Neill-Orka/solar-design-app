@@ -118,13 +118,18 @@ export const AuthProvider = ({ children }) => {
     if (!user) return false;
     
     const roleHierarchy = {
-      'admin': 3,
+      'admin': 4,
+      'manager': 3,
       'sales': 2,
       'design': 1
     };
 
     return roleHierarchy[user.role] >= roleHierarchy[requiredRole];
   };
+
+  const canDelete = () => {
+    return user && user.role === 'admin'; // only admin can delete
+  }
 
   const canModifyProjects = () => {
     return user && (user.role === 'admin' || user.role === 'design');
@@ -142,6 +147,7 @@ export const AuthProvider = ({ children }) => {
     hasRole,
     canModifyProjects,
     canModifyProducts,
+    canDelete,
     loading,
     isAuthenticated: !!user
   };
