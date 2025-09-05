@@ -642,13 +642,29 @@ const renderHeader = () => (
         </div>
         <div />
       </div>
-    <div className="bom-project-strip">
-      {projectData?.name || bomData.project?.name || bomData.project?.project_name || 'Project Name'} - 
-      {projectData?.inverter_brand_model ? ` ${projectData.inverter_brand_model}` : ""}
-      {projectData?.battery_brand_model 
-        ? ` & ${projectData.battery_brand_model}`
-        : ''}
-    </div>
+      <div className="bom-project-strip">
+        {(() => {
+          const name =
+            projectData?.name ||
+            bomData.project?.name ||
+            bomData.project?.project_name ||
+            'Project Name';
+        
+          const inverter = projectData?.inverter_brand_model;
+          const battery = projectData?.battery_brand_model;
+        
+          let details = '';
+          if (inverter && battery) {
+            details = ` - ${inverter} & ${battery}`;
+          } else if (inverter) {
+            details = ` - ${inverter}`;
+          } else if (battery) {
+            details = ` - ${battery}`;
+          }
+        
+          return `${name}${details}`;
+        })()}
+      </div>
     </header>
   );
 
