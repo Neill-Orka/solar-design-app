@@ -60,7 +60,16 @@ const PRIORITY = ['panel', 'inverter', 'battery'];
 
 /* ---------- Utils ---------- */
 const slugify = (s) => (s || '').toString().toLowerCase().replace(/&/g, ' and ').replace(/[^\w\s]/g, '').trim().replace(/\s+/g, '_');
-const fmt = (v) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(v || 0).replace('R', 'R ');
+const fmt = (v) =>
+  new Intl.NumberFormat('en-ZA', {
+    style: 'currency',
+    currency: 'ZAR',
+    minimumFractionDigits: 2,
+  })
+    .format(v || 0)
+    .replace('R', 'R') // optional if you want to keep 'R'
+    .replace(/,/g, ' '); // replace comma with space
+
 const toNum = (v) => (v === '' || v == null) ? 0 : Number(v);
 const DEFAULT_MARGIN = 0.25;
 const isCore = (cat) => ['panel','inverter','battery'].includes(cat);
@@ -87,10 +96,36 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
-  const [fullSystemMode, setFullSystemMode] = useState(() => {
-    try { return sessionStorage.getItem('bomFullSystemMode') !== 'false'; } catch { return true; }
-  });
-  useEffect(() => { try { sessionStorage.setItem('bomFullSystemMode', String(fullSystemMode)); } catch {} }, [fullSystemMode]);
+
+  const [fullSystemMode, setFullSystemMode] = useState(true);
+
+  // // Load persisted value whenever projectId changes
+  // useEffect(() => {
+  //   if (!projectId) return;
+  //   // migrate: if legacy global key exists, only apply it to this project once
+  //   try {
+  //     const legacy = sessionStorage.getItem('bomFullSystemMode');
+  //     if (legacy !== null) {
+  //       // apply legacy setting to current project then remove legacy key
+  //       localStorage.setItem(`bomFullSystemMode_project_${projectId}`, legacy);
+  //       localStorage.removeItem('bomFullSystemMode');
+  //     }
+  //   } catch {}
+  //   try {
+  //     const stored = localStorage.getItem(`bomFullSystemMode_project_${projectId}`);
+  //     setFullSystemMode(stored === null ? true : (stored === 'true'));
+  //   } catch {
+  //     setFullSystemMode(true);
+  //   }
+  // }, [projectId]);
+
+  // Persist only for this project
+  useEffect(() => {
+    if (!projectId) return;
+    try {
+      localStorage.setItem(`bomFullSystemMode_project_${projectId}`, fullSystemMode);
+    } catch {}
+  }, [fullSystemMode, projectId]);
 
   const coreLocked = (cat) => (quoteContext?.docId ? true : (fullSystemMode && isCore(cat)));
 
@@ -361,9 +396,14 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
 
   const totals = useMemo(() => {
     const subtotal = bom.reduce((s, r) => s + rowUnitPrice(r) * (Number(r.quantity) || 0), 0);
-    const vat_perc = 15; const vat_price = subtotal * vat_perc / 100; const total = subtotal + vat_price;
+    const vat_perc = 15; 
+    const vat_price = subtotal * vat_perc / 100;
+    const total = subtotal + vat_price;
+
     const total_cost = bom.reduce((s, r) => s + rowCost(r) * (Number(r.quantity) || 0), 0);
-    return { subtotal, total_cost, vat_perc, vat_price, total };
+    const total_markup = subtotal - total_cost;
+
+    return { subtotal, total_cost, vat_perc, vat_price, total, total_markup };
   }, [bom]);
 
   // Fuzzy search index (memoized)
@@ -704,21 +744,21 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
 
                         {/* Totals */}
                         <tr className="border-top border-dark">
-                          <td className="fw-semibold">Cost: {fmt(totals.total_cost)}</td>
-                          <td colSpan={3} className="text-end fw-semibold">Subtotal (excl. VAT):</td>
-                          <td className="text-end fw-semibold">{fmt(totals.subtotal)}</td>
+                          <td className="fw-semibold" style={ { whiteSpace: 'nowrap' } }>Cost: {fmt(totals.total_cost)}</td>
+                          <td colSpan={3} className="text-end fw-semibold" style={ { whiteSpace: 'nowrap' } }>Subtotal (excl. VAT):</td>
+                          <td className="text-end fw-semibold" style={ { whiteSpace: 'nowrap' } }>{fmt(totals.subtotal)}</td>
                           <td />
                         </tr>
                         <tr>
                           <td></td>
-                          <td colSpan={3} className="text-end fw-semibold">{totals.vat_perc}% VAT:</td>
-                          <td className="text-end fw-semibold">{fmt(totals.vat_price)}</td>
+                          <td colSpan={3} className="text-end fw-semibold" style={ { whiteSpace: 'nowrap' } }>{totals.vat_perc}% VAT:</td>
+                          <td className="text-end fw-semibold" style={ { whiteSpace: 'nowrap' } }>{fmt(totals.vat_price)}</td>
                           <td />
                         </tr>
                         <tr className="border-top border-dark">
-                          <td></td>
-                          <td colSpan={3} className="text-end fw-bold">Total (incl. VAT):</td>
-                          <td className="text-end fw-bold">{fmt(totals.total)}</td>
+                          <td className="fw-semibold" style={ { whiteSpace: 'nowrap' } }>Markup: {fmt(totals.total_markup)}</td>
+                          <td colSpan={3} className="text-end fw-bold" style={ { whiteSpace: 'nowrap' } }>Total (incl. VAT):</td>
+                          <td className="text-end fw-bold" style={ { whiteSpace: 'nowrap' } }>{fmt(totals.total)}</td>
                           <td />
                         </tr>
                       </tbody>

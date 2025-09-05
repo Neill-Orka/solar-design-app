@@ -154,7 +154,10 @@ def add_project():
         )
         db.session.add(new_project)
         db.session.commit()
-        return jsonify({'message': 'Project added successfully!'}), 200
+        return jsonify({
+            'message': 'Project added successfully!',
+            'project_id': new_project.id
+        }), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

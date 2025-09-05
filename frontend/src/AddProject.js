@@ -165,17 +165,23 @@ function AddProject() {
     }
 
     try {
-      await axios.post(`${API_URL}/api/projects`, {
+      const res = await axios.post(`${API_URL}/api/projects`, {
         ...projectData,
         latitude: parseFloat(projectData.latitude) || -25.9895,
         longitude: parseFloat(projectData.longitude) || 28.1284,
         client_id: clientId
       });
+      const newId = res.data.project_id;
+      if (!newId) {
+        setError('Project created but no project ID returned.');
+        setLoading(false);
+        return;
+      }
       setShowToast(true);
       setTimeout(() => {
         setShowToast(false);
-        navigate('/projects');
-      }, 2000);
+        navigate(`/projects/${newId}?tab=upload`);
+      }, 800);
       
     } catch (err) {
       console.error('Error adding project:', err);
