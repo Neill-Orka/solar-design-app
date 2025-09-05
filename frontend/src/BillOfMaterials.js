@@ -509,7 +509,7 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
                   <Form.Check
                     type="switch"
                     id="bom-mode-switch"
-                    label={coreLocked('panel') ? 'Full System Mode' : 'Component Quote Mode'}
+                    label={coreLocked('panel') ? 'Input from System Design' : 'Single Quote'}
                     checked={fullSystemMode}
                     onChange={() => setFullSystemMode(v => !v)}
                     disabled={!!quoteContext?.docId}
