@@ -617,7 +617,7 @@ const renderHeader = () => (
           <span className="label">Date:</span> {currentDate}
         </div>
         <div>
-          <span className="label">Company:</span> {projectData?.client_name || bomData.project?.client_name || 'Company Name'}
+          <span className="label">Company:</span> {projectData?.company || projectData?.client_name || 'Company Name'}
         </div>
         <div>
           <span className="label">Quote number:</span> {isQuoteMode ? (bomData.project?.quote_number || 'QTE000000') : `QTE${(projectData?.id || bomData.project?.id || '').toString().padStart(8, '0')}`}

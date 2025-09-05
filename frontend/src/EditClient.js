@@ -17,6 +17,8 @@ function EditClient() {
     province: '',
     country: 'South Africa'
   });
+  const [company, setCompany] = useState('');
+  const [vatNumber, setVatNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -28,6 +30,8 @@ function EditClient() {
         setEmail(response.data.email);
         setPhone(response.data.phone);
         setAddress(response.data.address);
+        setCompany(response.data.company || '');
+        setVatNumber(response.data.vat_number || '');
       })
       .catch((error) => {
         console.error('Error loading client:', error);
@@ -45,7 +49,9 @@ function EditClient() {
       client_name: clientName,
       email: email,
       phone: phone,
-      address: address
+      address: address,
+      company: company,
+      vat_number: vatNumber
     };
 
     axios.put(`${API_URL}/api/clients/${id}`, payload)
@@ -185,6 +191,38 @@ function EditClient() {
                         <option value="Mpumalanga">Mpumalanga</option>
                         <option value="Limpopo">Limpopo</option>
                       </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-4">
+                      <Form.Label className="fw-semibold">
+                        <i className="bi bi-building me-2"></i>Company
+                      </Form.Label>
+                      <Form.Control
+                        type="text"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        placeholder="Enter company name"
+                        size="md"
+                        className="rounded-lg"
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-4">
+                      <Form.Label className="fw-semibold">
+                        <i className="bi bi-file-earmark-text me-2"></i>VAT Number
+                      </Form.Label>
+                      <Form.Control
+                        type="text"
+                        value={vatNumber}
+                        onChange={(e) => setVatNumber(e.target.value)}
+                        placeholder="Enter VAT number"
+                        size="md"
+                        className="rounded-lg"
+                      />
                     </Form.Group>
                   </Col>
                 </Row>

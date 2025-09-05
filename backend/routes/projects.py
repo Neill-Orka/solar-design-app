@@ -87,6 +87,8 @@ def get_project_by_id(project_id):
             'client_name': project.client.client_name,
             'client_email': project.client.email,
             'client_phone': project.client.phone,
+            'company': project.client.company,
+            'vat_number': project.client.vat_number,
             'location': project.location,
             'latitude': project.latitude,
             'longitude': project.longitude,

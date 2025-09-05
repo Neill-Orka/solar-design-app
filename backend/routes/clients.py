@@ -17,7 +17,9 @@ def get_clients():
                 'client_name': c.client_name,
                 'email': c.email,
                 'phone': c.phone,
-                'address': c.address
+                'address': c.address,
+                'company': c.company,
+                'vat_number': c.vat_number
             }
             for c in clients
         ])
@@ -36,7 +38,9 @@ def get_client(client_id):
             'client_name': client.client_name,
             'email': client.email,
             'phone': client.phone,
-            'address': client.address 
+            'address': client.address,
+            'company': client.company,
+            'vat_number': client.vat_number
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -57,7 +61,9 @@ def add_client():
             client_name=data['client_name'],
             email=data['email'],
             phone=data['phone'],
-            address=address
+            address=address,
+            company=data['company'],
+            vat_number=data['vat_number']
         )
         db.session.add(new_client)
         db.session.commit()
@@ -84,6 +90,8 @@ def update_client(client_id):
         client.email = data.get('email', client.email)
         client.phone = data.get('phone', client.phone)
         client.address = data.get('address', client.address)
+        client.company = data.get('company', client.company)
+        client.vat_number = data.get('vat_number', client.vat_number)
 
         db.session.commit()
         return jsonify({'message': 'Client updated successfully!'})

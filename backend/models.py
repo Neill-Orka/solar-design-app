@@ -3,7 +3,7 @@ from email.policy import default
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import inspect
+from sqlalchemy import Nullable, inspect
 from sqlalchemy.orm import synonym
 from flask_bcrypt import Bcrypt
 from enum import Enum
@@ -198,6 +198,8 @@ class Clients(db.Model):
     email = db.Column(db.String(120), unique=True)
     phone = db.Column(db.String(20))
     address = db.Column(db.JSON, nullable=True)
+    company = db.Column(db.String(100), nullable=True)
+    vat_number = db.Column(db.String(30), nullable=True)
 
     projects = db.relationship('Projects', backref='client', lazy=True)
 
