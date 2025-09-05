@@ -860,7 +860,6 @@ function SystemDesign({ projectId }) {
                 const parsed = JSON.parse(cached);
                 if (parsed.timestamps) {
                     setSimulationData(parsed);
-                    console.log('Loaded cached simulation data:', projectId);
                 }
             } catch (err) {
                 console.error('Failed to parse cached simulation data:', err);
@@ -887,7 +886,6 @@ function SystemDesign({ projectId }) {
             generatorServiceInterval: design.generatorServiceInterval
         };
 
-        console.log('Saving generator settings to sessionStorage:', generatorSettings);
         sessionStorage.setItem(`generatorSettings_${projectId}`, JSON.stringify(generatorSettings));
     }, [projectId, design.generatorEnabled, design.generatorKva, design.generatorMinLoading, 
         design.generatorChargeBattery, design.dieselPrice, design.generatorMinRunTime, 
@@ -918,7 +916,7 @@ function SystemDesign({ projectId }) {
                     if (panelProduct) {
                         updates.selectedPanel = {
                             value: panelProduct.id,
-                            label: `${panelProduct.brand_name} ${panelProduct.description}`,
+                            label: `${panelProduct.brand_name} ${panelProduct.model}`,
                             product: panelProduct
                         };
                         updates.panelKw = ((coreComponents.panel.quantity * (panelProduct.power_w || PANEL_WATTAGE)) / 1000).toFixed(2);
@@ -934,7 +932,7 @@ function SystemDesign({ projectId }) {
                     if (inverterProduct) {
                         updates.selectedInverter = {
                             value: inverterProduct.id,
-                            label: `${inverterProduct.description} (${inverterProduct.rating_kva}kVA)`,
+                            label: `${inverterProduct.model} (${inverterProduct.rating_kva}kVA)`,
                             product: inverterProduct
                         };
                         updates.inverterQuantity = coreComponents.inverter.quantity;
