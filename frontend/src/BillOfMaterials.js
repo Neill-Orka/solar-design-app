@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './BillOfMaterials.css';
 import axios from 'axios';
 import {
@@ -7,885 +7,93 @@ import {
 } from 'react-bootstrap';
 import { API_URL } from './apiConfig';
 import { useNotification } from './NotificationContext';
-import Fuse from 'fuse.js';
+
+/**
+ * ---------------------------
+ *  SIMPLE BOM – single source of truth
+ *
+ *  Rules (matching your spec):
+ *  - If project.bom_modified === true ⇒ load saved BOM from DB, then overlay latest core components from SystemDesign.
+ *  - Else if a standard template is selected ⇒ load template extras, overlay core components from SystemDesign.
+ *  - Else ⇒ build from SystemDesign core only.
+ *  - Full System Mode locks core component quantities/removals. Component Quote Mode unlocks them.
+ *  - When editing a quote (quoteContext?.docId), core components are locked regardless of mode.
+ *  - “Generate Quote” snapshots current BOM into a new quote version (via /api/projects/:id/quotes) and navigates to Printable.
+ *  - Prices shown are *live* (cost * (1+margin)). Quote snapshots are handled server-side at versioning.
+ * ---------------------------
+ */
 
 /* ---------- Category meta (display only) ---------- */
 const CATEGORY_META = {
-  // Main system components
   panel:                 { name: 'Panel',                        icon: 'bi-grid-3x3-gap-fill',     color: 'warning'  },
   inverter:              { name: 'Inverter',                     icon: 'bi-box-seam',              color: 'info'     },
   battery:               { name: 'Battery',                      icon: 'bi-battery-full',          color: 'success'  },
   mppt:                  { name: 'MPPT',                         icon: 'bi-arrow-down-up',         color: 'info'     },
-  
-  // Components & protection
   protection:            { name: 'Protection',                   icon: 'bi-shield-slash-fill',     color: 'danger'   },
   inverter_aux:          { name: 'Inverter Aux',                 icon: 'bi-hdd-stack-fill',        color: 'secondary'},
   contactor:             { name: 'Contactor',                    icon: 'bi-lightning-charge-fill', color: 'danger'   },
   enclosure:             { name: 'Enclosure',                    icon: 'bi-box',                   color: 'secondary'},
   change_over_switch:    { name: 'Change Over Switch',           icon: 'bi-toggle-on',             color: 'secondary'},
   db:                    { name: 'DB',                           icon: 'bi-hdd-network',           color: 'secondary'},
-  
-  // Cables & management
   cable:                 { name: 'Cable',                        icon: 'bi-lightning',             color: 'dark'     },
   cable_management:      { name: 'Cable Management',             icon: 'bi-bezier2',               color: 'dark'     },
   conductor:             { name: 'Conductor',                    icon: 'bi-plug-fill',             color: 'dark'     },
-  
-  // Installation & mounting
   mounting_system:       { name: 'Mounting System',              icon: 'bi-bricks',                color: 'secondary'},
-  
-  // Monitoring & accessories
   monitoring:            { name: 'Monitoring',                   icon: 'bi-graph-up',              color: 'primary'  },
   monitoring_control:    { name: 'Monitoring & Control Equipment', icon: 'bi-display',             color: 'primary'  },
   auxiliaries:           { name: 'Auxiliaries',                  icon: 'bi-tools',                 color: 'secondary'},
-  
-  // Other equipment
   solar_geyser:          { name: 'Solar Geyser',                 icon: 'bi-water',                 color: 'info'     },
   lights:                { name: 'Lights',                       icon: 'bi-lightbulb',             color: 'warning'  },
   aux_generator:         { name: 'Aux Generator',                icon: 'bi-lightning-charge',      color: 'warning'  },
   vsd:                   { name: 'VSD',                          icon: 'bi-speedometer2',          color: 'info'     },
-  
-  // Services & logistics
   professional_services: { name: 'Professional Services',        icon: 'bi-person-badge',          color: 'primary'  },
   transport_logistics:   { name: 'Transport & Logistics',        icon: 'bi-truck',                 color: 'dark'     },
   human_resources:       { name: 'Human Resources',              icon: 'bi-people',                color: 'primary'  },
   hseq_compliance:       { name: 'HSEQ & Compliance',            icon: 'bi-check-circle',          color: 'success'  },
   st:                    { name: 'S&T',                          icon: 'bi-clipboard-check',       color: 'secondary'},
-  
-  // Fallbacks
   0:                     { name: 'Uncategorized',                icon: 'bi-question-circle',       color: 'secondary'},
   other:                 { name: 'Other',                        icon: 'bi-box',                   color: 'secondary'}
 };
 
-const CATEGORY_PRIORITY = ['panel', 'inverter', 'battery'];
+const PRIORITY = ['panel', 'inverter', 'battery'];
 
+/* ---------- Utils ---------- */
+const slugify = (s) => (s || '').toString().toLowerCase().replace(/&/g, ' and ').replace(/[^\w\s]/g, '').trim().replace(/\s+/g, '_');
+const fmt = (v) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(v || 0).replace('R', 'R ');
+const toNum = (v) => (v === '' || v == null) ? 0 : Number(v);
+const DEFAULT_MARGIN = 0.25;
+const isCore = (cat) => ['panel','inverter','battery'].includes(cat);
 
-/* ---------- Helpers ---------- */
-const slugify = (s) =>
-  (s || '')
-    .toString()
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^\w\s]/g, '')
-    .trim()
-    .replace(/\s+/g, '_');
-
-const formatCurrency = (value) => {
-  const number = (value || 0).toFixed(2);
-  const [integerPart, decimalPart] = number.split('.');
-
-  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
-
-  return `R${formattedInteger}.${decimalPart}`;
+const rowCost = (row) => toNum(row.unit_cost_at_time ?? row.product?.unit_cost);
+const rowMargin = (row) => {
+  if (row.override_margin != null && row.override_margin !== '') return Number(row.override_margin);
+  const m = Number(row.product?.margin);
+  return Number.isFinite(m) && m >= 0 ? (m <= 1 ? m : m/100) : DEFAULT_MARGIN;
 };
-
-
-
-const formatNumber0 = (value) =>
-  new Intl.NumberFormat('en-ZA', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value || 0);
-
-const toNumber = v => (v === null || v === undefined || v === '') ? 0 : Number(v);
-const DEFAULT_MARGIN_DEC = 0.25;
-
-// Helper function to check if a component is a core component that can only have margin edited
-const isCoreComponent = (category) => ['panel', 'inverter', 'battery'].includes(category);
-
-const normalizeMarginToDecimal = (m) => {
-  const v = toNumber(m);
-  if (!Number.isFinite(v) || v < 0) return DEFAULT_MARGIN_DEC;
-  
-  // If value is small (likely 1%), use default margin instead
-  if (v < 0.1) return DEFAULT_MARGIN_DEC;
-  
-  // Otherwise handle as before
-  return v <= 1 ? v : v / 100;
-}
-
-const computeUnitCost = (comp) => toNumber(comp.unit_cost_at_time ?? comp.product?.unit_cost);
-const computeMarginPct = (product) => normalizeMarginToDecimal(product?.margin);
-
-// effective margin for a BOM row: override -> product -> default (25%)
-const getRowMarginDecimal = (row) => {
-  if (row?.override_margin != null) return Number(row.override_margin);
-  const prodM = computeMarginPct(row?.product);
-  return Number.isFinite(prodM) && prodM >= 0 ? prodM : DEFAULT_MARGIN_DEC;
+const rowUnitPrice = (row) => {
+  const c = rowCost(row); const m = rowMargin(row);
+  return Number.isFinite(c) ? c * (1 + m) : Number(row.product?.price || 0);
 };
-
-// Update to use the new computeUnitCost
-const computeDerivedUnitFromRow = (row) => {
-  const cost = computeUnitCost(row);
-  const m = getRowMarginDecimal(row);
-  if (Number.isFinite(cost) && Number.isFinite(m)) return cost * (1 + m);
-  return toNumber(row?.product?.price);
-};
-
-// Draft = live; Locked = snapshot if present, else live
-const getUnitPriceForRow = (row, isDraft) => 
-  isDraft ? computeDerivedUnitFromRow(row) : (row.price_at_time ?? computeDerivedUnitFromRow(row));
 
 /* ---------- Component ---------- */
-function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
+export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
   const { showNotification } = useNotification();
 
-  // State
   const [loading, setLoading] = useState(true);
-  const [products, setProducts] = useState([]); // normalized categories
+  const [products, setProducts] = useState([]);
   const [project, setProject] = useState(null);
+  const [bom, setBom] = useState([]); // [{ product, quantity, override_margin?, unit_cost_at_time? }]
 
-  // BomItem: { product, quantity, price_at_time, current_price? }
-  const [bomComponents, setBomComponents] = useState([]);
-  const [isStandardDesign, setIsStandardDesign] = useState(false);
-  const [templateInfo, setTemplateInfo] = useState(null);
-
-  const [searchFilter, setSearchFilter] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-
-  const [savingComponents, setSavingComponents] = useState(false);
-  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
-  const [newTemplateName, setNewTemplateName] = useState('');
-  const [newTemplateDesc, setNewTemplateDesc] = useState('');
-
-  const [extrasCost, setExtrasCost] = useState('0');
-  const [quoteStatus, setQuoteStatus] = useState('draft'); // draft | sent | accepted | complete
-  const [creatingQuote, setCreatingQuote] = useState(false);
-  // Full System Mode (default) locks core components; Component Quote Mode allows editing/removal
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('all');
   const [fullSystemMode, setFullSystemMode] = useState(() => {
-    try {
-      const v = sessionStorage.getItem('bomFullSystemMode');
-      return v === null ? true : v === 'true';
-    } catch { return true; }
+    try { return sessionStorage.getItem('bomFullSystemMode') !== 'false'; } catch { return true; }
   });
-  const isCoreLocked = (category) => fullSystemMode && isCoreComponent(category);
-
-  // State for margin editing (allows blank values during editing)
-  const [editingMargins, setEditingMargins] = useState({});
-  const [editingCosts, setEditingCosts] = useState({});
-
-  /* ---------- Session persistence ---------- */
-  const SESSION_KEY_COMPONENTS = useMemo(() => `bomSessionComponents_${projectId}`, [projectId]);
-  const persistSessionComponents = useMemo(() => (list) => {
-    try {
-      const lightweight = list.map(c => ({
-        product_id: c.product?.id,
-        quantity: c.quantity,
-        unit_cost_at_time: c.unit_cost_at_time,
-        override_margin: c.override_margin
-      }));
-      sessionStorage.setItem(SESSION_KEY_COMPONENTS, JSON.stringify(lightweight));
-    } catch {}
-  }, [SESSION_KEY_COMPONENTS]);
-
   useEffect(() => { try { sessionStorage.setItem('bomFullSystemMode', String(fullSystemMode)); } catch {} }, [fullSystemMode]);
-
-  /* ---------- Initial load ---------- */
-  useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true);
-      try {
-        // products
-        const productsRes = await axios.get(`${API_URL}/api/products`);
-        const normalized = (productsRes.data || []).map(p => ({
-          ...p,
-          originalCategory: p.category, // Preserve original category name
-          category: slugify(p.category)  // Keep slugified for CATEGORY_META key lookup
-        }));
-        setProducts(normalized);
-
-        // project
-        const projectRes = await axios.get(`${API_URL}/api/projects/${projectId}`);
-        const proj = projectRes.data;
-        setProject(proj);
-
-        const std = !!proj?.template_id || !!proj?.from_standard_template || !!proj?.template_name;
-        setIsStandardDesign(std);
-        if (std) {
-          setTemplateInfo({
-            id: proj.template_id || null,
-            name: proj.template_name || null
-          });
-        }
-
-        // dispatch load in correct order
-        await loadProjectBOM(projectId, normalized, proj);
-        // Merge session-stored component edits (quantities/costs) after load
-    setBomComponents(prev => {
-          let merged = prev;
-          try {
-            const raw = sessionStorage.getItem(SESSION_KEY_COMPONENTS);
-            if (raw) {
-              const sessionRows = JSON.parse(raw) || [];
-              const byId = Object.fromEntries(merged.map(c => [c.product.id, { ...c }]));
-              sessionRows.forEach(r => {
-                const target = byId[r.product_id];
-                if (target) {
-                  if (Number.isFinite(r.quantity) && r.quantity > 0) target.quantity = r.quantity;
-                  if (r.unit_cost_at_time != null && r.unit_cost_at_time !== '') target.unit_cost_at_time = r.unit_cost_at_time;
-                  if (r.override_margin != null && r.override_margin !== '') target.override_margin = r.override_margin;
-                }
-              });
-      merged = Object.values(byId);
-      // Persist immediately so any normalization is reflected
-      persistSessionComponents(merged);
-            }
-          } catch {}
-          return merged;
-        });
-      } catch (err) {
-        console.error('Init load error:', err);
-        showNotification('Failed to load project or products', 'danger');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, SESSION_KEY_COMPONENTS]);
-
-  // Clear editing margins when BOM components change (e.g., on load)
-  useEffect(() => {
-    setEditingMargins({});
-    setEditingCosts({});
-  }, [bomComponents.length]); // Only trigger when the number of components changes
-
-  // Set quote status when loaded from a quote
-  useEffect(() => {
-    if (quoteContext?.docId) {
-      setQuoteStatus('draft'); // Set to draft when editing from quote
-    }
-  }, [quoteContext]);
-
-  // Auto-save BOM when design modifications are detected for standard designs
-  useEffect(() => {
-    const autoSaveBOM = async () => {
-      if (!isStandardDesign || !bomComponents.length) return;
-      
-      const designModified = sessionStorage.getItem(`systemDesignModified_${projectId}`) === 'true';
-      if (designModified) {
-        try {
-          // Auto-save the current BOM state to preserve design changes
-          const parsedExtras = parseFloat(extrasCost || '0') || 0;
-          const isDraft = (quoteStatus === 'draft');
-
-          const components = bomComponents.map(c => {
-            const liveUnit = computeDerivedUnitFromRow(c);
-            const liveCost = computeUnitCost(c);
-            return {
-              product_id: c.product.id,
-              quantity: Math.max(1, Number(c.quantity) || 1),
-              override_margin: c.override_margin ?? null,
-              price_at_time: isDraft ? null : (c.price_at_time ?? liveUnit),
-              unit_cost_at_time: isDraft ? null : (c.unit_cost_at_time ?? liveCost)
-            };
-          });
-
-          await axios.post(`${API_URL}/api/projects/${projectId}/bom`, {
-            project_id: projectId,
-            components,
-            extras_cost: parsedExtras,
-            quote_status: quoteStatus,
-            from_standard_template: !!isStandardDesign,
-            template_id: templateInfo?.id || null,
-            template_name: templateInfo?.name || null
-          });
-
-          console.log('Auto-saved BOM with design modifications');
-        } catch (err) {
-          console.warn('Auto-save BOM failed:', err);
-        }
-      }
-    };
-
-    // Only auto-save after initial load is complete
-    if (!loading && bomComponents.length > 0) {
-      autoSaveBOM();
-    }
-  }, [bomComponents, isStandardDesign, projectId, extrasCost, quoteStatus, templateInfo, loading]);
-
-  // Fuse instance for fuzzy search
-  const fuse = useMemo(() => {
-    const options = {
-      keys: [
-        'brand',
-        'model',
-        'category',
-        {
-          name: 'categoryName',
-          getFn: (product) => CATEGORY_META[product.category]?.name || product.originalCategory || product.category
-        },
-        'power_w',
-        'rating_kva',
-        'capacity_kwh'
-      ],
-      threshold: 0.4, // Lower means more strict matching
-      ignoreLocation: true,
-      useExtendedSearch: true
-    };
-
-    const records = products.map(p => ({
-      ...p,
-      categoryName: CATEGORY_META[p.category]?.name || p.originalCategory || p.category
-    }));
-
-    return new Fuse(records, options);
-  }, [products]);  
-
-  const createQuote = async () => {
-    if (!bomComponents.length) return showNotification('Add items to the BOM first.', 'warning');
-    setCreatingQuote(true);
-    try {
-      // ensure the latest BOM is persisted before locking
-      await saveBOM();
-      const res = await axios.post(`${API_URL}/api/projects/${projectId}/quotes`, {
-        tz: 'Africa/Johannesburg'
-      });
-  const { document } = res.data || {};
-      const docId = document?.id;
-      showNotification(`Quote created successfully!`, 'success');
-
-      // Navigate to quote details
-      if (docId) {
-        window.location.href = `/projects/${projectId}/quotes/${docId}`;
-      }
-    } catch (e) {
-      console.error(e);
-      showNotification('Failed to create quote.', 'danger');
-    } finally {
-      setCreatingQuote(false);
-    }
-  };
-
-
-  /* ---------- Template fetch helpers (by id OR by name) ------------ */
-  const fetchTemplateById = async (id) => {
-    if (!id) return null;
-    try {
-      const res = await axios.get(`${API_URL}/api/system_templates/${id}`);
-      return res.data || null;
-    } catch (e) {
-      console.warn('fetchTemplateById failed:', e);
-      return null;
-    }
-  };
-
-  const fetchTemplateByName = async (name) => {
-    if (!name) return null;
-    try {
-      const res = await axios.get(`${API_URL}/api/system_templates`);
-      const list = res.data || [];
-      const match = list.find(t => (t.name || '').toLowerCase().trim() === name.toLowerCase().trim());
-      if (!match) return null;
-      return await fetchTemplateById(match.id);
-    } catch (e) {
-      console.warn('fetchTemplateByName failed:', e);
-      return null;
-    }
-  };
-
-  const mapTemplateToItems = (template, productsData) => {
-    const comps = (template?.components || []).map(c => {
-      const prod = productsData.find(p => p.id === c.product_id);
-      if (!prod) return null;
-      return {
-        product: prod,
-        quantity: Number(c.quantity) || 1,
-        price_at_time: null,
-        current_price: computeDerivedUnitFromRow({ product: prod }),
-        override_margin: null  // Templates start with no margin override
-      };
-    }).filter(Boolean);
-    return comps;
-  };
-
-// Overlay panel/inverter/battery changes from systemDesign onto a full template
-const overlayFromProject = (items, projectData, productsData) => {
-  let result = [...items];
-
-  // Panels
-  if (projectData.panel_id) {
-    const prod = productsData.find(p => p.id === projectData.panel_id);
-    if (prod) {
-      // Find existing panel component to preserve margin override
-      const existingPanel = result.find(x => x.product?.category === 'panel' && x.product?.id === projectData.panel_id);
-      result = result.filter(x => x.product?.category !== 'panel');
-      // Use stored num_panels directly instead of calculating to avoid rounding issues
-      const qty = projectData.num_panels || 1;
-      result.push({ 
-        product: prod, 
-        quantity: qty, 
-        price_at_time: null, 
-        current_price: computeDerivedUnitFromRow({ product: prod }),
-        override_margin: existingPanel?.override_margin || null  // Preserve margin override
-      });
-    }
-  }
-
-  // Inverters
-  if (projectData.inverter_ids?.length) {
-    // Collect existing inverter margins before filtering
-    const existingInverters = result.filter(x => x.product?.category === 'inverter');
-    result = result.filter(x => x.product?.category !== 'inverter');
-    const qty = Number(projectData.inverter_kva?.quantity) || 1;
-    projectData.inverter_ids.forEach((id, idx) => {
-      const prod = productsData.find(p => p.id === id);
-      if (prod) {
-        // Find existing margin for this specific inverter
-        const existingInverter = existingInverters.find(x => x.product?.id === id);
-        result.push({
-          product: prod,
-          quantity: idx === 0 ? qty : 1,
-          price_at_time: null,
-          current_price: computeDerivedUnitFromRow({ product: prod }),
-          override_margin: existingInverter?.override_margin || null  // Preserve margin override
-        });
-      }
-    });
-  }
-
-  // Batteries
-  result = result.filter(x => x.product?.category !== 'battery');
-  if (projectData.battery_ids?.length) {
-    // Collect existing battery margins before filtering
-    const existingBatteries = items.filter(x => x.product?.category === 'battery');
-    const qty = Number(projectData.battery_kwh?.quantity) || 1;
-    projectData.battery_ids.forEach((id, idx) => {
-      const prod = productsData.find(p => p.id === id);
-      if (prod) {
-        const existingBattery = existingBatteries.find(x => x.product?.id === id);
-        result.push({
-          product: prod,
-          quantity: idx === 0 ? qty : 1,
-          price_at_time: null,
-          current_price: computeDerivedUnitFromRow({ product: prod }),
-          override_margin: existingBattery?.override_margin || null  // Preserve margin override
-        });
-      }
-    });
-  }
-
-  return result;
-};
-
-// Removed unused helper getBrandModelCategory
-
-  /* ---------- NEW HYBRID BOM LOADER ---------- */
-const loadProjectBOM = async (pid, productsData, projectData) => {
-  console.log('Loading BOM with hybrid approach. Project data:', {
-    bom_modified: projectData?.bom_modified,
-    template_id: projectData?.template_id,
-    template_name: projectData?.template_name
-  });
-
-  let finalComponents = [];
-
-  try {
-    // Step 1: Determine BOM source strategy
-    const hasBOMInDatabase = projectData?.bom_modified === true;
-    const hasTemplate = projectData?.template_id || projectData?.template_name;
-
-    if (hasBOMInDatabase) {
-      // USER HAS MODIFIED BOM: Load from database + overlay core components
-      console.log('Loading from database (user has modified BOM)');
-      
-      try {
-        const bomRes = await axios.get(`${API_URL}/api/projects/${pid}/bom`);
-        const savedComponents = bomRes.data || [];
-        
-        if (savedComponents.length > 0) {
-          // Load saved BOM components
-          finalComponents = savedComponents.map(saved => {
-            const product = productsData.find(p => p.id === saved.product_id);
-            return {
-              product,
-              quantity: saved.quantity,
-              price_at_time: saved.price_at_time,
-              current_price: saved.current_price,
-              override_margin: saved.override_margin,
-              unit_cost_at_time: saved.unit_cost_at_time ?? null
-            };
-          }).filter(item => item.product); // Remove any with missing products
-
-          // Set metadata
-          const meta = savedComponents.find(x => x.quote_status || x.extras_cost);
-          if (meta?.quote_status) setQuoteStatus(meta.quote_status);
-          if (meta?.extras_cost !== undefined) setExtrasCost(String(meta.extras_cost));
-        }
-      } catch (e) {
-        console.warn('Failed to load saved BOM:', e);
-      }
-
-      // Overlay core components from SystemDesign
-      finalComponents = overlayFromProject(finalComponents, projectData, productsData);
-
-    } else if (hasTemplate) {
-      // FRESH TEMPLATE: Load template + overlay core components
-      console.log('Loading from template (fresh/unmodified)');
-      
-      try {
-        let tmpl = null;
-        if (projectData.template_id) tmpl = await fetchTemplateById(projectData.template_id);
-        if (!tmpl && projectData.template_name) tmpl = await fetchTemplateByName(projectData.template_name);
-        
-        if (tmpl) {
-          // Load template components
-          finalComponents = mapTemplateToItems(tmpl, productsData);
-          
-          // Set template metadata
-          if (tmpl.extras_cost !== undefined && tmpl.extras_cost !== null) {
-            setExtrasCost(String(tmpl.extras_cost));
-          }
-          
-          // Overlay core components from SystemDesign
-          finalComponents = overlayFromProject(finalComponents, projectData, productsData);
-        }
-      } catch (e) {
-        console.warn('Template fetch failed:', e);
-      }
-    } else {
-      // NO TEMPLATE: Only core components from SystemDesign
-      console.log('Loading core components only (no template)');
-      finalComponents = overlayFromProject([], projectData, productsData);
-    }
-
-    // Set the final components
-    setBomComponents(finalComponents);
-    console.log('Final BOM components:', finalComponents.length, 'items');
-
-  } catch (err) {
-    console.error('BOM loading failed:', err);
-    showNotification('Failed to load Bill of Materials', 'danger');
-  }
-};
-
-  /* ---------- Overlay helpers ---------- */
-  // Removed unused initializeFromSystemDesign helper
-
-  /* ---------- Item ops ---------- */
-  const addComponent = (product) => {
-    const existing = bomComponents.find(c => c.product.id === product.id);
-    if (existing) {
-      updateQuantity(product.id, existing.quantity + 1);
-      return;
-    }
-    const addedList = [
-      ...bomComponents,
-      {
-        product,
-        quantity: 1,
-        price_at_time: null,
-        current_price: computeDerivedUnitFromRow({ product }),
-        override_margin: null,  // New components start with no margin override
-        unit_cost_at_time: null,
-      }
-    ];
-    setBomComponents(addedList);
-    persistSessionComponents(addedList);
-  };
-
-  const removeComponent = (productId) => {
-    // Check if this is a core component that shouldn't be removed
-    const componentToRemove = bomComponents.find(c => c.product.id === productId);
-  if (componentToRemove && isCoreLocked(componentToRemove.product.category)) {
-      showNotification('Core components (Panels, Inverters, Batteries) can only be modified in System Design', 'warning');
-      return;
-    }
-  const remaining = bomComponents.filter(c => c.product.id !== productId);
-  setBomComponents(remaining);
-  persistSessionComponents(remaining);
-  };
-
-  const updateQuantity = (productId, quantity) => {
-    // Check if this is a core component that shouldn't have quantity changed
-    const componentToUpdate = bomComponents.find(c => c.product.id === productId);
-  if (componentToUpdate && isCoreLocked(componentToUpdate.product.category)) {
-      showNotification('Core component quantities can only be modified in System Design', 'warning');
-      return;
-    }
-    // Allow empty string for better UX, but store the actual value
-    const updated = bomComponents.map(c =>
-      c.product.id === productId ? { ...c, quantity: quantity } : c
-    );
-    setBomComponents(updated);
-    persistSessionComponents(updated);
-  };
-
-  const handleQuantityBlur = (productId, quantity) => {
-    // Check if this is a core component that shouldn't have quantity changed
-    const componentToUpdate = bomComponents.find(c => c.product.id === productId);
-  if (componentToUpdate && isCoreLocked(componentToUpdate.product.category)) {
-      return; // Don't process blur for core components
-    }
-    // When field loses focus, ensure we have a valid number
-    const q = Math.max(1, parseInt(quantity || 1, 10));
-    const normalizedList = bomComponents.map(c =>
-      c.product.id === productId ? { ...c, quantity: q } : c
-    );
-    setBomComponents(normalizedList);
-    persistSessionComponents(normalizedList);
-  };
-
-  // Helper function to get the display value for margin input
-  const getMarginDisplayValue = (comp) => {
-    const productId = comp.product.id;
-    // If we're editing this margin, show the editing value
-    if (editingMargins.hasOwnProperty(productId)) {
-      return editingMargins[productId];
-    }
-    // Otherwise show the actual margin converted to percentage
-    return Math.round(getRowMarginDecimal(comp) * 100);
-  };
-
-  const updateMargin = (productId, marginPct) => {
-    // Store the raw input value to allow empty strings during editing
-    setEditingMargins(prev => ({
-      ...prev,
-      [productId]: marginPct
-    }));
-  };
-
-  const handleMarginBlur = (productId, marginPct) => {
-    // When field loses focus, ensure we have a valid margin or use default
-    const numValue = Number(marginPct);
-    let finalMargin = null; // null means use default 25%
-    
-    if (marginPct !== '' && !isNaN(numValue) && numValue >= 0) {
-      // Valid number entered, convert to decimal
-      finalMargin = Math.max(0, numValue / 100);
-    }
-    
-    // Update the component with the final margin value
-    const marginUpdated = bomComponents.map(c => 
-      c.product.id === productId ? { ...c, override_margin: finalMargin } : c
-    );
-    setBomComponents(marginUpdated);
-    persistSessionComponents(marginUpdated);
-    
-    // Clear the editing state
-    setEditingMargins(prev => {
-      const newState = { ...prev };
-      delete newState[productId];
-      return newState;
-    });
-  };
-
-  // Helper to get display value for cost input
-  const getCostDisplayValue = (comp) => {
-    const productId = comp.product.id;
-    // If editing show temp value
-    if (editingCosts.hasOwnProperty(productId)) {
-      return editingCosts[productId];
-    }
-    // Otherwise show the actual cost
-    return computeUnitCost(comp).toFixed(2);
-  };
-
-  const updateCost = (productId, cost) => {
-    // store the raw input for UX (allow empty during edit)
-    setEditingCosts(prev => ({
-      ...prev,
-      [productId]: cost
-    }));
-  };
-
-  const handleCostBlur = (productId, cost) => {
-    // on blur, validate and commit override
-    const numValue = Number(cost);
-    let finalCost = null; // null = use product.unit_cost
-
-    if (cost !== '' && !isNaN(numValue) && numValue >= 0) {
-      finalCost = numValue;
-    }
-
-    // Update bomComponents with override (null if invalid or empty)
-    const costUpdated = bomComponents.map(c => 
-      c.product.id === productId ? { ...c, unit_cost_at_time: finalCost } : c
-    );
-    setBomComponents(costUpdated);
-    persistSessionComponents(costUpdated);
-
-    // Clear temp state
-    setEditingCosts(prev => {
-      const newState = { ...prev };
-      delete newState[productId];
-      return newState;
-    });
-  };
-
-
-  /* ---------- Save BOM ---------- */
-  const saveBOM = async () => {
-    try {
-      setSavingComponents(true);
-
-      const parsedExtras = parseFloat(extrasCost || '0') || 0;
-      const isDraft = (quoteStatus === 'draft');
-
-      const components = (Array.isArray(bomComponents) ? bomComponents : []).map(c => {
-        const liveUnit = computeDerivedUnitFromRow(c);
-        const liveCost = computeUnitCost(c);
-        return {
-          product_id: c.product.id,
-          quantity: Math.max(1, Number(c.quantity) || 1),
-          override_margin: c.override_margin ?? null,
-          price_at_time: isDraft ? null : (c.price_at_time ?? liveUnit),
-          unit_cost_at_time: c.unit_cost_at_time ?? liveCost  // Always save custom costs, even in draft
-        };
-      });
-
-      await axios.post(`${API_URL}/api/projects/${projectId}/bom`, {
-        project_id: projectId,
-        components,
-        extras_cost: parsedExtras,
-        quote_status: quoteStatus,
-        from_standard_template: !!isStandardDesign,
-        template_id: templateInfo?.id || null,
-        template_name: templateInfo?.name || null
-      });
-
-      // Totals reflect what user sees: draft => live, locked => snapshot
-      const total = (Array.isArray(bomComponents) ? bomComponents: []).reduce((sum, c) => {
-        const unit = getUnitPriceForRow(c, isDraft);
-        return sum + unit * (Number(c.quantity) || 0);
-      }, parsedExtras);
-
-      await axios.put(`${API_URL}/api/projects/${projectId}`, {
-        project_value_excl_vat: total
-      });
-
-      // Clear modified flag
-      sessionStorage.removeItem(`systemDesignModified_${projectId}`);
-      showNotification('Bill of Materials saved', 'success');
-
-    } catch (err) {
-      console.error('Save BOM error:', err);
-      showNotification('Failed to save Bill of Materials', 'danger');
-    } finally {
-      setSavingComponents(false);
-    }
-  };
-
-  const [savingVersion, setSavingVersion] = useState(false);
-
-  const saveAsNewVersionToQuote = async () => {
-    if (!quoteContext?.docId) return;
-    try {
-      setSavingVersion(true);
-      // 1) Make sure latest edits are persisted to the workbench
-      await saveBOM();
-      //2) Snapshot BOM into a new version for this quote
-      await axios.post(`${API_URL}/api/quotes/${quoteContext.docId}/versions`, {});
-      showNotification(`Saved as new version for ${quoteContext.number || `quote #${quoteContext.docId}`}`, 'success');
-    } catch (e) {
-      console.error(e);
-      showNotification('Failed to create new quote version.', 'danger');
-    } finally {
-      setSavingVersion(false);
-    }
-  };
-
-  /* ---------- Save as Template ---------- */
-  const saveAsTemplate = async () => {
-    try {
-      setSavingComponents(true);
-      const payload = {
-        name: newTemplateName.trim(),
-        description: newTemplateDesc.trim(),
-        extras_cost: parseFloat(extrasCost || '0') || 0,
-        components: bomComponents.map(c => ({
-          product_id: c.product.id,
-          quantity: c.quantity
-        }))
-      };
-      await axios.post(`${API_URL}/api/system_templates`, payload);
-
-      setShowSaveTemplateModal(false);
-      setNewTemplateName('');
-      setNewTemplateDesc('');
-      showNotification('Template saved', 'success');
-    } catch (err) {
-      console.error('Save template error:', err);
-      showNotification('Failed to save template', 'danger');
-    } finally {
-      setSavingComponents(false);
-    }
-  };
-
-  /* ---------- Derived ---------- */
-  const filteredProducts = useMemo(() => {
-    // First filter by category if needed
-    let results = products;
-    if (selectedCategory !== 'all') {
-      results = products.filter(p => p.category === selectedCategory);
-    }
-    
-    // If there's no search text, return category-filtered results
-    if (!searchFilter.trim()) {
-      return results;
-    }
-    
-    // Otherwise, perform fuzzy search
-    // If category filter applied, search within that subset
-    const searchOn = selectedCategory !== 'all' ? 
-      new Fuse(results, fuse.options) : fuse;
-      
-    return searchOn.search(searchFilter)
-      .map(result => result.item);
-      
-  }, [products, searchFilter, selectedCategory, fuse]);
-
-  const grouped = useMemo(() => {
-    const g = {};
-    const list = Array.isArray(bomComponents) ? bomComponents : [];
-    list.forEach(c => {
-      const cat = c.product.category || 'other';
-      if (!g[cat]) g[cat] = [];
-      g[cat].push(c);
-    });
-    return g;
-  }, [bomComponents]);
-
-  // Add this new useMemo to create a sorted categories array
-  const sortedCategories = useMemo(() => {
-    // Get all categories from grouped
-    const allCategories = Object.keys(grouped);
-    
-    // Sort categories with priority items first, then alphabetically by display name
-    return allCategories.sort((a, b) => {
-      // Priority items at the top in specified order
-      const aIndex = CATEGORY_PRIORITY.indexOf(a);
-      const bIndex = CATEGORY_PRIORITY.indexOf(b);
-      
-      // If both are priority items, sort by priority order
-      if (aIndex >= 0 && bIndex >= 0) {
-        return aIndex - bIndex;
-      }
-      
-      // If only a is priority, it comes first
-      if (aIndex >= 0) return -1;
-      
-      // If only b is priority, it comes first
-      if (bIndex >= 0) return 1;
-      
-      // For non-priority items, sort alphabetically by display name
-      const aName = CATEGORY_META[a]?.name || a;
-      const bName = CATEGORY_META[b]?.name || b;
-      return aName.localeCompare(bName);
-    });
-  }, [grouped]);
-
-  const hasPriceChanges = useMemo(() => {
-    if (quoteStatus === 'draft') return false;
-    return (Array.isArray(bomComponents) ? bomComponents : []).some(c => 
-      c.price_at_time !== undefined &&
-      c.price_at_time !== null &&
-      computeDerivedUnitFromRow(c) !== c.price_at_time
-    );
-  }, [bomComponents, quoteStatus]);
-
+  
   const systemSpecs = useMemo(() => {
     let panelW = 0, inverterKva = 0, batteryKwh = 0;
-    const list = Array.isArray(bomComponents) ? bomComponents : [];
+    const list = Array.isArray(bom) ? bom : [];
     list.forEach(c => {
       const cat = c.product.category;
       if (cat === 'panel' && c.product.power_w) {
@@ -901,56 +109,235 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
       inverterKva: inverterKva.toFixed(2),
       batteryKwh: batteryKwh.toFixed(2)
     };
-  }, [bomComponents]);
+  }, [bom]);
+
+  const coreLocked = (cat) => (quoteContext?.docId ? true : (fullSystemMode && isCore(cat)));
+
+  // ---- Load project + products + BOM (simple flow) ----
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const [prodRes, projRes] = await Promise.all([
+          axios.get(`${API_URL}/api/products`),
+          axios.get(`${API_URL}/api/projects/${projectId}`)
+        ]);
+        const prods = (prodRes.data || []).map(p => ({ ...p, originalCategory: p.category, category: slugify(p.category) }));
+        const proj = projRes.data;
+        if (!mounted) return;
+        setProducts(prods);
+        setProject(proj);
+
+        // decide source
+        const hasSaved = proj?.bom_modified === true;
+        const hasTemplate = !!(proj?.template_id || proj?.template_name || proj?.from_standard_template);
+
+        let rows = [];
+        if (hasSaved) {
+          // load saved rows
+          const saved = (await axios.get(`${API_URL}/api/projects/${projectId}/bom`)).data || [];
+          rows = saved
+            .map(s => {
+              const prod = prods.find(p => p.id === s.product_id);
+              return prod ? {
+                product: prod,
+                quantity: Number(s.quantity) || 1,
+                override_margin: s.override_margin ?? null,
+                unit_cost_at_time: s.unit_cost_at_time ?? null,
+              } : null;
+            })
+            .filter(Boolean);
+          // overlay latest core from SystemDesign
+          rows = overlayCore(rows, proj, prods);
+        } else if (hasTemplate) {
+          // fetch template (by id or name), map extras, overlay core
+          let tmpl = null;
+          if (proj.template_id) {
+            try { tmpl = (await axios.get(`${API_URL}/api/system_templates/${proj.template_id}`)).data; } catch {}
+          }
+          if (!tmpl && proj.template_name) {
+            try {
+              const list = (await axios.get(`${API_URL}/api/system_templates`)).data || [];
+              const match = list.find(t => (t.name || '').toLowerCase().trim() === proj.template_name?.toLowerCase().trim());
+              if (match) tmpl = (await axios.get(`${API_URL}/api/system_templates/${match.id}`)).data;
+            } catch {}
+          }
+          rows = mapTemplate(tmpl, prods);
+          rows = overlayCore(rows, proj, prods);
+        } else {
+          // core only
+          rows = overlayCore([], proj, prods);
+        }
+        if (!mounted) return;
+        setBom(rows);
+      } catch (e) {
+        console.error(e);
+        showNotification('Failed to load Bill of Materials', 'danger');
+      } finally { if (mounted) setLoading(false); }
+    })();
+    return () => { mounted = false; };
+  }, [projectId, showNotification, quoteContext?.docId]);
+
+  /* ---------- Overlay core (panels / inverters / batteries) ---------- */
+  const overlayCore = (items, proj, prods) => {
+    let out = [...items];
+
+    // PANELS
+    if (proj?.panel_id) {
+      const prod = prods.find(p => p.id === proj.panel_id);
+      if (prod) {
+        const keepMargin = out.find(x => x.product?.id === prod.id)?.override_margin ?? null;
+        out = out.filter(x => x.product?.category !== 'panel');
+        const qty = Number(proj.num_panels) || 1;
+        out.push({ product: prod, quantity: qty, override_margin: keepMargin, unit_cost_at_time: null });
+      }
+    }
+
+    // INVERTERS
+    if (Array.isArray(proj?.inverter_ids) && proj.inverter_ids.length) {
+      const qtyFirst = Number(proj?.inverter_kva?.quantity) || 1;
+      const existing = out.filter(x => x.product?.category === 'inverter');
+      out = out.filter(x => x.product?.category !== 'inverter');
+      proj.inverter_ids.forEach((id, idx) => {
+        const prod = prods.find(p => p.id === id);
+        if (prod) {
+          const keep = existing.find(e => e.product?.id === id)?.override_margin ?? null;
+          out.push({ product: prod, quantity: idx === 0 ? qtyFirst : 1, override_margin: keep, unit_cost_at_time: null });
+        }
+      });
+    }
+
+    // BATTERIES
+    if (Array.isArray(proj?.battery_ids) && proj.battery_ids.length) {
+      const qtyFirst = Number(proj?.battery_kwh?.quantity) || 1;
+      const existing = out.filter(x => x.product?.category === 'battery');
+      out = out.filter(x => x.product?.category !== 'battery');
+      proj.battery_ids.forEach((id, idx) => {
+        const prod = prods.find(p => p.id === id);
+        if (prod) {
+          const keep = existing.find(e => e.product?.id === id)?.override_margin ?? null;
+          out.push({ product: prod, quantity: idx === 0 ? qtyFirst : 1, override_margin: keep, unit_cost_at_time: null });
+        }
+      });
+    }
+
+    return out;
+  };
+
+  const mapTemplate = (template, prods) => {
+    if (!template) return [];
+    return (template.components || [])
+      .map(c => {
+        const prod = prods.find(p => p.id === c.product_id);
+        return prod ? { product: prod, quantity: Number(c.quantity) || 1, override_margin: null, unit_cost_at_time: null } : null;
+      })
+      .filter(Boolean);
+  };
+
+  /* ---------- Item operations ---------- */
+  const addItem = (product) => {
+    const existing = bom.find(r => r.product.id === product.id);
+    if (existing) return updateQty(product.id, Number(existing.quantity || 1) + 1);
+    const next = [...bom, { product, quantity: 1, override_margin: null, unit_cost_at_time: null }];
+    setBom(next);
+  };
+  const removeItem = (pid) => {
+    const target = bom.find(r => r.product.id === pid);
+    if (target && coreLocked(target.product.category)) return showNotification('Core components are managed in System Design', 'warning');
+    setBom(bom.filter(r => r.product.id !== pid));
+  };
+  const updateQty = (pid, q) => {
+    const target = bom.find(r => r.product.id === pid);
+    if (target && coreLocked(target.product.category)) return showNotification('Core quantities are managed in System Design', 'warning');
+    const qty = Math.max(1, parseInt(q || 1, 10));
+    setBom(bom.map(r => r.product.id === pid ? { ...r, quantity: qty } : r));
+  };
+  const updateMarginPct = (pid, pctStr) => {
+    const pct = pctStr === '' ? '' : Math.max(0, Number(pctStr) || 0);
+    setBom(bom.map(r => r.product.id === pid ? { ...r, override_margin: pct === '' ? '' : pct / 100 } : r));
+  };
+  const normalizeMargin = (pid) => {
+    setBom(bom.map(r => r.product.id === pid ? {
+      ...r,
+      override_margin: (r.override_margin === '' || r.override_margin == null) ? null : Math.max(0, Number(r.override_margin))
+    } : r));
+  };
+
+  /* ---------- Save / Quote ---------- */
+  const saveBOM = async () => {
+    try {
+      const components = bom.map(r => ({
+        product_id: r.product.id,
+        quantity: Math.max(1, Number(r.quantity) || 1),
+        override_margin: r.override_margin ?? null,
+        unit_cost_at_time: r.unit_cost_at_time ?? rowCost(r), // keep any manual edits later if you add UI
+      }));
+      await axios.post(`${API_URL}/api/projects/${projectId}/bom`, {
+        project_id: projectId,
+        components,
+      });
+      showNotification('BOM saved', 'success');
+    } catch (e) {
+      console.error(e);
+      showNotification('Failed to save BOM', 'danger');
+    }
+  };
+
+  const [creatingQuote, setCreatingQuote] = useState(false);
+  const createQuote = async () => {
+    if (!bom.length) return showNotification('Add items to the BOM first', 'warning');
+    setCreatingQuote(true);
+    try {
+      await saveBOM();
+      const res = await axios.post(`${API_URL}/api/projects/${projectId}/quotes`, { tz: 'Africa/Johannesburg' });
+      const docId = res.data?.document?.id;
+      showNotification('Quote created', 'success');
+      if (docId) window.location.href = `/projects/${projectId}/quotes/${docId}`;
+    } catch (e) {
+      console.error(e);
+      showNotification('Failed to create quote', 'danger');
+    } finally { setCreatingQuote(false); }
+  };
+
+  /* ---------- Derived ---------- */
+  const grouped = useMemo(() => {
+    const g = {};
+    bom.forEach(r => {
+      const cat = r.product.category || 'other';
+      if (!g[cat]) g[cat] = [];
+      g[cat].push(r);
+    });
+    return g;
+  }, [bom]);
+
+  const sortedCats = useMemo(() => {
+    const all = Object.keys(grouped);
+    return all.sort((a,b) => {
+      const ia = PRIORITY.indexOf(a), ib = PRIORITY.indexOf(b);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1; if (ib !== -1) return 1;
+      const an = CATEGORY_META[a]?.name || a; const bn = CATEGORY_META[b]?.name || b;
+      return an.localeCompare(bn);
+    });
+  }, [grouped]);
 
   const totals = useMemo(() => {
-    const isDraft = (quoteStatus === 'draft');
-    const list = Array.isArray(bomComponents) ? bomComponents : [];
-    
-    // Calculate selling price total
-    const total_ex_vat = list.reduce((sum, c) => {
-      const unit = getUnitPriceForRow(c, isDraft);
-      return sum + unit * (Number(c.quantity) || 0);
-    }, 0);
-    
-    // Calculate cost price total
-    const total_cost = list.reduce((sum, c) => {
-      const costPrice = computeUnitCost(c);
-      return sum + costPrice * (Number(c.quantity) || 0);
-    }, 0);
-    
-    // Calculate total markup
-    const total_markup = total_ex_vat - total_cost;
-    
-    const vat_perc = 15;
-    const vat_price = total_ex_vat * (vat_perc / 100);
-    const total_in_vat = total_ex_vat * (1 + vat_perc / 100);
-    
-    return { 
-      total_excl_vat: total_ex_vat, 
-      total_cost: total_cost,
-      total_markup: total_markup,
-      vat_perc: vat_perc, 
-      vat_price: vat_price, 
-      total_incl_vat: total_in_vat 
-    };
-  }, [bomComponents, quoteStatus]);
+    const subtotal = bom.reduce((s, r) => s + rowUnitPrice(r) * (Number(r.quantity) || 0), 0);
+    const vat_perc = 15; const vat_price = subtotal * vat_perc / 100; const total = subtotal + vat_price;
+    const total_cost = bom.reduce((s, r) => s + rowCost(r) * (Number(r.quantity) || 0), 0);
+    return { subtotal, total_cost, vat_perc, vat_price, total };
+  }, [bom]);
 
-  // Calculate total selling price per category
-  const categoryTotals = useMemo(() => {
-    const isDraft = (quoteStatus === 'draft');
-    const totals = {};
-    
-    Object.keys(grouped).forEach(cat => {
-      totals[cat] = grouped[cat].reduce((sum, c) => {
-        const unit = getUnitPriceForRow(c, isDraft);
-        return sum + unit * (Number(c.quantity) || 0);
-      }, 0);
-    });
-    
-    return totals;
-  }, [grouped, quoteStatus]);
-
+  const productsFiltered = useMemo(() => {
+    let list = products;
+    if (category !== 'all') list = list.filter(p => p.category === category);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(p => `${p.brand} ${p.model}`.toLowerCase().includes(q));
+    }
+    return list;
+  }, [products, category, search]);
 
   /* ---------- UI ---------- */
   if (loading) {
@@ -961,10 +348,6 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
       </div>
     );
   }
-
-  
-  // Helper function to calculate totals for any component list
-  // Removed unused calculateTotalsForComponents helper
 
   return (
     <div>
@@ -979,66 +362,31 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                 </h4>
                 <div className="small text-muted d-flex flex-wrap align-items-center gap-2">
                   <span>Project: <strong>{project?.name}</strong></span>
-                  {isStandardDesign && (
-                    <Badge bg="secondary" className="rounded-pill px-2 py-1">
-                      Standard: {templateInfo?.name || 'Template'}
-                    </Badge>
-                  )}
+                  {project?.template_id || project?.template_name ? (
+                    <Badge bg="secondary" className="rounded-pill px-2 py-1">Standard: {project?.template_name || 'Template'}</Badge>
+                  ) : null}
                 </div>
               </div>
+
               <div className="bom-toolbar d-flex flex-wrap align-items-center gap-2">
-                {/* 1. Mode Switch */}
                 <div className="mode-switch card shadow-sm border-0 px-3 py-2 d-flex align-items-center">
                   <Form.Check
                     type="switch"
                     id="bom-mode-switch"
-                    label={fullSystemMode ? 'Full System Mode' : 'Component Quote Mode'}
+                    label={coreLocked('panel') ? 'Full System Mode' : 'Component Quote Mode'}
                     checked={fullSystemMode}
                     onChange={() => setFullSystemMode(v => !v)}
+                    disabled={!!quoteContext?.docId}
                   />
                 </div>
 
-                {/* 2. Template Button */}
-                <Button
-                  variant="outline-secondary"
-                  className="bom-btn shadow-sm bom-template-btn"
-                  onClick={() => setShowSaveTemplateModal(true)}
-                  disabled={!bomComponents.length || savingComponents}
-                >
-                  <i className="bi bi-save me-1" />
-                  Save Template
+                <Button variant="success" className="bom-btn shadow-sm" onClick={saveBOM}>
+                  <i className="bi bi-check2-circle me-1" /> Save BOM
                 </Button>
 
-                {/* 3. Save BOM */}
-                <Button
-                  variant="success"
-                  className="bom-btn shadow-sm"
-                  onClick={saveBOM}
-                  disabled={savingComponents}
-                >
-                  {savingComponents ? (
-                    <>
-                      <Spinner size="sm" as="span" animation="border" className="me-2" />
-                      Saving…
-                    </>
-                  ) : (
-                    <>
-                      <i className="bi bi-check2-circle me-1" />
-                      Save BOM
-                    </>
-                  )}
-                </Button>
-
-                {/* 4. Generate Quote (primary CTA) */}
                 {!quoteContext?.docId && (
-                  <Button
-                    variant="primary"
-                    className="bom-btn shadow-sm bom-generate-btn"
-                    onClick={createQuote}
-                    disabled={creatingQuote || savingComponents || !bomComponents.length}
-                  >
-                    <i className="bi bi-file-earmark-plus me-1" />
-                    {creatingQuote ? 'Generating…' : 'Generate Quote'}
+                  <Button variant="primary" className="bom-btn shadow-sm bom-generate-btn" onClick={createQuote} disabled={!bom.length || creatingQuote}>
+                    <i className="bi bi-file-earmark-plus me-1" /> {creatingQuote ? 'Generating…' : 'Generate Quote'}
                   </Button>
                 )}
               </div>
@@ -1046,73 +394,43 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
           </Col>
         </Row>
 
-        {hasPriceChanges && (
-          <Alert variant="warning" className="py-2">
-            <i className="bi bi-exclamation-triangle me-2" />
-            Some items have price changes since the BOM was last saved. The saved “unit price” will be respected on export unless you update it.
-          </Alert>
+        {quoteContext?.docId && (
+          <Row>
+            <Col>
+              <Alert variant="info" className="d-flex justify-content-between align-items-center">
+                <div>
+                  Editing <b>{quoteContext.number || `quote #${quoteContext.docId}`}</b>. Core components are locked.
+                </div>
+                {/* Keep the "Save as New Version" button handled elsewhere in your app if needed */}
+              </Alert>
+            </Col>
+          </Row>
         )}
 
         <Row>
-          <Col>
-            {quoteContext?.docId && (
-              <Alert variant="info" className="d-flex justify-content-between align-items-center">
-                <div>
-                  Editing <b>{quoteContext.number || `quote #${quoteContext.docId}`}</b>
-                  {quoteContext.fromVersion ? <> (loaded from v{quoteContext.fromVersion})</> : null}. 
-                  Changes here are drafts until you “Save as New Version”.
-                </div>
-                <div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={saveAsNewVersionToQuote}
-                    disabled={savingVersion}
-                  >
-                    {savingVersion ? 'Saving…' : 'Save as New Version'}
-                  </Button>
-                </div>
-              </Alert>
-            )}
-          </Col>
-        </Row>
-
-        <Row>
-          {/* Left: Product browser - Changed from lg={7} to lg={6} */}
+          {/* Left: Product browser */}
           <Col lg={6}>
             <div style={{ 
               position: 'sticky', 
               top: 'max(20px, calc(50vh - 40vh))', 
               zIndex: 1000,
-              maxHeight: '80vh',
+              maxHeight: '95vh',
               overflow: 'visible'
             }}>
             <Card className="shadow-sm mb-4">
               <Card.Header as="h5" className="py-2">
-                <i className="bi bi-list-ul me-2" />
-                Add Components
+                <i className="bi bi-list-ul me-2" /> Add Components
               </Card.Header>
               <Card.Body className="p-2">
                 <Row className="mb-2">
                   <Col md={6}>
                     <InputGroup size="sm">
-                      <InputGroup.Text className="py-0">
-                        <i className="bi bi-search" />
-                      </InputGroup.Text>
-                      <Form.Control
-                        size="sm"
-                        placeholder="Search products…"
-                        value={searchFilter}
-                        onChange={e => setSearchFilter(e.target.value)}
-                      />
+                      <InputGroup.Text className="py-0"><i className="bi bi-search" /></InputGroup.Text>
+                      <Form.Control size="sm" placeholder="Search products…" value={search} onChange={e => setSearch(e.target.value)} />
                     </InputGroup>
                   </Col>
                   <Col md={6}>
-                    <Form.Select
-                      size="sm"
-                      value={selectedCategory}
-                      onChange={e => setSelectedCategory(e.target.value)}
-                    >
+                    <Form.Select size="sm" value={category} onChange={e => setCategory(e.target.value)}>
                       <option value="all">All categories</option>
                       {Object.keys(CATEGORY_META).map(k => (
                         <option key={k} value={k}>{CATEGORY_META[k].name}</option>
@@ -1132,49 +450,34 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredProducts.map(product => {
-                        const existing = bomComponents.find(c => c.product.id === product.id);
+                      {productsFiltered.map(product => {
+                        const existing = bom.find(r => r.product.id === product.id);
+                        const spec = (
+                          (product.category === 'panel' && product.power_w && <Badge bg="warning" text="dark" className="small">{Number(product.power_w).toFixed(0)}W</Badge>) ||
+                          (product.category === 'inverter' && product.rating_kva && <Badge bg="info" className="small">{product.rating_kva}kVA</Badge>) ||
+                          (product.category === 'battery' && product.capacity_kwh && <Badge bg="success" className="small">{product.capacity_kwh}kWh</Badge>) || null
+                        );
                         return (
                           <tr key={product.id}>
                             <td>
                               <div className="fw-medium small">{product.brand} {product.model}</div>
                               <div className="text-muted" style={{fontSize: '0.75rem'}}>{CATEGORY_META[product.category]?.name || product.originalCategory || product.category}</div>
                             </td>
-                            <td>
-                              {product.category === 'panel' && product.power_w && (
-                                <Badge bg="warning" text="dark" className="small">{formatNumber0(product.power_w)}W</Badge>
-                              )}{' '}
-                              {product.category === 'inverter' && product.rating_kva && (
-                                <Badge bg="info" className="small">{product.rating_kva}kVA</Badge>
-                              )}{' '}
-                              {product.category === 'battery' && product.capacity_kwh && (
-                                <Badge bg="success" className="small">{product.capacity_kwh}kWh</Badge>
-                              )}
-                            </td>
-                            <td className="text-end small">{formatCurrency(product.price || 0)}</td>
+                            <td>{spec}</td>
+                            <td className="text-end small">{fmt(rowUnitPrice({ product }))}</td>
                             <td className="text-center">
                               {existing ? (
                                 <ButtonGroup size="sm">
-                                  <Button 
-                                    variant="outline-secondary" 
-                                    size="sm" 
-                                    className="py-0 px-1" 
-                                    onClick={() => updateQuantity(product.id, Math.max(1, Number(existing.quantity) - 1))}
-                                    disabled={isCoreLocked(product.category)}
-                                    title={isCoreLocked(product.category) ? "Core component quantities can only be changed in System Design" : "Decrease quantity"}
-                                  >-</Button>
+                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1"
+                                    onClick={() => updateQty(product.id, Math.max(1, Number(existing.quantity) - 1))}
+                                    disabled={coreLocked(product.category)}>-</Button>
                                   <Button variant="outline-secondary" size="sm" className="py-0 px-1" disabled>{Number(existing.quantity) || 1}</Button>
-                                  <Button 
-                                    variant="outline-secondary" 
-                                    size="sm" 
-                                    className="py-0 px-1" 
-                                    onClick={() => updateQuantity(product.id, Number(existing.quantity) + 1)}
-                                    disabled={isCoreLocked(product.category)}
-                                    title={isCoreLocked(product.category) ? "Core component quantities can only be changed in System Design" : "Increase quantity"}
-                                  >+</Button>
+                                  <Button variant="outline-secondary" size="sm" className="py-0 px-1"
+                                    onClick={() => updateQty(product.id, Number(existing.quantity) + 1)}
+                                    disabled={coreLocked(product.category)}>+</Button>
                                 </ButtonGroup>
                               ) : (
-                                <Button variant="outline-primary" size="sm" className="py-0" onClick={() => addComponent(product)}>
+                                <Button variant="outline-primary" size="sm" className="py-0" onClick={() => addItem(product)}>
                                   <i className="bi bi-plus-lg" /> Add
                                 </Button>
                               )}
@@ -1182,10 +485,8 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                           </tr>
                         );
                       })}
-                      {filteredProducts.length === 0 && (
-                        <tr>
-                          <td colSpan="4" className="text-center text-muted">No products match your search.</td>
-                        </tr>
+                      {productsFiltered.length === 0 && (
+                        <tr><td colSpan="4" className="text-center text-muted">No products match your search.</td></tr>
                       )}
                     </tbody>
                   </Table>
@@ -1195,15 +496,14 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
             </div>
           </Col>
 
-          {/* Right: BOM + specs - Changed from lg={5} to lg={6} */}
+          {/* Right: BOM */}
           <Col lg={6}>
             <Card className="shadow-sm mb-4">
               <Card.Header as="h5">
-                <i className="bi bi-clipboard-check me-2" />
-                Your BOM ({bomComponents.length} items)
+                <i className="bi bi-clipboard-check me-2" /> Your BOM ({bom.length} items)
               </Card.Header>
               <Card.Body>
-                {bomComponents.length === 0 ? (
+                {!bom.length ? (
                   <div className="text-muted">Add components on the left to build your BOM.</div>
                 ) : (
                   <div className="table-responsive">
@@ -1211,113 +511,67 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                       <thead className="table-light">
                         <tr>
                           <th>Product</th>
-                          <th className='text-end' style={{ width: 80 }}>Cost</th>
+                          <th className='text-end' style={{ width: 90 }}>Unit</th>
                           <th style={{ width: 100 }}>Margin</th>
-                          <th className='text-end' style={{ width: 80 }}>Price</th>
                           <th style={{ width: 90 }}>Qty</th>
-                          <th className='text-end' style={{ width: 80 }}>Total</th>
+                          <th className='text-end' style={{ width: 100 }}>Total</th>
                           <th style={{ width: 40 }} />
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedCategories.map(cat => (
+                        {sortedCats.map(cat => (
                           <React.Fragment key={cat}>
                             <tr className="table-light">
-                              <td colSpan={5} className="py-1">
+                              <td colSpan={4} className="py-1">
                                 <div className="fw-semibold">
                                   <i className={`bi ${CATEGORY_META[cat]?.icon || 'bi-box'} me-1`} />
                                   {CATEGORY_META[cat]?.name || (grouped[cat][0]?.product?.originalCategory || cat)}
                                 </div>
                               </td>
                               <td className="py-1 text-end fw-semibold">
-                                {formatCurrency(categoryTotals[cat] || 0)}
+                                {fmt(grouped[cat].reduce((s,r)=>s+rowUnitPrice(r)*(Number(r.quantity)||0),0))}
                               </td>
-                              <td className="py-1"></td>
+                              <td />
                             </tr>
-                            {grouped[cat].map(comp => {
-                              const isDraft = (quoteStatus === 'draft');
-                              const unitPrice = getUnitPriceForRow(comp, isDraft);
-                              const line = unitPrice * (Number(comp.quantity) || 0);
-                              const priceChanged = !isDraft && comp.price_at_time != null &&
-                                computeDerivedUnitFromRow(comp) !== comp.price_at_time;
-
+                            {grouped[cat].map(r => {
+                              const unit = rowUnitPrice(r);
+                              const line = unit * (Number(r.quantity)||0);
+                              const marginPct = r.override_margin == null || r.override_margin === ''
+                                ? Math.round(((Number(r.product?.margin)||DEFAULT_MARGIN) <= 1 ? (Number(r.product?.margin)||DEFAULT_MARGIN) : Number(r.product?.margin)/100) * 100)
+                                : Math.round(Number(r.override_margin) * 100);
                               return (
-                                <tr key={comp.product.id}>
+                                <tr key={r.product.id}>
                                   <td>
                                     <div className="d-flex align-items-center justify-content-between">
-                                      <div>
-                                        <div className="small fw-small">{comp.product.brand} {comp.product.model}</div>
-                                        {priceChanged && (
-                                          <small className="text-danger">
-                                            Price changed: {formatCurrency(comp.price_at_time)} → {formatCurrency(computeDerivedUnitFromRow(comp))}
-                                          </small>
-                                        )}
-                                      </div>
-                                      {isCoreLocked(comp.product.category) && (
+                                      <div className="small fw-small">{r.product.brand} {r.product.model}</div>
+                                      {coreLocked(r.product.category) && (
                                         <Badge bg="info" className="ms-2" title="Core component - quantities managed in System Design">
                                           <i className="bi bi-gear-fill" style={{ fontSize: '0.75em' }}></i>
                                         </Badge>
                                       )}
                                     </div>
                                   </td>
-                                  <td className='text-end small'>
-                                    <Form.Control 
-                                      type='number'
-                                      min='0'
-                                      step='1'
-                                      style={{ minWidth: 80, maxWidth: 110, fontSize: '0.85rem'}}
-                                      value={getCostDisplayValue(comp)}
-                                      onChange={e => updateCost(comp.product.id, e.target.value)}
-                                      onBlur={e => handleCostBlur(comp.product.id, e.target.value)}
-                                      disabled={quoteStatus !== 'draft'}
-                                      className='py-0 text-end'
-                                      plaintext
-                                      readOnly={false}
-                                    />
-                                  </td>
+                                  <td className='text-end small'>{fmt(unit)}</td>
                                   <td>
                                     <InputGroup size='sm'>
                                       <InputGroup.Text className="py-0 px-1">%</InputGroup.Text>
-                                      <Form.Control
-                                        type="number"
-                                        min="0"
-                                        // size="md"
-                                        style={{ minWidth: 70, maxWidth: 110, fontSize: '0.85rem'}}
-                                        step="1"
-                                        value={getMarginDisplayValue(comp)}
-                                        onChange={e => updateMargin(comp.product.id, e.target.value)}
-                                        onBlur={e => handleMarginBlur(comp.product.id, e.target.value)}
-                                        disabled={quoteStatus !== 'draft'}
-                                        className="py-0"
-                                      />
+                                      <Form.Control type="number" min="0" step="1" value={r.override_margin === '' ? '' : marginPct}
+                                        onChange={e => updateMarginPct(r.product.id, e.target.value)}
+                                        onBlur={() => normalizeMargin(r.product.id)}
+                                        className="py-0" />
                                     </InputGroup>
                                   </td>
-                                  <td className='text-end small'>{formatCurrency(unitPrice)}</td>
                                   <td>
                                     <InputGroup size='sm'>
-                                      <Form.Control 
-                                        type="number"
-                                        min="0"
-                                        style={{ minWidth: 70, maxWidth: 110, fontSize: '0.85rem'}}
-                                        value={comp.quantity}
-                                        onChange={e => updateQuantity(comp.product.id, e.target.value)}
-                                        onBlur={e => handleQuantityBlur(comp.product.id, e.target.value)}
-                                        className="py-0"
-                                        disabled={isCoreLocked(comp.product.category)}
-                                        title={isCoreLocked(comp.product.category) ? "Core component quantities can only be changed in System Design" : ""}
-                                      />
+                                      <Form.Control type="number" min="1" value={r.quantity}
+                                        onChange={e => updateQty(r.product.id, e.target.value)}
+                                        className="py-0" disabled={coreLocked(r.product.category)} />
                                     </InputGroup>
                                   </td>
-                                  <td className='text-end small'>{formatCurrency(line)}</td>
+                                  <td className='text-end small'>{fmt(line)}</td>
                                   <td className='text-end'>
-                                    <Button 
-                                      variant="outline-danger" 
-                                      size='sm' 
-                                      className="py-0 px-1" 
-                                      onClick={() => removeComponent(comp.product.id)}
-                                      disabled={isCoreLocked(comp.product.category)}
-                                      title={isCoreLocked(comp.product.category) ? "Core components cannot be removed - manage in System Design" : "Remove component"}
-                                    >
+                                    <Button variant="outline-danger" size='sm' className="py-0 px-1"
+                                      onClick={() => removeItem(r.product.id)} disabled={coreLocked(r.product.category)}>
                                       <i className='bi bi-trash' />
                                     </Button>
                                   </td>
@@ -1326,138 +580,1536 @@ const loadProjectBOM = async (pid, productsData, projectData) => {
                             })}
                           </React.Fragment>
                         ))}
-                        
-                        {/* Totals rows */}
+
+                        {/* Totals */}
                         <tr className="border-top border-dark">
-                          <td className="fw-semibold">Cost Price: {formatCurrency(totals.total_cost)}</td>
-                          <td colSpan={4} className="text-end fw-semibold">Total (excl. VAT):</td>
-                          <td className="text-end fw-semibold">{formatCurrency(totals.total_excl_vat)}</td>
-                          <td></td>
+                          <td className="fw-semibold">Cost: {fmt(totals.total_cost)}</td>
+                          <td colSpan={3} className="text-end fw-semibold">Subtotal (excl. VAT):</td>
+                          <td className="text-end fw-semibold">{fmt(totals.subtotal)}</td>
+                          <td />
                         </tr>
                         <tr>
-                          <td className="fw-semibold">Total Markup: {formatCurrency(totals.total_markup)}</td>
-                          <td colSpan={4} className="text-end fw-semibold">{ totals.vat_perc ? `${totals.vat_perc}% VAT` : 'VAT:'}</td>
-                          <td className="text-end fw-semibold">{formatCurrency(totals.vat_price)}</td>
                           <td></td>
+                          <td colSpan={3} className="text-end fw-semibold">{totals.vat_perc}% VAT:</td>
+                          <td className="text-end fw-semibold">{fmt(totals.vat_price)}</td>
+                          <td />
                         </tr>
                         <tr className="border-top border-dark">
-                          <td className="fw-semibold"></td>
-                          <td colSpan={4} className="text-end fw-bold">Total (incl. VAT):</td>
-                          <td className="text-end fw-bold">{formatCurrency(totals.total_incl_vat)}</td>
                           <td></td>
+                          <td colSpan={3} className="text-end fw-bold">Total (incl. VAT):</td>
+                          <td className="text-end fw-bold">{fmt(totals.total)}</td>
+                          <td />
                         </tr>
                       </tbody>
                     </Table>
                   </div>
                 )}
-
-                <Row className="align-items-center mt-3">
-                  {/* <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>Extras / Labour (R)</Form.Label>
-                      <Form.Control
-                        value={extrasCost}
-                        onChange={e => setExtrasCost(e.target.value)}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                      />
-                    </Form.Group> */}
-                  {/* </Col> */}
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>Quote Status</Form.Label>
-                      <Form.Select value={quoteStatus} onChange={e => setQuoteStatus(e.target.value)}>
-                        <option value="draft">Draft</option>
-                        <option value="sent">Sent</option>
-                        <option value="accepted">Accepted</option>
-                        <option value="complete">Complete</option>
-                      </Form.Select>
-                    </Form.Group>
-                  </Col>
-                </Row>
               </Card.Body>
             </Card>
-            
             <Card className="shadow-sm">
-              <Card.Header as="h5">
-                <i className="bi bi-info-circle me-2" />
-                System Specifications
-              </Card.Header>
-              <Card.Body>
-                <Row>
-                  <Col sm={3} className="mb-3 text-center">
-                    <div className="small text-muted">PV Size</div>
-                    <div className="fs-4 fw-bold text-warning">{systemSpecs.panelKw} <small>kWp</small></div>
-                  </Col>
-                  <Col sm={3} className="mb-3 text-center">
-                    <div className="small text-muted">Inverter</div>
-                    <div className="fs-4 fw-bold text-info">{systemSpecs.inverterKva} <small>kVA</small></div>
-                  </Col>
-                  <Col sm={3} className="mb-3 text-center">
-                    <div className="small text-muted">Battery</div>
-                    <div className="fs-4 fw-bold text-success">{systemSpecs.batteryKwh} <small>kWh</small></div>
-                  </Col>
-                  <Col sm={3} className="mb-3 text-center">
-                    <div className="small text-muted">Cost per kWp</div>
-                    <div className="fs-4 fw-bold text-success">
-                      {formatCurrency(systemSpecs.panelKw > 0 ? (totals.total_excl_vat / systemSpecs.panelKw) : 0)}
-                      <small>/kWp</small>
-                    </div>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
+          <Card.Header as="h5">
+            <i className="bi bi-info-circle me-2" />
+            System Specifications
+          </Card.Header>
+          <Card.Body>
+            <Row>
+              <Col sm={3} className="mb-3 text-center">
+                <div className="small text-muted">PV Size</div>
+                <div className="fs-4 fw-bold text-warning">{systemSpecs.panelKw} <small>kWp</small></div>
+              </Col>
+              <Col sm={3} className="mb-3 text-center">
+                <div className="small text-muted">Inverter</div>
+                <div className="fs-4 fw-bold text-info">{systemSpecs.inverterKva} <small>kVA</small></div>
+              </Col>
+              <Col sm={3} className="mb-3 text-center">
+                <div className="small text-muted">Battery</div>
+                <div className="fs-4 fw-bold text-success">{systemSpecs.batteryKwh} <small>kWh</small></div>
+              </Col>
+              <Col sm={3} className="mb-3 text-center">
+                <div className="small text-muted">Cost per kWp</div>
+                <div className="fs-4 fw-bold text-success">
+                  {fmt(systemSpecs.panelKw > 0 ? (totals.subtotal / systemSpecs.panelKw) : 0)}
+                  <small>/kWp</small>
+                </div>
+              </Col>
+            </Row>
+          </Card.Body>
+        </Card>
           </Col>
         </Row>
       </Container>
 
-      {/* Save Template Modal */}
-      <Modal show={showSaveTemplateModal} onHide={() => setShowSaveTemplateModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Save as System Template</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>Template Name</Form.Label>
-            <Form.Control
-              type="text"
-              value={newTemplateName}
-              onChange={e => setNewTemplateName(e.target.value)}
-              placeholder="e.g., 10kW Hybrid System"
-            />
-          </Form.Group>
-          <Form.Group>
-            <Form.Label>Description</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={3}
-              value={newTemplateDesc}
-              onChange={e => setNewTemplateDesc(e.target.value)}
-              placeholder="Describe this system template…"
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowSaveTemplateModal(false)} disabled={savingComponents}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={saveAsTemplate}
-            disabled={savingComponents || !newTemplateName.trim()}
-          >
-            {savingComponents ? (
-              <>
-                <Spinner as="span" animation="border" size="sm" className="me-2" />
-                Saving…
-              </>
-            ) : 'Save Template'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+
+
+      {/* Placeholder modal kept for future (e.g., save as template) */}
+      <Modal show={false} onHide={()=>{}}><div></div></Modal>
     </div>
   );
 }
 
-export default BillOfMaterials;
+
+
+// import React, { useState, useEffect, useMemo } from 'react';
+// import './BillOfMaterials.css';
+// import axios from 'axios';
+// import {
+//   Container, Row, Col, Card, Button, Form, Spinner,
+//   Alert, InputGroup, Badge, Table, ButtonGroup, Modal
+// } from 'react-bootstrap';
+// import { API_URL } from './apiConfig';
+// import { useNotification } from './NotificationContext';
+// import Fuse from 'fuse.js';
+
+// /* ---------- Category meta (display only) ---------- */
+// const CATEGORY_META = {
+//   // Main system components
+//   panel:                 { name: 'Panel',                        icon: 'bi-grid-3x3-gap-fill',     color: 'warning'  },
+//   inverter:              { name: 'Inverter',                     icon: 'bi-box-seam',              color: 'info'     },
+//   battery:               { name: 'Battery',                      icon: 'bi-battery-full',          color: 'success'  },
+//   mppt:                  { name: 'MPPT',                         icon: 'bi-arrow-down-up',         color: 'info'     },
+  
+//   // Components & protection
+//   protection:            { name: 'Protection',                   icon: 'bi-shield-slash-fill',     color: 'danger'   },
+//   inverter_aux:          { name: 'Inverter Aux',                 icon: 'bi-hdd-stack-fill',        color: 'secondary'},
+//   contactor:             { name: 'Contactor',                    icon: 'bi-lightning-charge-fill', color: 'danger'   },
+//   enclosure:             { name: 'Enclosure',                    icon: 'bi-box',                   color: 'secondary'},
+//   change_over_switch:    { name: 'Change Over Switch',           icon: 'bi-toggle-on',             color: 'secondary'},
+//   db:                    { name: 'DB',                           icon: 'bi-hdd-network',           color: 'secondary'},
+  
+//   // Cables & management
+//   cable:                 { name: 'Cable',                        icon: 'bi-lightning',             color: 'dark'     },
+//   cable_management:      { name: 'Cable Management',             icon: 'bi-bezier2',               color: 'dark'     },
+//   conductor:             { name: 'Conductor',                    icon: 'bi-plug-fill',             color: 'dark'     },
+  
+//   // Installation & mounting
+//   mounting_system:       { name: 'Mounting System',              icon: 'bi-bricks',                color: 'secondary'},
+  
+//   // Monitoring & accessories
+//   monitoring:            { name: 'Monitoring',                   icon: 'bi-graph-up',              color: 'primary'  },
+//   monitoring_control:    { name: 'Monitoring & Control Equipment', icon: 'bi-display',             color: 'primary'  },
+//   auxiliaries:           { name: 'Auxiliaries',                  icon: 'bi-tools',                 color: 'secondary'},
+  
+//   // Other equipment
+//   solar_geyser:          { name: 'Solar Geyser',                 icon: 'bi-water',                 color: 'info'     },
+//   lights:                { name: 'Lights',                       icon: 'bi-lightbulb',             color: 'warning'  },
+//   aux_generator:         { name: 'Aux Generator',                icon: 'bi-lightning-charge',      color: 'warning'  },
+//   vsd:                   { name: 'VSD',                          icon: 'bi-speedometer2',          color: 'info'     },
+  
+//   // Services & logistics
+//   professional_services: { name: 'Professional Services',        icon: 'bi-person-badge',          color: 'primary'  },
+//   transport_logistics:   { name: 'Transport & Logistics',        icon: 'bi-truck',                 color: 'dark'     },
+//   human_resources:       { name: 'Human Resources',              icon: 'bi-people',                color: 'primary'  },
+//   hseq_compliance:       { name: 'HSEQ & Compliance',            icon: 'bi-check-circle',          color: 'success'  },
+//   st:                    { name: 'S&T',                          icon: 'bi-clipboard-check',       color: 'secondary'},
+  
+//   // Fallbacks
+//   0:                     { name: 'Uncategorized',                icon: 'bi-question-circle',       color: 'secondary'},
+//   other:                 { name: 'Other',                        icon: 'bi-box',                   color: 'secondary'}
+// };
+
+// const CATEGORY_PRIORITY = ['panel', 'inverter', 'battery'];
+
+
+// /* ---------- Helpers ---------- */
+// const slugify = (s) =>
+//   (s || '')
+//     .toString()
+//     .toLowerCase()
+//     .replace(/&/g, ' and ')
+//     .replace(/[^\w\s]/g, '')
+//     .trim()
+//     .replace(/\s+/g, '_');
+
+// const formatCurrency = (value) => {
+//   const number = (value || 0).toFixed(2);
+//   const [integerPart, decimalPart] = number.split('.');
+
+//   const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+
+//   return `R${formattedInteger}.${decimalPart}`;
+// };
+
+
+
+// const formatNumber0 = (value) =>
+//   new Intl.NumberFormat('en-ZA', {
+//     minimumFractionDigits: 0,
+//     maximumFractionDigits: 0
+//   }).format(value || 0);
+
+// const toNumber = v => (v === null || v === undefined || v === '') ? 0 : Number(v);
+// const DEFAULT_MARGIN_DEC = 0.25;
+
+// // Helper function to check if a component is a core component that can only have margin edited
+// const isCoreComponent = (category) => ['panel', 'inverter', 'battery'].includes(category);
+
+// const normalizeMarginToDecimal = (m) => {
+//   const v = toNumber(m);
+//   if (!Number.isFinite(v) || v < 0) return DEFAULT_MARGIN_DEC;
+  
+//   // If value is small (likely 1%), use default margin instead
+//   if (v < 0.1) return DEFAULT_MARGIN_DEC;
+  
+//   // Otherwise handle as before
+//   return v <= 1 ? v : v / 100;
+// }
+
+// const computeUnitCost = (comp) => toNumber(comp.unit_cost_at_time ?? comp.product?.unit_cost);
+// const computeMarginPct = (product) => normalizeMarginToDecimal(product?.margin);
+
+// // effective margin for a BOM row: override -> product -> default (25%)
+// const getRowMarginDecimal = (row) => {
+//   if (row?.override_margin != null) return Number(row.override_margin);
+//   const prodM = computeMarginPct(row?.product);
+//   return Number.isFinite(prodM) && prodM >= 0 ? prodM : DEFAULT_MARGIN_DEC;
+// };
+
+// // Update to use the new computeUnitCost
+// const computeDerivedUnitFromRow = (row) => {
+//   const cost = computeUnitCost(row);
+//   const m = getRowMarginDecimal(row);
+//   if (Number.isFinite(cost) && Number.isFinite(m)) return cost * (1 + m);
+//   return toNumber(row?.product?.price);
+// };
+
+// // Draft = live; Locked = snapshot if present, else live
+// const getUnitPriceForRow = (row, isDraft) => 
+//   isDraft ? computeDerivedUnitFromRow(row) : (row.price_at_time ?? computeDerivedUnitFromRow(row));
+
+// /* ---------- Component ---------- */
+// function BillOfMaterials({ projectId, onNavigateToPrintBom, quoteContext }) {
+//   const { showNotification } = useNotification();
+
+//   // State
+//   const [loading, setLoading] = useState(true);
+//   const [products, setProducts] = useState([]); // normalized categories
+//   const [project, setProject] = useState(null);
+
+//   // BomItem: { product, quantity, price_at_time, current_price? }
+//   const [bomComponents, setBomComponents] = useState([]);
+//   const [isStandardDesign, setIsStandardDesign] = useState(false);
+//   const [templateInfo, setTemplateInfo] = useState(null);
+
+//   const [searchFilter, setSearchFilter] = useState('');
+//   const [selectedCategory, setSelectedCategory] = useState('all');
+
+//   const [savingComponents, setSavingComponents] = useState(false);
+//   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+//   const [newTemplateName, setNewTemplateName] = useState('');
+//   const [newTemplateDesc, setNewTemplateDesc] = useState('');
+
+//   const [extrasCost, setExtrasCost] = useState('0');
+//   const [quoteStatus, setQuoteStatus] = useState('draft'); // draft | sent | accepted | complete
+//   const [creatingQuote, setCreatingQuote] = useState(false);
+//   // Full System Mode (default) locks core components; Component Quote Mode allows editing/removal
+//   const [fullSystemMode, setFullSystemMode] = useState(() => {
+//     try {
+//       const v = sessionStorage.getItem('bomFullSystemMode');
+//       return v === null ? true : v === 'true';
+//     } catch { return true; }
+//   });
+//   const isCoreLocked = (category) => fullSystemMode && isCoreComponent(category);
+
+//   // State for margin editing (allows blank values during editing)
+//   const [editingMargins, setEditingMargins] = useState({});
+//   const [editingCosts, setEditingCosts] = useState({});
+
+//   /* ---------- Session persistence ---------- */
+//   const SESSION_KEY_COMPONENTS = useMemo(() => `bomSessionComponents_${projectId}`, [projectId]);
+//   const persistSessionComponents = useMemo(() => (list) => {
+//     try {
+//       const lightweight = list.map(c => ({
+//         product_id: c.product?.id,
+//         quantity: c.quantity,
+//         unit_cost_at_time: c.unit_cost_at_time,
+//         override_margin: c.override_margin
+//       }));
+//       sessionStorage.setItem(SESSION_KEY_COMPONENTS, JSON.stringify(lightweight));
+//     } catch {}
+//   }, [SESSION_KEY_COMPONENTS]);
+
+//   useEffect(() => { try { sessionStorage.setItem('bomFullSystemMode', String(fullSystemMode)); } catch {} }, [fullSystemMode]);
+
+//   /* ---------- Initial load ---------- */
+//   useEffect(() => {
+//     const fetchAll = async () => {
+//       setLoading(true);
+//       try {
+//         // products
+//         const productsRes = await axios.get(`${API_URL}/api/products`);
+//         const normalized = (productsRes.data || []).map(p => ({
+//           ...p,
+//           originalCategory: p.category, // Preserve original category name
+//           category: slugify(p.category)  // Keep slugified for CATEGORY_META key lookup
+//         }));
+//         setProducts(normalized);
+
+//         // project
+//         const projectRes = await axios.get(`${API_URL}/api/projects/${projectId}`);
+//         const proj = projectRes.data;
+//         setProject(proj);
+
+//         const std = !!proj?.template_id || !!proj?.from_standard_template || !!proj?.template_name;
+//         setIsStandardDesign(std);
+//         if (std) {
+//           setTemplateInfo({
+//             id: proj.template_id || null,
+//             name: proj.template_name || null
+//           });
+//         }
+
+//         // dispatch load in correct order
+//         await loadProjectBOM(projectId, normalized, proj);
+//         // Merge session-stored component edits (quantities/costs) after load
+//     setBomComponents(prev => {
+//           let merged = prev;
+//           try {
+//             const raw = sessionStorage.getItem(SESSION_KEY_COMPONENTS);
+//             if (raw) {
+//               const sessionRows = JSON.parse(raw) || [];
+//               const byId = Object.fromEntries(merged.map(c => [c.product.id, { ...c }]));
+//               sessionRows.forEach(r => {
+//                 const target = byId[r.product_id];
+//                 if (target) {
+//                   if (Number.isFinite(r.quantity) && r.quantity > 0) target.quantity = r.quantity;
+//                   if (r.unit_cost_at_time != null && r.unit_cost_at_time !== '') target.unit_cost_at_time = r.unit_cost_at_time;
+//                   if (r.override_margin != null && r.override_margin !== '') target.override_margin = r.override_margin;
+//                 }
+//               });
+//       merged = Object.values(byId);
+//       // Persist immediately so any normalization is reflected
+//       persistSessionComponents(merged);
+//             }
+//           } catch {}
+//           return merged;
+//         });
+//       } catch (err) {
+//         console.error('Init load error:', err);
+//         showNotification('Failed to load project or products', 'danger');
+//       } finally {
+//         setLoading(false);
+//       }
+//     };
+//     fetchAll();
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
+//   }, [projectId, SESSION_KEY_COMPONENTS]);
+
+//   // Clear editing margins when BOM components change (e.g., on load)
+//   useEffect(() => {
+//     setEditingMargins({});
+//     setEditingCosts({});
+//   }, [bomComponents.length]); // Only trigger when the number of components changes
+
+//   // Set quote status when loaded from a quote
+//   useEffect(() => {
+//     if (quoteContext?.docId) {
+//       setQuoteStatus('draft'); // Set to draft when editing from quote
+//     }
+//   }, [quoteContext]);
+
+//   // Auto-save BOM when design modifications are detected for standard designs
+//   useEffect(() => {
+//     const autoSaveBOM = async () => {
+//       if (!isStandardDesign || !bomComponents.length) return;
+      
+//       const designModified = sessionStorage.getItem(`systemDesignModified_${projectId}`) === 'true';
+//       if (designModified) {
+//         try {
+//           // Auto-save the current BOM state to preserve design changes
+//           const parsedExtras = parseFloat(extrasCost || '0') || 0;
+//           const isDraft = (quoteStatus === 'draft');
+
+//           const components = bomComponents.map(c => {
+//             const liveUnit = computeDerivedUnitFromRow(c);
+//             const liveCost = computeUnitCost(c);
+//             return {
+//               product_id: c.product.id,
+//               quantity: Math.max(1, Number(c.quantity) || 1),
+//               override_margin: c.override_margin ?? null,
+//               price_at_time: isDraft ? null : (c.price_at_time ?? liveUnit),
+//               unit_cost_at_time: isDraft ? null : (c.unit_cost_at_time ?? liveCost)
+//             };
+//           });
+
+//           await axios.post(`${API_URL}/api/projects/${projectId}/bom`, {
+//             project_id: projectId,
+//             components,
+//             extras_cost: parsedExtras,
+//             quote_status: quoteStatus,
+//             from_standard_template: !!isStandardDesign,
+//             template_id: templateInfo?.id || null,
+//             template_name: templateInfo?.name || null
+//           });
+
+//           console.log('Auto-saved BOM with design modifications');
+//         } catch (err) {
+//           console.warn('Auto-save BOM failed:', err);
+//         }
+//       }
+//     };
+
+//     // Only auto-save after initial load is complete
+//     if (!loading && bomComponents.length > 0) {
+//       autoSaveBOM();
+//     }
+//   }, [bomComponents, isStandardDesign, projectId, extrasCost, quoteStatus, templateInfo, loading]);
+
+//   // Fuse instance for fuzzy search
+//   const fuse = useMemo(() => {
+//     const options = {
+//       keys: [
+//         'brand',
+//         'model',
+//         'category',
+//         {
+//           name: 'categoryName',
+//           getFn: (product) => CATEGORY_META[product.category]?.name || product.originalCategory || product.category
+//         },
+//         'power_w',
+//         'rating_kva',
+//         'capacity_kwh'
+//       ],
+//       threshold: 0.4, // Lower means more strict matching
+//       ignoreLocation: true,
+//       useExtendedSearch: true
+//     };
+
+//     const records = products.map(p => ({
+//       ...p,
+//       categoryName: CATEGORY_META[p.category]?.name || p.originalCategory || p.category
+//     }));
+
+//     return new Fuse(records, options);
+//   }, [products]);  
+
+//   const createQuote = async () => {
+//     if (!bomComponents.length) return showNotification('Add items to the BOM first.', 'warning');
+//     setCreatingQuote(true);
+//     try {
+//       // ensure the latest BOM is persisted before locking
+//       await saveBOM();
+//       const res = await axios.post(`${API_URL}/api/projects/${projectId}/quotes`, {
+//         tz: 'Africa/Johannesburg'
+//       });
+//   const { document } = res.data || {};
+//       const docId = document?.id;
+//       showNotification(`Quote created successfully!`, 'success');
+
+//       // Navigate to quote details
+//       if (docId) {
+//         window.location.href = `/projects/${projectId}/quotes/${docId}`;
+//       }
+//     } catch (e) {
+//       console.error(e);
+//       showNotification('Failed to create quote.', 'danger');
+//     } finally {
+//       setCreatingQuote(false);
+//     }
+//   };
+
+
+//   /* ---------- Template fetch helpers (by id OR by name) ------------ */
+//   const fetchTemplateById = async (id) => {
+//     if (!id) return null;
+//     try {
+//       const res = await axios.get(`${API_URL}/api/system_templates/${id}`);
+//       return res.data || null;
+//     } catch (e) {
+//       console.warn('fetchTemplateById failed:', e);
+//       return null;
+//     }
+//   };
+
+//   const fetchTemplateByName = async (name) => {
+//     if (!name) return null;
+//     try {
+//       const res = await axios.get(`${API_URL}/api/system_templates`);
+//       const list = res.data || [];
+//       const match = list.find(t => (t.name || '').toLowerCase().trim() === name.toLowerCase().trim());
+//       if (!match) return null;
+//       return await fetchTemplateById(match.id);
+//     } catch (e) {
+//       console.warn('fetchTemplateByName failed:', e);
+//       return null;
+//     }
+//   };
+
+//   const mapTemplateToItems = (template, productsData) => {
+//     const comps = (template?.components || []).map(c => {
+//       const prod = productsData.find(p => p.id === c.product_id);
+//       if (!prod) return null;
+//       return {
+//         product: prod,
+//         quantity: Number(c.quantity) || 1,
+//         price_at_time: null,
+//         current_price: computeDerivedUnitFromRow({ product: prod }),
+//         override_margin: null  // Templates start with no margin override
+//       };
+//     }).filter(Boolean);
+//     return comps;
+//   };
+
+// // Overlay panel/inverter/battery changes from systemDesign onto a full template
+// const overlayFromProject = (items, projectData, productsData) => {
+//   let result = [...items];
+
+//   // Panels
+//   if (projectData.panel_id) {
+//     const prod = productsData.find(p => p.id === projectData.panel_id);
+//     if (prod) {
+//       // Find existing panel component to preserve margin override
+//       const existingPanel = result.find(x => x.product?.category === 'panel' && x.product?.id === projectData.panel_id);
+//       result = result.filter(x => x.product?.category !== 'panel');
+//       // Use stored num_panels directly instead of calculating to avoid rounding issues
+//       const qty = projectData.num_panels || 1;
+//       result.push({ 
+//         product: prod, 
+//         quantity: qty, 
+//         price_at_time: null, 
+//         current_price: computeDerivedUnitFromRow({ product: prod }),
+//         override_margin: existingPanel?.override_margin || null  // Preserve margin override
+//       });
+//     }
+//   }
+
+//   // Inverters
+//   if (projectData.inverter_ids?.length) {
+//     // Collect existing inverter margins before filtering
+//     const existingInverters = result.filter(x => x.product?.category === 'inverter');
+//     result = result.filter(x => x.product?.category !== 'inverter');
+//     const qty = Number(projectData.inverter_kva?.quantity) || 1;
+//     projectData.inverter_ids.forEach((id, idx) => {
+//       const prod = productsData.find(p => p.id === id);
+//       if (prod) {
+//         // Find existing margin for this specific inverter
+//         const existingInverter = existingInverters.find(x => x.product?.id === id);
+//         result.push({
+//           product: prod,
+//           quantity: idx === 0 ? qty : 1,
+//           price_at_time: null,
+//           current_price: computeDerivedUnitFromRow({ product: prod }),
+//           override_margin: existingInverter?.override_margin || null  // Preserve margin override
+//         });
+//       }
+//     });
+//   }
+
+//   // Batteries
+//   result = result.filter(x => x.product?.category !== 'battery');
+//   if (projectData.battery_ids?.length) {
+//     // Collect existing battery margins before filtering
+//     const existingBatteries = items.filter(x => x.product?.category === 'battery');
+//     const qty = Number(projectData.battery_kwh?.quantity) || 1;
+//     projectData.battery_ids.forEach((id, idx) => {
+//       const prod = productsData.find(p => p.id === id);
+//       if (prod) {
+//         const existingBattery = existingBatteries.find(x => x.product?.id === id);
+//         result.push({
+//           product: prod,
+//           quantity: idx === 0 ? qty : 1,
+//           price_at_time: null,
+//           current_price: computeDerivedUnitFromRow({ product: prod }),
+//           override_margin: existingBattery?.override_margin || null  // Preserve margin override
+//         });
+//       }
+//     });
+//   }
+
+//   return result;
+// };
+
+// // Removed unused helper getBrandModelCategory
+
+//   /* ---------- NEW HYBRID BOM LOADER ---------- */
+// const loadProjectBOM = async (pid, productsData, projectData) => {
+//   console.log('Loading BOM with hybrid approach. Project data:', {
+//     bom_modified: projectData?.bom_modified,
+//     template_id: projectData?.template_id,
+//     template_name: projectData?.template_name
+//   });
+
+//   let finalComponents = [];
+
+//   try {
+//     // Step 1: Determine BOM source strategy
+//     const hasBOMInDatabase = projectData?.bom_modified === true;
+//     const hasTemplate = projectData?.template_id || projectData?.template_name;
+
+//     if (hasBOMInDatabase) {
+//       // USER HAS MODIFIED BOM: Load from database + overlay core components
+//       console.log('Loading from database (user has modified BOM)');
+      
+//       try {
+//         const bomRes = await axios.get(`${API_URL}/api/projects/${pid}/bom`);
+//         const savedComponents = bomRes.data || [];
+        
+//         if (savedComponents.length > 0) {
+//           // Load saved BOM components
+//           finalComponents = savedComponents.map(saved => {
+//             const product = productsData.find(p => p.id === saved.product_id);
+//             return {
+//               product,
+//               quantity: saved.quantity,
+//               price_at_time: saved.price_at_time,
+//               current_price: saved.current_price,
+//               override_margin: saved.override_margin,
+//               unit_cost_at_time: saved.unit_cost_at_time ?? null
+//             };
+//           }).filter(item => item.product); // Remove any with missing products
+
+//           // Set metadata
+//           const meta = savedComponents.find(x => x.quote_status || x.extras_cost);
+//           if (meta?.quote_status) setQuoteStatus(meta.quote_status);
+//           if (meta?.extras_cost !== undefined) setExtrasCost(String(meta.extras_cost));
+//         }
+//       } catch (e) {
+//         console.warn('Failed to load saved BOM:', e);
+//       }
+
+//       // Overlay core components from SystemDesign
+//       finalComponents = overlayFromProject(finalComponents, projectData, productsData);
+
+//     } else if (hasTemplate) {
+//       // FRESH TEMPLATE: Load template + overlay core components
+//       console.log('Loading from template (fresh/unmodified)');
+      
+//       try {
+//         let tmpl = null;
+//         if (projectData.template_id) tmpl = await fetchTemplateById(projectData.template_id);
+//         if (!tmpl && projectData.template_name) tmpl = await fetchTemplateByName(projectData.template_name);
+        
+//         if (tmpl) {
+//           // Load template components
+//           finalComponents = mapTemplateToItems(tmpl, productsData);
+          
+//           // Set template metadata
+//           if (tmpl.extras_cost !== undefined && tmpl.extras_cost !== null) {
+//             setExtrasCost(String(tmpl.extras_cost));
+//           }
+          
+//           // Overlay core components from SystemDesign
+//           finalComponents = overlayFromProject(finalComponents, projectData, productsData);
+//         }
+//       } catch (e) {
+//         console.warn('Template fetch failed:', e);
+//       }
+//     } else {
+//       // NO TEMPLATE: Only core components from SystemDesign
+//       console.log('Loading core components only (no template)');
+//       finalComponents = overlayFromProject([], projectData, productsData);
+//     }
+
+//     // Set the final components
+//     setBomComponents(finalComponents);
+//     console.log('Final BOM components:', finalComponents);
+//     console.log('BomComponents: ', bomComponents);
+
+//   } catch (err) {
+//     console.error('BOM loading failed:', err);
+//     showNotification('Failed to load Bill of Materials', 'danger');
+//   }
+// };
+
+//   /* ---------- Overlay helpers ---------- */
+//   // Removed unused initializeFromSystemDesign helper
+
+//   /* ---------- Item ops ---------- */
+//   const addComponent = (product) => {
+//     const existing = bomComponents.find(c => c.product.id === product.id);
+//     if (existing) {
+//       updateQuantity(product.id, existing.quantity + 1);
+//       return;
+//     }
+//     const addedList = [
+//       ...bomComponents,
+//       {
+//         product,
+//         quantity: 1,
+//         price_at_time: null,
+//         current_price: computeDerivedUnitFromRow({ product }),
+//         override_margin: null,  // New components start with no margin override
+//         unit_cost_at_time: null,
+//       }
+//     ];
+//     setBomComponents(addedList);
+//     persistSessionComponents(addedList);
+//   };
+
+//   const removeComponent = (productId) => {
+//     // Check if this is a core component that shouldn't be removed
+//     const componentToRemove = bomComponents.find(c => c.product.id === productId);
+//   if (componentToRemove && isCoreLocked(componentToRemove.product.category)) {
+//       showNotification('Core components (Panels, Inverters, Batteries) can only be modified in System Design', 'warning');
+//       return;
+//     }
+//   const remaining = bomComponents.filter(c => c.product.id !== productId);
+//   setBomComponents(remaining);
+//   persistSessionComponents(remaining);
+//   };
+
+//   const updateQuantity = (productId, quantity) => {
+//     // Check if this is a core component that shouldn't have quantity changed
+//     const componentToUpdate = bomComponents.find(c => c.product.id === productId);
+//   if (componentToUpdate && isCoreLocked(componentToUpdate.product.category)) {
+//       showNotification('Core component quantities can only be modified in System Design', 'warning');
+//       return;
+//     }
+//     // Allow empty string for better UX, but store the actual value
+//     const updated = bomComponents.map(c =>
+//       c.product.id === productId ? { ...c, quantity: quantity } : c
+//     );
+//     setBomComponents(updated);
+//     persistSessionComponents(updated);
+//   };
+
+//   const handleQuantityBlur = (productId, quantity) => {
+//     // Check if this is a core component that shouldn't have quantity changed
+//     const componentToUpdate = bomComponents.find(c => c.product.id === productId);
+//   if (componentToUpdate && isCoreLocked(componentToUpdate.product.category)) {
+//       return; // Don't process blur for core components
+//     }
+//     // When field loses focus, ensure we have a valid number
+//     const q = Math.max(1, parseInt(quantity || 1, 10));
+//     const normalizedList = bomComponents.map(c =>
+//       c.product.id === productId ? { ...c, quantity: q } : c
+//     );
+//     setBomComponents(normalizedList);
+//     persistSessionComponents(normalizedList);
+//   };
+
+//   // Helper function to get the display value for margin input
+//   const getMarginDisplayValue = (comp) => {
+//     const productId = comp.product.id;
+//     // If we're editing this margin, show the editing value
+//     if (editingMargins.hasOwnProperty(productId)) {
+//       return editingMargins[productId];
+//     }
+//     // Otherwise show the actual margin converted to percentage
+//     return Math.round(getRowMarginDecimal(comp) * 100);
+//   };
+
+//   const updateMargin = (productId, marginPct) => {
+//     // Store the raw input value to allow empty strings during editing
+//     setEditingMargins(prev => ({
+//       ...prev,
+//       [productId]: marginPct
+//     }));
+//   };
+
+//   const handleMarginBlur = (productId, marginPct) => {
+//     // When field loses focus, ensure we have a valid margin or use default
+//     const numValue = Number(marginPct);
+//     let finalMargin = null; // null means use default 25%
+    
+//     if (marginPct !== '' && !isNaN(numValue) && numValue >= 0) {
+//       // Valid number entered, convert to decimal
+//       finalMargin = Math.max(0, numValue / 100);
+//     }
+    
+//     // Update the component with the final margin value
+//     const marginUpdated = bomComponents.map(c => 
+//       c.product.id === productId ? { ...c, override_margin: finalMargin } : c
+//     );
+//     setBomComponents(marginUpdated);
+//     persistSessionComponents(marginUpdated);
+    
+//     // Clear the editing state
+//     setEditingMargins(prev => {
+//       const newState = { ...prev };
+//       delete newState[productId];
+//       return newState;
+//     });
+//   };
+
+//   // Helper to get display value for cost input
+//   const getCostDisplayValue = (comp) => {
+//     const productId = comp.product.id;
+//     // If editing show temp value
+//     if (editingCosts.hasOwnProperty(productId)) {
+//       return editingCosts[productId];
+//     }
+//     // Otherwise show the actual cost
+//     return computeUnitCost(comp).toFixed(2);
+//   };
+
+//   const updateCost = (productId, cost) => {
+//     // store the raw input for UX (allow empty during edit)
+//     setEditingCosts(prev => ({
+//       ...prev,
+//       [productId]: cost
+//     }));
+//   };
+
+//   const handleCostBlur = (productId, cost) => {
+//     // on blur, validate and commit override
+//     const numValue = Number(cost);
+//     let finalCost = null; // null = use product.unit_cost
+
+//     if (cost !== '' && !isNaN(numValue) && numValue >= 0) {
+//       finalCost = numValue;
+//     }
+
+//     // Update bomComponents with override (null if invalid or empty)
+//     const costUpdated = bomComponents.map(c => 
+//       c.product.id === productId ? { ...c, unit_cost_at_time: finalCost } : c
+//     );
+//     setBomComponents(costUpdated);
+//     persistSessionComponents(costUpdated);
+
+//     // Clear temp state
+//     setEditingCosts(prev => {
+//       const newState = { ...prev };
+//       delete newState[productId];
+//       return newState;
+//     });
+//   };
+
+
+//   /* ---------- Save BOM ---------- */
+//   const saveBOM = async () => {
+//     try {
+//       setSavingComponents(true);
+
+//       const parsedExtras = parseFloat(extrasCost || '0') || 0;
+//       const isDraft = (quoteStatus === 'draft');
+
+//       const components = (Array.isArray(bomComponents) ? bomComponents : []).map(c => {
+//         const liveUnit = computeDerivedUnitFromRow(c);
+//         const liveCost = computeUnitCost(c);
+//         return {
+//           product_id: c.product.id,
+//           quantity: Math.max(1, Number(c.quantity) || 1),
+//           override_margin: c.override_margin ?? null,
+//           price_at_time: isDraft ? null : (c.price_at_time ?? liveUnit),
+//           unit_cost_at_time: c.unit_cost_at_time ?? liveCost  // Always save custom costs, even in draft
+//         };
+//       });
+
+//       await axios.post(`${API_URL}/api/projects/${projectId}/bom`, {
+//         project_id: projectId,
+//         components,
+//         extras_cost: parsedExtras,
+//         quote_status: quoteStatus,
+//         from_standard_template: !!isStandardDesign,
+//         template_id: templateInfo?.id || null,
+//         template_name: templateInfo?.name || null
+//       });
+
+//       // Totals reflect what user sees: draft => live, locked => snapshot
+//       const total = (Array.isArray(bomComponents) ? bomComponents: []).reduce((sum, c) => {
+//         const unit = getUnitPriceForRow(c, isDraft);
+//         return sum + unit * (Number(c.quantity) || 0);
+//       }, parsedExtras);
+
+//       await axios.put(`${API_URL}/api/projects/${projectId}`, {
+//         project_value_excl_vat: total
+//       });
+
+//       // Clear modified flag
+//       sessionStorage.removeItem(`systemDesignModified_${projectId}`);
+//       showNotification('Bill of Materials saved', 'success');
+
+//     } catch (err) {
+//       console.error('Save BOM error:', err);
+//       showNotification('Failed to save Bill of Materials', 'danger');
+//     } finally {
+//       setSavingComponents(false);
+//     }
+//   };
+
+//   const [savingVersion, setSavingVersion] = useState(false);
+
+//   const saveAsNewVersionToQuote = async () => {
+//     if (!quoteContext?.docId) return;
+//     try {
+//       setSavingVersion(true);
+//       // 1) Make sure latest edits are persisted to the workbench
+//       await saveBOM();
+//       //2) Snapshot BOM into a new version for this quote
+//       await axios.post(`${API_URL}/api/quotes/${quoteContext.docId}/versions`, {});
+//       showNotification(`Saved as new version for ${quoteContext.number || `quote #${quoteContext.docId}`}`, 'success');
+//     } catch (e) {
+//       console.error(e);
+//       showNotification('Failed to create new quote version.', 'danger');
+//     } finally {
+//       setSavingVersion(false);
+//     }
+//   };
+
+//   /* ---------- Save as Template ---------- */
+//   const saveAsTemplate = async () => {
+//     try {
+//       setSavingComponents(true);
+//       const payload = {
+//         name: newTemplateName.trim(),
+//         description: newTemplateDesc.trim(),
+//         extras_cost: parseFloat(extrasCost || '0') || 0,
+//         components: bomComponents.map(c => ({
+//           product_id: c.product.id,
+//           quantity: c.quantity
+//         }))
+//       };
+//       await axios.post(`${API_URL}/api/system_templates`, payload);
+
+//       setShowSaveTemplateModal(false);
+//       setNewTemplateName('');
+//       setNewTemplateDesc('');
+//       showNotification('Template saved', 'success');
+//     } catch (err) {
+//       console.error('Save template error:', err);
+//       showNotification('Failed to save template', 'danger');
+//     } finally {
+//       setSavingComponents(false);
+//     }
+//   };
+
+//   /* ---------- Derived ---------- */
+//   const filteredProducts = useMemo(() => {
+//     // First filter by category if needed
+//     let results = products;
+//     if (selectedCategory !== 'all') {
+//       results = products.filter(p => p.category === selectedCategory);
+//     }
+    
+//     // If there's no search text, return category-filtered results
+//     if (!searchFilter.trim()) {
+//       return results;
+//     }
+    
+//     // Otherwise, perform fuzzy search
+//     // If category filter applied, search within that subset
+//     const searchOn = selectedCategory !== 'all' ? 
+//       new Fuse(results, fuse.options) : fuse;
+      
+//     return searchOn.search(searchFilter)
+//       .map(result => result.item);
+      
+//   }, [products, searchFilter, selectedCategory, fuse]);
+
+//   const grouped = useMemo(() => {
+//     const g = {};
+//     const list = Array.isArray(bomComponents) ? bomComponents : [];
+//     list.forEach(c => {
+//       const cat = c.product.category || 'other';
+//       if (!g[cat]) g[cat] = [];
+//       g[cat].push(c);
+//     });
+//     return g;
+//   }, [bomComponents]);
+
+//   // Add this new useMemo to create a sorted categories array
+//   const sortedCategories = useMemo(() => {
+//     // Get all categories from grouped
+//     const allCategories = Object.keys(grouped);
+    
+//     // Sort categories with priority items first, then alphabetically by display name
+//     return allCategories.sort((a, b) => {
+//       // Priority items at the top in specified order
+//       const aIndex = CATEGORY_PRIORITY.indexOf(a);
+//       const bIndex = CATEGORY_PRIORITY.indexOf(b);
+      
+//       // If both are priority items, sort by priority order
+//       if (aIndex >= 0 && bIndex >= 0) {
+//         return aIndex - bIndex;
+//       }
+      
+//       // If only a is priority, it comes first
+//       if (aIndex >= 0) return -1;
+      
+//       // If only b is priority, it comes first
+//       if (bIndex >= 0) return 1;
+      
+//       // For non-priority items, sort alphabetically by display name
+//       const aName = CATEGORY_META[a]?.name || a;
+//       const bName = CATEGORY_META[b]?.name || b;
+//       return aName.localeCompare(bName);
+//     });
+//   }, [grouped]);
+
+//   const hasPriceChanges = useMemo(() => {
+//     if (quoteStatus === 'draft') return false;
+//     return (Array.isArray(bomComponents) ? bomComponents : []).some(c => 
+//       c.price_at_time !== undefined &&
+//       c.price_at_time !== null &&
+//       computeDerivedUnitFromRow(c) !== c.price_at_time
+//     );
+//   }, [bomComponents, quoteStatus]);
+
+//   const systemSpecs = useMemo(() => {
+//     let panelW = 0, inverterKva = 0, batteryKwh = 0;
+//     const list = Array.isArray(bomComponents) ? bomComponents : [];
+//     list.forEach(c => {
+//       const cat = c.product.category;
+//       if (cat === 'panel' && c.product.power_w) {
+//         panelW += (Number(c.product.power_w) || 0) * (Number(c.quantity) || 0);
+//       } else if (cat === 'inverter' && c.product.rating_kva) {
+//         inverterKva += (Number(c.product.rating_kva) || 0) * (Number(c.quantity) || 0);
+//       } else if (cat === 'battery' && c.product.capacity_kwh) {
+//         batteryKwh += (Number(c.product.capacity_kwh) || 0) * (Number(c.quantity) || 0);
+//       }
+//     });
+//     return {
+//       panelKw: (panelW / 1000).toFixed(2),
+//       inverterKva: inverterKva.toFixed(2),
+//       batteryKwh: batteryKwh.toFixed(2)
+//     };
+//   }, [bomComponents]);
+
+//   const totals = useMemo(() => {
+//     const isDraft = (quoteStatus === 'draft');
+//     const list = Array.isArray(bomComponents) ? bomComponents : [];
+    
+//     // Calculate selling price total
+//     const total_ex_vat = list.reduce((sum, c) => {
+//       const unit = getUnitPriceForRow(c, isDraft);
+//       return sum + unit * (Number(c.quantity) || 0);
+//     }, 0);
+    
+//     // Calculate cost price total
+//     const total_cost = list.reduce((sum, c) => {
+//       const costPrice = computeUnitCost(c);
+//       return sum + costPrice * (Number(c.quantity) || 0);
+//     }, 0);
+    
+//     // Calculate total markup
+//     const total_markup = total_ex_vat - total_cost;
+    
+//     const vat_perc = 15;
+//     const vat_price = total_ex_vat * (vat_perc / 100);
+//     const total_in_vat = total_ex_vat * (1 + vat_perc / 100);
+    
+//     return { 
+//       total_excl_vat: total_ex_vat, 
+//       total_cost: total_cost,
+//       total_markup: total_markup,
+//       vat_perc: vat_perc, 
+//       vat_price: vat_price, 
+//       total_incl_vat: total_in_vat 
+//     };
+//   }, [bomComponents, quoteStatus]);
+
+//   // Calculate total selling price per category
+//   const categoryTotals = useMemo(() => {
+//     const isDraft = (quoteStatus === 'draft');
+//     const totals = {};
+    
+//     Object.keys(grouped).forEach(cat => {
+//       totals[cat] = grouped[cat].reduce((sum, c) => {
+//         const unit = getUnitPriceForRow(c, isDraft);
+//         return sum + unit * (Number(c.quantity) || 0);
+//       }, 0);
+//     });
+    
+//     return totals;
+//   }, [grouped, quoteStatus]);
+
+
+//   /* ---------- UI ---------- */
+//   if (loading) {
+//     return (
+//       <div className="text-center py-5">
+//         <Spinner animation="border" />
+//         <div className="mt-2">Loading bill of materials…</div>
+//       </div>
+//     );
+//   }
+
+  
+//   // Helper function to calculate totals for any component list
+//   // Removed unused calculateTotalsForComponents helper
+
+//   return (
+//     <div>
+//       <Container fluid>
+//         <Row className="mb-3">
+//           <Col>
+//             <div className="bom-toolbar-wrapper d-flex flex-column flex-xl-row gap-3 align-items-stretch align-items-xl-center justify-content-between">
+//               <div className="bom-heading flex-grow-1">
+//                 <h4 className="mb-1 d-flex align-items-center fw-semibold">
+//                   <i className="bi bi-basket3 me-2 text-primary" />
+//                   Bill of Materials
+//                 </h4>
+//                 <div className="small text-muted d-flex flex-wrap align-items-center gap-2">
+//                   <span>Project: <strong>{project?.name}</strong></span>
+//                   {isStandardDesign && (
+//                     <Badge bg="secondary" className="rounded-pill px-2 py-1">
+//                       Standard: {templateInfo?.name || 'Template'}
+//                     </Badge>
+//                   )}
+//                 </div>
+//               </div>
+//               <div className="bom-toolbar d-flex flex-wrap align-items-center gap-2">
+//                 {/* 1. Mode Switch */}
+//                 <div className="mode-switch card shadow-sm border-0 px-3 py-2 d-flex align-items-center">
+//                   <Form.Check
+//                     type="switch"
+//                     id="bom-mode-switch"
+//                     label={fullSystemMode ? 'Full System Mode' : 'Component Quote Mode'}
+//                     checked={fullSystemMode}
+//                     onChange={() => setFullSystemMode(v => !v)}
+//                   />
+//                 </div>
+
+//                 {/* 2. Template Button */}
+//                 <Button
+//                   variant="outline-secondary"
+//                   className="bom-btn shadow-sm bom-template-btn"
+//                   onClick={() => setShowSaveTemplateModal(true)}
+//                   disabled={!bomComponents.length || savingComponents}
+//                 >
+//                   <i className="bi bi-save me-1" />
+//                   Save Template
+//                 </Button>
+
+//                 {/* 3. Save BOM */}
+//                 <Button
+//                   variant="success"
+//                   className="bom-btn shadow-sm"
+//                   onClick={saveBOM}
+//                   disabled={savingComponents}
+//                 >
+//                   {savingComponents ? (
+//                     <>
+//                       <Spinner size="sm" as="span" animation="border" className="me-2" />
+//                       Saving…
+//                     </>
+//                   ) : (
+//                     <>
+//                       <i className="bi bi-check2-circle me-1" />
+//                       Save BOM
+//                     </>
+//                   )}
+//                 </Button>
+
+//                 {/* 4. Generate Quote (primary CTA) */}
+//                 {!quoteContext?.docId && (
+//                   <Button
+//                     variant="primary"
+//                     className="bom-btn shadow-sm bom-generate-btn"
+//                     onClick={createQuote}
+//                     disabled={creatingQuote || savingComponents || !bomComponents.length}
+//                   >
+//                     <i className="bi bi-file-earmark-plus me-1" />
+//                     {creatingQuote ? 'Generating…' : 'Generate Quote'}
+//                   </Button>
+//                 )}
+//               </div>
+//             </div>
+//           </Col>
+//         </Row>
+
+//         {hasPriceChanges && (
+//           <Alert variant="warning" className="py-2">
+//             <i className="bi bi-exclamation-triangle me-2" />
+//             Some items have price changes since the BOM was last saved. The saved “unit price” will be respected on export unless you update it.
+//           </Alert>
+//         )}
+
+//         <Row>
+//           <Col>
+//             {quoteContext?.docId && (
+//               <Alert variant="info" className="d-flex justify-content-between align-items-center">
+//                 <div>
+//                   Editing <b>{quoteContext.number || `quote #${quoteContext.docId}`}</b>
+//                   {quoteContext.fromVersion ? <> (loaded from v{quoteContext.fromVersion})</> : null}. 
+//                   Changes here are drafts until you “Save as New Version”.
+//                 </div>
+//                 <div>
+//                   <Button
+//                     variant="primary"
+//                     size="sm"
+//                     onClick={saveAsNewVersionToQuote}
+//                     disabled={savingVersion}
+//                   >
+//                     {savingVersion ? 'Saving…' : 'Save as New Version'}
+//                   </Button>
+//                 </div>
+//               </Alert>
+//             )}
+//           </Col>
+//         </Row>
+
+//         <Row>
+//           {/* Left: Product browser - Changed from lg={7} to lg={6} */}
+//           <Col lg={6}>
+//             <div style={{ 
+//               position: 'sticky', 
+//               top: 'max(20px, calc(50vh - 40vh))', 
+//               zIndex: 1000,
+//               maxHeight: '80vh',
+//               overflow: 'visible'
+//             }}>
+//             <Card className="shadow-sm mb-4">
+//               <Card.Header as="h5" className="py-2">
+//                 <i className="bi bi-list-ul me-2" />
+//                 Add Components
+//               </Card.Header>
+//               <Card.Body className="p-2">
+//                 <Row className="mb-2">
+//                   <Col md={6}>
+//                     <InputGroup size="sm">
+//                       <InputGroup.Text className="py-0">
+//                         <i className="bi bi-search" />
+//                       </InputGroup.Text>
+//                       <Form.Control
+//                         size="sm"
+//                         placeholder="Search products…"
+//                         value={searchFilter}
+//                         onChange={e => setSearchFilter(e.target.value)}
+//                       />
+//                     </InputGroup>
+//                   </Col>
+//                   <Col md={6}>
+//                     <Form.Select
+//                       size="sm"
+//                       value={selectedCategory}
+//                       onChange={e => setSelectedCategory(e.target.value)}
+//                     >
+//                       <option value="all">All categories</option>
+//                       {Object.keys(CATEGORY_META).map(k => (
+//                         <option key={k} value={k}>{CATEGORY_META[k].name}</option>
+//                       ))}
+//                     </Form.Select>
+//                   </Col>
+//                 </Row>
+
+//                 <div className="table-responsive" style={{ maxHeight: 400, overflowY: 'auto' }}>
+//                   <Table hover size="sm" className="align-middle small">
+//                     <thead className="table-light">
+//                       <tr>
+//                         <th>Product</th>
+//                         <th>Specs</th>
+//                         <th className="text-end">Price</th>
+//                         <th className="text-center" style={{ width: 100 }}>Add</th>
+//                       </tr>
+//                     </thead>
+//                     <tbody>
+//                       {filteredProducts.map(product => {
+//                         const existing = bomComponents.find(c => c.product.id === product.id);
+//                         return (
+//                           <tr key={product.id}>
+//                             <td>
+//                               <div className="fw-medium small">{product.brand} {product.model}</div>
+//                               <div className="text-muted" style={{fontSize: '0.75rem'}}>{CATEGORY_META[product.category]?.name || product.originalCategory || product.category}</div>
+//                             </td>
+//                             <td>
+//                               {product.category === 'panel' && product.power_w && (
+//                                 <Badge bg="warning" text="dark" className="small">{formatNumber0(product.power_w)}W</Badge>
+//                               )}{' '}
+//                               {product.category === 'inverter' && product.rating_kva && (
+//                                 <Badge bg="info" className="small">{product.rating_kva}kVA</Badge>
+//                               )}{' '}
+//                               {product.category === 'battery' && product.capacity_kwh && (
+//                                 <Badge bg="success" className="small">{product.capacity_kwh}kWh</Badge>
+//                               )}
+//                             </td>
+//                             <td className="text-end small">{formatCurrency(product.price || 0)}</td>
+//                             <td className="text-center">
+//                               {existing ? (
+//                                 <ButtonGroup size="sm">
+//                                   <Button 
+//                                     variant="outline-secondary" 
+//                                     size="sm" 
+//                                     className="py-0 px-1" 
+//                                     onClick={() => updateQuantity(product.id, Math.max(1, Number(existing.quantity) - 1))}
+//                                     disabled={isCoreLocked(product.category)}
+//                                     title={isCoreLocked(product.category) ? "Core component quantities can only be changed in System Design" : "Decrease quantity"}
+//                                   >-</Button>
+//                                   <Button variant="outline-secondary" size="sm" className="py-0 px-1" disabled>{Number(existing.quantity) || 1}</Button>
+//                                   <Button 
+//                                     variant="outline-secondary" 
+//                                     size="sm" 
+//                                     className="py-0 px-1" 
+//                                     onClick={() => updateQuantity(product.id, Number(existing.quantity) + 1)}
+//                                     disabled={isCoreLocked(product.category)}
+//                                     title={isCoreLocked(product.category) ? "Core component quantities can only be changed in System Design" : "Increase quantity"}
+//                                   >+</Button>
+//                                 </ButtonGroup>
+//                               ) : (
+//                                 <Button variant="outline-primary" size="sm" className="py-0" onClick={() => addComponent(product)}>
+//                                   <i className="bi bi-plus-lg" /> Add
+//                                 </Button>
+//                               )}
+//                             </td>
+//                           </tr>
+//                         );
+//                       })}
+//                       {filteredProducts.length === 0 && (
+//                         <tr>
+//                           <td colSpan="4" className="text-center text-muted">No products match your search.</td>
+//                         </tr>
+//                       )}
+//                     </tbody>
+//                   </Table>
+//                 </div>
+//               </Card.Body>
+//             </Card>
+//             </div>
+//           </Col>
+
+//           {/* Right: BOM + specs - Changed from lg={5} to lg={6} */}
+//           <Col lg={6}>
+//             <Card className="shadow-sm mb-4">
+//               <Card.Header as="h5">
+//                 <i className="bi bi-clipboard-check me-2" />
+//                 Your BOM ({bomComponents.length} items)
+//               </Card.Header>
+//               <Card.Body>
+//                 {bomComponents.length === 0 ? (
+//                   <div className="text-muted">Add components on the left to build your BOM.</div>
+//                 ) : (
+//                   <div className="table-responsive">
+//                     <Table hover size="sm" className="align-middle">
+//                       <thead className="table-light">
+//                         <tr>
+//                           <th>Product</th>
+//                           <th className='text-end' style={{ width: 80 }}>Cost</th>
+//                           <th style={{ width: 100 }}>Margin</th>
+//                           <th className='text-end' style={{ width: 80 }}>Price</th>
+//                           <th style={{ width: 90 }}>Qty</th>
+//                           <th className='text-end' style={{ width: 80 }}>Total</th>
+//                           <th style={{ width: 40 }} />
+//                         </tr>
+//                       </thead>
+//                       <tbody>
+//                         {sortedCategories.map(cat => (
+//                           <React.Fragment key={cat}>
+//                             <tr className="table-light">
+//                               <td colSpan={5} className="py-1">
+//                                 <div className="fw-semibold">
+//                                   <i className={`bi ${CATEGORY_META[cat]?.icon || 'bi-box'} me-1`} />
+//                                   {CATEGORY_META[cat]?.name || (grouped[cat][0]?.product?.originalCategory || cat)}
+//                                 </div>
+//                               </td>
+//                               <td className="py-1 text-end fw-semibold">
+//                                 {formatCurrency(categoryTotals[cat] || 0)}
+//                               </td>
+//                               <td className="py-1"></td>
+//                             </tr>
+//                             {grouped[cat].map(comp => {
+//                               const isDraft = (quoteStatus === 'draft');
+//                               const unitPrice = getUnitPriceForRow(comp, isDraft);
+//                               const line = unitPrice * (Number(comp.quantity) || 0);
+//                               const priceChanged = !isDraft && comp.price_at_time != null &&
+//                                 computeDerivedUnitFromRow(comp) !== comp.price_at_time;
+
+//                               return (
+//                                 <tr key={comp.product.id}>
+//                                   <td>
+//                                     <div className="d-flex align-items-center justify-content-between">
+//                                       <div>
+//                                         <div className="small fw-small">{comp.product.brand} {comp.product.model}</div>
+//                                         {priceChanged && (
+//                                           <small className="text-danger">
+//                                             Price changed: {formatCurrency(comp.price_at_time)} → {formatCurrency(computeDerivedUnitFromRow(comp))}
+//                                           </small>
+//                                         )}
+//                                       </div>
+//                                       {isCoreLocked(comp.product.category) && (
+//                                         <Badge bg="info" className="ms-2" title="Core component - quantities managed in System Design">
+//                                           <i className="bi bi-gear-fill" style={{ fontSize: '0.75em' }}></i>
+//                                         </Badge>
+//                                       )}
+//                                     </div>
+//                                   </td>
+//                                   <td className='text-end small'>
+//                                     <Form.Control 
+//                                       type='number'
+//                                       min='0'
+//                                       step='1'
+//                                       style={{ minWidth: 80, maxWidth: 110, fontSize: '0.85rem'}}
+//                                       value={getCostDisplayValue(comp)}
+//                                       onChange={e => updateCost(comp.product.id, e.target.value)}
+//                                       onBlur={e => handleCostBlur(comp.product.id, e.target.value)}
+//                                       disabled={quoteStatus !== 'draft'}
+//                                       className='py-0 text-end'
+//                                       plaintext
+//                                       readOnly={false}
+//                                     />
+//                                   </td>
+//                                   <td>
+//                                     <InputGroup size='sm'>
+//                                       <InputGroup.Text className="py-0 px-1">%</InputGroup.Text>
+//                                       <Form.Control
+//                                         type="number"
+//                                         min="0"
+//                                         // size="md"
+//                                         style={{ minWidth: 70, maxWidth: 110, fontSize: '0.85rem'}}
+//                                         step="1"
+//                                         value={getMarginDisplayValue(comp)}
+//                                         onChange={e => updateMargin(comp.product.id, e.target.value)}
+//                                         onBlur={e => handleMarginBlur(comp.product.id, e.target.value)}
+//                                         disabled={quoteStatus !== 'draft'}
+//                                         className="py-0"
+//                                       />
+//                                     </InputGroup>
+//                                   </td>
+//                                   <td className='text-end small'>{formatCurrency(unitPrice)}</td>
+//                                   <td>
+//                                     <InputGroup size='sm'>
+//                                       <Form.Control 
+//                                         type="number"
+//                                         min="0"
+//                                         style={{ minWidth: 70, maxWidth: 110, fontSize: '0.85rem'}}
+//                                         value={comp.quantity}
+//                                         onChange={e => updateQuantity(comp.product.id, e.target.value)}
+//                                         onBlur={e => handleQuantityBlur(comp.product.id, e.target.value)}
+//                                         className="py-0"
+//                                         disabled={isCoreLocked(comp.product.category)}
+//                                         title={isCoreLocked(comp.product.category) ? "Core component quantities can only be changed in System Design" : ""}
+//                                       />
+//                                     </InputGroup>
+//                                   </td>
+//                                   <td className='text-end small'>{formatCurrency(line)}</td>
+//                                   <td className='text-end'>
+//                                     <Button 
+//                                       variant="outline-danger" 
+//                                       size='sm' 
+//                                       className="py-0 px-1" 
+//                                       onClick={() => removeComponent(comp.product.id)}
+//                                       disabled={isCoreLocked(comp.product.category)}
+//                                       title={isCoreLocked(comp.product.category) ? "Core components cannot be removed - manage in System Design" : "Remove component"}
+//                                     >
+//                                       <i className='bi bi-trash' />
+//                                     </Button>
+//                                   </td>
+//                                 </tr>
+//                               );
+//                             })}
+//                           </React.Fragment>
+//                         ))}
+                        
+//                         {/* Totals rows */}
+//                         <tr className="border-top border-dark">
+//                           <td className="fw-semibold">Cost Price: {formatCurrency(totals.total_cost)}</td>
+//                           <td colSpan={4} className="text-end fw-semibold">Total (excl. VAT):</td>
+//                           <td className="text-end fw-semibold">{formatCurrency(totals.total_excl_vat)}</td>
+//                           <td></td>
+//                         </tr>
+//                         <tr>
+//                           <td className="fw-semibold">Total Markup: {formatCurrency(totals.total_markup)}</td>
+//                           <td colSpan={4} className="text-end fw-semibold">{ totals.vat_perc ? `${totals.vat_perc}% VAT` : 'VAT:'}</td>
+//                           <td className="text-end fw-semibold">{formatCurrency(totals.vat_price)}</td>
+//                           <td></td>
+//                         </tr>
+//                         <tr className="border-top border-dark">
+//                           <td className="fw-semibold"></td>
+//                           <td colSpan={4} className="text-end fw-bold">Total (incl. VAT):</td>
+//                           <td className="text-end fw-bold">{formatCurrency(totals.total_incl_vat)}</td>
+//                           <td></td>
+//                         </tr>
+//                       </tbody>
+//                     </Table>
+//                   </div>
+//                 )}
+
+//                 <Row className="align-items-center mt-3">
+//                   {/* <Col md={6}>
+//                     <Form.Group>
+//                       <Form.Label>Extras / Labour (R)</Form.Label>
+//                       <Form.Control
+//                         value={extrasCost}
+//                         onChange={e => setExtrasCost(e.target.value)}
+//                         type="number"
+//                         min="0"
+//                         step="0.01"
+//                       />
+//                     </Form.Group> */}
+//                   {/* </Col> */}
+//                   <Col md={6}>
+//                     <Form.Group>
+//                       <Form.Label>Quote Status</Form.Label>
+//                       <Form.Select value={quoteStatus} onChange={e => setQuoteStatus(e.target.value)}>
+//                         <option value="draft">Draft</option>
+//                         <option value="sent">Sent</option>
+//                         <option value="accepted">Accepted</option>
+//                         <option value="complete">Complete</option>
+//                       </Form.Select>
+//                     </Form.Group>
+//                   </Col>
+//                 </Row>
+//               </Card.Body>
+//             </Card>
+            
+//             <Card className="shadow-sm">
+//               <Card.Header as="h5">
+//                 <i className="bi bi-info-circle me-2" />
+//                 System Specifications
+//               </Card.Header>
+//               <Card.Body>
+//                 <Row>
+//                   <Col sm={3} className="mb-3 text-center">
+//                     <div className="small text-muted">PV Size</div>
+//                     <div className="fs-4 fw-bold text-warning">{systemSpecs.panelKw} <small>kWp</small></div>
+//                   </Col>
+//                   <Col sm={3} className="mb-3 text-center">
+//                     <div className="small text-muted">Inverter</div>
+//                     <div className="fs-4 fw-bold text-info">{systemSpecs.inverterKva} <small>kVA</small></div>
+//                   </Col>
+//                   <Col sm={3} className="mb-3 text-center">
+//                     <div className="small text-muted">Battery</div>
+//                     <div className="fs-4 fw-bold text-success">{systemSpecs.batteryKwh} <small>kWh</small></div>
+//                   </Col>
+//                   <Col sm={3} className="mb-3 text-center">
+//                     <div className="small text-muted">Cost per kWp</div>
+//                     <div className="fs-4 fw-bold text-success">
+//                       {formatCurrency(systemSpecs.panelKw > 0 ? (totals.total_excl_vat / systemSpecs.panelKw) : 0)}
+//                       <small>/kWp</small>
+//                     </div>
+//                   </Col>
+//                 </Row>
+//               </Card.Body>
+//             </Card>
+//           </Col>
+//         </Row>
+//       </Container>
+
+//       {/* Save Template Modal */}
+//       <Modal show={showSaveTemplateModal} onHide={() => setShowSaveTemplateModal(false)}>
+//         <Modal.Header closeButton>
+//           <Modal.Title>Save as System Template</Modal.Title>
+//         </Modal.Header>
+//         <Modal.Body>
+//           <Form.Group className="mb-3">
+//             <Form.Label>Template Name</Form.Label>
+//             <Form.Control
+//               type="text"
+//               value={newTemplateName}
+//               onChange={e => setNewTemplateName(e.target.value)}
+//               placeholder="e.g., 10kW Hybrid System"
+//             />
+//           </Form.Group>
+//           <Form.Group>
+//             <Form.Label>Description</Form.Label>
+//             <Form.Control
+//               as="textarea"
+//               rows={3}
+//               value={newTemplateDesc}
+//               onChange={e => setNewTemplateDesc(e.target.value)}
+//               placeholder="Describe this system template…"
+//             />
+//           </Form.Group>
+//         </Modal.Body>
+//         <Modal.Footer>
+//           <Button variant="secondary" onClick={() => setShowSaveTemplateModal(false)} disabled={savingComponents}>
+//             Cancel
+//           </Button>
+//           <Button
+//             variant="primary"
+//             onClick={saveAsTemplate}
+//             disabled={savingComponents || !newTemplateName.trim()}
+//           >
+//             {savingComponents ? (
+//               <>
+//                 <Spinner as="span" animation="border" size="sm" className="me-2" />
+//                 Saving…
+//               </>
+//             ) : 'Save Template'}
+//           </Button>
+//         </Modal.Footer>
+//       </Modal>
+//     </div>
+//   );
+// }
+
+// export default BillOfMaterials;
