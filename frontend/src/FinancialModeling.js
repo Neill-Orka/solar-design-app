@@ -71,6 +71,7 @@ function FinancialModeling({ projectId }) {
         const p = res.data;
         if (p && p.project_value_excl_vat != null) {
           setProjectValue(p.project_value_excl_vat);
+          console.log('Project VALUE from FinModeling: ', p.project_value_excl_vat);
           
           // Check if this was from a standard template
           if (p.from_standard_template) {

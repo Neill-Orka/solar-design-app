@@ -316,6 +316,12 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
         project_id: projectId,
         components,
       });
+
+      await axios.put(`${API_URL}/api/projects/${projectId}`, {
+        project_value_excl_vat: totals.subtotal
+      });
+      console.log(" Project VALUE from BOM save: ", totals.subtotal);
+
       showNotification('BOM saved', 'success');
     } catch (e) {
       console.error(e);
