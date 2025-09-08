@@ -1436,8 +1436,8 @@ function SystemDesign({ projectId }) {
                 datasets.push({
                     label: 'Generator (kW)',
                     data: generator_kw,
-                    borderColor: '#FF5733',
-                    backgroundColor: '#FF573320',
+                    borderColor: '#33ff92ff',
+                    backgroundColor: '#33ff6320',
                     tension: 0.3,
                     pointRadius: 0,
                     borderWidth: 2

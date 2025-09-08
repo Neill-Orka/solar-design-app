@@ -39,6 +39,12 @@ function PrintableBOM({ projectId: propProjectId }) {
   // Retrieve data from localStorage (project-specific key or quote-specific key)
   const dataKey = isQuoteMode ? `quoteData_${docId}` : `printBomData_${projectId}`;
   const [bomData, setBomData] = useState({});
+
+  // Puts 2 decimals in the number only if its not a whole number
+  const formatNumber = (value) => {
+    const num = Number(value);
+    return Number.isInteger(num) ? num.toString() : num.toFixed(2);
+  };
   
   // Load data from localStorage initially
   useEffect(() => {
@@ -126,7 +132,7 @@ function PrintableBOM({ projectId: propProjectId }) {
           if (inverterData) {
             const brand_name = inverterData.brand || '';
             const inverter_quantity = data.inverter_kva.quantity || 1;
-            const power_rating_kva = inverterData.rating_kva ? `${Number(inverterData.rating_kva).toFixed(2) * inverter_quantity}kVA` : '';
+            const power_rating_kva = inverterData.rating_kva ? `${formatNumber(Number(inverterData.rating_kva) * inverter_quantity)}kVA` : '';
             console.log('Inverter brand and capacity:', brand_name, power_rating_kva);
 
             // Store in project data for title display
@@ -147,7 +153,7 @@ function PrintableBOM({ projectId: propProjectId }) {
           if (batteryData) {
             const brand_name = batteryData.brand || '';
             const battery_quantity = data.battery_kwh.quantity || 1;
-            const nominal_capacity_kwh = batteryData.nominal_rating_kwh ? `${Number(batteryData.nominal_rating_kwh).toFixed(2) * battery_quantity}kWh` : '';
+            const nominal_capacity_kwh = batteryData.nominal_rating_kwh ? `${formatNumber(Number(batteryData.nominal_rating_kwh) * battery_quantity)}kWh` : '';
             console.log('Battery brand and capacity:', brand_name, nominal_capacity_kwh);
 
             console.log('Battery quantity from project data:', battery_quantity);
