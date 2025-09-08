@@ -23,7 +23,7 @@ function Clients() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [addingInline, setAddingInline] = useState(false);
-  const [newClient, setNewClient] = useState({ client_name: '', email: '', phone: '', street: '', town: '', province: '' });
+  const [newClient, setNewClient] = useState({ client_name: '', email: '', phone: '', street: '', town: '', province: '', company: '', vat_number: '' });
 
   useEffect(() => {
     loadClients();
@@ -51,7 +51,9 @@ function Clients() {
       (c.phone || '').toLowerCase().includes(q) ||
       (c.address?.street || '').toLowerCase().includes(q) ||
       (c.address?.town || '').toLowerCase().includes(q) ||
-      (c.address?.province || '').toLowerCase().includes(q)
+      (c.address?.province || '').toLowerCase().includes(q) || 
+      (c.company || '').toLowerCase().includes(q) ||
+      (c.vat_number || '').toLowerCase().includes(q)
     );
   }, [clients, search]);
 
@@ -85,7 +87,7 @@ function Clients() {
         };
         delete payload.street; delete payload.town; delete payload.province;
       }
-      await axios.patch(`${API_URL}/api/clients/${client.id}`, payload, { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
+      await axios.put(`${API_URL}/api/clients/${client.id}`, payload, { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
       await loadClients();
       cancelEdit(client.id);
     } catch (e) {
@@ -107,11 +109,13 @@ function Clients() {
         client_name: newClient.client_name,
         email: newClient.email,
         phone: newClient.phone || '',
-  address: { street: newClient.street || '', town: newClient.town || '', province: newClient.province || '' }
+        address: { street: newClient.street || '', town: newClient.town || '', province: newClient.province || '' },
+        company: newClient.company || '',
+        vat_number: newClient.vat_number || ''
       };
       await axios.post(`${API_URL}/api/clients`, payload, { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
       await loadClients();
-  setNewClient({ client_name: '', email: '', phone: '', street: '', town: '', province: '' });
+      setNewClient({ client_name: '', email: '', phone: '', street: '', town: '', province: '', company: '', vat_number: '' });
       setAddingInline(false);
     } catch (e) {
       setError('Failed to add client: ' + (e.response?.data?.message || e.message));
@@ -134,7 +138,7 @@ function Clients() {
         </div>
         <div className="d-flex gap-2">
           {!addingInline && <Button size="sm" variant="success" onClick={()=>setAddingInline(true)}><FaPlus className='me-1'/>New</Button>}
-          {addingInline && <Button size="sm" variant="outline-secondary" onClick={()=>{setAddingInline(false); setNewClient({ client_name:'', email:'', phone:'', street:'', town:'', province:''});}}>Cancel</Button>}
+          {addingInline && <Button size="sm" variant="outline-secondary" onClick={()=>{setAddingInline(false); setNewClient({ client_name:'', email:'', phone:'', street:'', town:'', province:'', company:'', vat_number:'' });}}>Cancel</Button>}
         </div>
       </div>
       <div className="table-responsive" style={{maxHeight:'70vh', overflow:'auto'}}>
@@ -148,7 +152,9 @@ function Clients() {
               <th>Street</th>
               <th>Town</th>
               <th>Province</th>
-              <th style={{width:100}}>Actions</th>
+              <th>Company</th>
+              <th>VAT Number</th>
+              <th style={{width:80}}>Actions</th>
             </tr>
             {addingInline && (
               <tr className="table-success">
@@ -164,6 +170,8 @@ function Clients() {
                     {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
                   </Form.Select>
                 </td>
+                <td><Form.Control size="sm" value={newClient.company} onChange={e=>setNewClient(c=>({...c, company:e.target.value}))} placeholder="Company" /></td>
+                <td><Form.Control size="sm" value={newClient.vat_number} onChange={e=>setNewClient(c=>({...c, vat_number:e.target.value}))} placeholder="VAT Number" /></td>
                 <td className="text-center">
                   <Button size="sm" variant="success" className="me-1" disabled={saving} onClick={handleAddInline}><FaSave /></Button>
                   <Button size="sm" variant="outline-secondary" disabled={saving} onClick={()=>{setAddingInline(false);}}><FaUndo /></Button>
@@ -199,6 +207,12 @@ function Clients() {
                         {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
                       </Form.Select>
                     ) : <span>{c.address?.province}</span>}
+                  </td>
+                  <td>
+                    {editing ? <Form.Control size="sm" value={draftValue(c.id, 'company', c.company || '')} onChange={e=>updateDraftField(c.id,'company',e.target.value)} /> : <span>{c.company}</span>}
+                  </td>
+                  <td>
+                    {editing ? <Form.Control size="sm" value={draftValue(c.id, 'vat_number', c.vat_number || '')} onChange={e=>updateDraftField(c.id,'vat_number',e.target.value)} /> : <span>{c.vat_number}</span>}
                   </td>
                   <td className="text-center">
                     {!editing && (
