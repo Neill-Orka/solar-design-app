@@ -15,14 +15,15 @@ import {
   Tooltip,
   Legend,
   TimeScale,
-  TimeSeriesScale
+  TimeSeriesScale,
+  Decimation
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import { API_URL } from './apiConfig';
 import { useNotification } from './NotificationContext';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, TimeSeriesScale);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, TimeSeriesScale, Decimation);
 
 const PANEL_WATTAGE = 565; // JA SOLAR 72S30-565/GR
 
@@ -1252,6 +1253,12 @@ function SystemDesign({ projectId }) {
         }
     }, [simulationData]);
 
+    const rangeDays = useMemo(() => {
+        if (!startDate || !endDate) return 0;
+        const days = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24));
+        return Math.max(1, days);
+    }, [startDate, endDate]);
+
     // Memorized chart data (exactly like QuickResults structure)
     const chartData = useMemo(() => {
         if (!simulationData || !startDate || !endDate) {
@@ -1263,15 +1270,84 @@ function SystemDesign({ projectId }) {
         const startIndex = sim.timestamps.findIndex(t => new Date(t) >= startDate);
         let endIndex = sim.timestamps.findIndex(t => new Date(t) > endDate);    
         if (endIndex === -1) endIndex = sim.timestamps.length; // If no end date found, use full length
-
         if (startIndex === -1) return { labels: [], datasets: [] }; // If no start date found, return empty
 
-        const labels = sim.timestamps.slice(startIndex, endIndex).map(t => new Date(t));
+        // Determine if we need to downsample based on range size
+        // For ranges > 90 days, downsample to improve performance
+        let timestamps = [];
+        let demand = [];
+        let import_grid = [];
+        let battery_soc = [];
+        let generation = [];
+        let pv_potential = [];
+        let export_grid = [];
+        let generator_kw = [];
+
+        if (rangeDays > 90) {
+            // Downsample to daily average values for long ranges
+            console.log('Downsampling data for better performance - showing daily averages');
+
+            // Group by day and calculate averages
+            const dailyData = {};
+
+            for (let i = startIndex; i < endIndex; i++) {
+                const date = new Date(sim.timestamps[i]);
+                const dayKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+
+                if (!dailyData[dayKey]) {
+                    dailyData[dayKey] = {
+                        count: 0,
+                        demand: 0,
+                        import: 0,
+                        export: 0,
+                        battery: 0,
+                        generation: 0,
+                        potential: 0,
+                        generator: 0,
+                        timestamp: new Date(dayKey)
+                    };
+                }
+
+                // Sum values for averaging later
+                dailyData[dayKey].count++;
+                dailyData[dayKey].demand += sim.demand[i] || 0;
+                dailyData[dayKey].import += sim.import_from_grid[i] || 0;
+                dailyData[dayKey].export += sim.export_to_grid[i] || 0;
+                dailyData[dayKey].battery += sim.battery_soc[i] || 0;
+                dailyData[dayKey].generation += sim.generation[i] || 0;
+                dailyData[dayKey].potential += (sim.potential_generation ? sim.potential_generation[i] : 0) || 0;
+                dailyData[dayKey].generator += (sim.generator_kw ? sim.generator_kw[i] : 0) || 0;
+            }
+
+            // Convert to arrays of daily averages
+            const days = Object.keys(dailyData).sort();
+            days.forEach(day => {
+                const data = dailyData[day];
+                timestamps.push(data.timestamp);
+                demand.push(data.demand / data.count);
+                import_grid.push(data.import / data.count);
+                export_grid.push(data.export / data.count);
+                battery_soc.push(data.battery / data.count);
+                generation.push(data.generation / data.count);
+                pv_potential.push(data.potential / data.count);
+                generator_kw.push(data.generator / data.count);
+            });
+        } else {
+            // For smaller ranges, use full resolution
+            timestamps = sim.timestamps.slice(startIndex, endIndex).map(t => new Date(t));
+            demand = sim.demand.slice(startIndex, endIndex);
+            import_grid = sim.import_from_grid.slice(startIndex, endIndex);
+            export_grid = sim.export_to_grid.slice(startIndex, endIndex);
+            battery_soc = sim.battery_soc.slice(startIndex, endIndex);
+            generation = sim.generation.slice(startIndex, endIndex);
+            pv_potential = sim.potential_generation ? sim.potential_generation.slice(startIndex, endIndex) : [];
+            generator_kw = sim.generator_kw ? sim.generator_kw.slice(startIndex, endIndex) : [];
+        }
 
         const datasets = [
             { 
                 label: 'Demand (kW)', 
-                data: sim.demand.slice(startIndex, endIndex), 
+                data: demand, 
                 borderColor: '#ff6384', 
                 backgroundColor: '#ff638420', 
                 tension: 0.3, 
@@ -1280,7 +1356,7 @@ function SystemDesign({ projectId }) {
             },
             { 
                 label: 'Grid Import (kW)', 
-                data: sim.import_from_grid.slice(startIndex, endIndex), 
+                data: import_grid, 
                 borderColor: '#cc65fe', 
                 backgroundColor: '#cc65fe20', 
                 tension: 0.3, 
@@ -1290,7 +1366,7 @@ function SystemDesign({ projectId }) {
             },
             { 
                 label: 'Battery SOC (%)', 
-                data: sim.battery_soc.slice(startIndex, endIndex), 
+                data: battery_soc, 
                 borderColor: '#ffce56', 
                 backgroundColor: '#ffce5620', 
                 yAxisID: 'y1', 
@@ -1301,75 +1377,122 @@ function SystemDesign({ projectId }) {
         ];
 
         if (showLosses) {
-            datasets.push({
-                label: 'PV Generation (kW)', // Changed to match QuickResults naming
-                data: sim.generation.slice(startIndex, endIndex),
-                borderColor: '#4bc0c0',
-                backgroundColor: '#4bc0c020',
-                tension: 0.3,
-                pointRadius: 0,
+            // Add PV generation dataset
+            datasets.push({ 
+                label: 'PV Generation (kW)', 
+                data: generation, 
+                borderColor: '#36a2eb', 
+                backgroundColor: '#36a2eb20', 
+                tension: 0.3, 
+                pointRadius: 0, 
                 borderWidth: 2,
-                fill: true,              
-            },
-            {
-                label: 'Throttling Losses',
-                data: sim.potential_generation.slice(startIndex, endIndex),
-                borderColor: 'transparent',
-                backgroundColor: 'rgba(108, 117, 125, 0.3)',
-                pointRadius: 0,
-                fill: 3, // Changed to match QuickResults (fill: 3 instead of fill: '-1')
+                fill: true
             });
+
+            // Add PV potential if available
+            if (pv_potential.length > 0) {
+                datasets.push({
+                    label: 'PV Potential (kW)',
+                    data: pv_potential,
+                    borderColor: '#4bc0c0',
+                    backgroundColor: '#386f6f20',
+                    tension: 0.3,
+                    pointRadius: 0,
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    fill: true // Fill to the previous dataset (generation
+                });
+            }
+
+            // Add grid export if available
+            if (export_grid.length > 0 && design.allowExport) {
+                datasets.push({
+                    label: 'Grid Export (kW)',
+                    data: export_grid,
+                    borderColor: '#ff9f40',
+                    backgroundColor: '#ff9f4020',
+                    tension: 0.3,
+                    pointRadius: 0,
+                    borderWidth: 1.5
+                });
+            }
         } else {
-            datasets.push({
-                label: 'PV Generation (kW)', // Changed to match QuickResults naming
-                data: sim.generation.slice(startIndex, endIndex),
-                borderColor: '#4bc0c0',
-                backgroundColor: '#4bc0c020',
-                tension: 0.3,
-                pointRadius: 0,
-                borderWidth: 2
-            });            
+            // Just add PV generation (but not potential or export)
+            datasets.push({ 
+                label: 'PV Generation (kW)', 
+                data: generation, 
+                borderColor: '#36a2eb', 
+                backgroundColor: '#36a2eb20', 
+                tension: 0.3, 
+                pointRadius: 0, 
+                borderWidth: 2,
+                fill: true
+            });
         }
 
         if (design.systemType === 'off-grid') {
-            datasets.push({
-              label: 'Generator (kW)',
-              data: sim.generator_kw.slice(startIndex, endIndex),
-              borderColor: '#198754',
-              backgroundColor: '#19875420',
-              tension: 0.3,
-              pointRadius: 0,
-              borderWidth: 2,
-            });
-
-            datasets.push({
-              label: 'Energy Shortfall (kW)',
-              data: sim.shortfall_kw.slice(startIndex, endIndex),
-              borderColor: '#dc3545',
-              backgroundColor: '#dc354540',
-              tension: 0.3,
-              pointRadius: 0,
-              borderWidth: 2,
-              fill: true
-            });
+            // Add generator dataset if it's available
+            if (generator_kw.length > 0) {
+                datasets.push({
+                    label: 'Generator (kW)',
+                    data: generator_kw,
+                    borderColor: '#FF5733',
+                    backgroundColor: '#FF573320',
+                    tension: 0.3,
+                    pointRadius: 0,
+                    borderWidth: 2
+                });
+            }
         }
 
+        return { labels: timestamps, datasets };
+    }, [simulationData, startDate, endDate, showLosses, design.systemType, design.allowExport, rangeDays]);
 
-        return { labels, datasets };
-    }, [simulationData, startDate, endDate, showLosses, design.systemType]);
-
-    // Chart options (exactly like QuickResults)
-    const chartOptions = useMemo(() =>  ({
+    // Update chartOptions to optimize rendering
+    const chartOptions = useMemo(() => ({
         responsive: true, 
-        maintainAspectRatio: false, 
+        maintainAspectRatio: false,
+        animation: {
+            duration: rangeDays > 90 ? 0 : 300 // Disable animation for large datasets
+        },
         interaction: { mode: 'index', intersect: false },
+        elements: {
+            point: {
+                radius: 0, // Hide all points
+                hitRadius: 10 // Keep a hit area for tooltips
+            },
+            line: {
+                borderWidth: 2,
+                tension: 0.3 // Smooth lines
+            }
+        },
+        parsing: true, // Disable parsing for performance
+        normalized: true, // Pre-normalized data for performance
         plugins: {
-            datalabels: {display: false}
+            datalabels: {display: false},
+            // decimation: {
+            //     enabled: true,
+            //     algorithm: 'lttb', // Largest-Triangle-Three-Buckets algorithm
+            //     samples: rangeDays > 180 ? 200 : 500, // Fewer points for very long ranges
+            //     threshold: 100 // Decimate if there are more than 100 points
+            // }
         },
         scales: { 
             x: { 
-                type: 'time', 
-                time: { unit: 'day', tooltipFormat: 'MMM dd, HH:mm' },
+                type: 'time',
+                time: { 
+                    unit: rangeDays > 90 ? 'month' : 
+                          rangeDays > 30 ? 'week' : 'day',
+                    tooltipFormat: rangeDays > 90 ? 'MMM dd' : 'MMM dd, HH:mm',
+                    displayFormats: {
+                        day: 'MMM dd',
+                        week: 'MMM dd',
+                        month: 'MMM yyyy'
+                    }
+                },
+                ticks: {
+                    maxTicksLimit: 15 // Limit the number of ticks for readability
+                }
             },
             y: { 
                 beginAtZero: true, 
@@ -1385,7 +1508,7 @@ function SystemDesign({ projectId }) {
                 grid: { drawOnChartArea: false } 
             }
         }
-    }), []);
+    }), [rangeDays]);
 
     // A single, unified handler to update the master design state
     const handleDesignChange = (newDesignState) => {
