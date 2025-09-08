@@ -797,6 +797,7 @@ function SystemDesign({ projectId }) {
     const [annualMetrics, setAnnualMetrics] = useState({
         daytimeConsumption: '0',
         consumptionFromPV: '0',
+        pvUtilization: '0',
         potentialGenDaily: '0',
         utilizedGenDaily: '0',
         throttlingLossesDaily: '0',
@@ -1715,6 +1716,8 @@ function SystemDesign({ projectId }) {
         const utilizedGenDaily = totalUtilizedGenKwh / daysInSim;
         const throttlingLossesDaily = (totalPotentialGenKwh - totalUtilizedGenKwh) / daysInSim;
 
+        const pvUtilizationPct = utilizedGenDaily / potentialGenDaily * 100;
+
         const panelKwFloat = safeParseFloat(design.panelKw);
         const specYieldInclThrottling = panelKwFloat > 0 ? (utilizedGenDaily / panelKwFloat) : 0;
         const specYieldExclThrottling = panelKwFloat > 0 ? (potentialGenDaily / panelKwFloat) : 0; 
@@ -1734,6 +1737,7 @@ function SystemDesign({ projectId }) {
         setAnnualMetrics({
             daytimeConsumption: daytimeConsumptionPct.toFixed(0),
             consumptionFromPV: consumptionFromPvPct.toFixed(0),
+            pvUtilization: pvUtilizationPct.toFixed(0),
             potentialGenDaily: potentialGenDaily.toFixed(2),
             utilizedGenDaily: utilizedGenDaily.toFixed(2),
             throttlingLossesDaily: throttlingLossesDaily.toFixed(2),
@@ -2193,8 +2197,13 @@ function SystemDesign({ projectId }) {
                                         <td>%</td>
                                     </tr>
                                     <tr>
-                                        <td>Overall Consumption from PV (Grid Independence)</td>
+                                        <td>Overall Consumption from PV</td>
                                         <td>{annualMetrics.consumptionFromPV}</td>
+                                        <td>%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>PV Utilization</td>
+                                        <td>{annualMetrics.pvUtilization}</td>
                                         <td>%</td>
                                     </tr>
                                     <tr>
