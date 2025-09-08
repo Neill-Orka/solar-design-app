@@ -418,7 +418,10 @@ const termsSum = useMemo(() => termsPerc.reduce((a,b)=>a+(+b||0),0), [termsPerc]
       currency: 'ZAR',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    }).format(value || 0).replace('R', 'R ');
+    })
+      .format(value || 0)
+      .replace('R', 'R ')
+      .replace(/,/g, ' '); // Replace commas with spaces for thousands
 
   // ----- Pagination constants (keep in sync with CSS) -----
   const CM_TO_PX = 37.79527559;
