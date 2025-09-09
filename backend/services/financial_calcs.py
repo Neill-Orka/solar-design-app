@@ -94,6 +94,11 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             project.system_type == 'off-grid' and 
             sim_response.get('generator_config', {}).get('enabled', False)
         )
+
+        is_offgrid_without_generator = (
+            project.system_type == 'off-grid' and
+            not sim_response.get('generator_config', {}).get('enabled', False)
+        )
         
         # 1 Initialize the tariff engine 
         tariff_data = {}
@@ -117,7 +122,7 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
                 tariff_data = _serialize_tariff_for_engine(tariff_obj)
 
         # For grid-tied systems, tariff is required. For off-grid, it will be handled in the off-grid section
-        if not is_offgrid_with_generator:
+        if not is_offgrid_with_generator and not is_offgrid_without_generator:
             if not tariff_data.get('rates'):
                 return {"error": "No valid tariff data available for financial calculations."}
             
@@ -235,7 +240,30 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
                 
                 # Calculate total old bill (grid costs)
                 values['total_old_bill'] = values['old_energy_cost'] + values['old_fixed_cost'] + values['old_demand_cost']
-            
+
+        elif is_offgrid_without_generator:
+            # Off-Grid without generator
+            # 
+            # # setup monthly costs with all zeros for billing components
+            for i, ts in enumerate(timestamps):
+                month_key = ts.strftime('%Y-%m')
+
+                if month_key not in monthly_costs:
+                    monthly_costs[month_key] = {
+                        'old_energy_cost': Decimal(0), 
+                        'new_energy_cost': Decimal(0),
+                        'old_demand_cost': Decimal(0),
+                        'new_demand_cost': Decimal(0),
+                        'old_fixed_cost': Decimal(0),
+                        'new_fixed_cost': Decimal(0),
+                        'total_old_bill': Decimal(0),
+                        'total_new_bill': Decimal(0)
+                    }
+
+            # # Calculate energy shortfall and add warning messge
+            # energy_shortfall_total_kwh = sum([x * time_interval_hours for x in shortfall_kw])
+            # energy_shortfall_pct = (energy_shortfall_total_kwh / total_demand_kwh * 100) if total_demand_kwh > 0 else 0     
+        
         else:
             # 3B) Grid-tied system: Calculate tariff costs
             if not engine:

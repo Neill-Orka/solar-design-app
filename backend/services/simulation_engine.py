@@ -625,6 +625,74 @@ def simulate_system_inner(
         generator_energy_total_kwh = generator.total_energy_kwh if generator else 0.0
         generator_runtime_hours = generator.total_runtime_hours if generator else 0.0
 
+        ### --- Calculate Annual Metrics --- ###
+        # data for full year (not filtered by date range)
+        total_demand_kwh = sum(demand_kw) * time_interval_hours
+        total_potential_gen_kwh = sum(potential_generation_kw) * time_interval_hours
+        total_utilized_gen_kwh = sum(usable_generation_kw) * time_interval_hours
+        total_import_kwh = sum(import_from_grid) * time_interval_hours
+        total_export_kwh = sum(export_to_grid) * time_interval_hours
+        pv_used_onsite_kwh = total_utilized_gen_kwh - total_export_kwh
+
+        # Calculate daytime consumptin (6AM to 6PM)
+        daytime_demand_kwh = 0
+        for i, ts in enumerate(full_30min_index):
+            hour = ts.hour
+            if 6 <= hour < 18:
+                daytime_demand_kwh += demand_kw[i] * time_interval_hours
+
+        # Calculate percentage metrics
+        daytime_consumption_ptc = (daytime_demand_kwh / total_demand_kwh * 100) if total_demand_kwh > 0 else 0
+        consumption_from_pv_ptc = (pv_used_onsite_kwh / total_demand_kwh * 100) if total_demand_kwh > 0 else 0
+        pv_utilization_ptc = (total_utilized_gen_kwh / total_potential_gen_kwh * 100) if total_potential_gen_kwh > 0 else 0
+
+        # Daily metrics
+        days_in_sim = len(full_30min_index) / 48
+        potential_gen_daily = total_potential_gen_kwh / days_in_sim
+        utilized_gen_daily = total_utilized_gen_kwh / days_in_sim
+        throttling_losses_daily = (total_potential_gen_kwh - total_utilized_gen_kwh) / days_in_sim
+
+        # Yield metrics
+        specific_yield_incl_losses = utilized_gen_daily / panel_kw if panel_kw > 0 else 0
+        specific_yield_excl_losses = potential_gen_daily / panel_kw if panel_kw > 0 else 0
+
+        # Annual projections
+        potential_gen_annual = potential_gen_daily * 365
+        utilized_gen_annual = utilized_gen_daily * 365
+        throttling_losses_annual = throttling_losses_daily * 365
+
+        # Battery cycles calculations
+        battery_cycles_annual = '-'
+        if battery_capacity_kwh > 0 and len(battery_soc_trace) > 1:
+            total_charge_energy = 0
+            for i in range(1, len(battery_soc_trace)):
+                # Calculate increase in SOC (charging only)
+                soc_diff = battery_soc_trace[i] - battery_soc_trace[i-1]
+                if soc_diff > 0: # Only count chargin
+                    # Convert SOC% to kWh
+                    charge_kwh = (soc_diff / 100) * battery_capacity_kwh
+                    total_charge_energy += charge_kwh
+
+            # Calculate daily cycles and project to annual
+            daily_cycles = (total_charge_energy / battery_capacity_kwh) / days_in_sim
+            battery_cycles_annual = daily_cycles * 365
+
+        # Create annual metrics object for the response
+        annual_metrics = {
+            "daytime_consumption_pct": round(daytime_consumption_ptc, 2),
+            "consumption_from_pv_pct": round(consumption_from_pv_ptc, 2),
+            "pv_utilization_pct": round(pv_utilization_ptc, 2),
+            "potential_gen_daily_kwh": round(potential_gen_daily, 2),
+            "utilized_gen_daily_kwh": round(utilized_gen_daily, 2),
+            "throttling_losses_daily_kwh": round(throttling_losses_daily, 2),
+            "specific_yield_incl_losses": round(specific_yield_incl_losses, 2),
+            "specific_yield_excl_losses": round(specific_yield_excl_losses, 2),
+            "potential_gen_annual_kwh": round(potential_gen_annual, 0),
+            "utilized_gen_annual_kwh": round(utilized_gen_annual, 0),
+            "throttling_losses_annual_kwh": round(throttling_losses_annual, 0),
+            "battery_cycles_annual": round(battery_cycles_annual, 1) if isinstance(battery_cycles_annual, (int, float)) else battery_cycles_annual,
+        }
+
         return {
             "timestamps": [ts.isoformat() for ts in full_30min_index],
             "demand": demand_kw,
@@ -658,7 +726,8 @@ def simulate_system_inner(
                 "diesel_price_r_per_liter": diesel_price,
                 "generator_running_intervals": generator.is_running if generator else False,
                 "generator_total_run_time_hours": (generator.min_run_time_hours - generator.run_time_remaining) if generator else 0
-            }
+            },
+            "annual_metrics": annual_metrics
         }
 
     except Exception as e:

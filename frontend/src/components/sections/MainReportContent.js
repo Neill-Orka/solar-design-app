@@ -1286,62 +1286,62 @@ function MainReportContent({
                         <tbody className="small">
                             <tr>
                                 <td>Daytime Consumption</td>
-                                <td className="text-end">{data?.financials?.daytime_consumption_perc || 0}%</td>
-                                <td></td>
+                                <td className="text-end">{formatValue(data?.simulation?.annual_metrics?.daytime_consumption_pct || 0)}</td>
+                                <td>%</td>
                             </tr>
                             <tr>
                                 <td>PV Utilization</td>
-                                <td className="text-end">{data?.financials?.self_consumption_rate || 0}%</td>
-                                <td></td>
+                                <td className="text-end">{formatValue(data?.simulation?.annual_metrics?.pv_utilization_pct || 0)}</td>
+                                <td>%</td>
                             </tr>
                             <tr>
                                 <td>Overall Consumption from PV</td>
-                                <td className="text-end">{data?.financials?.grid_independence_rate || 0}%</td>
-                                <td></td>
+                                <td className="text-end">{formatValue(data?.simulation?.annual_metrics?.consumption_from_pv_pct || 0)}</td>
+                                <td>%</td>
                             </tr>
                             <tr>
                                 <td>Potential Generation (daily)</td>
-                                <td className="text-end">{formatValue((data?.financials?.potential_generation_kwh || 0) / 365)}</td>
+                                <td className="text-end">{formatValue((data?.simulation?.annual_metrics?.potential_gen_daily_kwh || 0))}</td>
                                 <td>kWh</td>
                             </tr>
                             <tr>
                                 <td>Utilized Generation (daily)</td>
-                                <td className="text-end">{formatValue((data?.financials?.total_generation_kwh || 0) / 365)}</td>
+                                <td className="text-end">{formatValue((data?.simulation?.annual_metrics?.utilized_gen_daily_kwh || 0))}</td>
                                 <td>kWh</td>
                             </tr>
                             <tr>
                                 <td>Throttling Losses (daily)</td>
-                                <td className="text-end">{formatValue((data?.financials?.potential_generation_kwh - data?.financials?.total_generation_kwh || 0) / 365)}</td>
+                                <td className="text-end">{formatValue((data?.simulation?.annual_metrics?.throttling_losses_daily_kwh|| 0))}</td>
                                 <td>kWh</td>
                             </tr>
                             <tr>
                                 <td>Specific Yield Including Throttling Losses</td>
-                                <td className="text-end">{(data?.financials?.yield_incl_losses || 0)}</td>
+                                <td className="text-end">{(data?.simulation?.annual_metrics?.specific_yield_incl_losses || 0)}</td>
                                 <td>kWh/kWp/day</td>
                             </tr>
                             <tr>
                                 <td>Potential Generation p.a.</td>
-                                <td className="text-end">{formatValue(data?.financials?.potential_generation_kwh || 0)}</td>
+                                <td className="text-end">{formatValue(data?.simulation?.annual_metrics?.potential_gen_annual_kwh || 0)}</td>
                                 <td>kWh</td>
                             </tr>
                             <tr>
                                 <td>Utilized Generation p.a.</td>
-                                <td className="text-end">{formatValue(data?.financials?.total_generation_kwh || 0)}</td>
+                                <td className="text-end">{formatValue(data?.simulation?.annual_metrics?.utilized_gen_annual_kwh || 0)}</td>
                                 <td>kWh</td>
                             </tr>
                             <tr>
                                 <td>Throttling Losses p.a.</td>
-                                <td className="text-end">{formatValue(data?.financials?.potential_generation_kwh - data?.financials?.total_generation_kwh || 0)}</td>
+                                <td className="text-end">{formatValue(data?.simulation?.annual_metrics?.throttling_losses_annual_kwh || 0)}</td>
                                 <td>kWh</td>
                             </tr>
                             <tr>
                                 <td>Specific Yield Excl. Throttling Losses</td>
-                                <td className="text-end">{(data?.financials?.yield_excl_losses || 0)}</td>
+                                <td className="text-end">{(data?.simulation?.annual_metrics?.specific_yield_excl_losses || 0)}</td>
                                 <td>kWh/kWp/day</td>
                             </tr>
                             <tr>
                                 <td>Battery cycles in 1 year</td>
-                                <td className="text-end">{data?.financials?.battery_cycles || '-'}</td>
+                                <td className="text-end">{data?.simulation?.annual_metrics?.battery_cycles_annual || '-'}</td>
                                 <td>cycles/y</td>
                             </tr>
                         </tbody>

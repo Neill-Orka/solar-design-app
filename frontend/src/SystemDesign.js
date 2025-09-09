@@ -713,6 +713,7 @@ function SystemDesign({ projectId }) {
     const [startDate, setStartDate] = useState(null); // Changed to null like QuickResults
     const [endDate, setEndDate] = useState(null); // Changed to null like QuickResults
     const [showLosses, setShowLosses] = useState(false);
+    const [showAverages, setShowAverages] = useState(true);
 
     // Data State
     const [products, setProducts] = useState({ panels: [], inverters: [], batteries: [] });
@@ -1259,8 +1260,111 @@ function SystemDesign({ projectId }) {
         return Math.max(1, days);
     }, [startDate, endDate]);
 
-    // Memorized chart data (exactly like QuickResults structure)
+
+
+
     const chartData = useMemo(() => {
+    if (!simulationData || !startDate || !endDate) return { labels: [], datasets: [] };
+
+    const sim = simulationData;
+    const startIndex = sim.timestamps.findIndex(t => new Date(t) >= startDate);
+    let endIndex = sim.timestamps.findIndex(t => new Date(t) > endDate);
+    if (endIndex === -1) endIndex = sim.timestamps.length;
+    if (startIndex === -1) return { labels: [], datasets: [] };
+
+    const ts = sim.timestamps.slice(startIndex, endIndex).map(t => new Date(t));
+    const enableLTTB = rangeDays > 120 && ts.length >= 3; // > ~4 months
+    
+    const demand = sim.demand.slice(startIndex, endIndex);
+    const import_grid = sim.import_from_grid.slice(startIndex, endIndex);
+    const export_grid = sim.export_to_grid.slice(startIndex, endIndex);
+    const battery_soc = sim.battery_soc.slice(startIndex, endIndex);
+    const generation = sim.generation.slice(startIndex, endIndex);
+    const pv_potential = sim.potential_generation ? sim.potential_generation.slice(startIndex, endIndex) : [];
+    const generator_kw = sim.generator_kw ? sim.generator_kw.slice(startIndex, endIndex) : [];
+
+    // Helper to produce {x,y} points for LTTB
+    const toXY = (xs, ys) => {
+        const out = new Array(xs.length);
+        for (let i = 0; i < xs.length; i++) {
+            const x = xs[i] instanceof Date ? xs[i].getTime() : +xs[i];
+            const yy = ys?.[i];
+            const y = Number.isFinite(yy) ? yy : 0;
+            out[i] = { x, y };
+        }
+        return out;
+    }
+
+    // When LTTB is on, pass {x,y}. Otherwise keep fast numeric arrays + labels.
+    const labels = enableLTTB ? [] : ts;
+    const demandData      = enableLTTB ? toXY(ts, demand)       : demand;
+    const importData      = enableLTTB ? toXY(ts, import_grid)  : import_grid;
+    const exportData      = enableLTTB ? toXY(ts, export_grid)  : export_grid;
+    const socData         = enableLTTB ? toXY(ts, battery_soc)  : battery_soc;
+    const genData         = enableLTTB ? toXY(ts, generation)   : generation;
+    const potentialData   = enableLTTB ? toXY(ts, pv_potential) : pv_potential;
+    const generatorData   = enableLTTB ? toXY(ts, generator_kw) : generator_kw;
+
+    const datasets = [
+        {
+        label: 'Demand (kW)',
+        data: demandData,
+        borderColor: '#ff6384', backgroundColor: '#ff638420',
+        tension: 0.3, pointRadius: 0, borderWidth: 2
+        },
+        {
+        label: 'Grid Import (kW)',
+        data: importData,
+        borderColor: '#cc65fe', backgroundColor: '#cc65fe20',
+        tension: 0.3, pointRadius: 0, borderWidth: 1.5, borderDash: [5,5]
+        },
+        {
+        label: 'Battery SOC (%)',
+        data: socData, yAxisID: 'y1',
+        borderColor: '#ffce56', backgroundColor: '#ffce5620',
+        tension: 0.3, pointRadius: 0, borderWidth: 2
+        },
+        {
+        label: 'PV Generation (kW)',
+        data: genData,
+        borderColor: '#36a2eb', backgroundColor: '#36a2eb20',
+        tension: 0.3, pointRadius: 0, borderWidth: 2, fill: true
+        }
+    ];
+
+    if (showLosses && potentialData.length > 0) {
+        datasets.push({
+        label: 'PV Potential (kW)',
+        data: potentialData,
+        borderColor: '#4bc0c0', backgroundColor: '#386f6f20',
+        tension: 0.3, pointRadius: 0, borderWidth: 1, borderDash: [5,5], fill: true
+        });
+    }
+
+    if (showLosses && exportData.length > 0 && design.allowExport) {
+        datasets.push({
+        label: 'Grid Export (kW)',
+        data: exportData,
+        borderColor: '#ff9f40', backgroundColor: '#ff9f4020',
+        tension: 0.3, pointRadius: 0, borderWidth: 1.5
+        });
+    }
+
+    if (design.systemType === 'off-grid' && generatorData.length > 0) {
+        datasets.push({
+        label: 'Generator (kW)',
+        data: generatorData,
+        borderColor: '#33ff92ff', backgroundColor: '#33ff6320',
+        tension: 0.3, pointRadius: 0, borderWidth: 2
+        });
+    }
+
+    return { labels, datasets };
+    }, [simulationData, startDate, endDate, showLosses, design.systemType, design.allowExport, rangeDays]);
+
+
+    // Memorized chart data (exactly like QuickResults structure)
+    const chartDataAverage = useMemo(() => {
         if (!simulationData || !startDate || !endDate) {
             return { labels: [], datasets: [] };
         }
@@ -1301,8 +1405,8 @@ function SystemDesign({ projectId }) {
                         import: 0,
                         export: 0,
                         battery: 0,
-                        generation: 0,
-                        potential: 0,
+                        genArr: [],
+                        potArr: [],
                         generator: 0,
                         timestamp: new Date(dayKey)
                     };
@@ -1314,8 +1418,8 @@ function SystemDesign({ projectId }) {
                 dailyData[dayKey].import += sim.import_from_grid[i] || 0;
                 dailyData[dayKey].export += sim.export_to_grid[i] || 0;
                 dailyData[dayKey].battery += sim.battery_soc[i] || 0;
-                dailyData[dayKey].generation += sim.generation[i] || 0;
-                dailyData[dayKey].potential += (sim.potential_generation ? sim.potential_generation[i] : 0) || 0;
+                dailyData[dayKey].genArr.push(sim.generation[i] || 0);
+                dailyData[dayKey].potArr.push((sim.potential_generation ? sim.potential_generation[i] : sim.generation[i]) || 0);
                 dailyData[dayKey].generator += (sim.generator_kw ? sim.generator_kw[i] : 0) || 0;
             }
 
@@ -1328,8 +1432,23 @@ function SystemDesign({ projectId }) {
                 import_grid.push(data.import / data.count);
                 export_grid.push(data.export / data.count);
                 battery_soc.push(data.battery / data.count);
-                generation.push(data.generation / data.count);
-                pv_potential.push(data.potential / data.count);
+                
+                // daylight-aware threshold
+                const panelKw = parseFloat(design.panelKw || 0) || 0;
+                const baseThresh = panelKw > 0 ? 0.02 * panelKw : 0.05; // 2% of array kW, fallback 0.05 kW
+                const dayMaxPot = data.potArr.length ? Math.max(...data.potArr) : 0;
+                const thr = Math.max(baseThresh, 0.05 * dayMaxPot);
+
+                // average only where PV is "on"
+                let gSum = 0, pSum = 0, n = 0;
+                for (let i = 0; i < data.genArr.length; i++) {
+                const g = data.genArr[i] || 0;
+                const p = data.potArr[i] || 0;
+                if (p > thr || g > thr) { gSum += g; pSum += p; n++; }
+                }
+                generation.push(n ? gSum / n : 0);
+                pv_potential.push(n ? pSum / n : 0);
+
                 generator_kw.push(data.generator / data.count);
             });
         } else {
@@ -1446,10 +1565,60 @@ function SystemDesign({ projectId }) {
         }
 
         return { labels: timestamps, datasets };
-    }, [simulationData, startDate, endDate, showLosses, design.systemType, design.allowExport, rangeDays]);
+    }, [simulationData, startDate, endDate, showLosses, design.systemType, design.allowExport, rangeDays, design.panelKw]);
+
+    const chartOptions = useMemo(() => {
+    const enableLTTB = rangeDays > 120; // > ~4 months
+    // Aim for ~600–1200 rendered points depending on range length
+    const targetSamples = Math.min(1200, Math.max(600, Math.round(rangeDays * 3)));
+    const threshold = Math.max(targetSamples * 1.5, 1000); // start decimating only when big enough
+
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: enableLTTB ? 0 : 300 },
+        interaction: { mode: 'index', intersect: false },
+        elements: {
+        point: { radius: 0, hitRadius: 10 },
+        line: { borderWidth: 2, tension: 0.3 }
+        },
+        // Important for {x,y} objects + LTTB
+        parsing: enableLTTB ? false : true,
+        normalized: true,
+        plugins: {
+        datalabels: { display: false },
+        decimation: enableLTTB ? {
+            enabled: true,
+            algorithm: 'lttb',
+            samples: targetSamples,
+            threshold
+        } : { enabled: false }
+        },
+        scales: {
+        x: {
+            type: 'time',
+            time: {
+            unit:
+                rangeDays > 180 ? 'month' :
+                rangeDays > 60  ? 'week'  : 'day',
+            tooltipFormat: rangeDays > 60 ? 'MMM dd' : 'MMM dd, HH:mm',
+            displayFormats: { day: 'MMM dd', week: 'MMM dd', month: 'MMM yyyy' }
+            },
+            ticks: { maxTicksLimit: 15 }
+        },
+        y: { beginAtZero: true, title: { display: true, text: 'Power (kW)' } },
+        y1: {
+            type: 'linear', position: 'right', beginAtZero: true, max: 100,
+            title: { display: true, text: 'Battery SOC (%)' },
+            grid: { drawOnChartArea: false }
+        }
+        }
+    };
+    }, [rangeDays]);
+
 
     // Update chartOptions to optimize rendering
-    const chartOptions = useMemo(() => ({
+    const chartOptionsAverage = useMemo(() => ({
         responsive: true, 
         maintainAspectRatio: false,
         animation: {
@@ -1511,6 +1680,9 @@ function SystemDesign({ projectId }) {
     }), [rangeDays]);
 
     // A single, unified handler to update the master design state
+    
+    
+    
     const handleDesignChange = (newDesignState) => {
         setDesign(newDesignState);
     };
@@ -1707,6 +1879,7 @@ function SystemDesign({ projectId }) {
 
                 try {
                     sessionStorage.setItem(`simulationData_${projectId}`, JSON.stringify(res.data));
+                    console.log('Simulation Data: ', res.data);
                     console.log('Cached simulation data:', projectId);
                 } catch (err) {
                     console.error('Failed to cache simulation data:', err);
@@ -1814,64 +1987,66 @@ function SystemDesign({ projectId }) {
 
     // For Annual Metrics
     useEffect(() => {
-        if (!simulationData || !simulationData.timestamps || simulationData.timestamps.length === 0) return;
+        if (!simulationData || !simulationData.timestamps || simulationData.timestamps.length === 0 || !simulationData.annual_metrics) return;
 
-        const data = simulationData;
-        const timeIntervalHours = 0.5;
+        // const data = simulationData;
+        // const timeIntervalHours = 0.5;
 
-        const totalDemandKwh = data.demand.reduce((sum, val) => sum+val,0) * timeIntervalHours;
-        const totalPotentialGenKwh = data.potential_generation.reduce((sum, val) => sum+val,0) * timeIntervalHours;
-        const totalUtilizedGenKwh = data.generation.reduce((sum, val) => sum+val,0) * timeIntervalHours;
-        const totalExportKwh = data.export_to_grid.reduce((sum, val) => sum+val,0) * timeIntervalHours;
-        const pvUsedOnSiteKwh = totalUtilizedGenKwh - totalExportKwh;
+        // const totalDemandKwh = data.demand.reduce((sum, val) => sum+val,0) * timeIntervalHours;
+        // const totalPotentialGenKwh = data.potential_generation.reduce((sum, val) => sum+val,0) * timeIntervalHours;
+        // const totalUtilizedGenKwh = data.generation.reduce((sum, val) => sum+val,0) * timeIntervalHours;
+        // const totalExportKwh = data.export_to_grid.reduce((sum, val) => sum+val,0) * timeIntervalHours;
+        // const pvUsedOnSiteKwh = totalUtilizedGenKwh - totalExportKwh;
 
-        const daytimeDemandKwh = data.timestamps.map((ts, i) => {
-            const hour = new Date(ts).getHours();
-            return (hour >= 6 && hour < 18) ? data.demand[i] : 0;
-        }).reduce((sum, val) => sum + val, 0) * timeIntervalHours;
+        // const daytimeDemandKwh = data.timestamps.map((ts, i) => {
+        //     const hour = new Date(ts).getHours();
+        //     return (hour >= 6 && hour < 18) ? data.demand[i] : 0;
+        // }).reduce((sum, val) => sum + val, 0) * timeIntervalHours;
 
-        const daytimeConsumptionPct = totalDemandKwh > 0 ? (daytimeDemandKwh / totalDemandKwh) * 100 : 0;
-        const consumptionFromPvPct = totalUtilizedGenKwh > 0 ? (pvUsedOnSiteKwh / totalDemandKwh) * 100 : 0;
+        // const daytimeConsumptionPct = totalDemandKwh > 0 ? (daytimeDemandKwh / totalDemandKwh) * 100 : 0;
+        // const consumptionFromPvPct = totalUtilizedGenKwh > 0 ? (pvUsedOnSiteKwh / totalDemandKwh) * 100 : 0;
 
 
-        const daysInSim = data.timestamps.length / 48;
-        const potentialGenDaily = totalPotentialGenKwh / daysInSim;
-        const utilizedGenDaily = totalUtilizedGenKwh / daysInSim;
-        const throttlingLossesDaily = (totalPotentialGenKwh - totalUtilizedGenKwh) / daysInSim;
+        // const daysInSim = data.timestamps.length / 48;
+        // const potentialGenDaily = totalPotentialGenKwh / daysInSim;
+        // const utilizedGenDaily = totalUtilizedGenKwh / daysInSim;
+        // const throttlingLossesDaily = (totalPotentialGenKwh - totalUtilizedGenKwh) / daysInSim;
 
-        const pvUtilizationPct = utilizedGenDaily / potentialGenDaily * 100;
+        // const pvUtilizationPct = utilizedGenDaily / potentialGenDaily * 100;
 
-        const panelKwFloat = safeParseFloat(design.panelKw);
-        const specYieldInclThrottling = panelKwFloat > 0 ? (utilizedGenDaily / panelKwFloat) : 0;
-        const specYieldExclThrottling = panelKwFloat > 0 ? (potentialGenDaily / panelKwFloat) : 0; 
+        // const panelKwFloat = safeParseFloat(design.panelKw);
+        // const specYieldInclThrottling = panelKwFloat > 0 ? (utilizedGenDaily / panelKwFloat) : 0;
+        // const specYieldExclThrottling = panelKwFloat > 0 ? (potentialGenDaily / panelKwFloat) : 0; 
 
-        let cyclesAnnual = '-'
-        const totalBatteryCapacity = (design.selectedBattery?.product.capacity_kwh || 0) * design.batteryQuantity;
-        if (data.battery_soc?.length > 1 && totalBatteryCapacity > 0) {
-            let totalChargeEnergy = 0;
-            for (let i = 1; i < data.battery_soc.length; i++) {
-                const socDiff = data.battery_soc[i] - data.battery_soc[i - 1];
-                if (socDiff > 0) totalChargeEnergy += (socDiff / 100) * totalBatteryCapacity;
-            }
-            const dailyCycles = (totalChargeEnergy / totalBatteryCapacity) / daysInSim;
-            cyclesAnnual = (dailyCycles * 365).toFixed(1);
-        }
+        // let cyclesAnnual = '-'
+        // const totalBatteryCapacity = (design.selectedBattery?.product.capacity_kwh || 0) * design.batteryQuantity;
+        // if (data.battery_soc?.length > 1 && totalBatteryCapacity > 0) {
+        //     let totalChargeEnergy = 0;
+        //     for (let i = 1; i < data.battery_soc.length; i++) {
+        //         const socDiff = data.battery_soc[i] - data.battery_soc[i - 1];
+        //         if (socDiff > 0) totalChargeEnergy += (socDiff / 100) * totalBatteryCapacity;
+        //     }
+        //     const dailyCycles = (totalChargeEnergy / totalBatteryCapacity) / daysInSim;
+        //     cyclesAnnual = (dailyCycles * 365).toFixed(1);
+        // }
+
+        const metrics = simulationData.annual_metrics;
 
         setAnnualMetrics({
-            daytimeConsumption: daytimeConsumptionPct.toFixed(0),
-            consumptionFromPV: consumptionFromPvPct.toFixed(0),
-            pvUtilization: pvUtilizationPct.toFixed(0),
-            potentialGenDaily: potentialGenDaily.toFixed(2),
-            utilizedGenDaily: utilizedGenDaily.toFixed(2),
-            throttlingLossesDaily: throttlingLossesDaily.toFixed(2),
-            specificYieldWithThrottling: specYieldInclThrottling.toFixed(2),
-            specificYieldExclThrottling: specYieldExclThrottling.toFixed(2),
-            potentialGenAnnual: (potentialGenDaily * 365).toFixed(0),
-            utilizedGenAnnual: (utilizedGenDaily * 365).toFixed(0),
-            throttlingLossesAnnual: (throttlingLossesDaily * 365).toFixed(0),
-            batteryCyclesAnnual: cyclesAnnual,
+            daytimeConsumption: metrics.daytime_consumption_pct.toString(),
+            consumptionFromPV: metrics.consumption_from_pv_pct.toString(),
+            pvUtilization: metrics.pv_utilization_pct.toString(),
+            potentialGenDaily: metrics.potential_gen_daily_kwh.toFixed(2),
+            utilizedGenDaily: metrics.utilized_gen_daily_kwh.toFixed(2),
+            throttlingLossesDaily: metrics.throttling_losses_daily_kwh.toFixed(2),
+            specificYieldWithThrottling: metrics.specific_yield_incl_losses.toFixed(2),
+            specificYieldExclThrottling: metrics.specific_yield_excl_losses.toFixed(2),
+            potentialGenAnnual: (metrics.potential_gen_annual_kwh).toString(),
+            utilizedGenAnnual: (metrics.utilized_gen_annual_kwh).toString(),
+            throttlingLossesAnnual: (metrics.throttling_losses_annual_kwh).toString(),
+            batteryCyclesAnnual: metrics.battery_cycles_annual.toString(),
         })
-    }, [simulationData, design]);
+    }, [simulationData]);
 
     // The main return statement that renders the component UI
     return (
@@ -2007,6 +2182,15 @@ function SystemDesign({ projectId }) {
                                     <i className={`bi ${showLosses ? "bi-eye-slash-fill" : "bi-eye-fill"} me-2`}></i>
                                     {showLosses ? "Hide Losses" : "Show Losses"}
                                 </Button>
+                                <Button
+                                    variant={showAverages ? "primary" : "outline-secondary"}
+                                    size="sm"
+                                    className='me-3'
+                                    onClick={() => setShowAverages(!showAverages)}
+                                >
+                                    <i className={`bi ${showAverages ? "bi-eye-slash-fill" : "bi-eye-fill"} me-2`}></i>
+                                    {showAverages ? "Hide Averages (for full year)" : "Show Averages (for full year)"}
+                                </Button>
                             </div>
 
                             
@@ -2054,8 +2238,8 @@ function SystemDesign({ projectId }) {
                         </Card.Header>
                         <Card.Body style={{ height: '400px' }}>
                             <Line 
-                                options={chartOptions} 
-                                data={chartData} 
+                                options={showAverages ? chartOptionsAverage : chartOptions} 
+                                data={showAverages ? chartDataAverage : chartData} 
                             />
                         </Card.Body>
                     </Card>
