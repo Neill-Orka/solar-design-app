@@ -669,6 +669,7 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
                     <thead className="table-light">
                       <tr>
                         <th>Product</th>
+                        <th>Updated</th>
                         <th>Specs</th>
                         <th className="text-end">Price</th>
                         <th className="text-center" style={{ width: 100 }}>Add</th>
@@ -687,6 +688,18 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
                             <td>
                               <div className="fw-medium small">{product.brand} {product.model}</div>
                               <div className="text-muted" style={{fontSize: '0.75rem'}}>{CATEGORY_META[product.category]?.name || product.originalCategory || product.category}</div>
+                            </td>
+                            <td>
+                              <div className="d-flex flex-column">
+                                <small className="text-muted">
+                                  {product.updated_at ? new Date(product.updated_at).toLocaleDateString('en-GB') : '—'}
+                                </small>
+                                {product.updated_by && (
+                                  <small className="text-muted" style={{ fontSize: '0.6rem' }}>
+                                    {product.updated_by}
+                                  </small>
+                                )}
+                              </div>
                             </td>
                             <td>{spec}</td>
                             <td className="text-end small">{fmt(rowUnitPrice({ product }))}</td>
