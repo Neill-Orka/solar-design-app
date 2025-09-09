@@ -96,6 +96,7 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
+  const [bomSearch, setBomSearch] = useState('');
 
   const [fullSystemMode, setFullSystemMode] = useState(true);
 
@@ -379,26 +380,25 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
   };
 
   /* ---------- Derived ---------- */
-  const grouped = useMemo(() => {
-    const g = {};
-    bom.forEach(r => {
-      const cat = r.product.category || 'other';
-      if (!g[cat]) g[cat] = [];
-      g[cat].push(r);
+  const systemSpecs = useMemo(() => {
+    let panelW = 0, inverterKva = 0, batteryKwh = 0;
+    const list = Array.isArray(bom) ? bom : [];
+    list.forEach(c => {
+      const cat = c.product.category;
+      if (cat === 'panel' && c.product.power_w) {
+        panelW += (Number(c.product.power_w) || 0) * (Number(c.quantity) || 0);
+      } else if (cat === 'inverter' && c.product.rating_kva) {
+        inverterKva += (Number(c.product.rating_kva) || 0) * (Number(c.quantity) || 0);
+      } else if (cat === 'battery' && c.product.capacity_kwh) {
+        batteryKwh += (Number(c.product.capacity_kwh) || 0) * (Number(c.quantity) || 0);
+      }
     });
-    return g;
-  }, [bom]);
-
-  const sortedCats = useMemo(() => {
-    const all = Object.keys(grouped);
-    return all.sort((a,b) => {
-      const ia = PRIORITY.indexOf(a), ib = PRIORITY.indexOf(b);
-      if (ia !== -1 && ib !== -1) return ia - ib;
-      if (ia !== -1) return -1; if (ib !== -1) return 1;
-      const an = CATEGORY_META[a]?.name || a; const bn = CATEGORY_META[b]?.name || b;
-      return an.localeCompare(bn);
-    });
-  }, [grouped]);
+    return {
+      panelKw: (panelW / 1000).toFixed(2),
+      inverterKva: inverterKva.toFixed(2),
+      batteryKwh: batteryKwh.toFixed(2)
+    };
+  }, [bom]);  
 
   const totals = useMemo(() => {
     const subtotal = bom.reduce((s, r) => s + rowUnitPrice(r) * (Number(r.quantity) || 0), 0);
@@ -411,6 +411,80 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
 
     return { subtotal, total_cost, vat_perc, vat_price, total, total_markup };
   }, [bom]);
+
+  // Fuzzy search index for BOM items (memoized)
+  const bomFuse = useMemo(() => {
+    if (!bom?.length) return null;
+    return new Fuse(bom, {
+      includeScore: true,
+      threshold: 0.45,
+      ignoreLocation: true,
+      useExtendedSearch: true,
+      keys: [
+        { name: 'product.brand', weight: 2 },
+        { name: 'product.model', weight: 2 },
+        { name: 'product.brand_name', weight: 1.5 },
+        { name: 'product.description', weight: 1 },
+        { name: 'product.notes', weight: 0.5 },
+        { name: 'product.originalCategory', weight: 0.5 },
+        { name: 'product.category', weight: 0.5 },
+        { name: 'product.component_type', weight: 0.5 },
+        { name: 'product.power_w', weight: 0.3 },
+        { name: 'product.rating_kva', weight: 0.3 },
+        { name: 'product.capacity_kwh', weight: 0.3 }
+      ].filter(Boolean)
+    });
+  }, [bom]);
+
+  const bomFiltered = useMemo(() => {
+    const term = bomSearch.trim();
+    if (!term) return bom;
+
+    const words = term.split(/\s+/).filter(Boolean);
+    let result = [];
+    if (bomFuse && words.length) {
+      try {
+        let current = bom;
+        for (const w of words) {
+          const pattern = w.length <= 2 ? `=${w}` : w;
+          const localFuse = new Fuse(current, bomFuse.options);
+          const partial = localFuse.search(pattern);
+          current = partial.map(r => r.item);
+          if (!current.length) break;
+        }
+        result = current;
+        if (!result.length) {
+          const broad = bomFuse.search(term).map(r => r.item);
+          result = broad;
+        }
+      } catch (e) {
+        const q = term.toLowerCase();
+        result = bom.filter(r => `${r.product.brand} ${r.product.model} ${r.product.description || ''}`.toLowerCase().includes(q));
+      }
+    }
+    return result.length ? result : bom;
+  }, [bom, bomSearch, bomFuse]);
+
+  const groupedFiltered = useMemo(() => {
+    const g = {};
+    bomFiltered.forEach(r => {
+      const cat = r.product.category || 'other';
+      if (!g[cat]) g[cat] = [];
+      g[cat].push(r);
+    });
+    return g;
+  }, [bomFiltered]);
+
+  const sortedCatsFiltered = useMemo(() => {
+    const all = Object.keys(groupedFiltered);
+    return all.sort((a,b) => {
+      const ia = PRIORITY.indexOf(a), ib = PRIORITY.indexOf(b);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1; if (ib !== -1) return 1;
+      const an = CATEGORY_META[a]?.name || a; const bn = CATEGORY_META[b]?.name || b;
+      return an.localeCompare(bn);
+    });
+  }, [groupedFiltered]);
 
   // Fuzzy search index (memoized)
   const fuse = useMemo(() => {
@@ -595,6 +669,7 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
                     <thead className="table-light">
                       <tr>
                         <th>Product</th>
+                        <th>Updated</th>
                         <th>Specs</th>
                         <th className="text-end">Price</th>
                         <th className="text-center" style={{ width: 100 }}>Add</th>
@@ -613,6 +688,18 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
                             <td>
                               <div className="fw-medium small">{product.brand} {product.model}</div>
                               <div className="text-muted" style={{fontSize: '0.75rem'}}>{CATEGORY_META[product.category]?.name || product.originalCategory || product.category}</div>
+                            </td>
+                            <td>
+                              <div className="d-flex flex-column">
+                                <small className="text-muted">
+                                  {product.updated_at ? new Date(product.updated_at).toLocaleDateString('en-GB') : '—'}
+                                </small>
+                                {product.updated_by && (
+                                  <small className="text-muted" style={{ fontSize: '0.6rem' }}>
+                                    {product.updated_by}
+                                  </small>
+                                )}
+                              </div>
                             </td>
                             <td>{spec}</td>
                             <td className="text-end small">{fmt(rowUnitPrice({ product }))}</td>
@@ -650,12 +737,32 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
           {/* Right: BOM */}
           <Col lg={6}>
             <Card className="shadow-sm mb-4">
-              <Card.Header as="h5">
-                <i className="bi bi-clipboard-check me-2" /> Your BOM ({bom.length} items)
+              <Card.Header as="h5" className="d-flex justify-content-between align-items-center">
+                <div>
+                  <i className="bi bi-clipboard-check me-2" /> Your BOM ({bomFiltered.length} of {bom.length} items)
+                </div>
+                {bom.length > 0 && (
+                  <div style={{ width: '200px' }}>
+                    <InputGroup size="sm">
+                      <InputGroup.Text className="py-0"><i className="bi bi-search" /></InputGroup.Text>
+                      <Form.Control 
+                        size="sm" 
+                        placeholder="Search BOM..." 
+                        value={bomSearch} 
+                        onChange={e => setBomSearch(e.target.value)} 
+                      />
+                    </InputGroup>
+                  </div>
+                )}
               </Card.Header>
               <Card.Body>
                 {!bom.length ? (
                   <div className="text-muted">Add components on the left to build your BOM.</div>
+                ) : !bomFiltered.length ? (
+                  <div className="text-muted text-center py-3">
+                    <i className="bi bi-search me-2"></i>
+                    No items match your search "{bomSearch}".
+                  </div>
                 ) : (
                   <div className="table-responsive">
                     <Table hover size="sm" className="align-middle">
@@ -670,21 +777,21 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedCats.map(cat => (
+                        {sortedCatsFiltered.map(cat => (
                           <React.Fragment key={cat}>
                             <tr className="table-light">
                               <td colSpan={4} className="py-1">
                                 <div className="fw-semibold">
                                   <i className={`bi ${CATEGORY_META[cat]?.icon || 'bi-box'} me-1`} />
-                                  {CATEGORY_META[cat]?.name || (grouped[cat][0]?.product?.originalCategory || cat)}
+                                  {CATEGORY_META[cat]?.name || (groupedFiltered[cat][0]?.product?.originalCategory || cat)}
                                 </div>
                               </td>
                               <td className="py-1 text-end fw-semibold">
-                                {fmt(grouped[cat].reduce((s,r)=>s+rowUnitPrice(r)*(Number(r.quantity)||0),0))}
+                                {fmt(groupedFiltered[cat].reduce((s,r)=>s+rowUnitPrice(r)*(Number(r.quantity)||0),0))}
                               </td>
                               <td />
                             </tr>
-                            {grouped[cat].map(r => {
+                            {groupedFiltered[cat].map(r => {
                               const unit = rowUnitPrice(r);
                               const unitCost = rowCost(r);
                               const line = unit * (Number(r.quantity)||0);
@@ -771,6 +878,35 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
                     </Table>
                   </div>
                 )}
+              </Card.Body>
+            </Card>
+            <Card className="shadow-sm">
+              <Card.Header as="h5">
+                <i className="bi bi-info-circle me-2" />
+                System Specifications
+              </Card.Header>
+              <Card.Body>
+                <Row>
+                  <Col sm={3} className="mb-3 text-center">
+                    <div className="small text-muted">PV Size</div>
+                    <div className="fs-6 fw-bold text-warning">{systemSpecs.panelKw} <small>kWp</small></div>
+                  </Col>
+                  <Col sm={3} className="mb-3 text-center">
+                    <div className="small text-muted">Inverter</div>
+                    <div className="fs-6 fw-bold text-info">{systemSpecs.inverterKva} <small>kVA</small></div>
+                  </Col>
+                  <Col sm={3} className="mb-3 text-center">
+                    <div className="small text-muted">Battery</div>
+                    <div className="fs-6 fw-bold text-success">{systemSpecs.batteryKwh} <small>kWh</small></div>
+                  </Col>
+                  <Col sm={3} className="mb-3 text-center">
+                    <div className="small text-muted">Cost per kWp</div>
+                    <div className="fs-6 fw-bold text-success">
+                      {(systemSpecs.panelKw > 0 ? fmt(totals.subtotal / systemSpecs.panelKw) : 10)}
+                      <small>/kWp</small>
+                    </div>
+                  </Col>
+                </Row>
               </Card.Body>
             </Card>
           </Col>
