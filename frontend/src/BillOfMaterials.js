@@ -99,6 +99,7 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
   const [bomSearch, setBomSearch] = useState('');
 
   const [fullSystemMode, setFullSystemMode] = useState(true);
+  const [newTemplateType, setNewTemplateType] = useState('hybrid');
 
   // // Load persisted value whenever projectId changes
   // useEffect(() => {
@@ -370,6 +371,7 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
       setShowSaveTemplateModal(false);
       setNewTemplateName('');
       setNewTemplateDesc('');
+      setNewTemplateType('hybrid');
       showNotification('Template saved', 'success');
     } catch (e) {
       console.error(e);
@@ -378,6 +380,21 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
       setSavingTemplate(false);
     }
   };
+
+  const openSaveTemplateModal = () => {
+    let guessedType = 'hybrid';
+
+    if (project?.system_type) {
+      guessedType = project.system_type;
+    } else if (bom.some(item => item.product?.category === 'battery')) {
+      guessedType = 'hybrid';
+    } else {
+      guessedType = 'grid';
+    }
+
+    setNewTemplateType(guessedType);
+    setShowSaveTemplateModal(true);
+  }
 
   /* ---------- Derived ---------- */
   const systemSpecs = useMemo(() => {
@@ -603,7 +620,7 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
                 <Button
                   variant="outline-secondary"
                   className="bom-btn shadow-sm"
-                  onClick={() => setShowSaveTemplateModal(true)}
+                  onClick={openSaveTemplateModal}
                   disabled={!bom.length || savingTemplate}
                 >
                   <i className="bi bi-save me-1" /> Save Template
@@ -928,6 +945,20 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
               placeholder="e.g., 30kWp Victron 40kWh"
             />
           </Form.Group>
+          
+          {/* Add this Form.Group for system type selection */}
+          <Form.Group className="mb-3">
+            <Form.Label>System Type</Form.Label>
+            <Form.Select 
+              value={newTemplateType} 
+              onChange={e => setNewTemplateType(e.target.value)}
+            >
+              <option value="hybrid">Hybrid</option>
+              <option value="grid">Grid-Tied</option>
+              <option value="off-grid">Off-Grid</option>
+            </Form.Select>
+          </Form.Group>
+          
           <Form.Group>
             <Form.Label>Description</Form.Label>
             <Form.Control
