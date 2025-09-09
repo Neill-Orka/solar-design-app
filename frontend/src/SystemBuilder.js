@@ -302,6 +302,19 @@ function SystemBuilder() {
         setComponents(reconstructedComponents);
     };
 
+    const handleCopy = (template) => {
+        setEditingTemplate(null); // Clear editing state for copy
+        setTemplateName(template.name + ' (Copy)');
+        setTemplateDesc(template.description);
+        setTemplateType(template.system_type);
+        setExtrasCost(template.extras_cost !== undefined ? template.extras_cost.toString() : '');
+        const reconstructedComponents = template.components.map(comp => {
+            const fullProduct = products.find(p => p.id === comp.product_id);
+            return { product: fullProduct, quantity: comp.quantity };
+        }).filter(c => c.product);
+        setComponents(reconstructedComponents);
+    };
+
     const handleDelete = (templateId) => {
         if (window.confirm("Are you sure you want to delete this system template?")) {
             axios.delete(`${API_URL}/api/system_templates/${templateId}`)
@@ -484,6 +497,7 @@ function SystemBuilder() {
                                             </div>
                                             <Stack direction="horizontal" gap={2}>
                                                 <Button variant="outline-primary" size="sm" onClick={() => handleEditClick(template)}><i className="bi bi-pencil-fill"></i></Button>
+                                                <Button variant="outline-primary" size="sm" onClick={() => handleCopy(template)}><i className="bi bi-copy"></i></Button>
                                                 <Button variant="outline-danger" size="sm" onClick={() => handleDelete(template.id)}><i className="bi bi-trash-fill"></i></Button>
                                             </Stack>
                                         </ListGroup.Item>
