@@ -245,6 +245,12 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             # Off-Grid without generator
             # 
             # # setup monthly costs with all zeros for billing components
+
+            if not tariff_data.get('rates'):
+                return {"error": "Off-grid financial modeling requires tariff information to calculate grid savings"}
+            
+            engine = TariffEngine(tariff_data)
+            
             for i, ts in enumerate(timestamps):
                 month_key = ts.strftime('%Y-%m')
 
@@ -259,10 +265,42 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
                         'total_old_bill': Decimal(0),
                         'total_new_bill': Decimal(0)
                     }
+                
+                if month_key not in monthly_max_demand:
+                    monthly_max_demand[month_key] = {'old': Decimal(0), 'new': Decimal(0)}
 
-            # # Calculate energy shortfall and add warning messge
-            # energy_shortfall_total_kwh = sum([x * time_interval_hours for x in shortfall_kw])
-            # energy_shortfall_pct = (energy_shortfall_total_kwh / total_demand_kwh * 100) if total_demand_kwh > 0 else 0     
+                # OLD energy = demand_kwh * energy_rate
+                demand_kw = Decimal(str(demand[i]))
+                energy_rate_r_kwh = engine.get_energy_rate_r_per_kwh(ts)
+                monthly_costs[month_key]['old_energy_cost'] += demand_kw * time_interval_hours * energy_rate_r_kwh
+
+                # Track OLD monthly max demand for demand charges
+                monthly_max_demand[month_key]['old'] = max(monthly_max_demand[month_key]['old'], demand_kw)
+
+                # Populate a small tariff sample for the first week (366 half-hours)
+                if i < 366:
+                    tariff_sample.append({
+                        'timestamp': ts.isoformat(),
+                        'rate': float(round(energy_rate_r_kwh, 4))
+                    })
+
+            # 2. Month end: add old Fixed + old demand charges
+            daily_fixed_rate = engine.get_fixed_rate_r_per_day()
+            for month_key, values in monthly_costs.items():
+                year, month = map(int, month_key.split('-'))
+                days_in_month = monthrange(year, month)[1]
+
+                # Fixed charge (old)
+                values['old_fixed_cost'] = Decimal(days_in_month) * daily_fixed_rate
+
+                # Demand charge (old) — use first day of month to determine season
+                month_start = datetime(year, month, 1)
+                demand_rate = engine.get_demand_rate_r_per_kva_per_month(month_start)
+                values['old_demand_cost'] = demand_rate * monthly_max_demand[month_key]['old']
+
+                # Totals: old bill is grid costs; new bill is zero (no grid, no diesel)
+                values['total_old_bill'] = values['old_energy_cost'] + values['old_fixed_cost'] + values['old_demand_cost']
+                values['total_new_bill'] = Decimal('0')  
         
         else:
             # 3B) Grid-tied system: Calculate tariff costs
@@ -520,6 +558,8 @@ def run_quick_financials(sim_response: dict, system_cost: float, project: 'Proje
             "diesel_cost_total": diesel_cost_total,
             "diesel_price_r_per_liter": diesel_price_r_per_liter,
             "generator_efficiency_kwh_per_liter": generator_efficiency_kwh_per_liter,
+            "energy_shortfall_total_kwh": round(sim_response.get("energy_shortfall_total_kwh", 0), 2),
+            "has_shortfall": sim_response.get("energy_shortfall_total_kwh", 0) > 0,
 
             # Technical KPIs
             "total_demand_kwh": round(total_demand_kwh),

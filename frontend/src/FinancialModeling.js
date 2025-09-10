@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useContext } from 'react';
 import axios from 'axios';
-import { Card, Button, Form, Row, Col, Spinner, Table, Badge } from 'react-bootstrap';
+import { Card, Button, Form, Row, Col, Spinner, Table, Badge, Alert } from 'react-bootstrap';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Line, Bar } from 'react-chartjs-2';
@@ -551,6 +551,7 @@ function FinancialModeling({ projectId }) {
           </Button>
         </Card.Body>
       </Card>
+      
 
       {/* System Specifications Cards */}
       <Row className='mb-2 g-2'>
@@ -707,6 +708,12 @@ function FinancialModeling({ projectId }) {
               <Line options={chartOptions} data={energyChartData} />
             </Card.Body>
           </Card>
+          {financialResult?.system_type === 'off-grid' && financialResult?.has_shortfall && (
+            <Alert variant="danger" className="mb-3">
+              <b>Shortfall: {financialResult.energy_shortfall_total_kwh.toFixed(1)} kWh/year </b> 
+              (Add more PV/battery or a generator).
+            </Alert>
+          )}
 
           {/* Annual performance and bill comparison */}
           <Row>
