@@ -87,44 +87,44 @@ function AuthenticatedApp() {
             
             {/* Project routes - only for design team and admin */}
             <Route path="/projects" element={
-              <ProtectedRoute requiredRole="design">
+              <ProtectedRoute requiredRole={["design", "manager"]}>
                 <Projects />
               </ProtectedRoute>
             } />
             <Route path="/projects/add" element={
-              <ProtectedRoute requiredRole="design">
+              <ProtectedRoute requiredRole={["design", "manager"]}>
                 <AddProject />
               </ProtectedRoute>
             } />
             <Route path="/projects/edit/:id" element={
-              <ProtectedRoute requiredRole="design">
+              <ProtectedRoute requiredRole={["design", "manager"]}>
                 <EditProject />
               </ProtectedRoute>
             } />
             <Route path="/projects/:id" element={
-              <ProtectedRoute requiredRole="design">
+              <ProtectedRoute requiredRole={["design", "manager"]}>
                 <ProjectDashboard />
               </ProtectedRoute>
             } />
             <Route path="/projects/:id/system-design" element={
-              <ProtectedRoute requiredRole="design">
+              <ProtectedRoute requiredRole={["design", "manager"]}>
                 <SystemDesignWrapper />
               </ProtectedRoute>
             } />
             <Route path="/projects/:id/financial-model" element={
-              <ProtectedRoute requiredRole="design">
+              <ProtectedRoute requiredRole={["design", "manager"]}>
                 <FinancialModelWrapper />
               </ProtectedRoute>
             } />
             <Route path="/projects/:id/optimize" element={
-              <ProtectedRoute requiredRole="design">
+              <ProtectedRoute requiredRole={["design", "manager"]}>
                 <Optimize />
               </ProtectedRoute>
             } />
             
             {/* Product routes - only for sales team and admin */}
             <Route path="/products-admin" element={
-              <ProtectedRoute requiredRole="sales">
+              <ProtectedRoute requiredRole={["sales", "manager"]}>
                 <ProductsAdmin />
               </ProtectedRoute>
             } />
