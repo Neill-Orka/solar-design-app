@@ -32,10 +32,22 @@ function Projects() {
     systemType: 'all',
     projectType: 'all'
   });
-
+  
   useEffect(() => {
     loadProjects();
   }, []);
+
+  useEffect(() => {
+    const onProjectListChange = () => loadProjects();
+    window.addEventListener('refresh-projects', onProjectListChange);
+    // Optional: also refetch on any single-project update
+    window.addEventListener('refresh-project', onProjectListChange);
+    return () => {
+      window.removeEventListener('refresh-projects', onProjectListChange);
+      window.removeEventListener('refresh-project', onProjectListChange);
+    };
+  }, []);
+
 
   const loadProjects = () => {
     setLoading(true);
@@ -56,6 +68,13 @@ function Projects() {
         setLoading(false);
       });
   };
+
+  useEffect(() => {
+    const onRefetch = () => loadProjects();
+    window.addEventListener('refresh-project', onRefetch);
+    return () => window.removeEventListener('refresh-project', onRefetch);
+  }, []);
+
 
   const handleDeleteRequest = (id) => {
     setProjectToDelete(id);

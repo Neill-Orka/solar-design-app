@@ -30,6 +30,17 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
     loadQuotes();
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const onRefetch = () => window.location.reload();
+    window.addEventListener('refresh-project', onRefetch);
+    window.addEventListener('refresh-quotes', onRefetch);
+    return () => {
+      window.removeEventListener('refresh-project', onRefetch);
+      window.removeEventListener('refresh-quotes', onRefetch);
+    };
+}, []);
+
+
   const handleAcceptQuote = async (quoteId, e) => {
     e.stopPropagation(); // Prevent row click
     if (!window.confirm('Mark this quote as accepted?')) return;

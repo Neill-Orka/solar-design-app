@@ -8,8 +8,13 @@ from flask_mail import Mail
 from config import Config
 from models import db, bcrypt
 from flask_migrate import Migrate
+from flask_socketio import SocketIO, join_room
+from sqlalchemy import event
+from models import Product, Projects, BOMComponent, LoadProfiles, Tariffs, TariffRates, Document, DocumentKind, User, Clients
 import logging
+import os
 import sys
+import manage
 
 # Import and register blueprints
 from routes.auth import auth_bp
@@ -37,6 +42,12 @@ app.config.from_object(Config)
 # Update CORS for production - add your Vercel domain
 CORS(app, origins=["http://localhost:3000", "https://solar-design-app.vercel.app"], supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
 
+socketio = SocketIO(
+    app,
+    cors_allowed_origins=["http://localhost:3000", "https://solar-design-app.vercel.app"],
+    async_mode='eventlet'
+)
+
 # Initialize extensions
 db.init_app(app)
 bcrypt.init_app(app)
@@ -45,6 +56,17 @@ mail = Mail(app)
 migrate = Migrate(app, db)
 
 logging.basicConfig(level=logging.INFO)
+
+@socketio.on("join")
+def on_join(data):
+    for r in data.get("rooms", []):
+        join_room(r)
+
+def _emit(kind, payload, room=None):
+    try:
+        socketio.emit(kind, payload, to=room) if room else socketio.emit(kind, payload)
+    except Exception as e:
+        app.logger.warning(f"socket emit failed: {e}")
 
 # JWT error handlers
 @jwt.expired_token_loader
@@ -86,7 +108,37 @@ app.register_blueprint(rules_bp, url_prefix='/api')
 app.register_blueprint(bom_bp, url_prefix='/api')
 app.register_blueprint(quotes_bp, url_prefix='/api')
 
-if __name__ == '__main__':
-    app.run(debug=True)
+@event.listens_for(Product, 'after_insert')
+@event.listens_for(Product, 'after_update')
+@event.listens_for(Product, 'after_delete')
+def _product_changed(mapper, connection, target):
+    _emit("product:updated", {"id": getattr(target, 'id', None)}, room="products")
 
-import manage
+@event.listens_for(Projects, 'after_insert')
+@event.listens_for(Projects, 'after_update')
+@event.listens_for(Projects, 'after_delete')
+def _projects_changed(mapper, connection, target):
+    pid = getattr(target, 'id', None)
+    _emit("projects:updated", {"id": pid}, room="projects")  # NEW
+    if pid:
+        _emit("project:updated", {"id": pid}, room=f"project:{pid}")  # existing pattern
+
+# clients -> NEW listener + broadcast
+@event.listens_for(Clients, 'after_insert')
+@event.listens_for(Clients, 'after_update')
+@event.listens_for(Clients, 'after_delete')
+def _clients_changed(mapper, connection, target):
+    _emit("clients:updated", {"id": getattr(target, 'id', None)}, room="clients")
+
+@event.listens_for(BOMComponent, 'after_insert')
+@event.listens_for(BOMComponent, 'after_update')
+@event.listens_for(BOMComponent, 'after_delete')
+def _bom_changed(mapper, connection, target):
+    pid = getattr(target, "project_id", None)
+    if pid:
+        _emit("project:updated", {"id": pid}, room=f"project:{pid}")
+
+if __name__ == '__main__':
+    socketio.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
+
+

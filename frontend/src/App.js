@@ -2,6 +2,9 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useParams } from 'react-router-dom';
 import { NotificationProvider } from './NotificationContext';
 import { AuthProvider, useAuth } from './AuthContext';
+import { io } from 'socket.io-client';
+import { useEffect } from 'react';
+import { SOCKET_URL } from './apiConfig';
 import ToastNotification from './ToastNotification';
 import ProtectedRoute from './ProtectedRoute';
 import Navbar from './Navbar';
@@ -31,16 +34,64 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './index.css'; 
 
+function LiveBus({ projectId }) {
+  useEffect(() => {
+    const socket = io(SOCKET_URL, { transports: ['websocket'] });
+
+    socket.on("connect", () => {
+      const rooms = ["products", "projects", "clients"];
+      if (projectId) rooms.push(`project:${projectId}`); // NOTE the colon
+      socket.emit("join", { rooms });                    // NOTE the event name
+    });
+
+    // Products — keep existing behavior
+    socket.on("product:updated", () => {
+      window.dispatchEvent(new Event("refresh-products"));
+    });
+
+    // Projects — refresh single project views AND the projects list
+    socket.on("project:updated", (msg) => {
+      if (!projectId || (msg?.id === projectId)) {
+        window.dispatchEvent(new Event("refresh-project"));
+      }
+      window.dispatchEvent(new Event("refresh-projects"));
+    });
+    socket.on("projects:updated", () => {
+      window.dispatchEvent(new Event("refresh-projects"));
+    });
+
+    // Clients
+    socket.on("clients:updated", () => {
+      window.dispatchEvent(new Event("refresh-clients"));
+    });
+
+    return () => socket.disconnect();
+  }, [projectId]);
+
+  return null;
+}
+
+
 // ------ tiny wrappers to inject :id into the components -----------
 function SystemDesignWrapper() {
   const { id } = useParams();
-  return <SystemDesign projectId={parseInt(id, 10)} />;
+  const pid = parseInt(id, 10);
+  return <>
+    <LiveBus projectId={pid} />
+    <SystemDesign projectId={pid} />
+  </>;
 }
 
 function FinancialModelWrapper() {
   const { id } = useParams();
-  return <FinancialModeling projectId={parseInt(id, 10)} />;
+  const pid = parseInt(id, 10);
+  return <>
+    <LiveBus projectId={pid} />
+    <FinancialModeling projectId={pid} />
+  </>;
 }
+
+
 
 
 function App() {
@@ -77,6 +128,7 @@ function AuthenticatedApp() {
       <ProtectedRoute>
         <Navbar />
         <div style={{ paddingTop: '72px' }}>
+          <LiveBus />
           <Routes>
             <Route path="/" element={<Home />} />
             

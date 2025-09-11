@@ -88,6 +88,13 @@ function LoadProfileManager() {
             .finally(() => setLoading(false));
     };
 
+    useEffect(() => {
+        const onRefetch = () => fetchProfiles();
+        window.addEventListener('refresh-profiles', onRefetch);
+        return () => window.removeEventListener('refresh-profiles', onRefetch);
+    }, []);
+
+
     const handleFileChange = (e) => {
         setProfileFile(e.target.files[0]);
     };

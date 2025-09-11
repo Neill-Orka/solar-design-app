@@ -192,6 +192,13 @@ export default function ProductsAdmin() {
 
   useEffect(() => { fetchProducts(true); }, [fetchProducts]);
 
+  useEffect(() => {
+    const onRefetch = () => fetchProducts();
+    window.addEventListener('refresh-products', onRefetch);
+    return () => window.removeEventListener('refresh-products', onRefetch);
+  }, [fetchProducts]);
+
+
   // Modal openers
   const openAdd = useCallback(() => {
     setEditId(null);

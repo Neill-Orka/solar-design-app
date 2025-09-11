@@ -852,6 +852,28 @@ function SystemDesign({ projectId }) {
         fetchAllProducts();
     }, [showNotification]); // The dependency array is empty so it only runs once
 
+    useEffect(() => {
+    const refetch = async () => {
+        try {
+        const [panelsRes, invertersRes, batteriesRes] = await Promise.all([
+            axios.get(`${API_URL}/api/products?category=panel`),
+            axios.get(`${API_URL}/api/products?category=inverter`),
+            axios.get(`${API_URL}/api/products?category=battery`)
+        ]);
+        setProducts({
+            panels: panelsRes.data,
+            inverters: invertersRes.data,
+            batteries: batteriesRes.data
+        });
+        } catch (err) {
+        showNotification('Failed to refresh product lists.', 'danger');
+        }
+    };
+    const onProducts = () => refetch();
+    window.addEventListener('refresh-products', onProducts);
+    return () => window.removeEventListener('refresh-products', onProducts);
+    }, [showNotification]);
+
     // Effect to load cached simulation data from sessionStorage
     useEffect(() => {
         if (!projectId) return;
@@ -1988,47 +2010,6 @@ function SystemDesign({ projectId }) {
     // For Annual Metrics
     useEffect(() => {
         if (!simulationData || !simulationData.timestamps || simulationData.timestamps.length === 0 || !simulationData.annual_metrics) return;
-
-        // const data = simulationData;
-        // const timeIntervalHours = 0.5;
-
-        // const totalDemandKwh = data.demand.reduce((sum, val) => sum+val,0) * timeIntervalHours;
-        // const totalPotentialGenKwh = data.potential_generation.reduce((sum, val) => sum+val,0) * timeIntervalHours;
-        // const totalUtilizedGenKwh = data.generation.reduce((sum, val) => sum+val,0) * timeIntervalHours;
-        // const totalExportKwh = data.export_to_grid.reduce((sum, val) => sum+val,0) * timeIntervalHours;
-        // const pvUsedOnSiteKwh = totalUtilizedGenKwh - totalExportKwh;
-
-        // const daytimeDemandKwh = data.timestamps.map((ts, i) => {
-        //     const hour = new Date(ts).getHours();
-        //     return (hour >= 6 && hour < 18) ? data.demand[i] : 0;
-        // }).reduce((sum, val) => sum + val, 0) * timeIntervalHours;
-
-        // const daytimeConsumptionPct = totalDemandKwh > 0 ? (daytimeDemandKwh / totalDemandKwh) * 100 : 0;
-        // const consumptionFromPvPct = totalUtilizedGenKwh > 0 ? (pvUsedOnSiteKwh / totalDemandKwh) * 100 : 0;
-
-
-        // const daysInSim = data.timestamps.length / 48;
-        // const potentialGenDaily = totalPotentialGenKwh / daysInSim;
-        // const utilizedGenDaily = totalUtilizedGenKwh / daysInSim;
-        // const throttlingLossesDaily = (totalPotentialGenKwh - totalUtilizedGenKwh) / daysInSim;
-
-        // const pvUtilizationPct = utilizedGenDaily / potentialGenDaily * 100;
-
-        // const panelKwFloat = safeParseFloat(design.panelKw);
-        // const specYieldInclThrottling = panelKwFloat > 0 ? (utilizedGenDaily / panelKwFloat) : 0;
-        // const specYieldExclThrottling = panelKwFloat > 0 ? (potentialGenDaily / panelKwFloat) : 0; 
-
-        // let cyclesAnnual = '-'
-        // const totalBatteryCapacity = (design.selectedBattery?.product.capacity_kwh || 0) * design.batteryQuantity;
-        // if (data.battery_soc?.length > 1 && totalBatteryCapacity > 0) {
-        //     let totalChargeEnergy = 0;
-        //     for (let i = 1; i < data.battery_soc.length; i++) {
-        //         const socDiff = data.battery_soc[i] - data.battery_soc[i - 1];
-        //         if (socDiff > 0) totalChargeEnergy += (socDiff / 100) * totalBatteryCapacity;
-        //     }
-        //     const dailyCycles = (totalChargeEnergy / totalBatteryCapacity) / daysInSim;
-        //     cyclesAnnual = (dailyCycles * 365).toFixed(1);
-        // }
 
         const metrics = simulationData.annual_metrics;
 
