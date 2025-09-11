@@ -13,8 +13,6 @@ from sqlalchemy import event
 from models import Product, Projects, BOMComponent, LoadProfiles, Tariffs, TariffRates, Document, DocumentKind, User, Clients
 import logging
 import os
-import sys
-import manage
 
 # Import and register blueprints
 from routes.auth import auth_bp
