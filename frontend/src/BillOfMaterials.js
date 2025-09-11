@@ -101,25 +101,30 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
   const [fullSystemMode, setFullSystemMode] = useState(true);
   const [newTemplateType, setNewTemplateType] = useState('hybrid');
 
-  // // Load persisted value whenever projectId changes
-  // useEffect(() => {
-  //   if (!projectId) return;
-  //   // migrate: if legacy global key exists, only apply it to this project once
-  //   try {
-  //     const legacy = sessionStorage.getItem('bomFullSystemMode');
-  //     if (legacy !== null) {
-  //       // apply legacy setting to current project then remove legacy key
-  //       localStorage.setItem(`bomFullSystemMode_project_${projectId}`, legacy);
-  //       localStorage.removeItem('bomFullSystemMode');
-  //     }
-  //   } catch {}
-  //   try {
-  //     const stored = localStorage.getItem(`bomFullSystemMode_project_${projectId}`);
-  //     setFullSystemMode(stored === null ? true : (stored === 'true'));
-  //   } catch {
-  //     setFullSystemMode(true);
-  //   }
-  // }, [projectId]);
+
+// Soft refresh: refetch products and patch product objects into existing BOM rows
+const softRefreshProducts = async () => {
+  try {
+    const res = await axios.get(`${API_URL}/api/products`);
+    const prods = (res.data || []).map(p => ({
+      ...p,
+      originalCategory: p.category,
+      category: slugify(p.category),   // ← use same transform as initial load
+    }));
+    setProducts(prods);
+
+    setBom(prev => prev.map(r => {
+      const updated = prods.find(p => p.id === r.product.id);
+      if (!updated) return r;
+      // keep manual override if present; otherwise use live product pricing
+      const keepManual = (r.unit_cost_at_time != null) ? r.unit_cost_at_time : null;
+      return { ...r, product: updated, unit_cost_at_time: keepManual };
+    }));
+  } catch (e) {
+    console.error('softRefreshProducts failed', e);
+  }
+};
+
 
   // Persist only for this project
   useEffect(() => {
@@ -162,7 +167,7 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
                 product: prod,
                 quantity: Number(s.quantity) || 1,
                 override_margin: s.override_margin ?? null,
-                unit_cost_at_time: s.unit_cost_at_time ?? null,
+                unit_cost_at_time: null,
               } : null;
             })
             .filter(Boolean);
@@ -196,6 +201,97 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
     })();
     return () => { mounted = false; };
   }, [projectId, showNotification, quoteContext?.docId]);
+
+  // Softly apply SystemDesign changes without nuking unsaved BOM edits
+  const softRefreshProject = async () => {
+    try {
+      const projRes = await axios.get(`${API_URL}/api/projects/${projectId}`);
+      const proj = projRes.data;
+      setProject(proj);
+
+      // we already have up-to-date products in state most of the time; if empty, fetch
+      let prods = products;
+      if (!Array.isArray(prods) || !prods.length) {
+        const res = await axios.get(`${API_URL}/api/products`);
+        prods = (res.data || []).map(p => ({
+          ...p,
+          originalCategory: p.category,
+          category: slugify(p.category),
+        }));
+        setProducts(prods);
+      }
+
+      setBom(prev => {
+        // start from existing rows but strip ONLY the three core categories
+        let out = prev.filter(x => !['panel','inverter','battery'].includes(x.product?.category));
+
+        // Panels
+        if (proj?.panel_id) {
+          const prod = prods.find(p => p.id === proj.panel_id);
+          if (prod) {
+            const was = prev.find(x => x.product?.id === prod.id);
+            const qty = Number(proj.num_panels) || 1;
+            out.push({
+              product: prod,
+              quantity: qty,
+              override_margin: was?.override_margin ?? null,
+              unit_cost_at_time: was?.unit_cost_at_time ?? null,
+            });
+          }
+        }
+
+        // Inverters
+        if (Array.isArray(proj?.inverter_ids) && proj.inverter_ids.length) {
+          const qtyFirst = Number(proj?.inverter_kva?.quantity) || 1;
+          proj.inverter_ids.forEach((id, idx) => {
+            const prod = prods.find(p => p.id === id);
+            if (prod) {
+              const was = prev.find(x => x.product?.id === id);
+              out.push({
+                product: prod,
+                quantity: idx === 0 ? qtyFirst : 1,
+                override_margin: was?.override_margin ?? null,
+                unit_cost_at_time: was?.unit_cost_at_time ?? null,
+              });
+            }
+          });
+        }
+
+        // Batteries
+        if (Array.isArray(proj?.battery_ids) && proj.battery_ids.length) {
+          const qtyFirst = Number(proj?.battery_kwh?.quantity) || 1;
+          proj.battery_ids.forEach((id, idx) => {
+            const prod = prods.find(p => p.id === id);
+            if (prod) {
+              const was = prev.find(x => x.product?.id === id);
+              out.push({
+                product: prod,
+                quantity: idx === 0 ? qtyFirst : 1,
+                override_margin: was?.override_margin ?? null,
+                unit_cost_at_time: was?.unit_cost_at_time ?? null,
+              });
+            }
+          });
+        }
+
+        return out;
+      });
+    } catch (e) {
+      console.error('softRefreshProject failed', e);
+    }
+  };
+
+  // listener block websocket
+  useEffect(() => {
+    const onProject = () => softRefreshProject();   // ← no liveTick bump
+    const onProducts = () => softRefreshProducts(); // ← keep prices/products fresh
+    window.addEventListener('refresh-project', onProject);
+    window.addEventListener('refresh-products', onProducts);
+    return () => {
+      window.removeEventListener('refresh-project', onProject);
+      window.removeEventListener('refresh-products', onProducts);
+    };
+  }, [projectId, products]); // products in deps is fine; handlers are stable closures
 
   /* ---------- Overlay core (panels / inverters / batteries) ---------- */
   const overlayCore = (items, proj, prods) => {
@@ -312,7 +408,7 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
         product_id: r.product.id,
         quantity: Math.max(1, Number(r.quantity) || 1),
         override_margin: r.override_margin ?? null,
-        unit_cost_at_time: r.unit_cost_at_time ?? rowCost(r), // keep any manual edits later if you add UI
+        unit_cost_at_time: r.unit_cost_at_time ?? null, // keep any manual edits later if you add UI
       }));
       await axios.post(`${API_URL}/api/projects/${projectId}/bom`, {
         project_id: projectId,

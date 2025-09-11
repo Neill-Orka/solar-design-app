@@ -91,6 +91,13 @@ function ProjectDashboard() {
     fetchProject();
   }, [fetchProject]);
 
+  useEffect(() => {
+    const onRefetch = () => fetchProject();
+    window.addEventListener('refresh-project', onRefetch);
+    return () => window.removeEventListener('refresh-project', onRefetch);
+  }, [fetchProject]);
+
+
   // Update activeTab when URL changes (e.g., back/forward browser navigation)
   useEffect(() => {
     const tab = searchParams.get('tab');

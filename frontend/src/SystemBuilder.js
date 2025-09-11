@@ -196,6 +196,13 @@ function SystemBuilder() {
             .finally(() => setLoadingTemplates(false));
     };
 
+    useEffect(() => {
+        const onRefetch = () => fetchProducts();
+        window.addEventListener('refresh-products', onRefetch);
+        return () => window.removeEventListener('refresh-products', onRefetch);
+    }, []);
+
+
     // Smart search function
     const applySmartSearch = (product) => {
         if (!mainSearch) return true;

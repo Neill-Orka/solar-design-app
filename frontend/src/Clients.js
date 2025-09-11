@@ -29,6 +29,12 @@ function Clients() {
     loadClients();
   }, []);
 
+  useEffect(() => {
+    const onRefetch = () => loadClients();
+    window.addEventListener('refresh-clients', onRefetch);
+    return () => window.removeEventListener('refresh-clients', onRefetch);
+  }, []);
+
   const loadClients = () => {
     setLoading(true);
     axios.get(`${API_URL}/api/clients`)

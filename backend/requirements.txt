@@ -35,6 +35,8 @@ PyJWT==2.8.0
 email-validator==2.1.0
 Flask
 Flask-SQLAlchemy
+flask-socketio
+eventlet
 Flask-Cors
 Flask-Migrate
 psycopg2-binary
