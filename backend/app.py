@@ -38,11 +38,11 @@ from routes.quotes import quotes_bp
 app = Flask(__name__)
 app.config.from_object(Config)
 # Update CORS for production - add your Vercel domain
-CORS(app, origins=["http://localhost:3000", "https://solar-design-app.vercel.app"], supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
+CORS(app, origins=["http://localhost:3000", "https://solar-design-app.vercel.app", "http://localhost:5173"], supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
 
 socketio = SocketIO(
     app,
-    cors_allowed_origins=["http://localhost:3000", "https://solar-design-app.vercel.app"],
+    cors_allowed_origins=["http://localhost:3000", "https://solar-design-app.vercel.app", "http://localhost:5173"],
     async_mode='eventlet'
 )
 
