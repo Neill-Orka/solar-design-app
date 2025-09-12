@@ -1,8 +1,7 @@
 {
-    "rewrites": [
-        {
-            "source": "/api/:path*",
-            "destination": "http://142.93.175.252/api/:path*"
-        }
-    ]
+  "rewrites": [
+    { "source": "/api/:path*",       "destination": "http://142.93.175.252/api/:path*" },
+    { "source": "/socket.io/:path*", "destination": "http://142.93.175.252/socket.io/:path*" },
+    { "source": "/((?!api|socket\\.io|assets|.*\\..*).*)", "destination": "/" }
+  ]
 }
