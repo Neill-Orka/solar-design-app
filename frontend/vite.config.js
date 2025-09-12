@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
     },
     // Optional: Match CRA's default build output directory
     build: {
-      outDir: 'build',
+      outDir: 'dist',
     },
     server: {
       // Optional: Open the browser on server start
