@@ -95,8 +95,8 @@ function EnergyDataUpload({ projectId }) {
 
     setSubmitting(true);
     axios.post(`${API_URL}/api/projects/${projectId}/use-profile`, {
-      profile_id: selectedProfileId,
-      scaler: profileScaler
+      profile_id: Number(selectedProfileId),
+      scaler: Number(profileScaler, 1)
     })
       .then((response) => {
         showNotification('Profile data applied successfully!', 'success');
