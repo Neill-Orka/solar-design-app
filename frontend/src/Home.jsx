@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import CountUp from 'react-countup';
-import { FaProjectDiagram, FaUsers, FaTools } from 'react-icons/fa';
+import { FaProjectDiagram, FaUsers, FaTools, FaClipboardList } from 'react-icons/fa';
 import './Home.css';
 import { useAuth } from './AuthContext';
 import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
@@ -139,7 +139,15 @@ function Home() {
               color: 'warning',
               icon: <FaTools size={46} />,
               roles: ['admin','sales']
-            }
+            },
+            {
+            title: 'Job Cards',
+            text: 'Create and complete on-site job cards.',
+            link: '/job-cards',
+            color: 'info',
+            icon: <FaClipboardList size={46} />,
+            roles: ['admin', 'manager', 'design'] // show to these roles
+          },
           ]
             .filter(card => {
               if (!user) return false; // no cards until auth resolved
