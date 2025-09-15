@@ -14,6 +14,8 @@
 // src/apiConfig.js
 const dev = process.env.NODE_ENV === 'development';
 
+export const SOCKET_ENABLED = process.env.NODE_ENV === 'development';
+
 export const API_URL = dev ? 'http://localhost:5000' : '';   // 👈 EMPTY in prod
 
 // Keep sockets pointing directly to your backend (needs HTTPS later)

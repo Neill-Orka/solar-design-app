@@ -4,7 +4,7 @@ import { NotificationProvider } from './NotificationContext';
 import { AuthProvider, useAuth } from './AuthContext';
 import { io } from 'socket.io-client';
 import { useEffect } from 'react';
-import { SOCKET_URL } from './apiConfig';
+import { SOCKET_URL, SOCKET_ENABLED } from './apiConfig';
 import ToastNotification from './ToastNotification';
 import ProtectedRoute from './ProtectedRoute';
 import Navbar from './Navbar';
@@ -36,7 +36,14 @@ import './index.css';
 
 function LiveBus({ projectId }) {
   useEffect(() => {
-    const socket = io(SOCKET_URL, { transports: ['websocket'] });
+
+    if (!SOCKET_ENABLED || !SOCKET_URL) return;
+
+    const socket = io(SOCKET_URL, {
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],
+      withCredentials: true,
+    });
 
     socket.on("connect", () => {
       const rooms = ["products", "projects", "clients"];
