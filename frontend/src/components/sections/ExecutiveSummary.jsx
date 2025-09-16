@@ -123,9 +123,7 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
           {project.name} - 
           {project.inverter_brand_model ? ` ${project.inverter_brand_model} ` : " "}
           {displayValue(project.inverter_kva, "0", "inverter_kva")} kVA
-          {Number(displayValue(project.battery_kwh, "0", "battery_kwh")) > 0 && project.battery_brand_model
-            ? ` & ${project.battery_brand_model} ${displayValue(project.battery_kwh, "0", "battery_kwh") / 0.8} kWh`
-            : ""}
+          {Number(displayValue(project.battery_kwh, "0", "battery_kwh")) > 0 && `& ${displayValue(project.battery_nominal_rating, "0", "battery_kwh")} kWh`}
         </div>
         <img className="orka-summary-logo" src={logo} alt="Orka Solar Logo" />
       </div>
@@ -169,7 +167,7 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
           <img src={batteryIcon} className="orka-summary-icon" alt="" />
           <div className="orka-summary-label">Backup</div>
           <div className="orka-summary-sublabel">Chemistry: {project.battery_chem || 'LFP'}</div>
-          <div className="orka-summary-sublabel">{formatValue(calculateBatteryAt100(project.battery_kwh))} kWh @ 100%</div>
+          <div className="orka-summary-sublabel">{project.battery_nominal_rating} kWh @ 100%</div>
           <div className="orka-summary-sublabel">{displayValue(project.battery_kwh, "0", "battery_kwh_80")} kWh @ 80%</div>
         </div>
       </div>

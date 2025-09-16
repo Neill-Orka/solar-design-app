@@ -60,7 +60,7 @@ function CoverPage({ data }) {
         <div className="orka-cover-projectname">{project.name}</div>
         <div className="orka-cover-specblock">
           <span>Inverting: <b>{displayValue(project.inverter_kva, "50", "inverter_kva")} kVA</b></span><br />
-          <span>ESS: <b>{displayValue(project.battery_kwh, "0", "battery_kwh")} kWh</b></span><br />
+          <span>ESS: <b>{project.battery_nominal_rating} kWh</b></span><br />
           <span>PV: <b>{displayValue(project.panel_kw, "32.1", "panel_kw")} kWp</b></span><br />
           <span>Load Shedding Scenario: <b>{displayValue(project.load_shedding, "0")}</b></span>
         </div>

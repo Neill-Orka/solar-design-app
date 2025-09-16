@@ -40,6 +40,8 @@ function MainReportContent({
     const [simulationStartDate, setSimulationStartDate] = useState(null);
     const [simulationEndDate, setSimulationEndDate] = useState(null);
 
+    console.log("Report data received (from MainReportContent):", data);
+
     // Initialize dates - first clear any existing stored dates
     useEffect(() => {
         // Clear any existing stored dates that might be causing the issue
@@ -1147,7 +1149,7 @@ function MainReportContent({
                         </div>
                         <div style={{ fontSize: '15px' }}>
                             <span style={{ fontWeight: '' }}>
-                                {formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh") / 0.8)}
+                                {data.project.battery_nominal_rating ? formatValue(data.project.battery_nominal_rating) : formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh"))}
                             </span>{' '}
                             <span style={{ fontSize: '14px' }}>kWh @100%</span>
                         </div>
@@ -1244,7 +1246,7 @@ function MainReportContent({
                             </tr> */}
                             <tr>
                                 <td>Battery selected</td>
-                                <td className="text-end">{formatValue(displayValue(data?.project?.battery_kwh, 0, "battery_kwh") / 0.8)}/
+                                <td className="text-end">{formatValue(data?.project?.battery_nominal_rating)}/
                                    {formatValue(data?.project?.battery_kwh_80 || (displayValue(data?.project?.battery_kwh, 0, "battery_kwh")))}</td>
                                 <td>kWh</td>
                             </tr>

@@ -164,8 +164,16 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
           return prod ? `${prod.brand}` : "";
         };
 
+        const getNominalRating = (products, ids, category) => {
+          if (!Array.isArray(ids) || !products) return '';
+          const prod = products.find(p => ids.includes(p.id) && p.category === category);
+          return prod ? prod.nominal_rating_kwh : '';
+        }
+
         project.inverter_brand_model = getBrandModel(products, project.inverter_ids, 'Inverter');
         project.battery_brand_model = getBrandModel(products, project.battery_ids, 'Battery');
+
+        project.battery_nominal_rating = Number(getNominalRating(products, project.battery_ids, 'Battery') * project.battery_kwh.quantity).toFixed(2);
      
         
         const reportData = {
