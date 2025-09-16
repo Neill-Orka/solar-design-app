@@ -19,34 +19,52 @@ export const AuthProvider = ({ children }) => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('access_token');
       const userData = localStorage.getItem('user');
-      
-      if (token && userData) {
-        try {
-          // Verify token is still valid
-          const response = await fetch(`${API_URL}/api/auth/me`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
 
-          if (response.ok) {
-            const data = await response.json();
-            setUser(data.user);
-          } else {
-            // Token is invalid, clear storage
-            console.log('Token verification failed, clearing auth data');
-            logout();
+      if (!token || !userData) {
+        setLoading(false);
+        return;
+      }
+
+      const hitMe = async (accessToken) => {
+        const res = await fetch(`${API_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        return res;
+      };
+
+      try {
+        // 1) try with current token
+        let res = await hitMe(token);
+
+        // 2) if 401, try refresh once, then retry /me
+        if (res.status === 401) {
+          const newToken = await refreshToken(); // your existing function
+          if (newToken) {
+            res = await hitMe(newToken);
           }
-        } catch (error) {
-          console.error('Auth verification failed:', error);
+        }
+
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+        } else {
+          // only logout if second attempt also failed
           logout();
         }
+      } catch (err) {
+        console.error('Auth verification failed:', err);
+        // network hiccup? don’t nuke the session immediately
+        // optionally keep the user and rely on next interaction to refresh
+        // but if you prefer to be strict, call logout() here.
+        logout();
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initializeAuth();
   }, []);
+
 
   const login = (userData, tokens) => {
     setUser(userData);

@@ -9,6 +9,13 @@ import '../../ReportBuilder.css';
 import StandardPage from "./StandardPage";
 import 'chartjs-adapter-date-fns'
 import { Image } from 'react-bootstrap';
+import saGHIMap from './../../assets/southafrica_ghi_map.png';
+import meanAnnualRainfall from './../../assets/MeanAnnualRainfall.jpg';
+import panel_icon from './../../assets/panel_icon.png';
+import inverter_icon from './../../assets/inverter_icon.png';
+import battery_icon from './../../assets/battery_icon.png';
+import yield_icon from './../../assets/yield_icon.png';
+import utilized_icon from './../../assets/utilized_icon.png';
 
 function MainReportContent({ 
   data, 
@@ -837,15 +844,13 @@ function MainReportContent({
         >
             <h4 className="fw-bold">Project Goal</h4>
             <p>{getSystemContent('projectGoal')}</p>
-            <p>
-                The following benefits will be achieved:
-                <ol>
-                    {getSystemContent('benefits').map((benefit, index) =>(
-                        <li key={index}>{benefit}</li>
-                    ))}
-                </ol>                
-            </p>
-
+            <p>The following benefits will be achieved:</p>
+            <ol>
+                {getSystemContent('benefits').map((benefit, index) =>(
+                    <li key={index}>{benefit}</li>
+                ))}
+            </ol>                
+            
             <h5 className="fw-bold">Current load profile and electrical consumption</h5>
             {/* Monthly energy consumption chart */}
             
@@ -1066,8 +1071,8 @@ function MainReportContent({
 
             <h5 className="fw-bold">Meteorological Data</h5>
             <p>The detailed designs were done using our verified proprietary software which takes into account the site's specific meteorological information to predict the typical generation that can be expected from the specified equipment simulated over 365 days of the year. This enables an accurate analysis of the system yields and in return accurate results on the financial returns.</p>
-            <Image width={300} src={require('../../assets/southafrica_ghi_map.png')} alt="Meteorological Data" />
-            <Image align="right" width={375} src={require('../../assets/MeanAnnualRainfall.jpg')} alt="Rainfall Data" />
+            <Image width={300} src={saGHIMap} alt="Meteorological Data" />
+            <Image align="right" width={375} src={meanAnnualRainfall} alt="Rainfall Data" />
 
         </StandardPage>
 
@@ -1099,7 +1104,7 @@ function MainReportContent({
                 }}>
                     {/* Solar PV */}
                     <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
-                        <img src={require('../../assets/panel_icon.png')} alt="Solar PV" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
+                        <img src={panel_icon} alt="Solar PV" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
                         <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Solar PV</div>
                         <div style={{ fontSize: '14px' }}>
                             {(data?.project?.panel_kw).toFixed(2) || 0} <span style={{ fontSize: '14px' }}>kWp</span>
@@ -1111,7 +1116,7 @@ function MainReportContent({
 
                     {/* Inverters */}
                     <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
-                        <img src={require('../../assets/inverter_icon.png')} alt="Inverters" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
+                        <img src={inverter_icon} alt="Inverters" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
                         <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Inverters</div>
                         <div style={{ fontSize: '15px' }}>
                             Total{' '}
@@ -1135,7 +1140,7 @@ function MainReportContent({
 
                     {/* Battery */}
                     <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
-                        <img src={require('../../assets/battery_icon.png')} alt="Battery" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
+                        <img src={battery_icon} alt="Battery" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
                         <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Battery</div>
                         <div style={{ fontSize: '15px' }}>
                             Chemistry: {data?.project?.battery_chem || "LiFePO4"}
@@ -1156,7 +1161,7 @@ function MainReportContent({
 
                     {/* Specific Yield */}
                     <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
-                        <img src={require('../../assets/yield_icon.png')} alt="Specific Yield" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
+                        <img src={yield_icon} alt="Specific Yield" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
                         <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Specific Yield</div>
                         <div style={{ fontSize: '18px', fontWeight: '' }}>
                             {formatValue(data?.financials?.yield_excl_losses * 365 || 1612)}
@@ -1168,7 +1173,7 @@ function MainReportContent({
 
                     {/* Utilized Energy */}
                     <div className="spec-item" style={{ textAlign: 'center', width: '16%' }}>
-                        <img src={require('../../assets/utilized_icon.png')} alt="Utilized Energy" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
+                        <img src={utilized_icon} alt="Utilized Energy" style={{ width: '60px', height: '60px', marginBottom: '5px' }} />
                         <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Utilized Energy<br />from System</div>
                         <div style={{ fontSize: '18px', fontWeight: '' }}>
                             {formatValue(data?.financials?.total_generation_kwh || 68166)}
