@@ -238,6 +238,8 @@ class Projects(db.Model):
     template_id = db.Column(db.Integer, nullable=True)
     template_name = db.Column(db.String(100), nullable=True)
     bom_modified = db.Column(db.Boolean, default=False)  # Track if user has modified BOM
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
 
     energy_data = db.relationship('EnergyData', backref='project', lazy=True, cascade="all, delete-orphan")
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")
