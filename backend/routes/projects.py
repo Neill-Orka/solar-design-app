@@ -36,6 +36,7 @@ def get_projects():
                 'tariff_id': p.tariff_id,
                 'custom_flat_rate': p.custom_flat_rate,
                 'created_at': p.created_at.isoformat() if p.created_at else None,
+                'created_by': p.created_by.full_name if p.created_by else '',
                 'tariff_details': serialize_tariff(p.tariff) if p.tariff else None,
             }
             for p in projects
@@ -128,9 +129,11 @@ def get_project_by_id(project_id):
 
 
 @projects_bp.route('/projects', methods=['POST'])
+@jwt_required()
 def add_project():
     try:
         data = request.json
+        user_id = get_jwt_identity()
         if data is None:
             return jsonify({'error': 'No JSON data provided'}), 400
         new_project = Projects(
@@ -150,7 +153,8 @@ def add_project():
             design_type=data.get('design_type', 'Quick'),
             project_type=data.get('project_type', 'Residential'),
             tariff_id=data.get('tariff_id'),
-            custom_flat_rate=data.get('custom_flat_rate')
+            custom_flat_rate=data.get('custom_flat_rate'),
+            created_by_id=user_id
         )
         db.session.add(new_project)
         db.session.commit()

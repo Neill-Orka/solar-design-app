@@ -189,11 +189,16 @@ function AddProject() {
     }
 
     try {
+      const token = localStorage.getItem('access_token');
       const res = await axios.post(`${API_URL}/api/projects`, {
         ...projectData,
         latitude: parseFloat(projectData.latitude) || -25.9895,
         longitude: parseFloat(projectData.longitude) || 28.1284,
         client_id: clientId
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
       const newId = res.data.project_id;
       if (!newId) {

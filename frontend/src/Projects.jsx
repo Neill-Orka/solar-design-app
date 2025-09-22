@@ -126,7 +126,12 @@ function Projects() {
       filtered = filtered.filter(p => (p.project_type || '').toLowerCase() === activeFilters.projectType);
     }
 
-    return filtered;
+    // Sort by creation date (newest first)
+    return filtered.sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+      const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+      return dateB - dateA;
+    });
   }, [projects, searchTerm, activeFilters]);
   return (
     <div className='min-vh-100' style={{ backgroundColor: '#f8f9fa' }}>
@@ -442,6 +447,11 @@ function Projects() {
                               <td><Badge bg="info" pill>{project.design_type || 'N/A'}</Badge></td>
                               <td>
                                 {project.created_at ? new Date(project.created_at).toLocaleDateString() : 'N/A'}
+                                {project.created_by && (
+                                  <div className='small text-muted'>
+                                    by {project.created_by}
+                                  </div>
+                                )}
                               </td>
                               <td className="text-end pe-3">
                                 <Link to={`/projects/${project.id}`} className="btn btn-primary btn-sm me-2">
