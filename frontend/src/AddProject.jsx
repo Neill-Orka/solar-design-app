@@ -16,8 +16,11 @@ function AddProject() {
     street: '',
     town: '',
     province: '',
-    country: 'South Africa'
+    country: 'South Africa',
   });
+  const [newClientCompany, setNewClientCompany] = useState('');
+  const [newClientVatNumber, setNewClientVatNumber] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [projectData, setProjectData] = useState({
@@ -68,6 +71,25 @@ function AddProject() {
     // Do not overwrite if user has typed something
     // Do nothing if 'new' client is selected
   }, [selectedClientId, clients]);
+
+  useEffect(() => {
+    if (selectedClientId === 'new') {
+      const { street, town, province } = newClientAddress;
+      // Only update if we have at least one address component
+      if (street || town || province) {
+        const locationStr = [
+          street,
+          town, 
+          province
+        ].filter(Boolean).join(', ');
+
+        setProjectData(prev => ({
+          ...prev,
+          location: locationStr
+        }));
+      }
+    }
+  }, [newClientAddress, selectedClientId]);
 
   const loadClients = () => {
     axios.get(`${API_URL}/api/clients`)
@@ -143,7 +165,9 @@ function AddProject() {
           client_name: newClientName,
           email: newClientEmail,
           phone: newClientPhone,
-          address: newClientAddress
+          address: newClientAddress,
+          company: newClientCompany,
+          vat_number: newClientVatNumber
         });
         // Reload clients and set the new one
         clientId = res.data.client_id;
@@ -206,31 +230,6 @@ function AddProject() {
               </div>
 
               {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
-
-              {/* Design Type Selection */}
-              {/* <div className="mb-5">
-                <h5 className="fw-semibold mb-3">
-                  <i className="bi bi-gear-fill me-2"></i>Design Type
-                </h5>
-                <div className="d-flex gap-3">
-                  <Button
-                    variant={projectData.design_type === 'Quick' ? 'primary' : 'outline-primary'}
-                    size="lg"
-                    onClick={() => setProjectData({ ...projectData, design_type: 'Quick'})}
-                    className="flex-fill rounded-lg shadow-sm"
-                  >
-                    <i className="bi bi-lightning-fill me-2"></i>Quick Design
-                  </Button>
-                  <Button
-                    variant={projectData.design_type === 'Detailed' ? 'primary' : 'outline-primary'}
-                    size="lg"
-                    onClick={() => setProjectData({ ...projectData, design_type: 'Detailed'})}
-                    className="flex-fill rounded-lg shadow-sm"
-                  >
-                    <i className="bi bi-tools me-2"></i>Detailed Design
-                  </Button>
-                </div>
-              </div> */}
 
               <Form onSubmit={handleSubmit}>
                 {/* Client Selection Section */}
@@ -366,7 +365,33 @@ function AddProject() {
                                 placeholder="South Africa"
                                 />
                             </Form.Group>
-                          </Col>                                                
+                          </Col>  
+                          <Col md={6}>
+                            <Form.Group className="mb-3">
+                              <Form.Label className="fw-semibold">Company</Form.Label>
+                              <Form.Control
+                                type="text"
+                                value={newClientCompany}
+                                onChange={e => setNewClientCompany(e.target.value)}
+                                size="md"
+                                className="rounded-md"
+                                placeholder="Enter company name"
+                                />
+                            </Form.Group>
+                          </Col>
+                          <Col md={6}>
+                            <Form.Group className="mb-3">
+                              <Form.Label className="fw-semibold">VAT Number</Form.Label>
+                              <Form.Control
+                                type="text"
+                                value={newClientVatNumber}
+                                onChange={(e) => setNewClientVatNumber(e.target.value)}
+                                size="md"
+                                className="rounded-md"
+                                placeholder="Enter VAT number"
+                              />
+                            </Form.Group>
+                          </Col>
                         </>
                       )}
                     </Row>
