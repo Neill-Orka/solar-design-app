@@ -29,6 +29,10 @@ import LoadProfileManager from './LoadProfileManager';
 import TariffManager from './TariffManager';
 import RuleEditor from './RuleEditor';
 import PrintableBOM from './PrintableBOM';
+import JobCardsPage from './features/jobcards/pages/JobCardsPage';
+import JobCardCreatePage from './features/jobcards/pages/JobCardCreatePage';
+import JobCardDetailPage from './features/jobcards/pages/JobCardDetailPage';
+
 import axios from 'axios';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -209,6 +213,9 @@ function AuthenticatedApp() {
             <Route path="/printable-bom/:projectId" element={<PrintableBOM />} />
             <Route path="/projects/:projectId/printable-bom/:docId" element={<PrintableBOM />} />
             <Route path="/projects/:projectId/quotes/:docId" element={<PrintableBOM />} />
+            <Route path="/jobcards" element={<JobCardsPage />} />
+            <Route path="/jobcards/new" element={<JobCardCreatePage />} />
+            <Route path="/jobcards/:id" element={<JobCardDetailPage />} />
 
             {/* Admin only routes */}
             <Route path="/admin" element={

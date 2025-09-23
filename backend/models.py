@@ -838,3 +838,225 @@ class DocumentEvent(db.Model):
             "created_by_id": self.created_by_id,
             "created_at": self.created_at.isoformat() + "Z",
         }
+    
+# ─────────────────────────────────────────────────────────────────────────────
+# Job Cards models
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TechnicianProfile(db.Model):
+    __tablename__ = "technician_profiles"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False)
+    hourly_rate = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    active = db.Column(db.Boolean, default=True)
+
+    user = db.relationship("User", backref=db.backref("technician_profile", uselist=False))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "name": self.user.full_name if self.user else None,
+            "hourly_rate": float(self.hourly_rate or 0),
+            "active": self.active,
+        }
+
+class JobCategory(db.Model):
+    __tablename__ = "job_categories"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False)
+    active = db.Column(db.Boolean, default=True)
+
+    def to_dict(self):
+        return {"id": self.id, "name": self.name, "active": self.active}
+
+class Vehicle(db.Model):
+    __tablename__ = "vehicles"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)          # e.g. "Hilux 2.4D"
+    registration = db.Column(db.String(40), unique=True)     # e.g. "CA 123-456"
+    rate_per_km = db.Column(db.Numeric(10, 2), nullable=True)  # optional, for costing
+    active = db.Column(db.Boolean, default=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "registration": self.registration,
+            "rate_per_km": float(self.rate_per_km or 0),
+            "active": self.active,
+        }
+
+class JobCard(db.Model):
+    __tablename__ = "job_cards"
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Assignment
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=False)
+    owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey("job_categories.id"), nullable=True)
+
+    # Basics
+    title = db.Column(db.String(120), nullable=True)
+    description = db.Column(db.Text, nullable=True)
+
+    # Timing
+    start_at = db.Column(db.DateTime, nullable=True)     # call out start
+    complete_at = db.Column(db.DateTime, nullable=True)  # completion
+
+    # Client snapshots (freeze values at creation time)
+    client_name_snapshot = db.Column(db.String(120))
+    client_email_snapshot = db.Column(db.String(120))
+    client_address_snapshot = db.Column(db.String(255))
+
+    # Labour (summary-level)
+    labourers_count = db.Column(db.Integer, default=0)
+    labour_hours = db.Column(db.Numeric(10, 2), nullable=True)
+    labour_rate_per_hour = db.Column(db.Numeric(10, 2), nullable=True)
+
+    # Materials
+    materials_used = db.Column(db.Boolean, default=False)
+
+    # Travel
+    did_travel = db.Column(db.Boolean, default=False)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey("vehicles.id"), nullable=True)
+    travel_distance_km = db.Column(db.Numeric(10, 2), nullable=True)
+
+    # Compliance
+    coc_required = db.Column(db.Boolean, default=False)
+
+    # Status / meta
+    # Suggested lifecycle strings: 'draft','scheduled','in_progress','paused','completed','cancelled','invoiced'
+    status = db.Column(db.String(20), default="open")
+    metadata_json = db.Column(JSONB, nullable=True)
+
+    # Audit
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    client = db.relationship("Clients", backref=db.backref("job_cards", lazy=True))
+    owner = db.relationship("User", foreign_keys=[owner_id])
+    category = db.relationship("JobCategory")
+    vehicle = db.relationship("Vehicle")
+
+    time_entries = db.relationship(
+        "JobCardTimeEntry", backref="job_card", cascade="all, delete-orphan", lazy=True
+    )
+    materials = db.relationship(
+        "JobCardMaterial", backref="job_card", cascade="all, delete-orphan", lazy=True
+    )
+    attachments = db.relationship(
+        "JobCardAttachment", backref="job_card", cascade="all, delete-orphan", lazy=True
+    )
+
+    def to_dict(self, with_lines: bool = True):
+        base = {
+            "id": self.id,
+            "client_id": self.client_id,
+            "owner_id": self.owner_id,
+            "category_id": self.category_id,
+            "title": self.title,
+            "description": self.description,
+            "start_at": self.start_at.isoformat() if self.start_at else None,
+            "complete_at": self.complete_at.isoformat() if self.complete_at else None,
+            "client_name": self.client_name_snapshot,
+            "client_email": self.client_email_snapshot,
+            "client_address": self.client_address_snapshot,
+            "labourers_count": self.labourers_count or 0,
+            "labour_hours": float(self.labour_hours or 0),
+            "labour_rate_per_hour": float(self.labour_rate_per_hour or 0),
+            "materials_used": bool(self.materials_used),
+            "did_travel": bool(self.did_travel),
+            "vehicle_id": self.vehicle_id,
+            "travel_distance_km": float(self.travel_distance_km or 0),
+            "coc_required": bool(self.coc_required),
+            "status": self.status,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+        if with_lines:
+            base["time_entries"] = [t.to_dict() for t in self.time_entries]
+            base["materials"] = [m.to_dict() for m in self.materials]
+            base["attachments"] = [a.to_dict() for a in self.attachments]
+        return base
+
+
+class JobCardTimeEntry(db.Model):
+    __tablename__ = "job_card_time_entries"
+    id = db.Column(db.Integer, primary_key=True)
+    job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    hours = db.Column(db.Numeric(6, 2), nullable=False, default=0)
+    hourly_rate_at_time = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+
+    user = db.relationship("User")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "job_card_id": self.job_card_id,
+            "user_id": self.user_id,
+            "user_name": self.user.full_name if self.user else None,
+            "hours": float(self.hours or 0),
+            "hourly_rate_at_time": float(self.hourly_rate_at_time or 0),
+            "amount": float((self.hours or 0) * (self.hourly_rate_at_time or 0)),
+        }
+
+
+class JobCardMaterial(db.Model):
+    __tablename__ = "job_card_materials"
+    id = db.Column(db.Integer, primary_key=True)
+    job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+
+    unit_cost_at_time = db.Column(db.Numeric(12, 2), nullable=True)
+    unit_price_at_time = db.Column(db.Numeric(12, 2), nullable=True)
+    note = db.Column(db.String(200), nullable=True)
+
+    product = db.relationship("Product")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "job_card_id": self.job_card_id,
+            "product_id": self.product_id,
+            "product_label": (
+                f"{self.product.brand_name or ''} {self.product.description or ''}".strip()
+                if self.product else None
+            ),
+            "quantity": self.quantity,
+            "unit_cost_at_time": float(self.unit_cost_at_time or 0),
+            "unit_price_at_time": float(self.unit_price_at_time or 0),
+            "line_total": float((self.unit_price_at_time or 0) * (self.quantity or 0)),
+            "note": self.note,
+        }
+
+
+class JobCardAttachment(db.Model):
+    __tablename__ = "job_card_attachments"
+    id = db.Column(db.Integer, primary_key=True)
+    job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=False)
+    filename = db.Column(db.String(200), nullable=False)
+    url = db.Column(db.String(500), nullable=False)  # where frontend can GET it
+    content_type = db.Column(db.String(80), nullable=True)
+    size_bytes = db.Column(db.Integer, nullable=True)
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    uploaded_by = db.relationship("User")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "job_card_id": self.job_card_id,
+            "filename": self.filename,
+            "url": self.url,
+            "content_type": self.content_type,
+            "size_bytes": self.size_bytes,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
