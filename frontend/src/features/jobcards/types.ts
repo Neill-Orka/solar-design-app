@@ -55,6 +55,7 @@ export interface JobCard {
     id: number;
     client_id: number;
     owner_id: number | null;
+    owner_name?: string;
     category_id: number | null;
     title: string | null;
     description: string | null;
@@ -80,6 +81,17 @@ export interface JobCard {
     attachments?: JobCardAttachment[];
 }
 
+export interface Product {
+    id: number;
+    brand?: string;
+    model?: string;
+    category?: string;
+    component_type?: string;
+    unit_cost?: number | null;
+    price?: number | null;
+    margin?: number | null;
+}
+
 export type JobCardUpsert = Omit<JobCard,
     | 'id' 
     | 'created_at'
@@ -92,3 +104,13 @@ export type JobCardUpsert = Omit<JobCard,
     | 'client_email'
     | 'client_phone'
 >;
+
+export type Client = { 
+    id: number;
+    client_name: string;
+    email?: string;
+    phone?: string;
+    address?: any;
+    company?: string;
+    vat_number?: string; 
+}

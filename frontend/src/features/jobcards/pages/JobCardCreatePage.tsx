@@ -1,28 +1,35 @@
 // JobCardCreatePage.tsx
 import { useNavigate } from 'react-router-dom';
-import JobCardForm from '../../jobcards/components/JobCardForm';
-import { createJobCard } from '../api';
+import JobCardFormMobile from '../components/JobCardFormMobile';
+import { createJobCard, setAuthToken } from '../api';
 import type { JobCardFormValues } from '../schemas';
-import { useAuth } from '../../../AuthContext'; // adjust path if needed
+import { useAuth } from '../../../AuthContext';
+import { useEffect } from 'react';
 
 export default function JobCardCreatePage() {
   const nav = useNavigate();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  useEffect(() => setAuthToken(token), [token]);
+
+  if (!user?.id) {
+    return <div className="p-3">Loading…</div>;
+  }
 
   const onSubmit = async (values: JobCardFormValues) => {
     const created = await createJobCard({
       ...values,
-      owner_id: user!.id,            // ensure > 0
+      owner_id: user.id,
     });
     nav(`/jobcards/${created.id}`);
   };
 
   return (
-    <div className="container py-3">
-      <h3>Create Job Card</h3>
-      <JobCardForm
-        initial={{ owner_id: user?.id ?? 0, status: 'draft' }}
+    <div className="container-fluid px-0">
+      <JobCardFormMobile
+        key={user.id}                              // re-init form with the proper owner
+        initial={{ owner_id: user.id, status: 'draft' }}
         onSubmit={onSubmit}
+        onCancel={() => nav(-1)}
       />
     </div>
   );

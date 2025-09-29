@@ -1,35 +1,56 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import JobCardForm from '../../jobcards/components/JobCardForm';
-import { getJobCard, updateJobCard } from '../api';
-import type { JobCard } from '../types';
-import type { JobCardFormValues } from '../schemas';
+// src/features/jobcards/pages/JobCardDetailPage.tsx
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { getJobCard, listCategories } from "../api";
+import type { JobCard, JobCategory } from "../types";
+import JobCardDetail from "../components/JobCardDetail"; // will rename later to JobCardDetail
 
 export default function JobCardDetailPage() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
-  const [item, setItem] = useState<JobCard | null>(null);
+
+  const [job, setJob] = useState<JobCard | null>(null);
+  const [categoryName, setCategoryName] = useState<string>("");
 
   useEffect(() => {
-    if (!id) return;
-    getJobCard(Number(id)).then(setItem);
+    let mounted = true;
+
+    (async () => {
+      if (!id) return;
+      const jc = await getJobCard(Number(id));
+      if (!mounted) return;
+      setJob(jc);
+
+      // map category id -> name (backend doesn’t snapshot it)
+      if (jc?.category_id) {
+        try {
+          const cats: JobCategory[] = await listCategories();
+          const match = cats.find((c) => c.id === jc.category_id);
+          if (mounted) setCategoryName(match?.name || "");
+        } catch {
+          /* ignore, keep empty name */
+        }
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, [id]);
 
-  const onSubmit = async (values: JobCardFormValues) => {
-    if (!id) return;
-    const updated = await updateJobCard(Number(id), values);
-    setItem(updated);
-  };
-
-  if (!item) return <div className="container py-3">Loading…</div>;
+  if (!job) {
+    return (
+      <div className="container py-4">
+        <div className="text-muted">Loading job card…</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container py-3">
-      <div className="d-flex justify-content-between align-items-center mb-2">
-        <h3>Job Card #{item.id}</h3>
-        <button className="btn btn-outline-secondary" onClick={() => nav('/jobcards')}>Back</button>
-      </div>
-      <JobCardForm initial={item} onSubmit={onSubmit} />
-    </div>
+    <JobCardDetail
+      job={job}
+      categoryName={categoryName}
+      onEdit={() => nav(`/jobcards/${job.id}/edit`)}
+    />
   );
 }

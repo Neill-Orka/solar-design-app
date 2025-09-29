@@ -32,6 +32,7 @@ import PrintableBOM from './PrintableBOM';
 import JobCardsPage from './features/jobcards/pages/JobCardsPage';
 import JobCardCreatePage from './features/jobcards/pages/JobCardCreatePage';
 import JobCardDetailPage from './features/jobcards/pages/JobCardDetailPage';
+import PageTransition from './features/jobcards/components/PageTransition';
 
 import axios from 'axios';
 
@@ -213,9 +214,25 @@ function AuthenticatedApp() {
             <Route path="/printable-bom/:projectId" element={<PrintableBOM />} />
             <Route path="/projects/:projectId/printable-bom/:docId" element={<PrintableBOM />} />
             <Route path="/projects/:projectId/quotes/:docId" element={<PrintableBOM />} />
-            <Route path="/jobcards" element={<JobCardsPage />} />
-            <Route path="/jobcards/new" element={<JobCardCreatePage />} />
-            <Route path="/jobcards/:id" element={<JobCardDetailPage />} />
+
+            {/* Pages with animations */}
+            <Route path="/jobcards" element={
+              <PageTransition>
+                <JobCardsPage />
+              </PageTransition>
+            } />
+            
+            <Route path="/jobcards/new" element={
+              <PageTransition>
+                <JobCardCreatePage />
+              </PageTransition>
+            } />
+            
+            <Route path="/jobcards/:id" element={
+              <PageTransition>
+                <JobCardDetailPage />
+              </PageTransition>
+            } />
 
             {/* Admin only routes */}
             <Route path="/admin" element={

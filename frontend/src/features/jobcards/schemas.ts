@@ -1,6 +1,11 @@
 // src/features/jobcards/schemas.ts
 import { z } from 'zod';
 
+const isoOrNull = z.preprocess(
+  (v) => (v === '' || v == null ? null : v),
+  z.string().datetime().nullable()
+);
+
 export const JobCardFormSchema = z.object({
   client_id: z.coerce.number().int().positive(),
   owner_id: z.coerce.number().int().positive(),
@@ -9,8 +14,8 @@ export const JobCardFormSchema = z.object({
   title: z.string().max(120).nullable().default(''),
   description: z.string().nullable().default(''),
 
-  start_at: z.string().datetime().nullable().default(null),
-  complete_at: z.string().datetime().nullable().default(null),
+  start_at: isoOrNull.default(null),
+  complete_at: isoOrNull.default(null),
 
   labourers_count: z.coerce.number().int().min(0).default(0),
   labour_hours: z.coerce.number().min(0).default(0),
@@ -34,7 +39,7 @@ export type JobCardFormValues = z.infer<typeof JobCardFormSchema>;
 // Single source of truth for form defaults (prevents undefined)
 export const jobCardDefaults: JobCardFormValues = {
   client_id: 0,
-  owner_id: 0,
+  owner_id: 1,
   category_id: null,
   title: '',
   description: '',

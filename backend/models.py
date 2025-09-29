@@ -956,6 +956,7 @@ class JobCard(db.Model):
             "id": self.id,
             "client_id": self.client_id,
             "owner_id": self.owner_id,
+            "owner_name": self.owner.first_name if self.owner else None,
             "category_id": self.category_id,
             "title": self.title,
             "description": self.description,
