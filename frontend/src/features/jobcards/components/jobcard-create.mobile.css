@@ -212,3 +212,40 @@
   display: flex;
   gap: 8px;
 }
+
+/* Project selection styling */
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-item {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.project-item:hover {
+  background-color: #f8fafc;
+}
+
+.project-item.selected {
+  border-color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.05);
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.project-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.project-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}

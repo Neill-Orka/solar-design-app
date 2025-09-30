@@ -899,6 +899,8 @@ class JobCard(db.Model):
     # Basics
     title = db.Column(db.String(120), nullable=True)
     description = db.Column(db.Text, nullable=True)
+    is_quoted = db.Column(db.Boolean, default=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=True)
 
     # Timing
     start_at = db.Column(db.DateTime, nullable=True)     # call out start
@@ -960,6 +962,8 @@ class JobCard(db.Model):
             "category_id": self.category_id,
             "title": self.title,
             "description": self.description,
+            "is_quoted": self.is_quoted,
+            "project_id": self.project_id,
             "start_at": self.start_at.isoformat() if self.start_at else None,
             "complete_at": self.complete_at.isoformat() if self.complete_at else None,
             "client_name": self.client_name_snapshot,

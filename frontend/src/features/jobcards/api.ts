@@ -193,3 +193,10 @@ export async function deleteClient(id: number): Promise<{ message: string }> {
   const { data } = await http.delete(`/clients/${id}`);
   return data;
 }
+
+
+// Client's Projects API CALLS
+export async function listClientProjects(clientId: number): Promise<any[]> {
+    const { data } = await http.get(`/projects?client_id=${clientId}`);
+    return data;
+}

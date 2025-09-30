@@ -16,7 +16,7 @@ import type {
   JobCardAttachment,
   Client
 } from "../types";
-import { createClient, listCategories, listClients, listVehicles } from "../api";
+import { createClient, listCategories, listClients, listVehicles, listClientProjects } from "../api";
 import "./jobcard-create.mobile.css";
 import ProductPickerModal from "./ProductPickerModal";
 import type { Product } from "../types";
@@ -88,6 +88,9 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
   const [clientQuery, setClientQuery] = useState("");
   const [clientOpen, setClientOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [isQuotedJC, setIsQuotedJC] = useState(false);
+  const [clientProjects, setClientProjects] = useState<any[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
 
   useEffect(() => {
     // ensure owner_id in form state for Zod
@@ -111,6 +114,26 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
     })();
     return () => ac.abort();
   }, []);
+
+  // UseEffect to load projects when client changes and isQuoted is selected
+  useEffect(() => {
+    if (isQuotedJC && selectedClient?.id) {
+      const fetchClientProjects = async () => {
+        try {
+          const projects = await listClientProjects(selectedClient.id);
+          setClientProjects(projects);
+          // Reset selection when client changes
+          setSelectedProjectId(null);
+        } catch (err) {
+          console.error("Failed to load client projects", err);
+        }
+      };
+      fetchClientProjects();
+    } else {
+      setClientProjects([]);
+      setSelectedProjectId(null);
+    }
+  }, [selectedClient?.id, isQuotedJC]);
 
   // Functions to fill data
   
@@ -185,6 +208,11 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
       }
     }
 
+    setValue("is_quoted", isQuotedJC, { shouldDirty: true });
+    if (isQuotedJC && selectedProjectId) {
+      setValue("project_id" as any, selectedProjectId, { shouldDirty: true });
+    }
+
     await Promise.resolve();
 
     await handleSubmit(onSubmit, onInvalid)();
@@ -240,6 +268,7 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
       category_id: initial.category_id ?? null,
       title: initial.title ?? "",
       description: initial.description ?? "",
+      is_quoted: initial.is_quoted ?? false,
       start_at: normalizeISO(initial.start_at),
       complete_at: normalizeISO(initial.complete_at),
       labourers_count: initial.labourers_count ?? 0,
@@ -297,12 +326,12 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
 
       <section>
         <div className="d-flex justify-content-center align-items-center gap-5 mb-2">
-          <button className="btn btn-lg btn-outline-success" type="button" onClick={() => console.log('Out of Scope')}>Out of Scope</button>
-          <button className="btn btn-lg btn-outline-danger" type="button" onClick={() => console.log('Quoted')}>Quoted</button>
+          <button className={`btn btn-lg ${!isQuotedJC ? 'active btn-outline-success' : 'btn-outline-secondary'}`} type="button" onClick={() => setIsQuotedJC(false)}>Out of Scope</button>
+          <button className={`btn btn-lg ${isQuotedJC ? 'active btn-outline-success' : 'btn-outline-secondary'}`} type="button" onClick={() => setIsQuotedJC(true)}>Quoted</button>
         </div>
       </section>
 
-      {/* CLIENT (visual only for now) */}
+      {/* CLIENT */}
       <section className="jcM-card">
         <h6 className="jcM-section">CLIENT</h6>
 
@@ -383,6 +412,59 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
         )}
 
       </section>
+
+      {/* Project Details if isQuotedJC */}
+      {isQuotedJC && (
+        <section className="jcM-card">
+          <h6 className="jcM-section">PROJECT DETAILS</h6>
+          
+          {!selectedClient && (
+            <div className="alert alert-info py-2">
+              Please select a client to view their projects.
+            </div>
+          )}
+          
+          {selectedClient && clientProjects.length === 0 && (
+            <div className="alert alert-warning py-2">
+              No projects found for this client.
+            </div>
+          )}
+          
+          {clientProjects.length > 0 && (
+            <div className="project-list">
+              {clientProjects.map(project => (
+                <div 
+                  key={project.id}
+                  className={`project-item ${selectedProjectId === project.id ? 'selected' : ''}`}
+                  onClick={() => setSelectedProjectId(project.id)}
+                >
+                  <div className="project-name">{project.name}</div>
+                  <div className="project-details">
+                    {project.system_type && <span className="badge bg-info me-1">{project.system_type}</span>}
+                    {project.panel_kw && <span className="badge bg-warning me-1">{project.panel_kw} kWp</span>}
+                    {project.battery_kwh && (
+                      <span className="badge bg-success">
+                        {typeof project.battery_kwh === 'object' 
+                          ? `${project.battery_kwh.capacity || 0} kWh${project.battery_kwh.quantity > 1 ? ` × ${project.battery_kwh.quantity}` : ''}`
+                          : `${project.battery_kwh} kWh`
+                        }
+                      </span>
+                    )}
+                    {project.inverter_kva && (
+                      <span className="badge bg-primary">
+                        {typeof project.inverter_kva === 'object' 
+                          ? `${project.inverter_kva.capacity || 0} kVA${project.inverter_kva.quantity > 1 ? ` × ${project.inverter_kva.quantity}` : ''}`
+                          : `${project.inverter_kva} kVA`
+                        }
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* JOB DETAILS */}
       <section className="jcM-card">

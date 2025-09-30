@@ -59,6 +59,7 @@ export interface JobCard {
     category_id: number | null;
     title: string | null;
     description: string | null;
+    is_quoted: boolean;
     start_at: string | null;
     complete_at: string | null;
     client_name: string | null;
@@ -103,7 +104,9 @@ export type JobCardUpsert = Omit<JobCard,
     | 'client_address'
     | 'client_email'
     | 'client_phone'
->;
+> & {
+    is_quoted: boolean;
+};
 
 export type Client = { 
     id: number;

@@ -13,6 +13,8 @@ export const JobCardFormSchema = z.object({
 
   title: z.string().max(120).nullable().default(''),
   description: z.string().nullable().default(''),
+  is_quoted: z.boolean().default(false),
+  project_id: z.coerce.number().int().positive().nullable().default(null),
 
   start_at: isoOrNull.default(null),
   complete_at: isoOrNull.default(null),
@@ -43,6 +45,8 @@ export const jobCardDefaults: JobCardFormValues = {
   category_id: null,
   title: '',
   description: '',
+  is_quoted: false,
+  project_id: null,
   start_at: null,
   complete_at: null,
   labourers_count: 0,
