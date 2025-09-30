@@ -105,7 +105,7 @@ function Home() {
               link: '/jobcards',
               color: 'info',
               icon: <FaTools size={46} />,
-              roles: ['admin','manager','technician','design', 'sales'] // tweak as you like
+              roles: ['admin','manager', 'team_leader', 'technician', 'sales'] 
             }
           ]
             .filter(card => {

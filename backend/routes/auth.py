@@ -56,12 +56,28 @@ def require_role(*allowed_roles):
             if not user or not user.is_active:
                 return jsonify({'message': 'User not found or inactive'}), 401
             
-            if user.role.value not in [role.value for role in allowed_roles]:
+            if user.role not in allowed_roles:
                 return jsonify({'message': 'Insufficient permissions'}), 403
             
             return f(*args, **kwargs)
         return decorated_function
     return decorator
+
+def parse_role(val) -> UserRole:
+    if isinstance(val, UserRole):
+        return val
+    if isinstance(val, str):
+        s = val.strip()
+        # try by NAME first (DB enum names are UPPERCASE)
+        try:
+            return UserRole[s.upper()]
+        except KeyError:
+            # Then by VALUE (lowercase slug)
+            try:
+                return UserRole(s.lower())
+            except KeyError:
+                pass
+    raise ValueError(f"Invalid role: {val!r}")
 
 @auth_bp.route('/admin/register', methods=['POST'])
 def register_admin():
@@ -250,11 +266,7 @@ def generate_registration_token():
         data = request.get_json()
         
         # Get role (default to DESIGN if not specified)
-        role_value = data.get('role', 'DESIGN').upper()
-        try:
-            role = UserRole(role_value.lower())
-        except ValueError:
-            return jsonify({'message': 'Invalid role'}), 400
+        role = parse_role(data.get('role', 'DESIGN'))
         
         # Generate token
         token_string = RegistrationToken.generate_token()
@@ -262,7 +274,7 @@ def generate_registration_token():
         # Create registration token (expires in 7 days)
         registration_token = RegistrationToken(
             token=token_string,
-            role=role_value,  # Store uppercase role to match database constraint
+            role=role,  # Store uppercase role to match database constraint
             created_by_id=current_user_id,
             expires_at=datetime.utcnow() + timedelta(days=7)
         )
@@ -273,7 +285,7 @@ def generate_registration_token():
         # Log the action
         log_user_action(current_user_id, 'CREATE', 'registration_token', registration_token.id, {
             'token': token_string,
-            'role': role_value
+            'role': role.value
         })
         
         return jsonify({
@@ -340,7 +352,7 @@ def register_with_token():
             email=email,
             first_name=data['first_name'],
             last_name=data['last_name'],
-            role=UserRole(token.role.lower()),  # Convert to lowercase for UserRole enum
+            role=parse_role(token.role),
             is_active=True,
             is_email_verified=True,
             created_by_id=token.created_by_id
@@ -388,7 +400,7 @@ def validate_token():
         
         return jsonify({
             'valid': True,
-            'role': token.role,
+            'role': token.role.value,
             'expires_at': token.expires_at.isoformat()
         }), 200
         
@@ -504,15 +516,17 @@ def change_user_role(user_id):
         if not data or 'role' not in data:
             return jsonify({'message': 'Role is required'}), 400
         
-        new_role = data['role'].lower()
-        
-        # Validate role
-        valid_roles = [role.value for role in UserRole]
-        if new_role not in valid_roles:
-            return jsonify({'message': f'Invalid role. Must be one of: {valid_roles}'}), 400
+        try:
+            new_role = parse_role(data['role'])
+        except (KeyError, ValueError):
+            valid_values = [r.value for r in UserRole]
+            valid_names = [r.name for r in UserRole]
+            return jsonify({'message': f'Invalid role. Use one of names {valid_names} or values {valid_values}'}), 400
         
         user = User.query.get_or_404(user_id)
-        old_role = user.role.value
+
+        old_role = user.role
+        user.role = new_role
         
         # Prevent changing own role from admin
         if current_user_id == user_id and user.role == UserRole.ADMIN:
@@ -525,8 +539,8 @@ def change_user_role(user_id):
         # Log the action
         log_user_action(current_user_id, 'UPDATE', 'user', user.id, {
             'type': 'role_change',
-            'old_role': old_role,
-            'new_role': new_role
+            'old_role': old_role.value,
+            'new_role': new_role.value
         })
         
         return jsonify({

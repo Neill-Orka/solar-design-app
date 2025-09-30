@@ -218,21 +218,33 @@ function AuthenticatedApp() {
             {/* Pages with animations */}
             <Route path="/jobcards" element={
               <PageTransition>
-                <JobCardsPage />
+                <ProtectedRoute requiredRole={["admin", "team_leader", "technician", "sales"]}>
+                  <JobCardsPage />
+                </ProtectedRoute>
               </PageTransition>
             } />
             
             <Route path="/jobcards/new" element={
               <PageTransition>
-                <JobCardCreatePage />
+                <ProtectedRoute requiredRole={["admin", "team_leader"]}>
+                  <JobCardCreatePage />
+                </ProtectedRoute>
               </PageTransition>
             } />
             
             <Route path="/jobcards/:id" element={
               <PageTransition>
-                <JobCardDetailPage />
+                <ProtectedRoute requiredRole={["admin", "team_leader", "technician", "sales"]}>
+                  <JobCardDetailPage />
+                </ProtectedRoute>
               </PageTransition>
             } />
+
+            {/* <Route path="/jobcards/:id/edit" element={
+              <ProtectedRoute requiredRole={["admin", "manager", "team_leader"]}>
+                <JobCardEditPage />
+              </ProtectedRoute>
+            } />             */}
 
             {/* Admin only routes */}
             <Route path="/admin" element={

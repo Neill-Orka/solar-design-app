@@ -7,6 +7,7 @@ from sqlalchemy import Nullable, inspect
 from sqlalchemy.orm import synonym
 from flask_bcrypt import Bcrypt
 from enum import Enum
+from sqlalchemy import Enum as SAEnum
 import secrets
 from zoneinfo import ZoneInfo
 
@@ -22,9 +23,11 @@ def sa_year_now() -> int:
 # User roles enum
 class UserRole(Enum):
     ADMIN = "admin"
+    MANAGER = "manager"
     SALES = "sales"
     DESIGN = "design"
-    MANAGER = "manager"
+    TEAM_LEADER = "team_leader"
+    TECHNICIAN = "technician"
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -79,7 +82,17 @@ class RegistrationToken(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     token = db.Column(db.String(64), unique=True, nullable=False)
-    role = db.Column(db.String(10), nullable=False)
+
+    role = db.Column(
+            SAEnum(
+                UserRole,
+                name="userrole",
+                values_callable=lambda e: [m.name for m in e]
+            ),
+            nullable=False,
+            default=UserRole.SALES
+    )
+    
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime, nullable=False)
@@ -99,19 +112,6 @@ class RegistrationToken(db.Model):
         alphabet = string.ascii_uppercase + string.digits
         return ''.join(secrets.choice(alphabet) for _ in range(8))
     
-    @property
-    def role_enum(self):
-        """Get the role as a UserRole enum"""
-        return UserRole(self.role.lower())  # Convert to lowercase for UserRole enum
-    
-    @role_enum.setter
-    def role_enum(self, value):
-        """Set the role from a UserRole enum"""
-        if isinstance(value, UserRole):
-            self.role = value.value.upper()  # Store uppercase for database constraint
-        else:
-            self.role = str(value).upper()  # Store uppercase for database constraint
-    
     def is_valid(self):
         """Check if token is still valid"""
         return (not self.is_used and 
@@ -127,7 +127,7 @@ class RegistrationToken(db.Model):
         return {
             'id': self.id,
             'token': self.token,
-            'role': self.role,
+            'role': self.role.name if self.role else None,
             'created_by': self.created_by.full_name if self.created_by else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'expires_at': self.expires_at.isoformat() if self.expires_at else None,
@@ -956,7 +956,7 @@ class JobCard(db.Model):
             "id": self.id,
             "client_id": self.client_id,
             "owner_id": self.owner_id,
-            "owner_name": self.owner.first_name if self.owner else None,
+            "owner_name": f"{self.owner.first_name} {self.owner.last_name}" if self.owner else None,
             "category_id": self.category_id,
             "title": self.title,
             "description": self.description,

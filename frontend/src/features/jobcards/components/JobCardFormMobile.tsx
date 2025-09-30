@@ -288,12 +288,19 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
 
     <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="jcM-wrap">
       {/* header summary */}
-      <div className="jcM-summary">
+      {/* <div className="jcM-summary">
         <span className={`badge bg-${statusClass[status]}`}>{status.replace("_", " ")}</span>
         <span className="badge text-bg-light">Labour: R {labourTotal.toFixed(2)}</span>
         {didTravel && <span className="badge text-bg-light">Travel: R {travelTotal.toFixed(2)}</span>}
         <span className="badge text-bg-dark">Est. R {grandTotal.toFixed(2)}</span>
-      </div>
+      </div> */}
+
+      <section>
+        <div className="d-flex justify-content-center align-items-center gap-5 mb-2">
+          <button className="btn btn-lg btn-outline-success" type="button" onClick={() => console.log('Out of Scope')}>Out of Scope</button>
+          <button className="btn btn-lg btn-outline-danger" type="button" onClick={() => console.log('Quoted')}>Quoted</button>
+        </div>
+      </section>
 
       {/* CLIENT (visual only for now) */}
       <section className="jcM-card">

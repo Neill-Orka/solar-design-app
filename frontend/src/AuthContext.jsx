@@ -143,10 +143,12 @@ export const AuthProvider = ({ children }) => {
     if (!user) return false;
     
     const roleHierarchy = {
-      'admin': 4,
-      'manager': 3,
-      'sales': 2,
-      'design': 1
+      'admin': 6,
+      'manager': 5,
+      'sales': 4,
+      'design': 3,
+      'team_leader': 2,
+      'technician': 1
     };
 
     return roleHierarchy[user.role] >= roleHierarchy[requiredRole];
@@ -164,6 +166,18 @@ export const AuthProvider = ({ children }) => {
     return user && (user.role === 'admin' || user.role === 'sales');
   };
 
+  const canApproveJobCards = () => {
+    return user && ['admin'].includes(user.role);
+  }
+
+  const canCreateJobCards = () => {
+    return user && ['admin', 'team_leader'].includes(user.role);
+  }
+
+  const canViewJobCards = () => {
+    return user && ['admin', 'manager', 'team_leader', 'technician', 'sales'].includes(user.role);
+  }
+
   const value = {
     user,
     login,
@@ -173,6 +187,9 @@ export const AuthProvider = ({ children }) => {
     canModifyProjects,
     canModifyProducts,
     canDelete,
+    canApproveJobCards,
+    canCreateJobCards,
+    canViewJobCards,
     loading,
     isAuthenticated: !!user
   };
