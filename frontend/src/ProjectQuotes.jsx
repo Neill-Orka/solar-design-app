@@ -4,6 +4,8 @@ import axios from 'axios';
 import { Table, Badge, Spinner, Button, ButtonGroup, Form } from 'react-bootstrap';
 import { useNotification } from './NotificationContext';
 import { API_URL } from './apiConfig';
+import CelebrationOverlay from './CelebrationOverlay';
+import { Howler } from 'howler';
 
 export default function ProjectQuotes({ projectId, onOpenQuote }) {
   const [rows, setRows] = useState(null);
@@ -12,6 +14,8 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
   const [editingQuote, setEditingQuote] = useState(null);
   const [editValue, setEditValue] = useState('');
   const { showNotification } = useNotification();
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationMeta, setCelebrationMeta] = useState(null);
 
   const loadQuotes = async () => {
     setLoading(true);
@@ -44,11 +48,22 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
   const handleAcceptQuote = async (quoteId, e) => {
     e.stopPropagation(); // Prevent row click
     if (!window.confirm('Mark this quote as accepted?')) return;
+
+    // Try to unlock audio right at the user gesture
+    try { await Howler.ctx.resume(); } catch {}
     
     setActionLoading(prev => ({ ...prev, [quoteId]: 'accept' }));
     try {
       await axios.post(`${API_URL}/api/quotes/${quoteId}/accept`);
       showNotification('Quote accepted!', 'success');
+
+      // Celebration
+      setCelebrationMeta({
+        title: 'DEAL CLOSED!',
+        subtitle: 'BAIE GELUK GROOTHOND!!!!!!'
+      });
+      setShowCelebration(true);
+
       await loadQuotes(); // Reload quotes to get updated status
     } catch (error) {
       console.error(error);
