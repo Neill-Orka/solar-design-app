@@ -29,6 +29,11 @@ import LoadProfileManager from './LoadProfileManager';
 import TariffManager from './TariffManager';
 import RuleEditor from './RuleEditor';
 import PrintableBOM from './PrintableBOM';
+import JobCardsPage from './features/jobcards/pages/JobCardsPage';
+import JobCardCreatePage from './features/jobcards/pages/JobCardCreatePage';
+import JobCardDetailPage from './features/jobcards/pages/JobCardDetailPage';
+import PageTransition from './features/jobcards/components/PageTransition';
+
 import axios from 'axios';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -209,6 +214,37 @@ function AuthenticatedApp() {
             <Route path="/printable-bom/:projectId" element={<PrintableBOM />} />
             <Route path="/projects/:projectId/printable-bom/:docId" element={<PrintableBOM />} />
             <Route path="/projects/:projectId/quotes/:docId" element={<PrintableBOM />} />
+
+            {/* Pages with animations */}
+            <Route path="/jobcards" element={
+              <PageTransition>
+                <ProtectedRoute requiredRole={["admin", "team_leader", "technician", "sales"]}>
+                  <JobCardsPage />
+                </ProtectedRoute>
+              </PageTransition>
+            } />
+            
+            <Route path="/jobcards/new" element={
+              <PageTransition>
+                <ProtectedRoute requiredRole={["admin", "team_leader"]}>
+                  <JobCardCreatePage />
+                </ProtectedRoute>
+              </PageTransition>
+            } />
+            
+            <Route path="/jobcards/:id" element={
+              <PageTransition>
+                <ProtectedRoute requiredRole={["admin", "team_leader", "technician", "sales"]}>
+                  <JobCardDetailPage />
+                </ProtectedRoute>
+              </PageTransition>
+            } />
+
+            {/* <Route path="/jobcards/:id/edit" element={
+              <ProtectedRoute requiredRole={["admin", "manager", "team_leader"]}>
+                <JobCardEditPage />
+              </ProtectedRoute>
+            } />             */}
 
             {/* Admin only routes */}
             <Route path="/admin" element={

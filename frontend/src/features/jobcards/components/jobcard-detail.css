@@ -1,0 +1,159 @@
+/* src/features/jobcards/components/jobcard-detail.css */
+
+.jcD-page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding-bottom: 72px;
+}
+
+.jcD-appbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 12px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+
+.jcD-back, .jcD-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  color: #0d6efd;
+  font-weight: 600;
+}
+
+.jcD-appbar-title {
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+  text-align: center;
+}
+
+.jcD-header {
+  padding: 12px 16px 8px 16px;
+}
+
+.jcD-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: #e9ecef;
+  margin-bottom: 8px;
+}
+
+.jcD-title {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.jcD-subtle {
+  color: #6c757d;
+  font-size: 13px;
+}
+
+.jcD-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 8px;
+  padding: 8px 16px 4px 16px;
+}
+
+@media (min-width: 560px) {
+  .jcD-meta { grid-template-columns: repeat(4, minmax(0,1fr)); }
+}
+
+.jcD-chip {
+  border: 1px solid #eaeaea;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.jcD-chip-value {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.jcD-chip-label {
+  font-size: 11px;
+  color: #6c757d;
+  margin-top: 2px;
+}
+
+.jcD-card {
+  margin: 12px 16px;
+  border: 1px solid #e2e3e5;
+  border-radius: 10px;
+  background: #f8f9fa;
+}
+
+.jcD-card-title {
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #495057;
+  border-bottom: 1px solid #e2e3e5;
+  background: #f1f3f5;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+
+.jcD-card-body {
+  padding: 10px;
+  font-size: 14px;
+  color: #212529;
+}
+
+.jcD-prewrap { white-space: pre-wrap; }
+
+.jcD-photoCard {
+  margin: 12px 16px;
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #eee;
+}
+
+.jcD-photo {
+  width: 100%;
+  display: block;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.jcD-photoCount {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(33, 37, 41, 0.8);
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+/* Optional gallery strip under hero */
+.jcD-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 16px 12px 16px;
+}
+.jcD-strip img {
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+}

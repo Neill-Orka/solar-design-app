@@ -235,6 +235,8 @@ const AdminDashboard = () => {
       case 'manager': return 'role-manager';
       case 'sales': return 'role-sales';
       case 'design': return 'role-design';
+      case 'team_leader': return 'role-team-leader';
+      case 'technician': return 'role-technician';
       default: return 'role-default';
     }
   };
@@ -297,10 +299,12 @@ const AdminDashboard = () => {
                     required
                     disabled={generating}
                   >
-                    <option value="manager">Manager</option>
                     <option value="admin">Admin</option>
+                    <option value="manager">Manager</option>
                     <option value="design">Design</option>
                     <option value="sales">Sales</option>
+                    <option value="team_leader">Team Leader</option>
+                    <option value="technician">Technician</option>
                   </select>
                 </div>
                 <div className="form-group">
@@ -550,6 +554,8 @@ const AdminDashboard = () => {
                 <option value="manager">Manager</option>
                 <option value="sales">Sales</option>
                 <option value="design">Design</option>
+                <option value="team_leader">Team Leader</option>
+                <option value="technician">Technician</option>
               </select>
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
