@@ -59,7 +59,7 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
 
       // Celebration
       setCelebrationMeta({
-        title: 'DEAL CLOSED!',
+        title: 'JA MANNEEEEE!',
         subtitle: 'BAIE GELUK GROOTHOND!!!!!!'
       });
       setShowCelebration(true);
@@ -180,6 +180,7 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
   };
 
   return (
+    <>
     <Table striped hover size="sm" className="align-middle">
       <thead>
         <tr>
@@ -343,5 +344,13 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
         ))}
       </tbody>
     </Table>
+
+    <CelebrationOverlay 
+      show={showCelebration}
+      onClose={() => setShowCelebration(false)}
+      title={celebrationMeta?.title}
+      subtitle={celebrationMeta?.subtitle}
+    />
+    </>
   );
 }
