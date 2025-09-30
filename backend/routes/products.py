@@ -52,33 +52,41 @@ def dynamic_cast_and_clean(payload):
 
 @products_bp.route('/products', methods=['GET'])
 def list_products():
-    q = (request.args.get('q') or '').strip()
-    category = (request.args.get('category') or '').strip()
-    try:
-        limit = min(int(request.args.get('limit', 50)), 500)
-    except Exception:
-        limit = 50
-    try:
-        offset = max(int(request.args.get('offset', 0)), 0)
-    except Exception:
-        offset = 0
-
+    category = request.args.get('category')  # optional filter
     query = Product.query
     if category:
-        query = query.filter(Product.category.ilike(f'%{category}%'))
-    if q:
-        like = f'%{q}%'
-        query = query.filter(or_(
-            Product.brand_name.ilike(like),
-            Product.description.ilike(like),
-            Product.category.ilike(like),
-            Product.component_type.ilike(like),
-        ))
+        query = query.filter(Product.category.ilike(category))
+    return jsonify([p.as_dict() for p in query.all()])
 
-    rows = (query
-            .order_by(Product.brand_name.asc(), Product.description.asc())
-            .offset(offset).limit(limit).all())
-    return jsonify([p.as_dict() for p in rows])
+# @products_bp.route('/products', methods=['GET'])
+# def list_products():
+#     q = (request.args.get('q') or '').strip()
+#     category = (request.args.get('category') or '').strip()
+#     try:
+#         limit = min(int(request.args.get('limit', 50)), 500)
+#     except Exception:
+#         limit = 50
+#     try:
+#         offset = max(int(request.args.get('offset', 0)), 0)
+#     except Exception:
+#         offset = 0
+
+#     query = Product.query
+#     if category:
+#         query = query.filter(Product.category.ilike(f'%{category}%'))
+#     if q:
+#         like = f'%{q}%'
+#         query = query.filter(or_(
+#             Product.brand_name.ilike(like),
+#             Product.description.ilike(like),
+#             Product.category.ilike(like),
+#             Product.component_type.ilike(like),
+#         ))
+
+#     rows = (query
+#             .order_by(Product.brand_name.asc(), Product.description.asc())
+#             .offset(offset).limit(limit).all())
+#     return jsonify([p.as_dict() for p in rows])
 
 @products_bp.route('/products/<int:pid>', methods=['GET'])
 def get_product(pid):
