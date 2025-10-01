@@ -122,8 +122,13 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
         try {
           const projects = await listClientProjects(selectedClient.id);
           setClientProjects(projects);
-          // Reset selection when client changes
-          setSelectedProjectId(null);
+
+          // Auto Select if thers only one project
+          if (projects.length === 1) {
+            setSelectedProjectId(projects[0].id);
+          } else {
+            setSelectedProjectId(null);
+          }
         } catch (err) {
           console.error("Failed to load client projects", err);
         }
@@ -230,8 +235,14 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
   }, []);
 
   const [technicianHours, setTechnicianHours] = useState<Record<string, number>>({
-    "Jurgens": 0,
-    "Justin": 0
+    "Jurgens Hamman": 0,
+    "Divan Beukes": 0,
+    "Justin Pretorius": 0,
+    "Muller van Eeden-Olivier": 0,
+    "George Knell": 0,
+    "Marco Henning": 0,
+    "Tristan Potgieter": 0,
+    "Additional hours": 0,
   });
 
   const [materialsOpen, setMaterialsOpen] = useState(false);
@@ -546,7 +557,7 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
           </div>
         </div>
 
-        {["Jurgens", "Justin"].map((name) => (
+        {["Jurgens Hamman", "Divan Beukes", "Justin Pretorius", "Muller van Eeden-Olivier", "George Knell", "Tristan Potgieter", "Marco Henning", "Additional Hours"].map((name) => (
           <div key={name} className="jcM-hoursRow">
             <span className="jcM-tech">{name}</span>
             <div className="jcM-dotbar">

@@ -33,6 +33,7 @@ import JobCardsPage from './features/jobcards/pages/JobCardsPage';
 import JobCardCreatePage from './features/jobcards/pages/JobCardCreatePage';
 import JobCardDetailPage from './features/jobcards/pages/JobCardDetailPage';
 import PageTransition from './features/jobcards/components/PageTransition';
+import RecycleBin from './RecycleBin';
 
 import axios from 'axios';
 
@@ -205,6 +206,15 @@ function AuthenticatedApp() {
                 <ProductsAdmin />
               </ProtectedRoute>
             } />
+
+            <Route path="/recycle-bin" element={
+              <PageTransition>
+                <ProtectedRoute requiredRole={["admin", "sales"]}>
+                  <RecycleBin />
+                </ProtectedRoute>
+              </PageTransition>
+            } 
+            />
             
             {/* System builder and other tools - accessible to all */}
             <Route path="/system-builder" element={<SystemBuilder />} />

@@ -400,6 +400,13 @@ class Product(db.Model):
     monitoring_communication = db.Column("Monitoring Communication", db.String(80))
     monitoring_application = db.Column("Monitoring Application",     db.String(80))
 
+    # ─── Soft delete fields  ──────────────────────────────────────────────────
+    is_deleted = db.Column(db.Boolean, default=False)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    deleted_by = db.relationship('User', foreign_keys=[deleted_by_id])
+
+
     # ─── Optional catch-all for anything else  ────────────────────────────────
     properties = db.Column(JSONB, nullable=True)
 
@@ -420,6 +427,9 @@ class Product(db.Model):
         # Append audit info in a consistent api shape
         d["updated_at"] = self.updated_at.isoformat() if getattr(self, 'updated_at', None) else None
         d["updated_by"] = self.updated_by.full_name if getattr(self, 'updated_by', None) else None
+        if self.is_deleted:
+            d['deleted_at'] = self.deleted_at.isoformat() if self.deleted_at else None
+            d['deleted_by'] = self.deleted_by.full_name if self.deleted_by else None
 
         return d
     

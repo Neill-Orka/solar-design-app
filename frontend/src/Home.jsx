@@ -81,7 +81,7 @@ function Home() {
               link: '/projects',
               color: 'primary',
               icon: <FaProjectDiagram size={46} />,
-              roles: ['admin','design']
+              roles: ['admin', 'manager','design']
             },
             {
               title: 'Clients',
@@ -89,7 +89,7 @@ function Home() {
               link: '/clients',
               color: 'success',
               icon: <FaUsers size={46} />,
-              roles: ['admin','sales','design']
+              roles: ['admin', 'manager', 'sales','design']
             },
             {
               title: 'Products',
@@ -97,15 +97,15 @@ function Home() {
               link: '/products-admin',
               color: 'warning',
               icon: <FaTools size={46} />,
-              roles: ['admin','sales']
+              roles: ['admin', 'manager','sales']
             },
             {
-              title: 'Job Cards',
+              title: 'Job Cards (DO NOT USE)',
               text: 'Create and track electrical jobs.',
               link: '/jobcards',
               color: 'info',
               icon: <FaTools size={46} />,
-              roles: ['admin','manager', 'team_leader', 'technician', 'sales'] 
+              roles: ['admin', 'manager', 'team_leader', 'technician']
             }
           ]
             .filter(card => {
