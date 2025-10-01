@@ -1,3 +1,4 @@
+from datetime import datetime
 from math import e
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -52,41 +53,20 @@ def dynamic_cast_and_clean(payload):
 
 @products_bp.route('/products', methods=['GET'])
 def list_products():
+    # Only show active products by default
+    include_deleted = request.args.get('include_deleted', '').lower() == 'true'
+
     category = request.args.get('category')  # optional filter
     query = Product.query
+
+    # Filter by deletion status
+    if not include_deleted:
+        query = query.filter(Product.is_deleted == False)
+
     if category:
         query = query.filter(Product.category.ilike(category))
+
     return jsonify([p.as_dict() for p in query.all()])
-
-# @products_bp.route('/products', methods=['GET'])
-# def list_products():
-#     q = (request.args.get('q') or '').strip()
-#     category = (request.args.get('category') or '').strip()
-#     try:
-#         limit = min(int(request.args.get('limit', 50)), 500)
-#     except Exception:
-#         limit = 50
-#     try:
-#         offset = max(int(request.args.get('offset', 0)), 0)
-#     except Exception:
-#         offset = 0
-
-#     query = Product.query
-#     if category:
-#         query = query.filter(Product.category.ilike(f'%{category}%'))
-#     if q:
-#         like = f'%{q}%'
-#         query = query.filter(or_(
-#             Product.brand_name.ilike(like),
-#             Product.description.ilike(like),
-#             Product.category.ilike(like),
-#             Product.component_type.ilike(like),
-#         ))
-
-#     rows = (query
-#             .order_by(Product.brand_name.asc(), Product.description.asc())
-#             .offset(offset).limit(limit).all())
-#     return jsonify([p.as_dict() for p in rows])
 
 @products_bp.route('/products/<int:pid>', methods=['GET'])
 def get_product(pid):
@@ -184,16 +164,28 @@ def update_product(pid):
 @jwt_required()
 def delete_product(pid):
     # Admin-only enforcement
-    user = User.query.get(get_jwt_identity())
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
     if not user or user.role != UserRole.ADMIN:
         return jsonify({
             'error': 'forbidden',
             'message': 'Access Restricted: Only administrators can delete products.'
         }), 403
-    p = Product.query.get_or_404(pid)
-    db.session.delete(p)
-    db.session.commit()
-    return jsonify({'message': 'deleted'})
+    
+    try:
+        p = Product.query.get_or_404(pid)
+
+        # Perform soft delete
+        p.is_deleted = True
+        p.deleted_at = datetime.utcnow()
+        p.deleted_by_id = user_id
+
+        db.session.commit()
+        return jsonify({'message': 'Product moved to recycle bin'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'delete_failed', 'details': str(e)}), 500
 
 @products_bp.route('/products/categories', methods=['GET'])
 def get_product_categories():
@@ -332,3 +324,94 @@ def get_field_metadata():
                     result[category_key]["fields"][field_name]["alias"] = "capacity_kwh"
     
     return jsonify(result)
+
+@products_bp.route('/products/recyclebin', methods=['GET'])
+@jwt_required()
+def product_recyclebin():
+    # Admin-only enforcement
+    user = User.query.get(get_jwt_identity())
+    if not user or user.role != UserRole.ADMIN:
+        return jsonify({
+            'error': 'forbidden',
+            'message': 'Access Restricted: Only administrators can access the recycle bin'
+        }), 403
+    
+    # Get all deleted products
+    deleted_products = Product.query.filter(Product.is_deleted == True).all()
+
+    # Enhance data with deletion info
+    result = []
+    for p in deleted_products:
+        product_data = p.as_dict()
+        
+        # Format deletion timestamp
+        if p.deleted_at:
+            product_data['deleted_at_formatted'] = p.deleted_at.strftime('%d/%m/%Y %H:%M:%S')
+        
+        # Get deleter name
+        if p.deleted_by:
+            product_data['deleted_by_name'] = p.deleted_by.full_name
+        
+        result.append(product_data)
+    
+    return jsonify(result)
+
+# Add restore endpoint
+@products_bp.route('/products/<int:pid>/restore', methods=['POST'])
+@jwt_required()
+def restore_product(pid):
+    # Admin-only enforcement
+    user = User.query.get(get_jwt_identity())
+    if not user or user.role != UserRole.ADMIN:
+        return jsonify({
+            'error': 'forbidden',
+            'message': 'Access Restricted: Only administrators can restore products.'
+        }), 403
+    
+    try:
+        p = Product.query.get_or_404(pid)
+        
+        # Skip if not deleted
+        if not p.is_deleted:
+            return jsonify({'message': 'Product is not deleted'}), 400
+        
+        # Restore product
+        p.is_deleted = False
+        p.deleted_at = None
+        p.deleted_by_id = None
+        
+        db.session.commit()
+        return jsonify({'message': 'Product restored successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'restore_failed', 'details': str(e)}), 500
+
+# Add permanent delete endpoint
+@products_bp.route('/products/<int:pid>/permanent', methods=['DELETE'])
+@jwt_required()
+def permanent_delete_product(pid):
+    # Admin-only enforcement
+    user = User.query.get(get_jwt_identity())
+    if not user or user.role != UserRole.ADMIN:
+        return jsonify({
+            'error': 'forbidden',
+            'message': 'Access Restricted: Only administrators can permanently delete products.'
+        }), 403
+    
+    try:
+        p = Product.query.get_or_404(pid)
+        
+        # Perform actual delete
+        db.session.delete(p)
+        db.session.commit()
+        
+        return jsonify({'message': 'Product permanently deleted'})
+    except Exception as e:
+        db.session.rollback()
+        if "foreign key constraint" in str(e).lower():
+            return jsonify({
+                'error': 'delete_failed',
+                'message': 'Cannot delete product: It is referenced by other records.'
+            }), 400
+        else:
+            return jsonify({'error': 'delete_failed', 'details': str(e)}), 500

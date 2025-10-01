@@ -200,3 +200,5 @@ export async function listClientProjects(clientId: number): Promise<any[]> {
     const { data } = await http.get(`/projects?client_id=${clientId}`);
     return data;
 }
+
+export { http }; 

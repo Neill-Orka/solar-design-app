@@ -573,3 +573,32 @@ def get_audit_logs():
         
     except Exception as e:
         return jsonify({'message': str(e)}), 500
+
+
+@auth_bp.route('/users', methods=['GET'])
+@jwt_required()
+def list_users_minimal():
+    """
+    Minimal users list for pickers.
+    GET /api/users?is_bum=1&active=1
+    Returns: [{id, full_name, is_bum}]
+    """
+    try:
+        q = User.query
+        # default to only active=1 unless explicitly disabled
+        active = request.args.get('active', '1')
+        if active in ('1', 'true', 'True'):
+            q = q.filter(User.is_active.is_(True))
+
+        # optional filter: only BUMs
+        is_bum = request.args.get('is_bum')
+        if is_bum in ('1', 'true', 'True'):
+            q = q.filter(User.is_bum.is_(True))
+
+        users = q.order_by(User.first_name.asc(), User.last_name.asc()).all()
+        return jsonify([
+            {"id": u.id, "full_name": u.full_name, "is_bum": bool(getattr(u, "is_bum", False))}
+            for u in users
+        ]), 200
+    except Exception as e:
+        return jsonify({"message": str(e)}), 500

@@ -49,6 +49,8 @@ class User(db.Model):
     # Relationships
     created_by = db.relationship('User', remote_side=[id], foreign_keys=[created_by_id])
     
+    is_bum = db.Column(db.Boolean, nullable=False, default=False)
+
     def set_password(self, password):
         """Set password hash"""
         self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
@@ -400,6 +402,13 @@ class Product(db.Model):
     monitoring_communication = db.Column("Monitoring Communication", db.String(80))
     monitoring_application = db.Column("Monitoring Application",     db.String(80))
 
+    # ─── Soft delete fields  ──────────────────────────────────────────────────
+    is_deleted = db.Column(db.Boolean, default=False)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    deleted_by = db.relationship('User', foreign_keys=[deleted_by_id])
+
+
     # ─── Optional catch-all for anything else  ────────────────────────────────
     properties = db.Column(JSONB, nullable=True)
 
@@ -420,6 +429,9 @@ class Product(db.Model):
         # Append audit info in a consistent api shape
         d["updated_at"] = self.updated_at.isoformat() if getattr(self, 'updated_at', None) else None
         d["updated_by"] = self.updated_by.full_name if getattr(self, 'updated_by', None) else None
+        if self.is_deleted:
+            d['deleted_at'] = self.deleted_at.isoformat() if self.deleted_at else None
+            d['deleted_by'] = self.deleted_by.full_name if self.deleted_by else None
 
         return d
     
@@ -895,6 +907,7 @@ class JobCard(db.Model):
     client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=False)
     owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey("job_categories.id"), nullable=True)
+    bum_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 
     # Basics
     title = db.Column(db.String(120), nullable=True)
@@ -942,6 +955,7 @@ class JobCard(db.Model):
     owner = db.relationship("User", foreign_keys=[owner_id])
     category = db.relationship("JobCategory")
     vehicle = db.relationship("Vehicle")
+    bum = db.relationship("User", foreign_keys=[bum_id])
 
     time_entries = db.relationship(
         "JobCardTimeEntry", backref="job_card", cascade="all, delete-orphan", lazy=True
@@ -959,6 +973,8 @@ class JobCard(db.Model):
             "client_id": self.client_id,
             "owner_id": self.owner_id,
             "owner_name": f"{self.owner.first_name} {self.owner.last_name}" if self.owner else None,
+            "bum_id": self.bum_id,
+            "bum_name": f"{self.bum.first_name} {self.bum.last_name}" if self.bum else None,
             "category_id": self.category_id,
             "title": self.title,
             "description": self.description,
