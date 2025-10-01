@@ -2,5 +2,19 @@
   "javascript.suggest.autoImports": true,
   "javascript.suggest.completeFunctionCalls": true,
   "eslint.validate": ["javascript", "javascriptreact"],
-  "editor.defaultFormatter": "esbenp.prettier-vscode"
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/src/assets**": true,
+    "**/*.mp4": true,
+    "**/*.gif": true,
+    "**/*.png": true,
+    "**/*.jpg": true
+  },
+  "search.exclude": {
+    "**/node_modules/**": true,
+    "**/media/**": true
+  }
+
 }

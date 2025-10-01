@@ -9,6 +9,12 @@ export interface TechnicianProfile {
     active: boolean;
 }
 
+export type UserListItem = {
+    id: number;
+    full_name: string;
+    is_bum?: boolean;
+}
+
 export interface JobCategory { id: number; name: string; active: boolean; }
 
 export interface Vehicle {
@@ -56,6 +62,8 @@ export interface JobCard {
     client_id: number;
     owner_id: number | null;
     owner_name?: string;
+    bum_id: number | null;
+    bum_name?: string;
     category_id: number | null;
     title: string | null;
     description: string | null;

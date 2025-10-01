@@ -9,6 +9,9 @@ const isoOrNull = z.preprocess(
 export const JobCardFormSchema = z.object({
   client_id: z.coerce.number().int().positive(),
   owner_id: z.coerce.number().int().positive(),
+
+  bum_id: z.coerce.number().int().positive().nullable().default(null),
+
   category_id: z.coerce.number().int().positive().nullable().default(null),
 
   title: z.string().max(120).nullable().default(''),
@@ -42,6 +45,7 @@ export type JobCardFormValues = z.infer<typeof JobCardFormSchema>;
 export const jobCardDefaults: JobCardFormValues = {
   client_id: 0,
   owner_id: 1,
+  bum_id: null,
   category_id: null,
   title: '',
   description: '',

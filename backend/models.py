@@ -49,6 +49,8 @@ class User(db.Model):
     # Relationships
     created_by = db.relationship('User', remote_side=[id], foreign_keys=[created_by_id])
     
+    is_bum = db.Column(db.Boolean, nullable=False, default=False)
+
     def set_password(self, password):
         """Set password hash"""
         self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
@@ -905,6 +907,7 @@ class JobCard(db.Model):
     client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=False)
     owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey("job_categories.id"), nullable=True)
+    bum_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 
     # Basics
     title = db.Column(db.String(120), nullable=True)
@@ -952,6 +955,7 @@ class JobCard(db.Model):
     owner = db.relationship("User", foreign_keys=[owner_id])
     category = db.relationship("JobCategory")
     vehicle = db.relationship("Vehicle")
+    bum = db.relationship("User", foreign_keys=[bum_id])
 
     time_entries = db.relationship(
         "JobCardTimeEntry", backref="job_card", cascade="all, delete-orphan", lazy=True
@@ -969,6 +973,8 @@ class JobCard(db.Model):
             "client_id": self.client_id,
             "owner_id": self.owner_id,
             "owner_name": f"{self.owner.first_name} {self.owner.last_name}" if self.owner else None,
+            "bum_id": self.bum_id,
+            "bum_name": f"{self.bum.first_name} {self.bum.last_name}" if self.bum else None,
             "category_id": self.category_id,
             "title": self.title,
             "description": self.description,

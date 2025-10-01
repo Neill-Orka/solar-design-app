@@ -14,13 +14,17 @@ import type {
   JobStatus,
   Vehicle,
   JobCardAttachment,
-  Client
+  Client,
+  UserListItem
 } from "../types";
 import { createClient, listCategories, listClients, listVehicles, listClientProjects } from "../api";
 import "./jobcard-create.mobile.css";
 import ProductPickerModal from "./ProductPickerModal";
 import type { Product } from "../types";
 import axios from "axios";
+import { API_URL } from '../../../apiConfig'
+import { useAuth } from '../../../AuthContext';
+import { http } from '../api';
 
 /** === utilities for datetime-local <-> ISO === */
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -91,6 +95,45 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
   const [isQuotedJC, setIsQuotedJC] = useState(false);
   const [clientProjects, setClientProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [techs, setTechs] = useState([]);
+  const [bums, setBums] = useState([]);
+  const { user: currentUser } = useAuth();
+  const [isCurrentUserBum, setIsCurrentUserBum] = useState<boolean>(false);
+  const [bumOptions, setBumOptions] = useState<UserListItem[]>([]);
+
+  // fetch BUMs once
+  useEffect(() => {
+    (async () => {
+      try {
+        // Use the pre-configured http client that includes auth headers
+        const { data } = await http.get('/auth/users?is_bum=1&active=1');
+        console.log('BUM data:', data);
+        setBumOptions(data);
+      } catch (err) {
+        console.error("Failed to load BUMs:", err);
+        setBumOptions([]);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const [t, b] = await Promise.all([
+        axios.get(`${API_URL}/api/users?filter=field_techs`),
+        axios.get(`${API_URL}/api/users?filter=bum`),
+      ]);
+      setTechs(t.data);
+      setBums(b.data);
+
+      // smart defaults
+      if (!isCurrentUserBum) {
+        setValue('owner_id', currentUser.id);
+      }
+      if (isCurrentUserBum) {
+        setValue('bum_id', currentUser.id);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     // ensure owner_id in form state for Zod
@@ -335,12 +378,60 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
         <span className="badge text-bg-dark">Est. R {grandTotal.toFixed(2)}</span>
       </div> */}
 
-      <section>
+      {/* <section>
         <div className="d-flex justify-content-center align-items-center gap-5 mb-2">
           <button className={`btn btn-lg ${!isQuotedJC ? 'active btn-outline-success' : 'btn-outline-secondary'}`} type="button" onClick={() => setIsQuotedJC(false)}>Out of Scope</button>
           <button className={`btn btn-lg ${isQuotedJC ? 'active btn-outline-success' : 'btn-outline-secondary'}`} type="button" onClick={() => setIsQuotedJC(true)}>Quoted</button>
         </div>
+      </section> */}
+
+      <section className="bum-selection">
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <label htmlFor="bum_id">BUSINESS UNIT MANAGER</label>
+          {isCurrentUserBum && (
+            <div className="bum-badge">
+              <i className="bi bi-person-check-fill"></i>
+              You are a BUM
+            </div>
+          )}
+        </div>
+        
+        <div className="bum-selection-dropdown">
+          <select
+            id="bum_id"
+            className="form-select"
+            {...register('bum_id', { valueAsNumber: true })}
+            defaultValue=""
+          >
+            <option value="">Select BUM...</option>
+            {bumOptions.map(u => (
+              <option key={u.id} value={u.id}>{u.full_name}</option>
+            ))}
+          </select>
+        </div>
+        {errors.bum_id && (
+          <div className="text-danger mt-1 small">{errors.bum_id.message as string}</div>
+        )}
       </section>
+
+      <section className="mb-3">
+        <div className="toggle-button-group">
+          <button 
+            type="button" 
+            className={`toggle-button ${!isQuotedJC ? 'active' : ''}`}
+            onClick={() => setIsQuotedJC(false)}
+          >
+            <i className="bi bi-lightning me-1"></i> Out of Scope
+          </button>
+          <button 
+            type="button" 
+            className={`toggle-button ${isQuotedJC ? 'active' : ''}`}
+            onClick={() => setIsQuotedJC(true)}
+          >
+            <i className="bi bi-check-circle me-1"></i> Quoted
+          </button>
+        </div>
+      </section>      
 
       {/* CLIENT */}
       <section className="jcM-card">
