@@ -45,11 +45,11 @@ class User(db.Model):
     last_login = db.Column(db.DateTime, nullable=True)
     profile_picture = db.Column(db.String(255), nullable=True)
     phone = db.Column(db.String(20), nullable=True)
+    is_bum = db.Column(db.Boolean, nullable=False, default=False)
     
     # Relationships
     created_by = db.relationship('User', remote_side=[id], foreign_keys=[created_by_id])
     
-    is_bum = db.Column(db.Boolean, nullable=False, default=False)
 
     def set_password(self, password):
         """Set password hash"""
@@ -75,7 +75,8 @@ class User(db.Model):
             'is_email_verified': self.is_email_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
-            'phone': self.phone
+            'phone': self.phone,
+            'is_bum': self.is_bum
         }
 
 
@@ -1042,14 +1043,15 @@ class JobCardMaterial(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
+        # Get the related product if available
+        product_name = None
+        if hasattr(self, 'product') and self.product:
+            product_name = self.product.model or f"{self.product.brand} {self.product.model}"
         return {
             "id": self.id,
             "job_card_id": self.job_card_id,
             "product_id": self.product_id,
-            "product_label": (
-                f"{self.product.brand_name or ''} {self.product.description or ''}".strip()
-                if self.product else None
-            ),
+            "product_name": product_name,
             "quantity": self.quantity,
             "unit_cost_at_time": float(self.unit_cost_at_time or 0),
             "unit_price_at_time": float(self.unit_price_at_time or 0),
@@ -1080,4 +1082,24 @@ class JobCardAttachment(db.Model):
             "content_type": self.content_type,
             "size_bytes": self.size_bytes,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+class JobCardMaterialReceipt(db.Model):
+    __tablename__ = "job_card_material_receipts"
+    id = db.Column(db.Integer, primary_key=True)
+    material_id = db.Column(db.Integer, db.ForeignKey("job_card_materials.id"), nullable=False)
+    attachment_id = db.Column(db.Integer, db.ForeignKey("job_card_attachments.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    material = db.relationship("JobCardMaterial", backref=db.backref("receipts", lazy=True))
+    attachment = db.relationship("JobCardAttachment")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "material_id": self.material_id,
+            "attachment_id": self.attachment_id,
+            "url": self.attachment.url if self.attachment else None,
+            "filename": self.attachment.filename if self.attachment else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None
         }

@@ -17,7 +17,7 @@ import type {
   Client,
   UserListItem
 } from "../types";
-import { createClient, listCategories, listClients, listVehicles, listClientProjects } from "../api";
+import { createClient, listCategories, listClients, listVehicles, listClientProjects, getAcceptedQuotes, getQuoteLineItems } from "../api";
 import "./jobcard-create.mobile.css";
 import ProductPickerModal from "./ProductPickerModal";
 import type { Product } from "../types";
@@ -64,8 +64,9 @@ const statusClass: Record<JobStatus, string> = {
 
 type Props = {
   initial?: Partial<JobCard>;
-  onSubmit: SubmitHandler<JobCardFormValues>;
+  onSubmit: (values: JobCardFormValues, materialData?: any) => Promise<void>;
   onCancel?: () => void;
+  isSubmitting?: boolean;
 };
 
 export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props) {
@@ -95,45 +96,101 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
   const [isQuotedJC, setIsQuotedJC] = useState(false);
   const [clientProjects, setClientProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [techs, setTechs] = useState([]);
-  const [bums, setBums] = useState([]);
   const { user: currentUser } = useAuth();
   const [isCurrentUserBum, setIsCurrentUserBum] = useState<boolean>(false);
   const [bumOptions, setBumOptions] = useState<UserListItem[]>([]);
+  const [techOptions, setTechOptions] = useState<UserListItem[]>([]);
+  const [acceptedQuotes, setAcceptedQuotes] = useState<any[]>([]);
+  const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null);
+  const [materialFileUploads, setMaterialFileUploads] = useState<Record<number, File | null>>({});
+  const [usedMaterials, setUsedMaterials] = useState<Record<number, boolean>>({});
+
+  type MatLine = { 
+    product_id: number; 
+    name: string; 
+    unit_price: number;
+    unit_cost: number; 
+    qty: number;
+    fromQuote?: boolean;
+    receiptRequired?: boolean;
+    used?: boolean;
+  };
 
   // fetch BUMs once
   useEffect(() => {
     (async () => {
       try {
         // Use the pre-configured http client that includes auth headers
-        const { data } = await http.get('/auth/users?is_bum=1&active=1');
-        console.log('BUM data:', data);
-        setBumOptions(data);
+        const { data: bumData } = await http.get('/auth/users?is_bum=1&active=1');
+        console.log('BUM data:', bumData);
+        setBumOptions(bumData);
+
+        // Load technicians
+        const { data: techData } = await http.get('/auth/technicians');
+        setTechOptions(techData);
+
+        // Check if current user is a BUM
+        if (currentUser) {
+          const isBum = bumData.some((bumUser: any) => bumUser.id === currentUser.id);
+          setIsCurrentUserBum(isBum);
+
+          // Set default values based on user role
+          if (isBum) {
+            setValue('bum_id', currentUser.id, { shouldDirty: true });
+          } else {
+            setValue('owner_id', currentUser.id, { shouldDirty: true });
+          }
+        }
       } catch (err) {
-        console.error("Failed to load BUMs:", err);
-        setBumOptions([]);
+        console.error("Failed to load BUMs and Techs:", err);
       }
     })();
-  }, []);
+  }, [currentUser, setValue]);
 
+  // Effect to detect if current user is bum
   useEffect(() => {
-    (async () => {
-      const [t, b] = await Promise.all([
-        axios.get(`${API_URL}/api/users?filter=field_techs`),
-        axios.get(`${API_URL}/api/users?filter=bum`),
-      ]);
-      setTechs(t.data);
-      setBums(b.data);
+    if (!currentUser) return;
 
-      // smart defaults
-      if (!isCurrentUserBum) {
-        setValue('owner_id', currentUser.id);
+    // Don't override tech selection if it was already done by a BUM
+    const technicianAlreadySelected = sessionStorage.getItem('technician_selected_by_bum') === 'true';
+
+    // Method 1: check if user has is_bum property
+    if (currentUser.is_bum) {
+      setIsCurrentUserBum(true);
+      setValue('bum_id', currentUser.id, { shouldDirty: true });
+    } else {
+      setValue('owner_id', currentUser.id, { shouldDirty: true });
+    }
+
+    // Method 2: Check if user's ID is in the bum options
+    if (bumOptions.length > 0) {
+      const isBum = bumOptions.some(bumUser => bumUser.id === currentUser.id);
+      setIsCurrentUserBum(isBum);
+  
+      // Auto select current user as BUM if they are one
+      if (isBum) {
+        setValue('bum_id', currentUser.id, { shouldDirty: true });
+        
+        // Only set owner_id if no technician was manually selected
+        if (!technicianAlreadySelected) {
+          // Default owner to current BUM user until they select a technician
+          setValue('owner_id', currentUser.id, { shouldDirty: true });
+        }
+      } else {
+        // If not a BUM, set current user as job owner (technician)
+        setValue('owner_id', currentUser.id, { shouldDirty: true });
       }
-      if (isCurrentUserBum) {
-        setValue('bum_id', currentUser.id);
-      }
-    })();
-  }, []);
+    }
+  }, [currentUser, bumOptions, setValue]);
+
+  // Effect to automatically set materials used if isQuoted
+  useEffect(() => {
+    if (isQuotedJC) {
+      setValue("materials_used", true, { shouldDirty: true });
+    } else {
+      setValue("materials_used", false, { shouldDirty: true });
+    }
+  }, [isQuotedJC, setValue]);
 
   useEffect(() => {
     // ensure owner_id in form state for Zod
@@ -183,8 +240,86 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
     }
   }, [selectedClient?.id, isQuotedJC]);
 
-  // Functions to fill data
-  
+  // --------------------------- Functions to fill data ---------------------------------
+
+  // Load accepted quotes when a project is selected
+  useEffect(() => {
+    if (isQuotedJC && selectedProjectId) {
+      const fetchAcceptedQuotes = async () => {
+        try {
+          const quotes = await getAcceptedQuotes(selectedProjectId);
+          setAcceptedQuotes(quotes);
+        
+          // Auto-select if only one accepted quote
+          if (quotes.length === 1) {
+            setSelectedQuoteId(quotes[0].id);
+          } else {
+            setSelectedQuoteId(null);
+          }
+        } catch (err) {
+          console.error("Failed to load accepted quotes: ", err);
+        }
+      };
+
+      fetchAcceptedQuotes();
+    } else {
+      setAcceptedQuotes([]);
+      setSelectedQuoteId(null);
+    }
+  }, [selectedProjectId, isQuotedJC]);
+
+  // Load line items when a quote is selected
+  useEffect(() => {
+    if (selectedQuoteId) {
+      const fetchQuoteItems = async () => {
+        try {
+          const data = await getQuoteLineItems(selectedQuoteId);
+
+          // Convert to material lines format
+          const quoteItems = data.items.map((item: any) => ({
+            product_id: item.product_id,
+            name: item.name,
+            unit_price: item.unit_price,
+            unit_cost: item.unit_cost,
+            qty: item.qty,
+            fromQuote: true,
+            used: true // Default to used
+          }));
+
+          // Initialize used state for all items
+          const initialUsedState: Record<number, boolean> = {};
+          quoteItems.forEach((item: any, index: number) => {
+            initialUsedState[index] = true;
+          });
+          setUsedMaterials(initialUsedState);
+
+          setMaterialLines(quoteItems);
+          setValue("materials_used", true, { shouldDirty: true });
+        } catch (err) {
+          console.error('Failed to load quote items: ', err);
+        }
+      };
+
+      fetchQuoteItems();
+    }
+  }, [selectedQuoteId, setValue]);
+
+  // function to handle file uploads
+  const handleFileUpload = (index: number, file: File | null) => {
+    setMaterialFileUploads(prev => ({
+      ...prev,
+      [index]: file
+    }));
+  };
+
+  // Function to toggle used status
+  const toggleUsed = (index: number) => {
+    setUsedMaterials(prev => ({
+      ...prev, 
+      [index]: !prev[index]
+    }));
+  };
+
   // Simple local client filter
   const filteredClients = clients.filter(c => {
     const q = clientQuery.trim().toLowerCase();
@@ -215,6 +350,11 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
 
   // ensure client exists before validation
   const onSave = async () => {
+    // Save the current values first to use later
+    const currentValues = getValues();
+    const currentBumId = currentValues.bum_id;
+    const currentOwnerId = currentValues.owner_id;
+    
     // guarantee owner_id is present for Zod
     if (!getValues().owner_id && initial?.owner_id) {
       setValue("owner_id", initial.owner_id, { shouldValidate: false });
@@ -256,14 +396,41 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
       }
     }
 
+    // Validate receipts for manually added materials
+    if (watch('materials_used') && materialLines.some((line, index) => !line.fromQuote && usedMaterials[index])) {
+      if (!validateMaterialReceipts()) {
+        return;
+      }
+    }
+
+    // Make sure tech_id is properly transferred to owner_id when a BUM submits the form
+    // if (isCurrentUserBum && techIdSelect && techIdSelect.value) {
+    //   const techId = parseInt(techIdSelect.value, 10);
+    //   if (!isNaN(techId) && techId > 0) {
+    //     setValue('owner_id', techId, { shouldDirty: true });
+    //     console.log('Setting owner_id to selected technician:', techId);
+    //   }
+    // }
+
     setValue("is_quoted", isQuotedJC, { shouldDirty: true });
     if (isQuotedJC && selectedProjectId) {
       setValue("project_id" as any, selectedProjectId, { shouldDirty: true });
     }
 
-    await Promise.resolve();
+    console.log('Owner ID:', currentOwnerId);
+    console.log('BUM ID:', currentBumId);
 
-    await handleSubmit(onSubmit, onInvalid)();
+    // Create an enhanced version of onSubmit that includes material data and ensures values
+    const enhancedSubmit = (values: JobCardFormValues) => {
+      return onSubmit(values, {
+        materialLines,
+        usedMaterials,
+        materialFileUploads
+      });
+    };
+    
+    await Promise.resolve();
+    await handleSubmit(enhancedSubmit, onInvalid)();
   }
 
 
@@ -289,7 +456,7 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
   });
 
   const [materialsOpen, setMaterialsOpen] = useState(false);
-  type MatLine = { product_id: number; name: string; unit_price: number; qty: number };
+
   const [materialLines, setMaterialLines] = useState<MatLine[]>([]);
 
   const materialTotal = materialLines.reduce((s, l) => s + l.unit_price * l.qty, 0);
@@ -297,19 +464,56 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
   // when the user clicks "add products"
   const handleAddProducts = (items: { product: Product; qty: number }[]) => {
     setMaterialLines(prev => {
-      const byId = new Map(prev.map(x => [x.product_id, x]));
+      const newLines = [...prev];
+
       for (const { product, qty } of items) {
         if (!qty) continue;
         const price = Number(product.price ?? product.unit_cost ?? 0);
+        const cost = Number(product.unit_cost ?? 0);
         const name = [product.brand, product.model].filter(Boolean).join(" • ") || `#${product.id}`;
-        if (byId.has(product.id)) {
-          byId.get(product.id)!.qty += qty;
+
+        // Check if product already exists in line
+        const existingIndex = newLines.findIndex(line => line.product_id === product.id);
+
+        if (existingIndex >= 0) {
+          newLines[existingIndex].qty += qty;
         } else {
-          byId.set(product.id, { product_id: product.id, name, unit_price: price, qty });
+          const newIndex = newLines.length;
+          newLines.push({
+            product_id: product.id,
+            name, 
+            unit_price: price,
+            unit_cost: cost,
+            qty,
+            fromQuote: false,
+            receiptRequired: true,
+            used: true
+          });
+
+          // Update used state for the new item
+          setUsedMaterials(prev => ({
+            ...prev,
+            [newIndex]: true
+          }));
         }
       }
-      return Array.from(byId.values());
+      
+      return newLines;
     });
+  };
+
+  // Add validation for materials with required receipts
+  const validateMaterialReceipts = () => {
+    const nonQuoteMaterialsWithoutReceipt = materialLines
+      .filter((line, index) => !line.fromQuote && usedMaterials[index] && !materialFileUploads[index])
+      .map(line => line.name);
+
+    if (nonQuoteMaterialsWithoutReceipt.length > 0) {
+      alert(`Please upload receipts for the following materials:\n- ${nonQuoteMaterialsWithoutReceipt.join("\n- ")}`);
+      return false;
+    }
+
+    return true;
   };
 
   // hydrate from initial (edit mode)
@@ -385,6 +589,7 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
         </div>
       </section> */}
 
+      {/* BUM SELECTION */}
       <section className="bum-selection">
         <div className="d-flex justify-content-between align-items-center mb-2">
           <label htmlFor="bum_id">BUSINESS UNIT MANAGER</label>
@@ -414,6 +619,32 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
         )}
       </section>
 
+      {/* Technician SELECTION */}
+      {isCurrentUserBum && (
+        <section className="bum-selection">
+          <div className="d-flex justify-content-between align-items-center mb-2">
+            <label htmlFor="tech_id">TECHNICIAN (JOB OWNER)</label>
+          </div>
+          
+          <div className="bum-selection-dropdown">
+            <select
+              id="owner_id"
+              className="form-select"
+              {...register('owner_id', { valueAsNumber: true})}
+              defaultValue=""
+            >
+              <option value="">Select Technician...</option>
+              {techOptions.map(tech => (
+                <option key={tech.id} value={tech.id}>{tech.full_name}</option>
+              ))}
+            </select>
+          </div>
+          {errors.owner_id && (
+            <div className="text-danger mt-1 small">{String(errors.owner_id.message)}</div>
+          )}
+        </section>
+      )}
+
       <section className="mb-3">
         <div className="toggle-button-group">
           <button 
@@ -438,7 +669,6 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
         <h6 className="jcM-section">CLIENT</h6>
 
         {/* hidden field so Zod can validate client_id */}
-        <input type="hidden" {...register("owner_id", { valueAsNumber: true })} />
         <input type="hidden" {...register("client_id", {valueAsNumber: true })} />
         
         <div className="jcM-autoComplete">
@@ -767,42 +997,185 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
 
     {watch('materials_used') && (
       <>
+        {selectedQuoteId && (
+          <div className="alert alert-info py-2">
+            <i className="bi bi-info-circle me-2"></i>
+            Materials loaded from selected quote
+          </div>
+        )}
+
+        {/* Quote selection if multiple accepted quotes exist */}
+        {isQuotedJC && selectedProjectId && acceptedQuotes.length > 0 && (
+          <div className="mb-3">
+            <label className="form-label">Select Quote:</label>
+            <div className="list-group">
+              {acceptedQuotes.map(quote => (
+                <button
+                  key={quote.id}
+                  type="button"
+                  className={`list-group-item list-group-item-action ${selectedQuoteId === quote.id ? 'active' : ''}`}
+                  onClick={() => setSelectedQuoteId(quote.id)}
+                >
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <div className="fw-bold">{quote.number}</div>
+                      <small>{new Date(quote.created_at).toLocaleDateString()}</small>
+                    </div>
+                    <div className="text-end">
+                      <div className="fw-bold">R {quote.totals?.total_incl_vat?.toFixed(2) || '0.00'}</div>
+                      <span className="badge bg-success">Accepted</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <button type="button" className="btn btn-sm btn-outline-primary mb-2" onClick={() => setMaterialsOpen(true)}>
           + Add products
         </button>
 
         {materialLines.length > 0 ? (
-          <ul className="list-group">
-            {materialLines.map((l, i) => (
-              <li key={i} className="list-group-item d-flex align-items-center justify-content-between gap-2">
-                <div className="flex-grow-1">
-                  <div className="fw-semibold">{l.name}</div>
-                  <small className="text-muted">R {l.unit_price.toFixed(2)} × </small>
+          <ul className="list-group mb-3">
+            {materialLines.map((line, index) => (
+              <li key={index} className="list-group-item">
+                <div className="form-check mb-2">
                   <input
-                    type="number"
-                    min={0}
-                    className="form-control form-control-sm d-inline-block"
-                    style={{ width: 80 }}
-                    value={l.qty}
-                    onChange={(e) => {
-                      const v = Math.max(0, Number(e.target.value || 0));
-                      setMaterialLines(lines => lines.map((x, idx) => idx === i ? { ...x, qty: v } : x));
-                    }}
+                    className="form-check-input"
+                    type="checkbox"
+                    id={`material-used-${index}`}
+                    checked={usedMaterials[index] ?? true}
+                    onChange={() => toggleUsed(index)}
                   />
+                  <label className="form-check-label d-flex justify-content-between w-100" htmlFor={`material-used-${index}`}>
+                    <div>
+                      <span className="fw-semibold">{line.name}</span>
+                      {line.fromQuote && <span className="badge bg-info ms-2">From Quote</span>}
+                    </div>
+                    <span className="text-nowrap">R {line.unit_price.toFixed(2)} × {line.qty}</span>
+                  </label>
                 </div>
-                <div className="text-nowrap">R {(l.unit_price * l.qty).toFixed(2)}</div>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-danger"
-                  onClick={() => setMaterialLines(lines => lines.filter((_, idx) => idx !== i))}
-                >
-                  Remove
-                </button>
+                
+                {usedMaterials[index] && (
+                  <div className="ms-4">
+                    {!line.fromQuote && (
+                      <div className="mb-2">
+                        <div className="row g-2 align-items-center">
+                          <div className="col-6">
+                            <div className="input-group input-group-sm">
+                              <span className="input-group-text">Actual Cost</span>
+                              <input
+                                type="number"
+                                className="form-control"
+                                value={line.unit_cost}
+                                onChange={(e) => {
+                                  const newCost = parseFloat(e.target.value) || 0;
+                                  setMaterialLines(prev => 
+                                    prev.map((item, i) => i === index ? {...item, unit_cost: newCost} : item)
+                                  );
+                                }}
+                                min="0"
+                                step="0.01"
+                              />
+                            </div>
+                          </div>
+                          <div className="col-6">
+                            <div className="input-group input-group-sm">
+                              <span className="input-group-text">Price</span>
+                              <input
+                                type="number"
+                                className="form-control"
+                                value={line.unit_price}
+                                onChange={(e) => {
+                                  const newPrice = parseFloat(e.target.value) || 0;
+                                  setMaterialLines(prev => 
+                                    prev.map((item, i) => i === index ? {...item, unit_price: newPrice} : item)
+                                  );
+                                }}
+                                min="0"
+                                step="0.01"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-2">
+                          <input
+                            type="file"
+                            id={`material-receipt-${index}`}
+                            className="d-none"
+                            accept="image/*"
+                            onChange={(e) => handleFileUpload(index, e.target.files?.[0] || null)}
+                          />
+                          <label 
+                            htmlFor={`material-receipt-${index}`}
+                            className={`btn btn-sm ${materialFileUploads[index] ? 'btn-success' : 'btn-outline-secondary'}`}
+                          >
+                            {materialFileUploads[index] ? 
+                              <><i className="bi bi-check-circle"></i> Receipt Uploaded</> : 
+                              <><i className="bi bi-receipt"></i> Upload Receipt (Required)</>
+                            }
+                          </label>
+                          
+                          {materialFileUploads[index] && (
+                            <span className="ms-2 text-muted small">
+                              {materialFileUploads[index]?.name} 
+                              ({Math.round(materialFileUploads[index]?.size as number / 1024)} KB)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="d-flex justify-content-between align-items-center mt-1">
+                      <div className="input-group input-group-sm" style={{maxWidth: '180px'}}>
+                        <span className="input-group-text">Qty</span>
+                        <input
+                          type="number"
+                          className="form-control"
+                          min="0"
+                          step="1"
+                          value={line.qty}
+                          onChange={(e) => {
+                            const newQty = Math.max(0, parseInt(e.target.value) || 0);
+                            setMaterialLines(prev => 
+                              prev.map((item, i) => i === index ? {...item, qty: newQty} : item)
+                            );
+                          }}
+                        />
+                      </div>
+                      
+                      <div>
+                        <span className="fw-bold me-2">Total: R {(line.unit_price * line.qty).toFixed(2)}</span>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={() => {
+                            setMaterialLines(prev => prev.filter((_, i) => i !== index));
+                            setUsedMaterials(prev => {
+                              const newUsed = {...prev};
+                              delete newUsed[index];
+                              return newUsed;
+                            });
+                            setMaterialFileUploads(prev => {
+                              const newUploads = {...prev};
+                              delete newUploads[index];
+                              return newUploads;
+                            });
+                          }}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
         ) : (
-          <div className="text-muted small">No materials added yet.</div>
+          <div className="alert alert-warning">No materials added yet.</div>
         )}
       </>
     )}
@@ -837,7 +1210,14 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
           </button>
         )}
         <button type="button" className="btn btn-primary flex-fill" onClick={onSave} disabled={isSubmitting}>
-          {isSubmitting ? "Saving…" : isDirty ? "Save changes" : "Save"}
+          {isSubmitting ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              "Saving…" 
+            </>
+            ) : ( 
+              "Save"
+            )}
         </button>
       </div>
 

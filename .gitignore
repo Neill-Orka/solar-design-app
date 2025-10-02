@@ -15,5 +15,6 @@ backend/utils/hopetown_pvgis_profile_1.csv
 backend/utils/hopetown_pvgis_profile_1.csv
 backend/.env.template
 backend/DEPLOYMENT.md
+backend/uploads/
 ~$Generator_Simulation.xlsx
 Generator_Simulation.xlsx

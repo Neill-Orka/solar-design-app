@@ -11,6 +11,7 @@ export const JobCardFormSchema = z.object({
   owner_id: z.coerce.number().int().positive(),
 
   bum_id: z.coerce.number().int().positive().nullable().default(null),
+  tech_id: z.coerce.number().int().positive().nullable().default(null),
 
   category_id: z.coerce.number().int().positive().nullable().default(null),
 
@@ -46,6 +47,7 @@ export const jobCardDefaults: JobCardFormValues = {
   client_id: 0,
   owner_id: 1,
   bum_id: null,
+  tech_id: null,
   category_id: null,
   title: '',
   description: '',

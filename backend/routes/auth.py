@@ -4,7 +4,7 @@ from flask_jwt_extended import (
     create_access_token, create_refresh_token, 
     jwt_required, get_jwt_identity, get_jwt
 )
-from models import db, User, RefreshToken, AuditLog, UserRole, RegistrationToken
+from models import db, User, RefreshToken, AuditLog, UserRole, RegistrationToken, TechnicianProfile
 from datetime import datetime, timedelta
 import re
 from functools import wraps
@@ -602,3 +602,38 @@ def list_users_minimal():
         ]), 200
     except Exception as e:
         return jsonify({"message": str(e)}), 500
+
+# Endpoint to list technicians
+@auth_bp.route('/technicians', methods=['GET'])
+@jwt_required()
+def list_technicians():
+    """
+    Get list of technicians from the TechnicianProfile table.
+    Returns [{id, user_id, full_name, hourly_rate, active ]
+    """
+    try:
+        # Join TechnicianProfile with Uer to get both profile data and user names
+        techs = db.session.query(
+            TechnicianProfile, User
+        ).join(
+            User, TechnicianProfile.user_id == User.id
+        ).filter(
+            TechnicianProfile.active == True
+        ).all()
+
+        # Format response
+        result = []
+        for profile, user in techs:
+            result.append({
+                "id": user.id,
+                "tech_profile_id": profile.id,
+                "full_name": user.full_name,
+                "hourly_rate": profile.hourly_rate,
+                "active": profile.active
+            })
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error fetching technicians: {str(e)}")
+        return jsonify({"Error": "Failed to get technician data"}), 500

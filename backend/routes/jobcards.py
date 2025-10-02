@@ -3,9 +3,10 @@ from flask import Blueprint, request, jsonify, abort, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 import json
-from models import db, JobCard, Clients, JobCategory, Vehicle
+from models import Document, JobCardMaterial, db, JobCard, Clients, JobCategory, Vehicle, DocumentKind, DocumentStatus, DocumentVersion, Product, User, UserRole
 from werkzeug.utils import secure_filename
 import os
+from routes.auth import log_user_action
 
 jobcards_bp = Blueprint("jobcards", __name__)
 
@@ -51,6 +52,7 @@ def jobcards_collection():
     jc = JobCard(
         client_id=data["client_id"],
         owner_id=data["owner_id"],
+        bum_id=int(data["bum_id"]) if data.get("bum_id") else None,
         category_id=data.get("category_id"),
         title=data.get("title"),
         description=data.get("description"),
@@ -94,7 +96,7 @@ def jobcards_item(jid: int):
             "title","description","is_quoted","project_id","category_id","start_at","complete_at",
             "labourers_count","labour_hours","labour_rate_per_hour",
             "materials_used","did_travel","vehicle_id","travel_distance_km",
-            "coc_required","status"
+            "coc_required","status","owner_id", "bum_id"
         ]:
             if f in data:
                 val = _parse_dt(data[f]) if f in ("start_at","complete_at") else data[f]
@@ -103,6 +105,28 @@ def jobcards_item(jid: int):
         return jsonify(jc.to_dict())
 
     if request.method == "DELETE":
+        # Get current user
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
+
+        # Check if user is admin
+        if not user or user.role != UserRole.ADMIN:
+            return jsonify({"error": "Only administrators can delete job cards"}), 403
+        
+        # Log the action before deletion
+        log_user_action(
+            user_id=current_user_id,
+            action='DELETE',
+            resource_type='job_card',
+            resource_id=jc.id,
+            details = {
+                'job_card_id': jc.id,
+                'client_name': jc.client_name_snapshot,
+                'title': jc.title,
+                'created_by': jc.created_by_id
+            }
+        )
+
         db.session.delete(jc)
         db.session.commit()
         return ("", 204)
@@ -235,3 +259,188 @@ def delete_jobcard_attachment(jid: int, aid: int):
       pass
   db.session.delete(att); db.session.commit()
   return ("", 204)
+
+# ----------- Materials Used (Get Quotes) ---------------------------------------------------
+@jobcards_bp.route("jobcards/projects/<int:project_id>/accepted_quotes", methods=["GET"])
+@jwt_required()
+def get_accepted_quotes_for_project(project_id):
+    """ GET all accepted quotes for a project """
+    try:
+        # Find quotes with ACCEPTED status for this project
+        quotes = Document.query.filter_by(
+            project_id=project_id,
+            kind=DocumentKind.QUOTE,
+            status=DocumentStatus.ACCEPTED
+        ).all()
+
+        result = []
+        for quote in quotes:
+            # Get the latest version
+            latest_version = quote.versions.order_by(DocumentVersion.version_no.desc()).first()
+            if latest_version:
+                result.append({
+                    "id": quote.id,
+                    "number": quote.number,
+                    "created_at": quote.created_at.isoformat(),
+                    "version_id": latest_version.id,
+                    "version_no": latest_version.version_no,
+                    "totals": latest_version.totals_json
+                })
+
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@jobcards_bp.route("jobcards/quotes/<int:quote_id>/line_items", methods=["GET"])
+@jwt_required()
+def get_quote_line_items(quote_id):
+    """ GET all line items from the latest version of an accepted quote """
+    try: 
+        # Find quote and verify it's accepted
+        quote = Document.query.filter_by(
+            id=quote_id, 
+            kind=DocumentKind.QUOTE,
+            status=DocumentStatus.ACCEPTED
+        ).first()
+
+        if not quote:
+            return jsonify({"error": "Accepted quote not found"}), 404
+        
+        # Get the latest version
+        latest_version = quote.versions.order_by(DocumentVersion.version_no.desc()).first()
+        if not latest_version:
+            return jsonify({"error": "No versions found for this quote"}), 404
+        
+        # Get line items
+        items = []
+        for item in latest_version.line_items:
+            # Get the current product if it still exists
+            product = Product.query.get(item.product_id) if item.product_id else None
+
+            # Use product snapshot if available, otherwise use current product details
+            snapshot = item.product_snapshot_json or {}
+
+            items.append({
+                "id": item.id,
+                "product_id": item.product_id,
+                "name": f"{snapshot.get('brand', product.brand if product else '')} • {snapshot.get('model', product.model if product else '')}".strip(),
+                "unit_price": item.unit_price_locked,
+                "unit_cost": item.unit_cost_locked,
+                "qty": item.qty,
+                "from_quote": True
+            })
+
+        return jsonify({
+            "quote_id": quote.id,
+            "quote_number": quote.number,
+            "items": items
+        }), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@jobcards_bp.route("/jobcards/<int:jid>/material-receipts/<int:material_id>", methods=["POST"])
+@jwt_required()
+def upload_material_receipt(jid: int, material_id: int):
+    from models import JobCard, JobCardMaterial, JobCardAttachment, db
+    
+    # Verify job card and material exist
+    jc = JobCard.query.get_or_404(jid)
+    material = JobCardMaterial.query.get_or_404(material_id)
+    
+    if material.job_card_id != jid:
+        return jsonify({"error": "Material does not belong to this job card"}), 400
+    
+    file = request.files.get('file')
+    if not file:
+        return {"message": "file required"}, 400
+        
+    # Similar file upload logic as attachments
+    fname = secure_filename(file.filename or "receipt.jpg")
+    root = current_app.config.get("UPLOAD_FOLDER", "uploads")
+    folder = os.path.join(root, "jobcards", str(jid), "receipts")
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, fname)
+    
+    # Prevent overwrite
+    base, ext = os.path.splitext(fname)
+    i = 1
+    while os.path.exists(path):
+        fname = f"{base}_{i}{ext}"
+        path = os.path.join(folder, fname)
+        i += 1
+        
+    file.save(path)
+
+    # Public URL
+    public_base = current_app.config.get("PUBLIC_UPLOAD_BASE", "/uploads")
+    url = f"{public_base}/jobcards/{jid}/receipts/{fname}"
+    
+    # Create an attachment for tracking
+    att = JobCardAttachment(
+        job_card_id=jid,
+        filename=fname,
+        url=url,
+        content_type=file.mimetype,
+        size_bytes=os.path.getsize(path),
+        uploaded_by_id=get_jwt_identity(),
+        # metadata_json={"type": "material_receipt", "material_id": material_id}
+    )
+    
+    db.session.add(att)
+    db.session.commit()
+    
+    # Also update the material with a note about the receipt
+    material.note = f"Receipt photo: {url}"
+    db.session.commit()
+    
+    return att.to_dict(), 201
+
+@jobcards_bp.route("/jobcards/materials", methods=["POST"])
+@jwt_required()
+def create_jobcard_material():
+    """Create a material line item for a job card"""
+    try:
+        data = request.get_json() or {}
+        
+        # Validate required fields
+        required = ["job_card_id", "product_id", "quantity"]
+        for field in required:
+            if field not in data:
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+        
+        # Verify job card exists
+        job_card = JobCard.query.get_or_404(data["job_card_id"])
+        
+        # Verify product exists
+        product = Product.query.get_or_404(data["product_id"])
+        
+        # Create the material entry
+        material = JobCardMaterial(
+            job_card_id=data["job_card_id"],
+            product_id=data["product_id"],
+            quantity=data["quantity"],
+            unit_cost_at_time=data.get("unit_cost_at_time"),
+            unit_price_at_time=data.get("unit_price_at_time"),
+            note=data.get("note")
+        )
+        
+        db.session.add(material)
+        db.session.commit()
+        
+        # Set product name for response
+        response = material.to_dict() if hasattr(material, 'to_dict') else {
+            "id": material.id,
+            "job_card_id": material.job_card_id,
+            "product_id": material.product_id,
+            "product_name": product.description or f"{product.brand_name} {product.description}",
+            "quantity": material.quantity,
+            "unit_cost_at_time": material.unit_cost_at_time,
+            "unit_price_at_time": material.unit_price_at_time,
+            "note": material.note
+        }
+        
+        return jsonify(response), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500    

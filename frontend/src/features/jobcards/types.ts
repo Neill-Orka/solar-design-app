@@ -13,6 +13,7 @@ export type UserListItem = {
     id: number;
     full_name: string;
     is_bum?: boolean;
+    is_tech?: boolean;
 }
 
 export interface JobCategory { id: number; name: string; active: boolean; }
@@ -64,6 +65,8 @@ export interface JobCard {
     owner_name?: string;
     bum_id: number | null;
     bum_name?: string;
+    tech_id: number | null;
+    tech_name?: string;
     category_id: number | null;
     title: string | null;
     description: string | null;
