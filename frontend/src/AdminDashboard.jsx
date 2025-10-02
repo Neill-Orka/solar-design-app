@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { API_URL } from './apiConfig';
 import './AdminDashboard.css';
@@ -21,6 +21,26 @@ const AdminDashboard = () => {
   const [newRole, setNewRole] = useState('');
   const [userActionLoading, setUserActionLoading] = useState(false);
 
+  // System settings variables
+  const [vehicles, setVehicles] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [bums, setBums] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
+  const [settingsSection, setSettingsSection] = useState('vehicles');
+
+  // Add loading states
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [loadingBums, setLoadingBums] = useState(false);
+  const [loadingTechnicians, setLoadingTechnicians] = useState(false);
+
+  // Add form states for editing/creating
+  const [editingVehicle, setEditingVehicle] = useState(null);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editingBum, setEditingBum] = useState(null);
+  const [editingTechnician, setEditingTechnician] = useState(null);
+
+  
   const getAuthHeaders = useCallback(() => {
     const token = localStorage.getItem('access_token');
     return {
@@ -28,6 +48,272 @@ const AdminDashboard = () => {
       'Content-Type': 'application/json'
     };
   }, []);
+  
+  const fetchVehicles = useCallback(async () => {
+    setLoadingVehicles(true);
+    try {
+      const response = await fetch(`${API_URL}/api/vehicles`, {
+        headers: getAuthHeaders()
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setVehicles(data);
+      } else {
+        setMessage('Failed to fetch vehicles');
+      }
+    } catch (error) {
+      console.error('Error fetching vehicles:', error);
+      setMessage('Error loading vehicles');
+    } finally {
+      setLoadingVehicles(false);
+    }
+  }, [getAuthHeaders]);
+
+  const fetchCategories = useCallback(async () => {
+    setLoadingCategories(true);
+    try {
+      const response = await fetch(`${API_URL}/api/jobcategories`, {
+        headers: getAuthHeaders()
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data);
+      } else {
+        setMessage('Failed to fetch job categories');
+      }
+    } catch (error) {
+      console.error('Error fetching job categories:', error);
+      setMessage('Error loading job categories');
+    } finally {
+      setLoadingCategories(false);
+    }
+  }, [getAuthHeaders]);
+
+  const fetchBums = useCallback(async () => {
+    setLoadingBums(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/users?is_bum=1`, {
+        headers: getAuthHeaders()
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setBums(data);
+      } else {
+        setMessage('Failed to fetch BUMs');
+      }
+    } catch (error) {
+      console.error('Error fetching BUMs:', error);
+      setMessage('Error loading BUMs');
+    } finally {
+      setLoadingBums(false);
+    }
+  }, [getAuthHeaders]);
+
+  const fetchTechnicians = useCallback(async () => {
+    setLoadingTechnicians(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/technicians`, {
+        headers: getAuthHeaders()
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTechnicians(data);
+      } else {
+        setMessage('Failed to fetch technicians');
+      }
+    } catch (error) {
+      console.error('Error fetching technicians:', error);
+      setMessage('Error loading technicians');
+    } finally {
+      setLoadingTechnicians(false);
+    }
+  }, [getAuthHeaders]);
+
+  useEffect(() => {
+    if (activeTab === 'settings') {
+      // Load all settings data
+      fetchVehicles();
+      fetchCategories();
+      fetchBums();
+      fetchTechnicians();
+    }
+  }, [activeTab, fetchVehicles, fetchCategories, fetchBums, fetchTechnicians]);
+
+  // Add these handlers for vehicles
+const handleSaveVehicle = async (vehicle) => {
+  try {
+    const method = vehicle.id ? 'PUT' : 'POST';
+    const url = vehicle.id ? 
+      `${API_URL}/api/vehicles/${vehicle.id}` : 
+      `${API_URL}/api/vehicles`;
+    
+    const response = await fetch(url, {
+      method,
+      headers: getAuthHeaders(),
+      body: JSON.stringify(vehicle)
+    });
+    
+    if (response.ok) {
+      setMessage(`Vehicle ${vehicle.id ? 'updated' : 'added'} successfully`);
+      fetchVehicles();
+      setEditingVehicle(null);
+    } else {
+      const error = await response.json();
+      setMessage(error.message || `Failed to ${vehicle.id ? 'update' : 'add'} vehicle`);
+    }
+  } catch (error) {
+    console.error(`Error ${vehicle.id ? 'updating' : 'adding'} vehicle:`, error);
+    setMessage(`Error ${vehicle.id ? 'updating' : 'adding'} vehicle`);
+  }
+};
+
+const handleDeleteVehicle = async (id) => {
+  if (!confirm('Are you sure you want to delete this vehicle?')) return;
+  
+  try {
+    const response = await fetch(`${API_URL}/api/vehicles/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    
+    if (response.ok) {
+      setMessage('Vehicle deleted successfully');
+      fetchVehicles();
+    } else {
+      const error = await response.json();
+      setMessage(error.message || 'Failed to delete vehicle');
+    }
+  } catch (error) {
+    console.error('Error deleting vehicle:', error);
+    setMessage('Error deleting vehicle');
+  }
+};
+
+// Add handlers for categories
+const handleSaveCategory = async (category) => {
+  try {
+    const method = category.id ? 'PUT' : 'POST';
+    const url = category.id ? 
+      `${API_URL}/api/jobcategories/${category.id}` : 
+      `${API_URL}/api/jobcategories`;
+    
+    const response = await fetch(url, {
+      method,
+      headers: getAuthHeaders(),
+      body: JSON.stringify(category)
+    });
+    
+    if (response.ok) {
+      setMessage(`Category ${category.id ? 'updated' : 'added'} successfully`);
+      fetchCategories();
+      setEditingCategory(null);
+    } else {
+      const error = await response.json();
+      setMessage(error.message || `Failed to ${category.id ? 'update' : 'add'} category`);
+    }
+  } catch (error) {
+    console.error(`Error ${category.id ? 'updating' : 'adding'} category:`, error);
+    setMessage(`Error ${category.id ? 'updating' : 'adding'} category`);
+  }
+};
+
+const handleDeleteCategory = async (id) => {
+  if (!confirm('Are you sure you want to delete this category? This may affect existing job cards.')) return;
+  
+  try {
+    const response = await fetch(`${API_URL}/api/jobcategories/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    
+    if (response.ok) {
+      setMessage('Category deleted successfully');
+      fetchCategories();
+    } else {
+      const error = await response.json();
+      setMessage(error.message || 'Failed to delete category');
+    }
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    setMessage('Error deleting category');
+  }
+};
+
+// Add handlers for BUMs management
+const handleToggleBumStatus = async (userId, isBum) => {
+  try {
+    const response = await fetch(`${API_URL}/api/auth/users/${userId}/toggle-bum`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ is_bum: !isBum })
+    });
+    
+    if (response.ok) {
+      setMessage(`User ${isBum ? 'removed from' : 'set as'} BUM successfully`);
+      fetchBums();
+      // Also update the regular users list if shown
+      if (activeTab === 'users') {
+        fetchUsers();
+      }
+    } else {
+      const error = await response.json();
+      setMessage(error.message || `Failed to update BUM status`);
+    }
+  } catch (error) {
+    console.error('Error updating BUM status:', error);
+    setMessage('Error updating BUM status');
+  }
+};
+
+// Add handlers for technicians
+const handleSaveTechnician = async (tech) => {
+  try {
+    const method = tech.tech_profile_id ? 'PUT' : 'POST';
+    const url = tech.tech_profile_id ? 
+      `${API_URL}/api/auth/technicians/${tech.tech_profile_id}` : 
+      `${API_URL}/api/auth/technicians`;
+    
+    const response = await fetch(url, {
+      method,
+      headers: getAuthHeaders(),
+      body: JSON.stringify(tech)
+    });
+    
+    if (response.ok) {
+      setMessage(`Technician ${tech.tech_profile_id ? 'updated' : 'added'} successfully`);
+      fetchTechnicians();
+      setEditingTechnician(null);
+    } else {
+      const error = await response.json();
+      setMessage(error.message || `Failed to ${tech.tech_profile_id ? 'update' : 'add'} technician`);
+    }
+  } catch (error) {
+    console.error(`Error ${tech.tech_profile_id ? 'updating' : 'adding'} technician:`, error);
+    setMessage(`Error ${tech.tech_profile_id ? 'updating' : 'adding'} technician`);
+  }
+};
+
+const handleDeleteTechnician = async (id) => {
+  if (!confirm('Are you sure you want to remove this technician profile?')) return;
+  
+  try {
+    const response = await fetch(`${API_URL}/api/auth/technicians/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    
+    if (response.ok) {
+      setMessage('Technician profile removed successfully');
+      fetchTechnicians();
+    } else {
+      const error = await response.json();
+      setMessage(error.message || 'Failed to remove technician profile');
+    }
+  } catch (error) {
+    console.error('Error removing technician profile:', error);
+    setMessage('Error removing technician profile');
+  }
+};
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -258,6 +544,12 @@ const AdminDashboard = () => {
       </div>
 
       <div className="admin-tabs">
+        <button
+          className={`tab-button ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}  
+        >
+          System Settings
+        </button>
         <button 
           className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
           onClick={() => setActiveTab('users')}
@@ -283,6 +575,499 @@ const AdminDashboard = () => {
           {message}
         </div>
       )}
+
+{activeTab === 'settings' && (
+  <div className="settings-section">
+    <div className="settings-header">
+      <h2>System Settings</h2>
+      <div className="settings-nav">
+        <button 
+          className={`settings-nav-btn ${settingsSection === 'vehicles' ? 'active' : ''}`}
+          onClick={() => setSettingsSection('vehicles')}
+        >
+          Vehicles
+        </button>
+        <button 
+          className={`settings-nav-btn ${settingsSection === 'categories' ? 'active' : ''}`}
+          onClick={() => setSettingsSection('categories')}
+        >
+          Job Categories
+        </button>
+        <button 
+          className={`settings-nav-btn ${settingsSection === 'bums' ? 'active' : ''}`}
+          onClick={() => setSettingsSection('bums')}
+        >
+          Business Unit Managers
+        </button>
+        <button 
+          className={`settings-nav-btn ${settingsSection === 'technicians' ? 'active' : ''}`}
+          onClick={() => setSettingsSection('technicians')}
+        >
+          Technicians
+        </button>
+      </div>
+    </div>
+
+    {/* Vehicles Management */}
+    {settingsSection === 'vehicles' && (
+      <div className="vehicles-section">
+        <div className="section-header">
+          <h3>Vehicles Management</h3>
+          <button 
+            className="add-btn"
+            onClick={() => setEditingVehicle({ name: '', registration: '', rate_per_km: 0, active: true })}
+          >
+            Add New Vehicle
+          </button>
+        </div>
+
+        {loadingVehicles ? (
+          <div className="loading">Loading vehicles...</div>
+        ) : (
+          <table className="settings-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Registration</th>
+                <th>Rate (per km)</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vehicles.map(vehicle => (
+                <tr key={vehicle.id}>
+                  <td>{vehicle.name}</td>
+                  <td>{vehicle.registration || '-'}</td>
+                  <td>R{vehicle.rate_per_km.toFixed(2)}</td>
+                  <td>
+                    <span className={`status-badge ${vehicle.active ? 'active' : 'inactive'}`}>
+                      {vehicle.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td>
+                    <button 
+                      className="action-button edit" 
+                      onClick={() => setEditingVehicle(vehicle)}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      className="action-button delete" 
+                      onClick={() => handleDeleteVehicle(vehicle.id)}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {vehicles.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="no-data">No vehicles found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+
+        {/* Vehicle Edit Modal */}
+        {editingVehicle && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <h3>{editingVehicle.id ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveVehicle(editingVehicle);
+              }}>
+                <div className="form-group">
+                  <label>Name</label>
+                  <input 
+                    type="text" 
+                    value={editingVehicle.name} 
+                    onChange={(e) => setEditingVehicle({...editingVehicle, name: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Registration</label>
+                  <input 
+                    type="text" 
+                    value={editingVehicle.registration || ''} 
+                    onChange={(e) => setEditingVehicle({...editingVehicle, registration: e.target.value})}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Rate per km (R)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    min="0"
+                    value={editingVehicle.rate_per_km} 
+                    onChange={(e) => setEditingVehicle({...editingVehicle, rate_per_km: parseFloat(e.target.value)})}
+                    required
+                  />
+                </div>
+                <div className="form-group checkbox">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      checked={editingVehicle.active} 
+                      onChange={(e) => setEditingVehicle({...editingVehicle, active: e.target.checked})}
+                    />
+                    Active
+                  </label>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="cancel-btn" onClick={() => setEditingVehicle(null)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="save-btn">
+                    {editingVehicle.id ? 'Update Vehicle' : 'Add Vehicle'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* Job Categories Management */}
+    {settingsSection === 'categories' && (
+      <div className="categories-section">
+        <div className="section-header">
+          <h3>Job Categories Management</h3>
+          <button 
+            className="add-btn"
+            onClick={() => setEditingCategory({ name: '', active: true })}
+          >
+            Add New Category
+          </button>
+        </div>
+
+        {loadingCategories ? (
+          <div className="loading">Loading categories...</div>
+        ) : (
+          <table className="settings-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map(category => (
+                <tr key={category.id}>
+                  <td>{category.name}</td>
+                  <td>
+                    <span className={`status-badge ${category.active ? 'active' : 'inactive'}`}>
+                      {category.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td>
+                    <button 
+                      className="action-button edit" 
+                      onClick={() => setEditingCategory(category)}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      className="action-button delete" 
+                      onClick={() => handleDeleteCategory(category.id)}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {categories.length === 0 && (
+                <tr>
+                  <td colSpan="3" className="no-data">No categories found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+
+        {/* Category Edit Modal */}
+        {editingCategory && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <h3>{editingCategory.id ? 'Edit Category' : 'Add New Category'}</h3>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveCategory(editingCategory);
+              }}>
+                <div className="form-group">
+                  <label>Name</label>
+                  <input 
+                    type="text" 
+                    value={editingCategory.name} 
+                    onChange={(e) => setEditingCategory({...editingCategory, name: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="form-group checkbox">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      checked={editingCategory.active} 
+                      onChange={(e) => setEditingCategory({...editingCategory, active: e.target.checked})}
+                    />
+                    Active
+                  </label>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="cancel-btn" onClick={() => setEditingCategory(null)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="save-btn">
+                    {editingCategory.id ? 'Update Category' : 'Add Category'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* BUM Management */}
+    {settingsSection === 'bums' && (
+      <div className="bums-section">
+        <div className="section-header">
+          <h3>Business Unit Managers (BUMs)</h3>
+          <p className="info-text">
+            To add a new BUM, first add them as a user, then assign the BUM role here.
+          </p>
+        </div>
+
+        <div className="bums-users-section">
+          <h4>Current BUMs</h4>
+          {loadingBums ? (
+            <div className="loading">Loading BUMs...</div>
+          ) : (
+            <table className="settings-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bums.map(bum => (
+                  <tr key={bum.id}>
+                    <td>{bum.full_name}</td>
+                    <td>{bum.email}</td>
+                    <td>
+                      <button 
+                        className="action-button remove" 
+                        onClick={() => handleToggleBumStatus(bum.id, true)}
+                      >
+                        Remove BUM Status
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {bums.length === 0 && (
+                  <tr>
+                    <td colSpan="3" className="no-data">No BUMs assigned</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="eligible-users-section">
+          <h4>Assign BUM Role to Users</h4>
+          {!loadingUsers ? (
+            <table className="settings-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.filter(user => 
+                  // Only show active users who aren't already BUMs
+                  user.is_active && !user.is_bum
+                ).map(user => (
+                  <tr key={user.id}>
+                    <td>{user.full_name}</td>
+                    <td>{user.email}</td>
+                    <td>{user.role}</td>
+                    <td>
+                      <button 
+                        className="action-button assign" 
+                        onClick={() => handleToggleBumStatus(user.id, false)}
+                      >
+                        Assign as BUM
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {users.filter(user => user.is_active && !user.is_bum).length === 0 && (
+                  <tr>
+                    <td colSpan="4" className="no-data">No eligible users found</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <div className="loading">Loading users...</div>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* Technicians Management */}
+    {settingsSection === 'technicians' && (
+      <div className="technicians-section">
+        <div className="section-header">
+          <h3>Technicians Management</h3>
+          <button 
+            className="add-btn"
+            onClick={() => {
+              // Create a new technician form with dropdown of eligible users
+              setEditingTechnician({ 
+                user_id: '', 
+                hourly_rate: 0, 
+                active: true,
+                eligible_users: users.filter(u => u.is_active && !technicians.some(t => t.id === u.id))
+              });
+            }}
+          >
+            Add New Technician
+          </button>
+        </div>
+
+        {loadingTechnicians ? (
+          <div className="loading">Loading technicians...</div>
+        ) : (
+          <table className="settings-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Hourly Rate</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {technicians.map(tech => (
+                <tr key={tech.id}>
+                  <td>{tech.full_name}</td>
+                  <td>R{tech.hourly_rate.toFixed(2)}</td>
+                  <td>
+                    <span className={`status-badge ${tech.active ? 'active' : 'inactive'}`}>
+                      {tech.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td>
+                    <button 
+                      className="action-button edit" 
+                      onClick={() => setEditingTechnician({
+                        tech_profile_id: tech.tech_profile_id,
+                        user_id: tech.id,
+                        full_name: tech.full_name,
+                        hourly_rate: tech.hourly_rate,
+                        active: tech.active
+                      })}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      className="action-button delete" 
+                      onClick={() => handleDeleteTechnician(tech.tech_profile_id)}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {technicians.length === 0 && (
+                <tr>
+                  <td colSpan="4" className="no-data">No technicians found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+
+        {/* Technician Edit Modal */}
+        {editingTechnician && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <h3>{editingTechnician.tech_profile_id ? 'Edit Technician' : 'Add New Technician'}</h3>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveTechnician(editingTechnician);
+              }}>
+                {!editingTechnician.tech_profile_id ? (
+                  <div className="form-group">
+                    <label>Select User</label>
+                    <select 
+                      value={editingTechnician.user_id} 
+                      onChange={(e) => setEditingTechnician({...editingTechnician, user_id: e.target.value})}
+                      required
+                    >
+                      <option value="">-- Select a user --</option>
+                      {editingTechnician.eligible_users.map(user => (
+                        <option key={user.id} value={user.id}>
+                          {user.full_name} ({user.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label>Technician</label>
+                    <input type="text" value={editingTechnician.full_name} disabled />
+                  </div>
+                )}
+                <div className="form-group">
+                  <label>Hourly Rate (R)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    min="0"
+                    value={editingTechnician.hourly_rate} 
+                    onChange={(e) => setEditingTechnician({...editingTechnician, hourly_rate: parseFloat(e.target.value)})}
+                    required
+                  />
+                </div>
+                <div className="form-group checkbox">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      checked={editingTechnician.active} 
+                      onChange={(e) => setEditingTechnician({...editingTechnician, active: e.target.checked})}
+                    />
+                    Active
+                  </label>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="cancel-btn" onClick={() => setEditingTechnician(null)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="save-btn">
+                    {editingTechnician.tech_profile_id ? 'Update Technician' : 'Add Technician'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+)}
 
       {activeTab === 'tokens' && (
         <div className="tokens-section">

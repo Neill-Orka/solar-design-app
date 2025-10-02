@@ -69,8 +69,33 @@
   padding: 8px 16px 4px 16px;
 }
 
+/* Medium screens - 3 columns */
 @media (min-width: 560px) {
-  .jcD-meta { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  .jcD-meta { 
+    grid-template-columns: repeat(3, minmax(0,1fr)); 
+  }
+}
+
+/* Larger screens - all 5 in one row */
+@media (min-width: 768px) {
+  .jcD-meta { 
+    grid-template-columns: repeat(5, minmax(0,1fr)); 
+  }
+}
+
+/* Optional: make font sizes slightly smaller on smaller screens */
+@media (max-width: 559px) {
+  .jcD-chip-value {
+    font-size: 13px;
+  }
+  
+  .jcD-chip-label {
+    font-size: 10px;
+  }
+  
+  .jcD-chip {
+    padding: 8px 10px;
+  }
 }
 
 .jcD-chip {
@@ -156,4 +181,101 @@
   height: 72px;
   object-fit: cover;
   border-radius: 8px;
+}
+
+/* Add these styles for the delete button and actions container */
+
+.jcD-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.jcD-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8d7da;
+  color: #dc3545;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.jcD-delete:hover {
+  background: #f5c2c7;
+}
+
+.jcD-delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal styles */
+.jcD-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.jcD-modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.jcD-modal-content h3 {
+  margin-top: 0;
+  font-size: 18px;
+  color: #dc3545;
+}
+
+.jcD-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.jcD-modal-cancel-btn {
+  padding: 8px 16px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.jcD-modal-delete-btn {
+  padding: 8px 16px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.jcD-modal-delete-btn:hover {
+  background: #c82333;
+}
+
+.jcD-modal-delete-btn:disabled,
+.jcD-modal-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

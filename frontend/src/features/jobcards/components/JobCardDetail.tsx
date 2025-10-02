@@ -4,6 +4,10 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import type { JobCard } from "../types";
+import { API_URL } from "../../../apiConfig";
+import { useAuth } from '../../../AuthContext';
+import { deleteJobCard } from "../api";
+import { useState } from "react";
 import "./jobcard-detail.css";
 
 type Props = {
@@ -25,6 +29,10 @@ const fmtDate = (iso?: string | null) => {
 
 export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
   const nav = useNavigate();
+  const { user } = useAuth();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const clientName =
     job.client_name ||
     (job as any).client?.client_name ||
@@ -37,7 +45,35 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
 
   const attachments = (job as any).attachments || []; // from backend `with_lines=True` (if present)
 
-  const hero = attachments[0]?.url as string | undefined;
+  // Process URLs to ensure they have the full API URL prefix
+  const processUrl = (url: string) => {
+    if (!url) return "";
+    // if the url already starts with http:// or https:// return as is
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      return url;
+    }
+    // otherwise, prepend the API_URL
+    return `${API_URL}${url}`;
+  }
+
+  const hero = attachments[0]?.url ? processUrl(attachments[0].url) : undefined;
+
+  const isAdmin = user?.role === 'admin';
+
+  const handleDelete = async () => {
+    if (!isAdmin) return;
+
+    try {
+      setDeleting(true);
+      await deleteJobCard(job.id);
+      nav('/jobcards', { replace: true });
+    } catch (error) {
+      console.error("Failed to delete job card:", error);
+      alert("Failed to delete job card. Please try again later");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="jcD-page">
@@ -53,6 +89,16 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
         <button className="jcD-done" onClick={onEdit} aria-label="Edit">
           Edit
         </button>
+        {isAdmin && (
+          <button
+            className="jcD-delete"
+            onClick={() => setShowDeleteConfirm(true)}
+            aria-label="Delete"
+            disabled={deleting}
+          >
+            <i className="bi bi-trash"></i>
+          </button>
+        )}
       </div>
 
       {/* Header */}
@@ -78,10 +124,16 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
         </div>
         <div className="jcD-chip">
           <div className="jcD-chip-value">
-            {job.owner_name || "Job Owner"}
+            {job.owner_name || "Not Assigned"}
           </div>
           <div className="jcD-chip-label">Job Owner</div>
         </div>
+        <div className="jcD-chip">
+          <div className="jcD-chip-value">
+            {job.bum_name || "Not assigned"}
+          </div>
+          <div className="jcD-chip-label">BUM</div>
+        </div>        
       </div>
 
       {/* Description */}
@@ -104,13 +156,38 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
         <div className="jcD-photoPlaceholder">No photos yet</div>
       )}
 
-      {/* If you want a simple gallery strip under hero, uncomment:
+      {/* If you want a simple gallery strip under hero, uncomment: */}
       <div className="jcD-strip">
         {attachments.slice(1).map((a: any) => (
           <img key={a.id || a.url} src={a.url} alt={a.filename || 'photo'} />
         ))}
       </div>
-      */}
+
+      {/* Delete Confirmation Model */}
+      {showDeleteConfirm && (
+        <div className="jcD-modal-overlay">
+          <div className="jcD-modal-content">
+            <h3>Delete Job Card</h3>
+            <p>Are you sure you want to delete this job card? This action cannot be undone.</p>
+            <div className="jcD-modal-actions">
+              <button 
+                className="jcD-modal-cancel-btn"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button 
+                className="jcD-modal-delete-btn"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}     
     </div>
   );
 }

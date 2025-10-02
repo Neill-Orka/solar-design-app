@@ -201,4 +201,47 @@ export async function listClientProjects(clientId: number): Promise<any[]> {
     return data;
 }
 
+// Materials / Accepted Quotes API Calls
+export async function getAcceptedQuotes(projectId: number): Promise<any[]> {
+  const { data } = await http.get(`/jobcards/projects/${projectId}/accepted_quotes`);
+  return data;
+}
+
+export async function getQuoteLineItems(quoteId: number): Promise<any> {
+  const { data } = await http.get(`/jobcards/quotes/${quoteId}/line_items`);
+  return data;
+}
+
+export async function uploadMaterialReceipt(
+  jobCardId: number, 
+  materialId: number, 
+  file: File
+): Promise<any> {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const { data } = await http.post(
+    `/jobcards/${jobCardId}/material-receipts/${materialId}`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }
+  );
+  return data;
+}
+
+export async function createJobCardMaterial(payload: {
+  job_card_id: number;
+  product_id: number;
+  quantity: number;
+  unit_price_at_time?: number;
+  unit_cost_at_time?: number;
+  note?: string;
+}): Promise<any> {
+  const { data } = await http.post('/jobcards/materials', payload);
+  return data;
+}
+
 export { http }; 
