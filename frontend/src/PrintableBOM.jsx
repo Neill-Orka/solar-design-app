@@ -910,7 +910,7 @@ const TermsDepositBlock = () => {
     const BankingAcceptanceBlock = () => (
       <section className="bom-block bom-block-bankingaccept">
         <div className="bom-two-col">
-          <div className="bom-box">
+          <div className="bom-box" style={{ fontSize: '12px' }}>
             <div style={{ fontWeight: 700, borderBottom: '1px solid #000', paddingBottom: 4, marginBottom: 4 }}>Banking details:</div>
             <div>Company: Orka Solar (Pty) Ltd.</div>
             <div>Branch: ABSA Mooirivier Mall</div>
@@ -918,8 +918,17 @@ const TermsDepositBlock = () => {
             <div>Account type: Cheque</div>
             <div>Account number: 409 240 5135</div>
           </div>
-          <div className="bom-box">
-            <div className="bom-signature">Client acceptance: signature & date</div>
+          <div className="bom-box" style={{ display: 'flex', flexDirection: 'column', fontSize: '12px' }}>
+            {/* <div className="bom-signature">Client acceptance: signature & date</div> */}
+            <div style={{ fontWeight: 700, borderBottom: '1px solid #000', paddingBottom: 4, marginBottom: 4}}>Client acceptance: </div>
+            <div style={{
+              marginTop: 'auto',
+              textAlign: 'center',
+              paddingBottom: '0px',
+              fontStyle: 'italic',
+            }}>
+              signature and date
+            </div>
           </div>
         </div>
       </section>
@@ -1063,10 +1072,6 @@ const TermsDepositBlock = () => {
               <Badge bg={quoteData.quote.status === 'sent' ? 'success' : quoteData.quote.status === 'accepted' ? 'primary' : quoteData.quote.status === 'declined' ? 'danger' : 'secondary'}>
                 {quoteData.quote.status || 'draft'}
               </Badge>
-              {/* Debug info - remove this later */}
-              <div style={{ fontSize: '0.6rem', color: '#999', marginTop: '2px' }}>
-                Debug: {JSON.stringify(quoteData.quote.status)}
-              </div>
             </div>
             
             {/* Action Buttons */}

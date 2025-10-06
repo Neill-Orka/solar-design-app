@@ -3,11 +3,12 @@ import axios from 'axios';
 import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
 import { Modal, Button, Form } from 'react-bootstrap';
-// import HeatMap if you need heat map support
-// import HeatMap from '@uiw/react-heat-map';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css'
 import { API_URL } from './apiConfig';
 import { useNotification } from './NotificationContext';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
+
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 ChartJS.unregister(ChartDataLabels);
@@ -15,12 +16,18 @@ ChartJS.unregister(ChartDataLabels);
 // helper to format numbers with spaces as thousand separators
 const formatWithSpaces = num => num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
+const toEndOfDay = (d) => {
+  if (!d) return d;
+  const clone = new Date(d);
+  clone.setHours(23, 59, 59, 999);
+  return clone;
+};
+
 function EnergyAnalysis({ projectId }) {
   const { showNotification } = useNotification();
   const [consumptionData, setConsumptionData] = useState([]);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [showDateModal, setShowDateModal] = useState(false);
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
   const [scaleFactorInput, setScaleFactorInput] = useState('');
   const [actualScaleFactor, setActualScaleFactor] = useState(1);
   const [isScaleFactorValid, setIsScaleFactorValid] = useState(true);
@@ -31,22 +38,22 @@ function EnergyAnalysis({ projectId }) {
     const savedEnd = sessionStorage.getItem('energyAnalysis_endDate');
   
     if (savedStart && savedEnd) {
-      setStartDate(savedStart);
-      setEndDate(savedEnd);
+      setStartDate(new Date(savedStart));
+      setEndDate(new Date(savedEnd));
     } else {
       const today = new Date();
       const monthAgo = new Date();
       monthAgo.setDate(today.getDate() - 30);
-      setStartDate(monthAgo.toISOString().slice(0, 10));
-      setEndDate(today.toISOString().slice(0, 10));
+      setStartDate(monthAgo);
+      setEndDate(toEndOfDay(today));
     }
   }, []);
 
   // Save date range to session storage
   useEffect(() => {
     if (startDate && endDate) {
-      sessionStorage.setItem('energyAnalysis_startDate', startDate);
-      sessionStorage.setItem('energyAnalysis_endDate', endDate);
+      sessionStorage.setItem('energyAnalysis_startDate', startDate.toISOString());
+      sessionStorage.setItem('energyAnalysis_endDate', endDate.toISOString());
     }
   }, [startDate, endDate]);
 
@@ -70,14 +77,41 @@ function EnergyAnalysis({ projectId }) {
   useEffect(() => {
     if (!projectId || !startDate || !endDate) return;
 
+    // Format dates for API request - include the time component for end date
+    const formattedStartDate = startDate.toISOString().split('T')[0];
+
+    // Instead of sending ISO string, send the date with explicit local time
+    const endYear = endDate.getFullYear();
+    const endMonth = String(endDate.getMonth() + 1).padStart(2, '0');
+    const endDay = String(endDate.getDate()).padStart(2, '0');
+    const formattedEndDate = `${endYear}-${endMonth}-${endDay}T23:59:59.999`;
+
+    console.log('EnergyAnalysis - API Request:', {
+      projectId,
+      startDate: formattedStartDate,
+      endDate: formattedEndDate,
+      scaleFactor: actualScaleFactor
+    });
+
     axios.get(`${API_URL}/api/consumption_data/${projectId}`, {
       params: {
-        start_date: startDate,
-        end_date: endDate,
-        scale_factor: actualScaleFactor
+        start_date: formattedStartDate,
+        end_date: formattedEndDate,
+        scale_factor: actualScaleFactor,
+        include_full_end_day: true,
+        local_timezone: true
       }
     })
-    .then(res => setConsumptionData(res.data))
+    .then(res => {
+      console.log('EnergyAnalysis - API Response:', {
+        dataPoints: res.data.length,
+        firstPoint: res.data[0],
+        lastPoint: res.data[res.data.length - 1],
+        requestedEndDate: formattedEndDate,
+        lastTimestamp: res.data[res.data.length - 1]?.timestamp
+      });
+      setConsumptionData(res.data);
+    })
     .catch(err => {
       console.error('Error loading data:', err);
       showNotification('Failed to fetch consumption data', 'danger');
@@ -346,30 +380,47 @@ function EnergyAnalysis({ projectId }) {
               
               {/* Date Range Buttons */}
               <div className="btn-group">
-              <button className="btn btn-outline-secondary" onClick={() => {
-                const today = new Date();
-                const weekAgo = new Date();
-                weekAgo.setDate(today.getDate() - 7);
-                setStartDate(weekAgo.toISOString().slice(0, 10));
-                setEndDate(today.toISOString().slice(0, 10));
-              }}>Last 7 Days</button>
+                <button className="btn btn-outline-secondary" onClick={() => {
+                  const today = new Date();
+                  const weekAgo = new Date();
+                  weekAgo.setDate(today.getDate() - 7);
+                  setStartDate(weekAgo);
+                  setEndDate(toEndOfDay(today));
+                }}>Last 7 Days</button>
 
-              <button className="btn btn-outline-secondary" onClick={() => {
-                const today = new Date();
-                const monthAgo = new Date();
-                monthAgo.setDate(today.getDate() - 30);
-                setStartDate(monthAgo.toISOString().slice(0, 10));
-                setEndDate(today.toISOString().slice(0, 10));
-              }}>Last 30 Days</button>
+                <button className="btn btn-outline-secondary" onClick={() => {
+                  const today = new Date();
+                  const monthAgo = new Date();
+                  monthAgo.setDate(today.getDate() - 30);
+                  setStartDate(monthAgo);
+                  setEndDate(toEndOfDay(today));
+                }}>Last 30 Days</button>
 
-              <button className="btn btn-outline-secondary" onClick={() => {
-                setStartDate('2025-01-01');
-                setEndDate('2026-01-01');
-              }}>Full Year</button>
+                <button className="btn btn-outline-secondary" onClick={() => {
+                  setStartDate(new Date('2025-01-01'));
+                  setEndDate(toEndOfDay(new Date('2025-12-31')));
+                }}>Full Year</button>
 
-              <button className="btn btn-outline-primary" onClick={() => setShowDateModal(true)}>
-                Custom Range
-              </button>
+                <DatePicker
+                  selected={startDate}
+                  onChange={(dates) => {
+                    const [start, end] = dates;
+                    setStartDate(start);
+                    setEndDate(end ? toEndOfDay(new Date(end)) : null);
+                    console.log('Date range set:', {
+                      startDate: start,
+                      endDate: end,
+                      endDateWithTime: end ? toEndOfDay(new Date(end)).toISOString() : null
+                    });
+                  }}
+                  startDate={startDate}
+                  endDate={endDate}
+                  selectsRange
+                  isClearable={false}
+                  dateFormat={"dd/MM/yyyy"}
+                  className='form-control form-control-sm shadow-sm'
+                  popperPlacement='bottom-end'
+                />
               </div>
             </div>
           </div>
@@ -438,35 +489,6 @@ function EnergyAnalysis({ projectId }) {
       {consumptionData.length === 0 && (
         <p>No data available for the selected period.</p>
       )}
-
-      {/* Modal for custom date selection */}
-      <Modal show={showDateModal} onHide={() => setShowDateModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Select Custom Date Range</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>Start Date</Form.Label>
-            <Form.Control
-              type="date"
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>End Date</Form.Label>
-            <Form.Control
-              type="date"
-              value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDateModal(false)}>Cancel</Button>
-          <Button variant="primary" onClick={() => setShowDateModal(false)}>Apply</Button>
-        </Modal.Footer>
-      </Modal>
     </div>
   );
 }

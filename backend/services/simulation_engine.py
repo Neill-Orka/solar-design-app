@@ -41,7 +41,6 @@ FUEL_TABLE = [
 
 FUEL_TABLE_SIZES = [row['size_kw'] for row in FUEL_TABLE]
 
-
 def get_fuel_consumption(generator_size_kw, load_factor):
     """
     Get fuel consumption (L/h) for a given generator size and load factor.
@@ -691,6 +690,7 @@ def simulate_system_inner(
             "utilized_gen_annual_kwh": round(utilized_gen_annual, 0),
             "throttling_losses_annual_kwh": round(throttling_losses_annual, 0),
             "battery_cycles_annual": round(battery_cycles_annual, 1) if isinstance(battery_cycles_annual, (int, float)) else battery_cycles_annual,
+            "totalConsumptionAnnual": round(total_demand_kwh, 0),
         }
 
         return {
