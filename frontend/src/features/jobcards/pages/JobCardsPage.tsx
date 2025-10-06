@@ -1,8 +1,8 @@
-import { Link } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import "./jobcards.mobile.css"; // add the styles below
-import type { Client, JobCard } from "../types";
-import { listJobCards } from "../api";
+import type { Client, JobCard, JobCategory } from "../types";
+import { listJobCards, createJobCard, updateJobCard, listCategories, getJobCard } from "../api";
 
 type FeedItem = {
   id: number;
@@ -54,6 +54,9 @@ const Avatar = ({ name }: { name: string }) => {
 };
 
 export default function JobCardsPage() {
+  const { id } = useParams<{ id?: string }>();
+  const isNew = id === "new";
+  const navigate = useNavigate();
   const [jobcards, setJobcards] = useState<JobCard[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
