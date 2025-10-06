@@ -31,6 +31,7 @@ function EnergyAnalysis({ projectId }) {
   const [scaleFactorInput, setScaleFactorInput] = useState('');
   const [actualScaleFactor, setActualScaleFactor] = useState(1);
   const [isScaleFactorValid, setIsScaleFactorValid] = useState(true);
+  const [profileInfo, setProfileInfo] = useState(null);
 
   // Set default to last 30 days
   useEffect(() => {
@@ -86,13 +87,6 @@ function EnergyAnalysis({ projectId }) {
     const endDay = String(endDate.getDate()).padStart(2, '0');
     const formattedEndDate = `${endYear}-${endMonth}-${endDay}T23:59:59.999`;
 
-    console.log('EnergyAnalysis - API Request:', {
-      projectId,
-      startDate: formattedStartDate,
-      endDate: formattedEndDate,
-      scaleFactor: actualScaleFactor
-    });
-
     axios.get(`${API_URL}/api/consumption_data/${projectId}`, {
       params: {
         start_date: formattedStartDate,
@@ -103,14 +97,13 @@ function EnergyAnalysis({ projectId }) {
       }
     })
     .then(res => {
-      console.log('EnergyAnalysis - API Response:', {
-        dataPoints: res.data.length,
-        firstPoint: res.data[0],
-        lastPoint: res.data[res.data.length - 1],
-        requestedEndDate: formattedEndDate,
-        lastTimestamp: res.data[res.data.length - 1]?.timestamp
-      });
-      setConsumptionData(res.data);
+      if (res.data.data && Array.isArray(res.data.data)) {
+        setConsumptionData(res.data.data);
+        setProfileInfo(res.data.profile_info);
+      } else if (Array.isArray(res.data)) {
+        // Handle old format for backward compatibility
+        setConsumptionData(res.data);
+      }
     })
     .catch(err => {
       console.error('Error loading data:', err);
@@ -361,7 +354,46 @@ function EnergyAnalysis({ projectId }) {
       {consumptionData.length > 0 && (
         <>
           <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
-            <h5 className="mb-0">Consumption Overview</h5>
+            <div>
+              <h5 className="mb-0">Consumption Overview</h5>
+              {/* Compact profile info display */}
+              {profileInfo && (
+                <div className="small mt-1 d-flex align-items-center flex-wrap">
+                  <span className="badge bg-secondary me-2">
+                    <i className="bi bi-lightning-fill me-1"></i>
+                    {profileInfo.name}
+                  </span>
+                  
+                  {profileInfo.monthly_avg_kwh_original && (
+                    <span className="badge bg-primary me-2">
+                      <i className="bi bi-lightning-charge me-1"></i>
+                      {Math.round(profileInfo.monthly_avg_kwh_original * 12).toLocaleString('en-ZA')} kWh/yr
+                    </span>
+                  )}
+                  
+                  {profileInfo.max_peak_demand_kw && (
+                    <span className="badge bg-danger me-2">
+                      <i className="bi bi-arrow-up-right me-1"></i>
+                      Peak: {profileInfo.max_peak_demand_kw.toFixed(2)} kW
+                    </span>
+                  )}
+                  
+                  {profileInfo.scaler && profileInfo.scaler !== 1 && (
+                    <span className="badge bg-warning text-dark me-2">
+                      <i className="bi bi-rulers me-1"></i>
+                      Scaled {profileInfo.scaler.toFixed(2)}x
+                    </span>
+                  )}
+                  
+                  {profileInfo.profile_type && (
+                    <span className="badge bg-info text-dark me-2">
+                      <i className="bi bi-tag me-1"></i>
+                      {profileInfo.profile_type}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="d-flex gap-3 align-items-center">
               {/* Scale Factor Input */}
               <div className="d-flex align-items-center">

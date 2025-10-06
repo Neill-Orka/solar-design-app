@@ -243,10 +243,13 @@ class Projects(db.Model):
     bom_modified = db.Column(db.Boolean, default=False)  # Track if user has modified BOM
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_by = db.relationship('User', foreign_keys=[created_by_id])
+    profile_id = db.Column(db.Integer, db.ForeignKey('load_profiles.id'), nullable=True)
+    profile_scaler = db.Column(db.Float, nullable=True, default=1.0)
 
     energy_data = db.relationship('EnergyData', backref='project', lazy=True, cascade="all, delete-orphan")
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")
     bom_components = db.relationship('BOMComponent', backref='project', lazy=True, cascade="all, delete-orphan")
+    load_profile = db.relationship('LoadProfiles', foreign_keys=[profile_id])
 
 class EnergyData(db.Model):
     __tablename__ = 'energy_data'

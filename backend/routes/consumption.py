@@ -47,12 +47,9 @@ def get_consumption_data(project_id):
             }
             for record in data
         ]
-        return jsonify([
-            {
-                'timestamp': record.timestamp.isoformat(),
-                'demand_kw': record.demand_kw * scale_factor
-            }
-            for record in data
-        ])
+        return jsonify({
+            "data": data_points,
+            "profile_info": profile_info
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
