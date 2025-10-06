@@ -2134,7 +2134,7 @@ function MainReportContent({
                     <li>Unless specified otherwise:
                         <ol type="a" className="ps-4">
                             <li>Generator integration is excluded.</li>
-                            <li>Construction of walkways are excluded.</li>
+                            <li>Generator integration is {settings.generatorIncluded ? "included" : "excluded"}.</li>
                             <li>No roof inspection for possible roof mounted panels were included, it is recommended that the client conduct such an inspection or contact Orka Solar to facilitate an inspection with a qualified third party.</li>
                             <li>Tree trimming/removal is excluded from the scope of work.</li>
                             <li>MV Transformers and/or MV switchgear are excluded.</li>
