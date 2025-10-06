@@ -13,6 +13,7 @@ build/
 backend/client_onboarding.backup
 backend/utils/hopetown_pvgis_profile_1.csv
 backend/utils/hopetown_pvgis_profile_1.csv
+backend/uploads/
 backend/.env.template
 backend/DEPLOYMENT.md
 ~$Generator_Simulation.xlsx
