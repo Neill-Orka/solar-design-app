@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -33,6 +33,8 @@ from routes.tariffs import tariffs_bp
 from routes.rules import rules_bp
 from routes.bom import bom_bp
 from routes.quotes import quotes_bp
+from routes.jobcards import jobcards_bp
+from routes.technicians import technicians_bp
 
 # Initialize app
 app = Flask(__name__)
@@ -54,6 +56,13 @@ mail = Mail(app)
 migrate = Migrate(app, db)
 
 logging.basicConfig(level=logging.INFO)
+
+app.config["UPLOAD_FOLDER"] = os.path.join(os.getcwd(), "uploads")
+app.config["PUBLIC_UPLOAD_BASE"] = "/uploads"
+
+@app.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @socketio.on("join")
 def on_join(data):
@@ -105,6 +114,8 @@ app.register_blueprint(tariffs_bp, url_prefix='/api')
 app.register_blueprint(rules_bp, url_prefix='/api')
 app.register_blueprint(bom_bp, url_prefix='/api')
 app.register_blueprint(quotes_bp, url_prefix='/api')
+app.register_blueprint(jobcards_bp, url_prefix='/api')
+app.register_blueprint(technicians_bp, url_prefix='/api')
 
 @event.listens_for(Product, 'after_insert')
 @event.listens_for(Product, 'after_update')

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { API_URL } from './apiConfig';
+import { setAuthToken } from './features/jobcards/api';
 
 const AuthContext = createContext();
 
@@ -24,6 +25,8 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
         return;
       }
+
+      setAuthToken(token);
 
       const hitMe = async (accessToken) => {
         const res = await fetch(`${API_URL}/api/auth/me`, {
@@ -71,8 +74,10 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('access_token', tokens.access_token);
     localStorage.setItem('refresh_token', tokens.refresh_token);
     localStorage.setItem('user', JSON.stringify(userData));
+    setAuthToken(tokens.access_token);
   };
 
+  // logout: also clears axios defaults
   const logout = async () => {
     const accessToken = localStorage.getItem('access_token');
     const refreshToken = localStorage.getItem('refresh_token');
@@ -98,6 +103,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
+    setAuthToken(null);
   };
 
   const refreshToken = async () => {
@@ -120,6 +126,7 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         const data = await response.json();
         localStorage.setItem('access_token', data.access_token);
+        setAuthToken(data.access_token);
         return data.access_token;
       } else {
         logout();
@@ -136,10 +143,12 @@ export const AuthProvider = ({ children }) => {
     if (!user) return false;
     
     const roleHierarchy = {
-      'admin': 4,
-      'manager': 3,
-      'sales': 2,
-      'design': 1
+      'admin': 6,
+      'manager': 5,
+      'sales': 4,
+      'design': 3,
+      'team_leader': 2,
+      'technician': 1
     };
 
     return roleHierarchy[user.role] >= roleHierarchy[requiredRole];
@@ -157,6 +166,18 @@ export const AuthProvider = ({ children }) => {
     return user && (user.role === 'admin' || user.role === 'sales');
   };
 
+  const canApproveJobCards = () => {
+    return user && ['admin'].includes(user.role);
+  }
+
+  const canCreateJobCards = () => {
+    return user && ['admin', 'team_leader'].includes(user.role);
+  }
+
+  const canViewJobCards = () => {
+    return user && ['admin', 'manager', 'team_leader', 'technician', 'sales'].includes(user.role);
+  }
+
   const value = {
     user,
     login,
@@ -166,6 +187,9 @@ export const AuthProvider = ({ children }) => {
     canModifyProjects,
     canModifyProducts,
     canDelete,
+    canApproveJobCards,
+    canCreateJobCards,
+    canViewJobCards,
     loading,
     isAuthenticated: !!user
   };

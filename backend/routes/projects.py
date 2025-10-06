@@ -9,7 +9,15 @@ projects_bp = Blueprint('projects', __name__)
 @projects_bp.route('/projects', methods=['GET'])
 def get_projects():
     try:
-        projects = Projects.query.all()
+        # Check for client_id filter parameter
+        client_id = request.args.get('client_id', type=int)
+
+        # Apply filter if client_id is provided
+        if client_id:
+            projects = Projects.query.filter_by(client_id = client_id)
+        else:
+            projects = Projects.query.all()
+
         return jsonify([
             {
                 'id': p.id,

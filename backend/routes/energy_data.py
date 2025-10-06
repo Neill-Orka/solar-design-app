@@ -101,6 +101,10 @@ def use_profile_as_energy_data(project_id):
     profile = LoadProfiles.query.get(profile_id)
     if not profile or not profile.profile_data:
         return jsonify({"error": f"Profile {profile_id} not found or has no data"}), 404
+    
+    # Store profile information in the Projects table
+    project.profile_id = profile_id
+    project.profile_scaler = scaler
 
     # normalize keys
     first = profile.profile_data[0]

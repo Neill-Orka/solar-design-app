@@ -4,7 +4,6 @@ from models import db, Projects, LoadProfiles, QuickDesignData
 try:
     from services.simulation_engine import run_quick_simulation
     from services.financial_calcs import run_quick_financials
-    print("--- DEBUG: Successfully imported simulation and financial services. ---")
 except ImportError as e:
     print(f"--- FATAL ERROR: Could not import services: {e} ---")
     def run_quick_simulation(*args, **kwargs): return {"error": f"Simulation engine failed to load: {e}"}

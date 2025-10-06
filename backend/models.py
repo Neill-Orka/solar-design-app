@@ -7,6 +7,7 @@ from sqlalchemy import Nullable, inspect
 from sqlalchemy.orm import synonym
 from flask_bcrypt import Bcrypt
 from enum import Enum
+from sqlalchemy import Enum as SAEnum
 import secrets
 from zoneinfo import ZoneInfo
 
@@ -22,9 +23,11 @@ def sa_year_now() -> int:
 # User roles enum
 class UserRole(Enum):
     ADMIN = "admin"
+    MANAGER = "manager"
     SALES = "sales"
     DESIGN = "design"
-    MANAGER = "manager"
+    TEAM_LEADER = "team_leader"
+    TECHNICIAN = "technician"
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -42,10 +45,12 @@ class User(db.Model):
     last_login = db.Column(db.DateTime, nullable=True)
     profile_picture = db.Column(db.String(255), nullable=True)
     phone = db.Column(db.String(20), nullable=True)
+    is_bum = db.Column(db.Boolean, nullable=False, default=False)
     
     # Relationships
     created_by = db.relationship('User', remote_side=[id], foreign_keys=[created_by_id])
     
+
     def set_password(self, password):
         """Set password hash"""
         self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
@@ -70,7 +75,8 @@ class User(db.Model):
             'is_email_verified': self.is_email_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
-            'phone': self.phone
+            'phone': self.phone,
+            'is_bum': self.is_bum
         }
 
 
@@ -79,7 +85,17 @@ class RegistrationToken(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     token = db.Column(db.String(64), unique=True, nullable=False)
-    role = db.Column(db.String(10), nullable=False)
+
+    role = db.Column(
+            SAEnum(
+                UserRole,
+                name="userrole",
+                values_callable=lambda e: [m.name for m in e]
+            ),
+            nullable=False,
+            default=UserRole.SALES
+    )
+    
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime, nullable=False)
@@ -99,19 +115,6 @@ class RegistrationToken(db.Model):
         alphabet = string.ascii_uppercase + string.digits
         return ''.join(secrets.choice(alphabet) for _ in range(8))
     
-    @property
-    def role_enum(self):
-        """Get the role as a UserRole enum"""
-        return UserRole(self.role.lower())  # Convert to lowercase for UserRole enum
-    
-    @role_enum.setter
-    def role_enum(self, value):
-        """Set the role from a UserRole enum"""
-        if isinstance(value, UserRole):
-            self.role = value.value.upper()  # Store uppercase for database constraint
-        else:
-            self.role = str(value).upper()  # Store uppercase for database constraint
-    
     def is_valid(self):
         """Check if token is still valid"""
         return (not self.is_used and 
@@ -127,7 +130,7 @@ class RegistrationToken(db.Model):
         return {
             'id': self.id,
             'token': self.token,
-            'role': self.role,
+            'role': self.role.name if self.role else None,
             'created_by': self.created_by.full_name if self.created_by else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'expires_at': self.expires_at.isoformat() if self.expires_at else None,
@@ -240,10 +243,13 @@ class Projects(db.Model):
     bom_modified = db.Column(db.Boolean, default=False)  # Track if user has modified BOM
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_by = db.relationship('User', foreign_keys=[created_by_id])
+    profile_id = db.Column(db.Integer, db.ForeignKey('load_profiles.id'), nullable=True)
+    profile_scaler = db.Column(db.Float, nullable=True, default=1.0)
 
     energy_data = db.relationship('EnergyData', backref='project', lazy=True, cascade="all, delete-orphan")
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")
     bom_components = db.relationship('BOMComponent', backref='project', lazy=True, cascade="all, delete-orphan")
+    load_profile = db.relationship('LoadProfiles', foreign_keys=[profile_id])
 
 class EnergyData(db.Model):
     __tablename__ = 'energy_data'
@@ -400,6 +406,13 @@ class Product(db.Model):
     monitoring_communication = db.Column("Monitoring Communication", db.String(80))
     monitoring_application = db.Column("Monitoring Application",     db.String(80))
 
+    # ─── Soft delete fields  ──────────────────────────────────────────────────
+    is_deleted = db.Column(db.Boolean, default=False)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    deleted_by = db.relationship('User', foreign_keys=[deleted_by_id])
+
+
     # ─── Optional catch-all for anything else  ────────────────────────────────
     properties = db.Column(JSONB, nullable=True)
 
@@ -420,6 +433,9 @@ class Product(db.Model):
         # Append audit info in a consistent api shape
         d["updated_at"] = self.updated_at.isoformat() if getattr(self, 'updated_at', None) else None
         d["updated_by"] = self.updated_by.full_name if getattr(self, 'updated_by', None) else None
+        if self.is_deleted:
+            d['deleted_at'] = self.deleted_at.isoformat() if self.deleted_at else None
+            d['deleted_by'] = self.deleted_by.full_name if self.deleted_by else None
 
         return d
     
@@ -837,4 +853,256 @@ class DocumentEvent(db.Model):
             "meta_json": self.meta_json,
             "created_by_id": self.created_by_id,
             "created_at": self.created_at.isoformat() + "Z",
+        }
+    
+# ─────────────────────────────────────────────────────────────────────────────
+# Job Cards models
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TechnicianProfile(db.Model):
+    __tablename__ = "technician_profiles"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False)
+    hourly_rate = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    active = db.Column(db.Boolean, default=True)
+
+    user = db.relationship("User", backref=db.backref("technician_profile", uselist=False))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "name": self.user.full_name if self.user else None,
+            "hourly_rate": float(self.hourly_rate or 0),
+            "active": self.active,
+        }
+
+class JobCategory(db.Model):
+    __tablename__ = "job_categories"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False)
+    active = db.Column(db.Boolean, default=True)
+
+    def to_dict(self):
+        return {"id": self.id, "name": self.name, "active": self.active}
+
+class Vehicle(db.Model):
+    __tablename__ = "vehicles"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)          # e.g. "Hilux 2.4D"
+    registration = db.Column(db.String(40), unique=True)     # e.g. "CA 123-456"
+    rate_per_km = db.Column(db.Numeric(10, 2), nullable=True)  # optional, for costing
+    active = db.Column(db.Boolean, default=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "registration": self.registration,
+            "rate_per_km": float(self.rate_per_km or 0),
+            "active": self.active,
+        }
+
+class JobCard(db.Model):
+    __tablename__ = "job_cards"
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Assignment
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=False)
+    owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey("job_categories.id"), nullable=True)
+    bum_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    # Basics
+    title = db.Column(db.String(120), nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    is_quoted = db.Column(db.Boolean, default=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=True)
+
+    # Timing
+    start_at = db.Column(db.DateTime, nullable=True)     # call out start
+    complete_at = db.Column(db.DateTime, nullable=True)  # completion
+
+    # Client snapshots (freeze values at creation time)
+    client_name_snapshot = db.Column(db.String(120))
+    client_email_snapshot = db.Column(db.String(120))
+    client_address_snapshot = db.Column(db.String(255))
+
+    # Labour (summary-level)
+    labourers_count = db.Column(db.Integer, default=0)
+    labour_hours = db.Column(db.Numeric(10, 2), nullable=True)
+    labour_rate_per_hour = db.Column(db.Numeric(10, 2), nullable=True)
+
+    # Materials
+    materials_used = db.Column(db.Boolean, default=False)
+
+    # Travel
+    did_travel = db.Column(db.Boolean, default=False)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey("vehicles.id"), nullable=True)
+    travel_distance_km = db.Column(db.Numeric(10, 2), nullable=True)
+
+    # Compliance
+    coc_required = db.Column(db.Boolean, default=False)
+
+    # Status / meta
+    # Suggested lifecycle strings: 'draft','scheduled','in_progress','paused','completed','cancelled','invoiced'
+    status = db.Column(db.String(20), default="open")
+    metadata_json = db.Column(JSONB, nullable=True)
+
+    # Audit
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    client = db.relationship("Clients", backref=db.backref("job_cards", lazy=True))
+    owner = db.relationship("User", foreign_keys=[owner_id])
+    category = db.relationship("JobCategory")
+    vehicle = db.relationship("Vehicle")
+    bum = db.relationship("User", foreign_keys=[bum_id])
+
+    time_entries = db.relationship(
+        "JobCardTimeEntry", backref="job_card", cascade="all, delete-orphan", lazy=True
+    )
+    materials = db.relationship(
+        "JobCardMaterial", backref="job_card", cascade="all, delete-orphan", lazy=True
+    )
+    attachments = db.relationship(
+        "JobCardAttachment", backref="job_card", cascade="all, delete-orphan", lazy=True
+    )
+
+    def to_dict(self, with_lines: bool = True):
+        base = {
+            "id": self.id,
+            "client_id": self.client_id,
+            "owner_id": self.owner_id,
+            "owner_name": f"{self.owner.first_name} {self.owner.last_name}" if self.owner else None,
+            "bum_id": self.bum_id,
+            "bum_name": f"{self.bum.first_name} {self.bum.last_name}" if self.bum else None,
+            "category_id": self.category_id,
+            "title": self.title,
+            "description": self.description,
+            "is_quoted": self.is_quoted,
+            "project_id": self.project_id,
+            "start_at": self.start_at.isoformat() if self.start_at else None,
+            "complete_at": self.complete_at.isoformat() if self.complete_at else None,
+            "client_name": self.client_name_snapshot,
+            "client_email": self.client_email_snapshot,
+            "client_address": self.client_address_snapshot,
+            "labourers_count": self.labourers_count or 0,
+            "labour_hours": float(self.labour_hours or 0),
+            "labour_rate_per_hour": float(self.labour_rate_per_hour or 0),
+            "materials_used": bool(self.materials_used),
+            "did_travel": bool(self.did_travel),
+            "vehicle_id": self.vehicle_id,
+            "travel_distance_km": float(self.travel_distance_km or 0),
+            "coc_required": bool(self.coc_required),
+            "status": self.status,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+        if with_lines:
+            base["time_entries"] = [t.to_dict() for t in self.time_entries]
+            base["materials"] = [m.to_dict() for m in self.materials]
+            base["attachments"] = [a.to_dict() for a in self.attachments]
+        return base
+
+
+class JobCardTimeEntry(db.Model):
+    __tablename__ = "job_card_time_entries"
+    id = db.Column(db.Integer, primary_key=True)
+    job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    hours = db.Column(db.Numeric(6, 2), nullable=False, default=0)
+    hourly_rate_at_time = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+
+    user = db.relationship("User")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "job_card_id": self.job_card_id,
+            "user_id": self.user_id,
+            "user_name": self.user.full_name if self.user else None,
+            "hours": float(self.hours or 0),
+            "hourly_rate_at_time": float(self.hourly_rate_at_time or 0),
+            "amount": float((self.hours or 0) * (self.hourly_rate_at_time or 0)),
+        }
+
+
+class JobCardMaterial(db.Model):
+    __tablename__ = "job_card_materials"
+    id = db.Column(db.Integer, primary_key=True)
+    job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+
+    unit_cost_at_time = db.Column(db.Numeric(12, 2), nullable=True)
+    unit_price_at_time = db.Column(db.Numeric(12, 2), nullable=True)
+    note = db.Column(db.String(200), nullable=True)
+
+    product = db.relationship("Product")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        # Get the related product if available
+        product_name = None
+        if hasattr(self, 'product') and self.product:
+            product_name = self.product.model or f"{self.product.brand} {self.product.model}"
+        return {
+            "id": self.id,
+            "job_card_id": self.job_card_id,
+            "product_id": self.product_id,
+            "product_name": product_name,
+            "quantity": self.quantity,
+            "unit_cost_at_time": float(self.unit_cost_at_time or 0),
+            "unit_price_at_time": float(self.unit_price_at_time or 0),
+            "line_total": float((self.unit_price_at_time or 0) * (self.quantity or 0)),
+            "note": self.note,
+        }
+
+
+class JobCardAttachment(db.Model):
+    __tablename__ = "job_card_attachments"
+    id = db.Column(db.Integer, primary_key=True)
+    job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=False)
+    filename = db.Column(db.String(200), nullable=False)
+    url = db.Column(db.String(500), nullable=False)  # where frontend can GET it
+    content_type = db.Column(db.String(80), nullable=True)
+    size_bytes = db.Column(db.Integer, nullable=True)
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    uploaded_by = db.relationship("User")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "job_card_id": self.job_card_id,
+            "filename": self.filename,
+            "url": self.url,
+            "content_type": self.content_type,
+            "size_bytes": self.size_bytes,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+class JobCardMaterialReceipt(db.Model):
+    __tablename__ = "job_card_material_receipts"
+    id = db.Column(db.Integer, primary_key=True)
+    material_id = db.Column(db.Integer, db.ForeignKey("job_card_materials.id"), nullable=False)
+    attachment_id = db.Column(db.Integer, db.ForeignKey("job_card_attachments.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    material = db.relationship("JobCardMaterial", backref=db.backref("receipts", lazy=True))
+    attachment = db.relationship("JobCardAttachment")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "material_id": self.material_id,
+            "attachment_id": self.attachment_id,
+            "url": self.attachment.url if self.attachment else None,
+            "filename": self.attachment.filename if self.attachment else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None
         }

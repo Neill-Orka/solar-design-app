@@ -4,6 +4,9 @@ import { Container, Row, Col, Card, Button, Modal, Form, InputGroup, Badge, Spin
 import { FaTrash, FaEdit, FaPlus } from "react-icons/fa";
 import Fuse from 'fuse.js';
 import { API_URL } from "./apiConfig";
+import { useAuth } from './AuthContext';
+import { Link } from 'react-router-dom';
+import { useNotification } from './NotificationContext';
 
 // Category metadata consistent with SystemBuilder
 const CATEGORY_META = {
@@ -74,6 +77,7 @@ const FIELD_MAP_UI2DB = {
 
 export default function ProductsAdmin() {
   // Standard state hooks from original implementation
+  const { showNotification } = useNotification();
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -97,6 +101,9 @@ export default function ProductsAdmin() {
   const [drafts, setDrafts] = useState({});
   const [saveInfo, setSaveInfo] = useState({ saving: false, savedCount: null });
   const [saveError, setSaveError] = useState('');
+
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin'
 
   const handleExcelToggle = () => {
     const newMode = !excelMode;
@@ -223,15 +230,20 @@ export default function ProductsAdmin() {
 
   // Delete
   const deleteProduct = useCallback((id) => {
-    if (!window.confirm('Delete this product?')) return;
-    const token = localStorage.getItem('access_token');
-
-    axios.delete(`${API_URL}/api/products/${id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(fetchProducts)
-      .catch(() => setError('Failed to delete product'));
-  }, [fetchProducts]);
+    if (!confirm('Are you sure you want to delete this product?')) return;
+    
+    setLoading(true);
+    axios.delete(`${API_URL}/api/products/${id}`)
+      .then(() => {
+        showNotification('Product moved to recycle bin', 'info');
+        fetchProducts();
+      })
+      .catch(err => {
+        console.error(err);
+        showNotification(err.response?.data?.message || 'Failed to delete product', 'danger');
+      })
+      .finally(() => setLoading(false));
+  }, [fetchProducts, showNotification]);
 
   // Save (modal)
   const handleSave = () => {
@@ -713,6 +725,21 @@ export default function ProductsAdmin() {
     return null;
   };
 
+  const renderRecycleBinLink = () => {
+    if (isAdmin) {
+      return (
+        <Link 
+          to="/recycle-bin" 
+          className="btn btn-outline-secondary ms-2" 
+          title="View deleted products"
+        >
+          <i className="bi bi-trash"></i>
+        </Link>
+      );
+    }
+    return null;
+  };
+
   // ---------- RENDER ----------
   return (
     <div className='min-vh-100' style={{ backgroundColor: '#f8f9fa' }}>
@@ -751,6 +778,8 @@ export default function ProductsAdmin() {
                       </Button>
                     </div>
                   )}
+
+                  {renderRecycleBinLink()}
 
                   <div className="mode-switch card shadow-sm border-0 px-3 py-2 d-flex align-items-center">
                     <Form.Check

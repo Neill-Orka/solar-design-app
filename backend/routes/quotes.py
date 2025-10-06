@@ -236,6 +236,10 @@ def list_project_quotes(project_id):
             "version_count": d.versions.count(),                     # dynamic rel
             "latest_version_no": v.version_no if v else None,
             "latest_totals": v.totals_json if v else None,
+            "created_by": {
+                "id": d.created_by.id if d.created_by else None,
+                "full_name": d.created_by.full_name if d.created_by else "Unknown",
+            }
         })
     return jsonify(out), 200
 

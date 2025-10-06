@@ -4,6 +4,9 @@ import axios from 'axios';
 import { Table, Badge, Spinner, Button, ButtonGroup, Form } from 'react-bootstrap';
 import { useNotification } from './NotificationContext';
 import { API_URL } from './apiConfig';
+import CelebrationOverlay from './CelebrationOverlay';
+import { Howler } from 'howler';
+import { useAuth } from './AuthContext';
 
 export default function ProjectQuotes({ projectId, onOpenQuote }) {
   const [rows, setRows] = useState(null);
@@ -12,6 +15,9 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
   const [editingQuote, setEditingQuote] = useState(null);
   const [editValue, setEditValue] = useState('');
   const { showNotification } = useNotification();
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationMeta, setCelebrationMeta] = useState(null);
+  const { user } = useAuth();
 
   const loadQuotes = async () => {
     setLoading(true);
@@ -44,11 +50,22 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
   const handleAcceptQuote = async (quoteId, e) => {
     e.stopPropagation(); // Prevent row click
     if (!window.confirm('Mark this quote as accepted?')) return;
+
+    // Try to unlock audio right at the user gesture
+    try { await Howler.ctx.resume(); } catch {}
     
     setActionLoading(prev => ({ ...prev, [quoteId]: 'accept' }));
     try {
       await axios.post(`${API_URL}/api/quotes/${quoteId}/accept`);
       showNotification('Quote accepted!', 'success');
+
+      // Celebration
+      setCelebrationMeta({
+        title: 'JA MANNEEEEE!',
+        subtitle: 'BAIE GELUK GROOTHOND!!!!!!'
+      });
+      setShowCelebration(true);
+
       await loadQuotes(); // Reload quotes to get updated status
     } catch (error) {
       console.error(error);
@@ -165,6 +182,7 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
   };
 
   return (
+    <>
     <Table striped hover size="sm" className="align-middle">
       <thead>
         <tr>
@@ -252,6 +270,12 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
               style={{ cursor: !editingQuote && onOpenQuote ? 'pointer' : 'default' }}
             >
               {new Date(q.created_at).toLocaleString('en-ZA')}
+              {q.created_by && (
+                <div className='small text-muted'>
+                  by {q.created_by.full_name}
+                  {console.log('User info:', q.created_by)}
+                </div>
+              )}
             </td>
             <td>
               {editingQuote === q.id ? (
@@ -328,5 +352,13 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
         ))}
       </tbody>
     </Table>
+
+    <CelebrationOverlay 
+      show={showCelebration}
+      onClose={() => setShowCelebration(false)}
+      title={celebrationMeta?.title}
+      subtitle={celebrationMeta?.subtitle}
+    />
+    </>
   );
 }

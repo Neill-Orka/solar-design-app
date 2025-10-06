@@ -9,18 +9,11 @@ import { useAuth } from './AuthContext';
 import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
 
 function Home() {
-  const [stats, setStats] = useState(null);
   const { user } = useAuth();
 
   // NEW JUMPSCARE
   const [ showSurprise, setShowSurprise ] = useState(false);
   const videoRef = useRef(null);
-
-  useEffect(() => {
-    axios.get(`${API_URL}/api/stats`)
-         .then(res => setStats(res.data))
-         .catch(() => setStats(null));
-  }, []);
 
   // New JUMPSCARE
   const openSurprise = () => {
@@ -72,41 +65,7 @@ function Home() {
       </svg>
 
       <div className="container py-5">
-
-        {/* ---------- stats ---------- */}
-        {stats && (
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className="row text-center mb-5"
-          >
-            <div className="col-md-6 mb-4">
-              <div className="card shadow-sm">
-                <div className="card-body">
-                  <FaUsers size={32} className="text-primary mb-2" />
-                  <h5>Total Clients</h5>
-                  <h2 className="display-6">
-                    <CountUp end={stats.total_clients} duration={1.5} />
-                  </h2>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-6 mb-4">
-              <div className="card shadow-sm">
-                <div className="card-body">
-                  <FaProjectDiagram size={32} className="text-success mb-2" />
-                  <h5>Total Projects</h5>
-                  <h2 className="display-6">
-                    <CountUp end={stats.total_projects} duration={1.5} />
-                  </h2>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-        
+              
         {/* ---------- quick links ---------- */}
         <motion.div
           className="row justify-content-center"
@@ -122,7 +81,7 @@ function Home() {
               link: '/projects',
               color: 'primary',
               icon: <FaProjectDiagram size={46} />,
-              roles: ['admin','design']
+              roles: ['admin', 'manager','design']
             },
             {
               title: 'Clients',
@@ -130,7 +89,7 @@ function Home() {
               link: '/clients',
               color: 'success',
               icon: <FaUsers size={46} />,
-              roles: ['admin','sales','design']
+              roles: ['admin', 'manager', 'sales','design']
             },
             {
               title: 'Products',
@@ -138,7 +97,15 @@ function Home() {
               link: '/products-admin',
               color: 'warning',
               icon: <FaTools size={46} />,
-              roles: ['admin','sales']
+              roles: ['admin', 'manager','sales']
+            },
+            {
+              title: 'Job Cards (DO NOT USE)',
+              text: 'Create and track electrical jobs.',
+              link: '/jobcards',
+              color: 'info',
+              icon: <FaTools size={46} />,
+              roles: ['admin', 'manager', 'team_leader', 'technician']
             }
           ]
             .filter(card => {
