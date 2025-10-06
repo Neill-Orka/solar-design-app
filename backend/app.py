@@ -34,6 +34,7 @@ from routes.rules import rules_bp
 from routes.bom import bom_bp
 from routes.quotes import quotes_bp
 from routes.jobcards import jobcards_bp
+from routes.technicians import technicians_bp
 
 # Initialize app
 app = Flask(__name__)
@@ -114,6 +115,7 @@ app.register_blueprint(rules_bp, url_prefix='/api')
 app.register_blueprint(bom_bp, url_prefix='/api')
 app.register_blueprint(quotes_bp, url_prefix='/api')
 app.register_blueprint(jobcards_bp, url_prefix='/api')
+app.register_blueprint(technicians_bp, url_prefix='/api')
 
 @event.listens_for(Product, 'after_insert')
 @event.listens_for(Product, 'after_update')

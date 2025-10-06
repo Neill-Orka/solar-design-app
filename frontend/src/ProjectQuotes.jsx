@@ -6,6 +6,7 @@ import { useNotification } from './NotificationContext';
 import { API_URL } from './apiConfig';
 import CelebrationOverlay from './CelebrationOverlay';
 import { Howler } from 'howler';
+import { useAuth } from './AuthContext';
 
 export default function ProjectQuotes({ projectId, onOpenQuote }) {
   const [rows, setRows] = useState(null);
@@ -16,6 +17,7 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
   const { showNotification } = useNotification();
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationMeta, setCelebrationMeta] = useState(null);
+  const { user } = useAuth();
 
   const loadQuotes = async () => {
     setLoading(true);
@@ -268,6 +270,12 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
               style={{ cursor: !editingQuote && onOpenQuote ? 'pointer' : 'default' }}
             >
               {new Date(q.created_at).toLocaleString('en-ZA')}
+              {q.created_by && (
+                <div className='small text-muted'>
+                  by {q.created_by.full_name}
+                  {console.log('User info:', q.created_by)}
+                </div>
+              )}
             </td>
             <td>
               {editingQuote === q.id ? (

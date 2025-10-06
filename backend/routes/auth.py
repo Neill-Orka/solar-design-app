@@ -602,6 +602,41 @@ def list_users_minimal():
         ]), 200
     except Exception as e:
         return jsonify({"message": str(e)}), 500
+    
+@auth_bp.route('/admin/users/<int:user_id>/update-bum-status', methods=['POST'])
+@require_role(UserRole.ADMIN)
+def update_bum_status(user_id):
+    """Update a user's BUM status (Admin only)"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        if 'is_bum' not in data:
+            return jsonify({'message': 'is_bum field is required'}), 400
+        
+        user = User.query.get_or_404(user_id)
+        
+        # Update BUM status
+        old_status = user.is_bum
+        user.is_bum = bool(data['is_bum'])
+        
+        db.session.commit()
+        
+        # Log the action
+        log_user_action(current_user_id, 'UPDATE', 'user', user.id, {
+            'type': 'bum_status_change',
+            'old_status': old_status,
+            'new_status': user.is_bum
+        })
+        
+        return jsonify({
+            'message': f'User BUM status updated successfully',
+            'user': user.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': str(e)}), 500    
 
 # Endpoint to list technicians
 @auth_bp.route('/technicians', methods=['GET'])

@@ -27,6 +27,7 @@ const AdminDashboard = () => {
   const [bums, setBums] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [settingsSection, setSettingsSection] = useState('vehicles');
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   // Add loading states
   const [loadingVehicles, setLoadingVehicles] = useState(false);
@@ -109,25 +110,47 @@ const AdminDashboard = () => {
     }
   }, [getAuthHeaders]);
 
-  const fetchTechnicians = useCallback(async () => {
-    setLoadingTechnicians(true);
+  const fetchUsers = useCallback(async () => {
+    setLoadingUsers(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/technicians`, {
+      const response = await fetch(`${API_URL}/api/auth/admin/users`, {
         headers: getAuthHeaders()
       });
+
       if (response.ok) {
         const data = await response.json();
-        setTechnicians(data);
+        setUsers(data.users);
       } else {
-        setMessage('Failed to fetch technicians');
+        console.error('Failed to fetch users');
       }
     } catch (error) {
-      console.error('Error fetching technicians:', error);
-      setMessage('Error loading technicians');
+      console.error('Error fetching users:', error);
     } finally {
-      setLoadingTechnicians(false);
+      setLoadingUsers(false);
     }
   }, [getAuthHeaders]);
+
+const fetchTechnicians = useCallback(async () => {
+  setLoadingTechnicians(true);
+  try {
+    // Use the correct endpoint - it should be under jobcards API, not auth
+    const response = await fetch(`${API_URL}/api/technicians`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      setTechnicians(data);
+    } else {
+      setMessage('Failed to fetch technicians');
+    }
+  } catch (error) {
+    console.error('Error fetching technicians:', error);
+    setMessage('Error loading technicians');
+  } finally {
+    setLoadingTechnicians(false);
+  }
+}, [getAuthHeaders]);
 
   useEffect(() => {
     if (activeTab === 'settings') {
@@ -136,8 +159,12 @@ const AdminDashboard = () => {
       fetchCategories();
       fetchBums();
       fetchTechnicians();
+
+      if (settingsSection === 'bums') {
+        fetchUsers();
+      }
     }
-  }, [activeTab, fetchVehicles, fetchCategories, fetchBums, fetchTechnicians]);
+  }, [activeTab, settingsSection, fetchVehicles, fetchCategories, fetchBums, fetchTechnicians, fetchUsers]);
 
   // Add these handlers for vehicles
 const handleSaveVehicle = async (vehicle) => {
@@ -242,19 +269,30 @@ const handleDeleteCategory = async (id) => {
 // Add handlers for BUMs management
 const handleToggleBumStatus = async (userId, isBum) => {
   try {
-    const response = await fetch(`${API_URL}/api/auth/users/${userId}/toggle-bum`, {
-      method: 'PUT',
+    // First, get the user's current role
+    const userToUpdate = users.find(u => u.id === userId);
+    if (!userToUpdate) {
+      setMessage('User not found');
+      return;
+    }
+    
+    // Use a dedicated endpoint for BUM status - this is more appropriate
+    const response = await fetch(`${API_URL}/api/auth/admin/users/${userId}/update-bum-status`, {
+      method: 'POST', // Changed to POST since we're performing an action
       headers: getAuthHeaders(),
-      body: JSON.stringify({ is_bum: !isBum })
+      body: JSON.stringify({ 
+        is_bum: !isBum   // Toggle the BUM status
+      })
     });
     
     if (response.ok) {
       setMessage(`User ${isBum ? 'removed from' : 'set as'} BUM successfully`);
-      fetchBums();
-      // Also update the regular users list if shown
-      if (activeTab === 'users') {
+
+      // Force a timeout before refreshing data to ensure backend has processed the change
+      setTimeout(() => {
+        fetchBums();
         fetchUsers();
-      }
+      }, 300);
     } else {
       const error = await response.json();
       setMessage(error.message || `Failed to update BUM status`);
@@ -268,15 +306,31 @@ const handleToggleBumStatus = async (userId, isBum) => {
 // Add handlers for technicians
 const handleSaveTechnician = async (tech) => {
   try {
-    const method = tech.tech_profile_id ? 'PUT' : 'POST';
-    const url = tech.tech_profile_id ? 
-      `${API_URL}/api/auth/technicians/${tech.tech_profile_id}` : 
-      `${API_URL}/api/auth/technicians`;
+    // Log what we're sending for debugging
+    console.log('Saving technician:', tech);
     
+    const method = tech.tech_profile_id ? 'PUT' : 'POST';
+    
+    // Fix the endpoint URLs - they should be under jobcards API, not auth
+    const url = tech.tech_profile_id ? 
+      `${API_URL}/api/technicians/${tech.tech_profile_id}` : 
+      `${API_URL}/api/technicians`;
+    
+    // Clean the payload to only include what the API expects
+    const payload = {
+      user_id: tech.user_id,
+      hourly_rate: parseFloat(tech.hourly_rate),
+      active: tech.active
+    };
+    
+    if (tech.tech_profile_id) {
+      payload.id = tech.tech_profile_id;
+    }
+
     const response = await fetch(url, {
       method,
       headers: getAuthHeaders(),
-      body: JSON.stringify(tech)
+      body: JSON.stringify(payload)
     });
     
     if (response.ok) {
@@ -293,11 +347,13 @@ const handleSaveTechnician = async (tech) => {
   }
 };
 
+// Update the handleDeleteTechnician function
 const handleDeleteTechnician = async (id) => {
   if (!confirm('Are you sure you want to remove this technician profile?')) return;
   
   try {
-    const response = await fetch(`${API_URL}/api/auth/technicians/${id}`, {
+    // Use the correct endpoint - it should be under jobcards API, not auth
+    const response = await fetch(`${API_URL}/api/technicians/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
@@ -314,23 +370,6 @@ const handleDeleteTechnician = async (id) => {
     setMessage('Error removing technician profile');
   }
 };
-
-  const fetchUsers = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/auth/admin/users`, {
-        headers: getAuthHeaders()
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.users);
-      } else {
-        console.error('Failed to fetch users');
-      }
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    }
-  }, [getAuthHeaders]);
 
   const fetchAuditLogs = useCallback(async () => {
     try {
@@ -585,24 +624,28 @@ const handleDeleteTechnician = async (id) => {
           className={`settings-nav-btn ${settingsSection === 'vehicles' ? 'active' : ''}`}
           onClick={() => setSettingsSection('vehicles')}
         >
+          <i className="bi bi-truck me-2"></i>
           Vehicles
         </button>
         <button 
           className={`settings-nav-btn ${settingsSection === 'categories' ? 'active' : ''}`}
           onClick={() => setSettingsSection('categories')}
         >
+          <i className="bi bi-tags me-2"></i>
           Job Categories
         </button>
         <button 
           className={`settings-nav-btn ${settingsSection === 'bums' ? 'active' : ''}`}
           onClick={() => setSettingsSection('bums')}
         >
+          <i className="bi bi-person-badge me-2"></i>
           Business Unit Managers
         </button>
         <button 
           className={`settings-nav-btn ${settingsSection === 'technicians' ? 'active' : ''}`}
           onClick={() => setSettingsSection('technicians')}
         >
+          <i className="bi bi-tools me-2"></i>
           Technicians
         </button>
       </div>
@@ -963,7 +1006,7 @@ const handleDeleteTechnician = async (id) => {
               {technicians.map(tech => (
                 <tr key={tech.id}>
                   <td>{tech.full_name}</td>
-                  <td>R{tech.hourly_rate.toFixed(2)}</td>
+                  <td>R{parseFloat(tech.hourly_rate).toFixed(2)}</td>
                   <td>
                     <span className={`status-badge ${tech.active ? 'active' : 'inactive'}`}>
                       {tech.active ? 'Active' : 'Inactive'}

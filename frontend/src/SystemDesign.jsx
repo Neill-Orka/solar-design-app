@@ -526,7 +526,14 @@ const safeParseFloat = (value) => {
 };
 
 const toMidnight = (d) => { d.setHours(0, 0, 0, 0); return d; };
-const toEndOfDay = (d) => { d.setHours(23, 59, 59, 999); return d; };
+// Add or update the toEndOfDay helper function
+const toEndOfDay = (d) => { 
+  if (!d) return d;
+  const clone = new Date(d);
+  clone.setHours(23, 59, 59, 999); 
+  return clone; 
+};
+
 // Component for the Standard Desing feature
 const StandardDesignSelector = ({ templates, loading, onSelectSystem }) => {
     if (loading) {
@@ -724,6 +731,8 @@ function SystemDesign({ projectId }) {
     const [designMode, setDesignMode] = useState('custom');
     const [systemTemplates, setSystemTemplates] = useState([]);
     const [loadingTemplates, setLoadingTemplates] = useState(true);
+    const [tempStartDate, setTempStartDate] = useState('');
+    const [tempEndDate, setTempEndDate] = useState('');
 
     const { showNotification } = useNotification();
 
@@ -788,6 +797,7 @@ function SystemDesign({ projectId }) {
 
     // State for all calculated metrics from the simulation results
     const [metrics, setMetrics] = useState({
+        totalEnergyConsumption: 0,
         totalPVGeneration: 0,
         utilizedPVGeneration: 0,
         gridImport: 0,
@@ -809,6 +819,8 @@ function SystemDesign({ projectId }) {
         throttlingLossesAnnual: '0',
         specificYieldExclThrottling: '0',
         batteryCyclesAnnual: '0',
+        totalConsumptionAnnual: '0',
+        avgDailyConsumption: '0',
     });
 
 // --- Piece 2: Data Fetching & Side Effects ---
@@ -1294,7 +1306,13 @@ function SystemDesign({ projectId }) {
     if (endIndex === -1) endIndex = sim.timestamps.length;
     if (startIndex === -1) return { labels: [], datasets: [] };
 
-    const ts = sim.timestamps.slice(startIndex, endIndex).map(t => new Date(t));
+    // Convert timestamps to local time to avoid timezone issues with Chart.js
+    const ts = sim.timestamps.slice(startIndex, endIndex).map(t => {
+        const date = new Date(t);
+        // Ensure Chart.js interprets this as local time
+        return date;
+    });
+    
     const enableLTTB = rangeDays > 120 && ts.length >= 3; // > ~4 months
     
     const demand = sim.demand.slice(startIndex, endIndex);
@@ -1397,6 +1415,12 @@ function SystemDesign({ projectId }) {
         let endIndex = sim.timestamps.findIndex(t => new Date(t) > endDate);    
         if (endIndex === -1) endIndex = sim.timestamps.length; // If no end date found, use full length
         if (startIndex === -1) return { labels: [], datasets: [] }; // If no start date found, return empty
+
+        // Convert timestamps to local time to avoid timezone issues with Chart.js
+        const ts = sim.timestamps.slice(startIndex, endIndex).map(t => {
+            const date = new Date(t);
+            return date;
+        });
 
         // Determine if we need to downsample based on range size
         // For ranges > 90 days, downsample to improve performance
@@ -1590,56 +1614,56 @@ function SystemDesign({ projectId }) {
     }, [simulationData, startDate, endDate, showLosses, design.systemType, design.allowExport, rangeDays, design.panelKw]);
 
     const chartOptions = useMemo(() => {
-    const enableLTTB = rangeDays > 120; // > ~4 months
-    // Aim for ~600–1200 rendered points depending on range length
-    const targetSamples = Math.min(1200, Math.max(600, Math.round(rangeDays * 3)));
-    const threshold = Math.max(targetSamples * 1.5, 1000); // start decimating only when big enough
+        const enableLTTB = rangeDays > 120; // > ~4 months
+        // Aim for ~600–1200 rendered points depending on range length
+        const targetSamples = Math.min(1200, Math.max(600, Math.round(rangeDays * 3)));
+        const threshold = Math.max(targetSamples * 1.5, 1000); // start decimating only when big enough
 
-    return {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: enableLTTB ? 0 : 300 },
-        interaction: { mode: 'index', intersect: false },
-        elements: {
-        point: { radius: 0, hitRadius: 10 },
-        line: { borderWidth: 2, tension: 0.3 }
-        },
-        // Important for {x,y} objects + LTTB
-        parsing: enableLTTB ? false : true,
-        normalized: true,
-        plugins: {
-        datalabels: { display: false },
-        decimation: enableLTTB ? {
-            enabled: true,
-            algorithm: 'lttb',
-            samples: targetSamples,
-            threshold
-        } : { enabled: false }
-        },
-        scales: {
-        x: {
-            type: 'time',
-            time: {
-            unit:
-                rangeDays > 180 ? 'month' :
-                rangeDays > 60  ? 'week'  : 'day',
-            tooltipFormat: rangeDays > 60 ? 'MMM dd' : 'MMM dd, HH:mm',
-            displayFormats: { day: 'MMM dd', week: 'MMM dd', month: 'MMM yyyy' }
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: enableLTTB ? 0 : 300 },
+            interaction: { mode: 'index', intersect: false },
+            elements: {
+            point: { radius: 0, hitRadius: 10 },
+            line: { borderWidth: 2, tension: 0.3 }
             },
-            ticks: { maxTicksLimit: 15 }
-        },
-        y: { beginAtZero: true, title: { display: true, text: 'Power (kW)' } },
-        y1: {
-            type: 'linear', position: 'right', beginAtZero: true, max: 100,
-            title: { display: true, text: 'Battery SOC (%)' },
-            grid: { drawOnChartArea: false }
-        }
-        }
-    };
-    }, [rangeDays]);
+            parsing: enableLTTB ? false : true,
+            normalized: true,
+            plugins: {
+            datalabels: { display: false },
+            decimation: enableLTTB ? {
+                enabled: true,
+                algorithm: 'lttb',
+                samples: targetSamples,
+                threshold
+            } : { enabled: false }
+            },
+            scales: {
+            x: {
+                type: 'time',
+                time: {
+                unit: rangeDays > 180 ? 'month' : rangeDays > 60 ? 'week' : 'day',
+                tooltipFormat: rangeDays > 60 ? 'MMM dd' : 'MMM dd, HH:mm',
+                displayFormats: { day: 'MMM dd', week: 'MMM dd', month: 'MMM yyyy' }
+                },
+                ticks: { maxTicksLimit: 15 },
+                // Add these lines to explicitly set the axis range:
+                min: startDate ? new Date(startDate) : undefined,
+                max: endDate ? toEndOfDay(new Date(endDate)) : undefined
+            },
+            y: { beginAtZero: true, title: { display: true, text: 'Power (kW)' } },
+            y1: {
+                type: 'linear', position: 'right', beginAtZero: true, max: 100,
+                title: { display: true, text: 'Battery SOC (%)' },
+                grid: { drawOnChartArea: false }
+            }
+            }
+        };
+        }, [rangeDays, startDate, endDate]); // Add startDate, endDate as dependencies
 
 
-    // Update chartOptions to optimize rendering
+        // Update chartOptions to optimize rendering
     const chartOptionsAverage = useMemo(() => ({
         responsive: true, 
         maintainAspectRatio: false,
@@ -1673,7 +1697,7 @@ function SystemDesign({ projectId }) {
                 type: 'time',
                 time: { 
                     unit: rangeDays > 90 ? 'month' : 
-                          rangeDays > 30 ? 'week' : 'day',
+                        rangeDays > 30 ? 'week' : 'day',
                     tooltipFormat: rangeDays > 90 ? 'MMM dd' : 'MMM dd, HH:mm',
                     displayFormats: {
                         day: 'MMM dd',
@@ -1683,7 +1707,9 @@ function SystemDesign({ projectId }) {
                 },
                 ticks: {
                     maxTicksLimit: 15 // Limit the number of ticks for readability
-                }
+                },
+                min: startDate ? new Date(startDate) : undefined,
+                max: endDate ? toEndOfDay(new Date(endDate)) : undefined
             },
             y: { 
                 beginAtZero: true, 
@@ -1699,12 +1725,9 @@ function SystemDesign({ projectId }) {
                 grid: { drawOnChartArea: false } 
             }
         }
-    }), [rangeDays]);
+    }), [rangeDays, startDate, endDate]);
 
-    // A single, unified handler to update the master design state
-    
-    
-    
+    // A single, unified handler to update the master design state    
     const handleDesignChange = (newDesignState) => {
         setDesign(newDesignState);
     };
@@ -1757,11 +1780,6 @@ function SystemDesign({ projectId }) {
                     capacity: design.selectedBattery.product.capacity_kwh,
                     quantity: design.batteryQuantity
                 } : null,
-                use_pvgis: usePvgis,
-                generation_profile_name: profileName,
-                battery_soc_limit: design.batterySocLimit,
-                inverter_ids: design.selectedInverter ? [design.selectedInverter.product.id] : [],
-                battery_ids: design.systemType !== 'grid' && design.selectedBattery ? [design.selectedBattery.product.id] : [],
 
                 // Clear template information
                 from_standard_template: false,
@@ -1920,35 +1938,62 @@ function SystemDesign({ projectId }) {
 
     // This useMemo hook filters the simulation data based on the selected date range.
     const filteredData = useMemo(() => {
-        if (!simulationData || !simulationData.timestamps || !startDate || !endDate) {
-            return null;
-        }
-
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0); // Set to beginning of start date
+        if (!simulationData) return null;
         
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 9999); // Set to end of end date
-
+        // Filter data based on selected date range
+        if (!startDate || !endDate) return simulationData;
+        
+        const startMoment = new Date(startDate);
+        const endMoment = toEndOfDay(new Date(endDate)); // Ensure end date includes full day
+        
+        console.log('SystemDesign - Date Range:', {
+            startDate: startMoment.toISOString(),
+            endDate: endMoment.toISOString(),
+            includesFullDayEnd: true
+        });
+        
         const filtered = {
-            timestamps: [], demand: [], generation: [], potential_generation: [],
-            battery_soc: [], import_from_grid: [], export_to_grid: [], shortfall_kw: [], generator_kw: []
+            timestamps: [],
+            demand: [],
+            generation: [],
+            import_from_grid: [],
+            export_to_grid: [],
+            battery_soc: [],
+            potential_generation: [],
+            generator_kw: [],
+            shortfall_kw: []
         };
-
+        
         simulationData.timestamps.forEach((ts, i) => {
-            const date = new Date(ts);
-            if (date >= start && date <= end) { 
+            const timestamp = new Date(ts);
+            if (timestamp >= startMoment && timestamp <= endMoment) {
                 filtered.timestamps.push(ts);
                 filtered.demand.push(simulationData.demand[i]);
                 filtered.generation.push(simulationData.generation[i]);
-                filtered.potential_generation.push(simulationData.potential_generation ? simulationData.potential_generation[i] : simulationData.generation[i]);
-                filtered.battery_soc.push(simulationData.battery_soc[i]);
                 filtered.import_from_grid.push(simulationData.import_from_grid[i]);
                 filtered.export_to_grid.push(simulationData.export_to_grid[i]);
-                filtered.shortfall_kw.push(simulationData.shortfall_kw ? simulationData.shortfall_kw[i]: 0);
-                filtered.generator_kw.push(simulationData.generator_kw ? simulationData.generator_kw[i]: 0);
+                filtered.battery_soc.push(simulationData.battery_soc[i]);
+                filtered.potential_generation.push(simulationData.potential_generation[i]);
+                
+                // These fields might not exist in all system types
+                if (simulationData.generator_kw) filtered.generator_kw.push(simulationData.generator_kw[i] || 0);
+                if (simulationData.shortfall_kw) filtered.shortfall_kw.push(simulationData.shortfall_kw[i] || 0);
             }
         });
+        
+        // Add debug logging to check filtered results
+        console.log('SystemDesign - Filtered Data:', {
+            pointCount: filtered.timestamps.length,
+            firstPoint: filtered.timestamps.length > 0 ? {
+              time: filtered.timestamps[0],
+              demand: filtered.demand[0]
+            } : null,
+            lastPoint: filtered.timestamps.length > 0 ? {
+              time: filtered.timestamps[filtered.timestamps.length - 1],
+              demand: filtered.demand[filtered.demand.length - 1]
+            } : null
+        });
+        
         return filtered;
     }, [simulationData, startDate, endDate]);
 
@@ -1959,6 +2004,7 @@ function SystemDesign({ projectId }) {
 
         const timeIntervalHours = 0.5;
 
+        const totalConsumption = filteredData.demand.reduce((sum, demand) => sum + demand * timeIntervalHours, 0);
         const totalPotentialGenKwh = filteredData.potential_generation.reduce((sum, val) => sum + (val * timeIntervalHours), 0);
         const totalUtlizedGenKwh = filteredData.generation.reduce((sum, val) => sum + (val * timeIntervalHours), 0);
         const totalImportKwh = filteredData.import_from_grid.reduce((sum, val) => sum + (val * timeIntervalHours), 0);
@@ -1994,6 +2040,7 @@ function SystemDesign({ projectId }) {
         }
 
         setMetrics({
+            totalConsumption: totalConsumption.toFixed(0),
             totalPVGeneration: totalPotentialGenKwh.toFixed(0),
             utilizedPVGeneration: pvUsedOnSiteKwh.toFixed(0),
             gridImport: totalImportKwh.toFixed(0),
@@ -2013,6 +2060,17 @@ function SystemDesign({ projectId }) {
 
         const metrics = simulationData.annual_metrics;
 
+        const timeIntervalHours = 0.5;
+
+        // Calculate total annual consumption
+        const totalConsumptionAnnual = simulationData.demand.reduce(
+            (sum, demand) => sum + demand * timeIntervalHours, 0
+        );
+
+        // Calculate average daily consumption
+        const daysInSim = simulationData.timestamps.length / 48;
+        const avgDailyConsumption = totalConsumptionAnnual / daysInSim;
+
         setAnnualMetrics({
             daytimeConsumption: metrics.daytime_consumption_pct.toString(),
             consumptionFromPV: metrics.consumption_from_pv_pct.toString(),
@@ -2026,6 +2084,8 @@ function SystemDesign({ projectId }) {
             utilizedGenAnnual: (metrics.utilized_gen_annual_kwh).toString(),
             throttlingLossesAnnual: (metrics.throttling_losses_annual_kwh).toString(),
             batteryCyclesAnnual: metrics.battery_cycles_annual.toString(),
+            totalConsumptionAnnual: totalConsumptionAnnual.toFixed(0),
+            avgDailyConsumption: avgDailyConsumption.toString(),
         })
     }, [simulationData]);
 
@@ -2200,13 +2260,17 @@ function SystemDesign({ projectId }) {
                                 <DatePicker
                                     selected={startDate}
                                     onChange={(dates) => {
-                                        // FIX: This is the correct logic from QuickResults.js
                                         const [start, end] = dates;
                                         setStartDate(start);
-                                        setEndDate(end);
+                                        setEndDate(end ? toEndOfDay(new Date(end)) : null);
+                                        console.log('Date range set (datepicker): ', {
+                                            startDate: start,
+                                            endDate: end,
+                                            endDateWithTime: end ? toEndOfDay(new Date(end)).toISOString() : null
+                                        });
                                     }}
                                     startDate={startDate}
-                                    endDate={endDate}
+                                    endDate={endDate ? new Date(endDate.getTime()) : null}
                                     selectsRange
                                     isClearable={false}
                                     dateFormat={"dd/MM/yyyy"}
@@ -2232,8 +2296,14 @@ function SystemDesign({ projectId }) {
                         </Alert>
                     )}
 
-                    {/* The Metrics Cards */}
+                    {/* The Metric Cards */}
                     <Row className="mb-4 g-3 mt-4" >
+                        <Col md={4} lg>
+                            <Card className="border-start border-4 border-secondary bg-white shadow-sm rounded p-3 h-100">
+                                <div className='text-muted small'>Total Energy Consumption</div>
+                                <div className="fs-4 fw-bold">{metrics.totalConsumption} kWh</div>
+                            </Card>
+                        </Col>
                         <Col md={4} lg>
                             <Card className="border-start border-4 border-primary bg-white shadow-sm rounded p-3 h-100">
                                 <div className="text-muted small">Total PV Generation</div>
@@ -2479,6 +2549,11 @@ function SystemDesign({ projectId }) {
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    <tr>
+                                        <td>Total Consumption</td>
+                                        <td>{annualMetrics.totalConsumptionAnnual}</td>
+                                        <td>kWh</td>
+                                    </tr>                                    
                                     <tr>
                                         <td>Daytime Consumption</td>
                                         <td>{annualMetrics.daytimeConsumption}</td>

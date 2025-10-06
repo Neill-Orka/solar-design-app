@@ -22,12 +22,34 @@ def get_consumption_data(project_id):
             query = query.filter(EnergyData.timestamp <= end_date)
 
         data = query.order_by(EnergyData.timestamp).all()
-        return jsonify([
+
+        # Get profile information if it exists
+        from models import LoadProfiles
+        profile_info = None
+
+        if hasattr(project, 'profile_id') and project.profile_id:
+            profile = LoadProfiles.query.get(project.profile_id)
+            if profile:
+                profile_info = {
+                    "name": profile.name,
+                    "annual_kwh": profile.annual_kwh,
+                    "monthly_avg_kwh_original": profile.monthly_avg_kwh_original,
+                    "max_peak_demand_kw": profile.max_peak_demand_kw,
+                    "profile_type": profile.profile_type,
+                    "scaler": project.profile_scaler if hasattr(project, 'profile_scaler') else 1.0
+                }
+
+        # Format response with both data and profile info
+        data_points = [
             {
                 'timestamp': record.timestamp.isoformat(),
                 'demand_kw': record.demand_kw * scale_factor
             }
             for record in data
-        ])
+        ]
+        return jsonify({
+            "data": data_points,
+            "profile_info": profile_info
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
