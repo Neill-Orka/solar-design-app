@@ -43,6 +43,7 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
     usedActualConsumption: false,
     threePhase: true,
     bomPriceMode: 'none',
+    generatorIncluded: false,
     projectSchedule: [
       { activity: "Deposit received & document compilation", timeline: "Week 1" },
       { activity: "Equipment procurement & delivery", timeline: "Week 2 (provided no major supplier delays)" },
@@ -284,6 +285,14 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
               />
               Three Phase?
             </label>  
+            <label>
+              <input 
+                type="checkbox"
+                checked={reportSettings.generatorIncluded}
+                onChange={() => setReportSettings(prev => ({ ...prev, generatorIncluded: !prev.generatorIncluded }))}
+              />
+              Include Generator Integration
+            </label>            
             
             <div>
               Adjust Project Schedule
@@ -305,6 +314,7 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
                 </div>
               ))}
             </div>
+
             <label style={{display:'flex',gap:'6px',alignItems:'center',marginTop:8}}>
               <span style={{minWidth:115}}>BOM prices:</span>
               <select
