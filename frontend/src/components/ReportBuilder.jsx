@@ -156,6 +156,7 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
     axios.get(`${API_URL}/api/projects/${projectId}`)
       .then((projectRes) => {
         const project = projectRes.data;
+        console.log('Project data loaded:', project);
 
         // --- Add inverter and battery brand/model from products ---
         const getBrandModel = (products, ids, category) => {

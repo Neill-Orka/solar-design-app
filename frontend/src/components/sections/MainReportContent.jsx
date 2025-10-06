@@ -68,35 +68,35 @@ function MainReportContent({
 
     // get consumption data when dates or projectId changes
     useEffect(() => {
-        if (!data?.project?.id || !startDate || !endDate) return;
+    if (!data?.project?.id || !startDate || !endDate) return;
 
-        const startStr = startDate.toISOString().split('T')[0];
-        const endStr = endDate.toISOString().split('T')[0];
+    // Format dates for API request
+    const formattedStartDate = startDate.toISOString().split('T')[0];
+    const formattedEndDate = endDate.toISOString().split('T')[0];
+
+    console.log(`Fetching data from ${formattedStartDate} to ${formattedEndDate}`);
+    
+    axios.get(`${API_URL}/api/consumption_data/${data.project.id}`, {
+        params: {
+        start_date: formattedStartDate,
+        end_date: formattedEndDate
+        }
+    })
+    .then(res => {
+        // Handle the new response format with data property
+        const consumptionDataArray = res.data && res.data.data ? res.data.data : res.data;
         
-        console.log(`Fetching data from ${startStr} to ${endStr}`);
-
-        axios.get(`${API_URL}/api/consumption_data/${data.project.id}`, {
-            params: { start_date: startStr, end_date: endStr }
-        })
-        .then(res => {
-            console.log("API returned data:", res.data.length, "records");
-            console.log("First record:", res.data[0]);
-            console.log("Last record:", res.data[res.data.length-1]);
-            
-            // Check what months are in the data
-            const months = new Set();
-            res.data.forEach(item => {
-                const date = new Date(item.timestamp);
-                months.add(date.getMonth());
-            });
-            console.log("Months in data:", Array.from(months).map(m => m+1)); // +1 because getMonth() is 0-based
-            
-            setConsumptionData(res.data);
-        })
-        .catch(err => {
-            console.error('Error loading consumption data:', err);
-            showNotification('Failed to fetch consumption data for report', 'danger');
-        });
+        if (Array.isArray(consumptionDataArray)) {
+        setConsumptionData(consumptionDataArray);
+        } else {
+        console.error('Unexpected data format:', res.data);
+        setConsumptionData([]);
+        }
+    })
+    .catch(err => {
+        console.error('Error loading consumption data:', err);
+        showNotification('Error loading consumption data', 'error');
+    });
     }, [data?.project?.id, startDate, endDate, showNotification]);
 
     // Process data into monthly consumption
@@ -470,58 +470,73 @@ function MainReportContent({
         }
     }, [simulationStartDate]);
 
-    // Add this useEffect to fetch demand data for the selected period
     useEffect(() => {
-        if (!data?.project?.id || !demandStartDate || !demandEndDate) return;
+    if (!data?.project?.id || !demandStartDate || !demandEndDate) return;
+
+    // Format dates for API request
+    const formattedStartDate = demandStartDate.toISOString().split('T')[0];
+    const formattedEndDate = demandEndDate.toISOString().split('T')[0];
+
+    console.log(`Fetching demand data from ${formattedStartDate} to ${formattedEndDate}`);
+    
+    axios.get(`${API_URL}/api/consumption_data/${data.project.id}`, {
+        params: {
+        start_date: formattedStartDate,
+        end_date: formattedEndDate
+        }
+    })
+    .then(res => {
+        // Handle the new response format with data property
+        const demandDataArray = res.data && res.data.data ? res.data.data : res.data;
         
-        // Format dates as YYYY-MM-DD, ensuring we get exactly the days we want
-        const formatDate = (date) => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        };
-        
-        const startStr = formatDate(demandStartDate);
-        const endStr = formatDate(demandEndDate);
-        
-        console.log(`Fetching demand data from ${startStr} to ${endStr}`);
-        
-        axios.get(`${API_URL}/api/consumption_data/${data.project.id}`, {
-            params: { start_date: startStr, end_date: endStr }
-        })
-        .then(res => {
-            setDemandData(res.data);
-        })
-        .catch(err => {
-            console.error('Error loading demand data:', err);
-            showNotification('Failed to fetch demand data for report', 'danger');
-        });
+        if (Array.isArray(demandDataArray)) {
+        setDemandData(demandDataArray);
+        } else {
+        console.error('Unexpected data format for demand data:', res.data);
+        setDemandData([]);
+        }
+    })
+    .catch(err => {
+        console.error('Error loading demand data:', err);
+    });
     }, [data?.project?.id, demandStartDate, demandEndDate, showNotification]);
 
     // Add this new useEffect to fetch the entire year's data once
     useEffect(() => {
-        if (!data?.project?.id) return;
+    if (!data?.project?.id) return;
+
+    const yearStart = new Date('2025-01-01');
+    const yearEnd = new Date('2025-12-31');
+    
+    // Format dates for API request
+    const formattedStartDate = yearStart.toISOString().split('T')[0];
+    const formattedEndDate = yearEnd.toISOString().split('T')[0];
+
+    console.log(`Fetching yearly data from ${formattedStartDate} to ${formattedEndDate}`);
+    
+    axios.get(`${API_URL}/api/consumption_data/${data.project.id}`, {
+        params: {
+        start_date: formattedStartDate,
+        end_date: formattedEndDate
+        }
+    })
+    .then(res => {
+        // Handle the new response format with data property
+        const yearlyDataArray = res.data && res.data.data ? res.data.data : res.data;
         
-        const currentYear = new Date().getFullYear();
-        const startOfYear = new Date(currentYear, 0, 1, 0, 0, 0);
-        const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
-        
-        const startStr = startOfYear.toISOString().split('T')[0];
-        const endStr = endOfYear.toISOString().split('T')[0];
-        
-        console.log(`Fetching yearly data from ${startStr} to ${endStr}`);
-        
-        axios.get(`${API_URL}/api/consumption_data/${data.project.id}`, {
-            params: { start_date: startStr, end_date: endStr }
-        })
-        .then(res => {
-            setYearlyConsumptionData(res.data);
-            console.log("Yearly data loaded:", res.data.length, "records");
-        })
-        .catch(err => {
-            console.error('Error loading yearly consumption data:', err);
-        });
+        if (Array.isArray(yearlyDataArray)) {
+        setYearlyConsumptionData(yearlyDataArray);
+        console.log(`Yearly data loaded: ${yearlyDataArray.length} records`);
+        } else {
+        console.error('Unexpected data format:', res.data);
+        console.log(`Yearly data loaded: undefined records`);
+        setYearlyConsumptionData([]);
+        }
+    })
+    .catch(err => {
+        console.error('Error loading yearly consumption data:', err);
+        console.log('Yearly data loaded: undefined records');
+    });
     }, [data?.project?.id]);
 
     // Create the demand chart data
