@@ -175,7 +175,8 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
         project.inverter_brand_model = getBrandModel(products, project.inverter_ids, 'Inverter');
         project.battery_brand_model = getBrandModel(products, project.battery_ids, 'Battery');
 
-        project.battery_nominal_rating = Number(getNominalRating(products, project.battery_ids, 'Battery') * project.battery_kwh.quantity).toFixed(2);
+        project.battery_nominal_rating = project.battery_kwh > 0 ? 
+        Number(getNominalRating(products, project.battery_ids, 'Battery') * project.battery_kwh.quantity).toFixed(2) : 0;
      
         
         const reportData = {
