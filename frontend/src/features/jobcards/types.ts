@@ -56,6 +56,8 @@ export interface JobCardAttachment {
     content_type: string | null;
     size_bytes: number | null;
     created_at: string | null;
+    attachment_type?: string | null;
+    caption?: string | null;
 }
 
 export interface JobCard {
@@ -83,6 +85,9 @@ export interface JobCard {
     materials_used: boolean;
     did_travel: boolean;
     vehicle_id: number | null;
+    vehicle_name?: string | null;
+    vehicle_registration?: string | null;
+    rate_per_km: number | null;
     travel_distance_km: number;
     coc_required: boolean;
     status: JobStatus;

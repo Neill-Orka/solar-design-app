@@ -995,6 +995,9 @@ class JobCard(db.Model):
             "materials_used": bool(self.materials_used),
             "did_travel": bool(self.did_travel),
             "vehicle_id": self.vehicle_id,
+            "vehicle_name": self.vehicle.name if self.vehicle else None,
+            "vehicle_registration": self.vehicle.registration if self.vehicle else None,
+            "rate_per_km": self.vehicle.rate_per_km if self.vehicle else None,
             "travel_distance_km": float(self.travel_distance_km or 0),
             "coc_required": bool(self.coc_required),
             "status": self.status,
@@ -1028,6 +1031,7 @@ class JobCardTimeEntry(db.Model):
             "hours": float(self.hours or 0),
             "hourly_rate_at_time": float(self.hourly_rate_at_time or 0),
             "amount": float((self.hours or 0) * (self.hourly_rate_at_time or 0)),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
 

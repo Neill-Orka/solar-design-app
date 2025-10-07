@@ -667,3 +667,52 @@
   font-weight: 500;
   color: #495057;
 }
+
+/* --- Site photo navigation additions --- */
+.jcD-heroNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.85);
+  color: #212529;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px #dee2e6;
+  transition: background .2s, box-shadow .2s;
+}
+.jcD-heroNav:hover {
+  background: #fff;
+  box-shadow: 0 0 0 2px #0d6efd55;
+}
+.jcD-heroNav-left { left: 8px; }
+.jcD-heroNav-right { right: 8px; }
+
+.jcD-heroCounter {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(33,37,41,0.75);
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 14px;
+  font-weight: 600;
+  letter-spacing: .5px;
+}
+
+.jcD-siteThumb.active {
+  box-shadow: 0 0 0 2px #0d6efd;
+}
+
+.jcD-siteThumbWrap.active .jcD-thumb-cap {
+  font-weight: 600;
+  color: #0d6efd;
+}
+
+.jcM-hoursRow, .jcM-dotbar

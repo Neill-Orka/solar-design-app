@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify, abort, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 import json
-from models import Document, JobCardMaterial, db, JobCard, Clients, JobCategory, Vehicle, DocumentKind, DocumentStatus, DocumentVersion, Product, User, UserRole
+from models import Document, JobCardMaterial, db, JobCard, Clients, JobCategory, Vehicle, DocumentKind, DocumentStatus, DocumentVersion, Product, User, UserRole, JobCardTimeEntry, TechnicianProfile
 from werkzeug.utils import secure_filename
 import os
 from routes.auth import log_user_action
@@ -79,6 +79,26 @@ def jobcards_collection():
         jc.client_address_snapshot= _str255(getattr(client, "address", None))
 
     db.session.add(jc)
+    db.session.commit()
+
+    time_entries = data.get("time_entries") or []
+    if isinstance(time_entries, list):
+        for te in time_entries:
+            try:
+                uid = int(te.get("user_id"))
+                hours = float(te.get("hours", 0))
+                if hours <= 0:
+                    continue
+            except Exception:
+                continue
+            prof = TechnicianProfile.query.filter_by(user_id=uid, active=True).first()
+            rate = float(prof.hourly_rate) if prof else 0.0
+            db.session.add(JobCardTimeEntry(
+                job_card_id=jc.id,
+                user_id=uid,
+                hours=hours,
+                hourly_rate_at_time=rate
+            ))
     db.session.commit()
     return jsonify(jc.to_dict()), 201
 

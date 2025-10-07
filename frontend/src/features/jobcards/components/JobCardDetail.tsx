@@ -2,13 +2,12 @@
 // Read-only job card detail view (mobile-first, works great on desktop too)
 
 // @ts-ignore
-import React , {useEffect} from "react";
+import React , {useEffect, useState} from "react";
 import { useNavigate } from "react-router-dom";
-import type { JobCard } from "../types";
+import type {JobCard, Vehicle} from "../types";
 import { API_URL } from "../../../apiConfig";
 import { useAuth } from '../../../AuthContext';
 import { deleteJobCard } from "../api";
-import { useState } from "react";
 import "./jobcard-detail.css";
 
 type Props = {
@@ -41,10 +40,13 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [showMaterials, setShowMaterials] = useState(false);
   const [attachments, setAttachments] = useState<any[]>(() => (job as any).attachments || []);
+  const [resolvedVehicle, setResolvedVehicle] = useState<Vehicle | any>(null);
+  const [heroIndex, setHeroIndex] = useState(0);
   
   useEffect(() => {
     setAttachments((job as any).attachments || []);
   }, [job]);
+
 
   const clientName =
     job.client_name ||
@@ -63,20 +65,33 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
 
   // Vehicle / Travel
   const didTravel = !!job.did_travel;
-  const vehicleObj: any = (job as any).vehicle || (job as any).vehicle_obj || null;
-  const vehicleName = 
-    (job as any).vehicle_name || 
-    vehicleObj?.name ||
-    (vehicleObj ? `${vehicleObj?.name}` : null);
-
-  const vehicleReg =
-    (job as any).vehicle_registration ||
-    vehicleObj?.registration ||
-    "";
+  const vehicleName = job.vehicle_name || (resolvedVehicle && resolvedVehicle.name) || null;
+  const vehicleReg = job.vehicle_registration || (resolvedVehicle && resolvedVehicle.vehicle_registration) || "";
 
   const travelKm = Number(job.travel_distance_km) || 0; // already round trip
-  const travelRate = Number(vehicleObj?.rate_per_km || 0);
+  const travelRate = Number(job.rate_per_km) ? Number(job.rate_per_km) : 0;
   const travelCost = travelKm * travelRate;
+
+  useEffect(() => {
+      // Fetch only if we have an id but backend didn't include name
+      if (job.vehicle_id && !job.vehicle_name) {
+          (async () => {
+              try {
+                  const token = localStorage.getItem("access_token");
+                  const res = await fetch(`{API_URL}/api/vehicles`, {
+                      headers: { Authorization: `Bearer ${token || ""}` }
+                  });
+                  if (res.ok) {
+                      const list = await res.json();
+                      const found = list.find((v: any) => v.id === job.vehicle_id);
+                      if (found) setResolvedVehicle(found);
+                  }
+              } catch (e) {
+                  console.warn('Failed loading vehicles: ', e);
+              }
+          })();
+      }
+  }, [job.vehicle_id, job.vehicle_name]);
     
 
   // Process URLs to ensure they have the full API URL prefix
@@ -96,64 +111,25 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
   const receipts = receiptPhotosAll;
   const sitePhotos = sitePhotosAll;
 
-  const hero = sitePhotos[0]?.url ? processUrl(sitePhotos[0].url) : undefined;
+  // Reset hero index if photos change
+  useEffect(() => {
+    if (heroIndex >= sitePhotos.length) setHeroIndex(0);
+  }, [sitePhotos.length, heroIndex]);
+  
+  const hero = sitePhotos[heroIndex]?.url ? processUrl(sitePhotos[heroIndex].url) : undefined;
 
-  const [uploadingSite, setUploadingSite] = useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  // Hero Navigation
+  const prevSite = () => {
+    if (sitePhotos.length < 2) return;
+    setHeroIndex(i => (i - 1 + sitePhotos.length) % sitePhotos.length);
+  }
 
-  const handleSelectSitePhoto = () => {
-    if (fileInputRef.current) fileInputRef.current.click();
-  };
+  const nextSite = () => {
+    if (sitePhotos.length < 2) return;
+    setHeroIndex(i => (i + 1) % sitePhotos.length);
+  }
 
-  const handleUploadSitePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const caption = prompt("Optional caption for this site photo:") || "";
-    try {
-      setUploadingSite(true);
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("attachment_type", "site");
-      if (caption.trim()) fd.append("caption", caption.trim());
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API_URL}/api/jobcards/${job.id}/attachments`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token || ""}` },
-        body: fd
-      });
-      if (!res.ok) throw new Error("Upload failed");
-      const data = await res.json();
-      setAttachments(prev => [data, ...prev]);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to upload site photo");
-    } finally {
-      setUploadingSite(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };  
-
-  const handleEditCaption = async (attId: number, oldCaption: string | null) => {
-    const next = prompt("Edit caption (leave blank to clear):", oldCaption || "") || "";
-    if (next === oldCaption) return;
-    try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API_URL}/api/jobcards/${job.id}/attachments/${attId}/caption`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token || ""}`,
-        },
-        body: JSON.stringify({ caption: next.trim() })
-      });
-      if (!res.ok) throw new Error("Caption update failed");
-      const updated = await res.json();
-      setAttachments(prev => prev.map(a => a.id === attId ? updated : a));
-    } catch (err) {
-      console.error(err);
-      alert("Failed to update caption");
-    }
-  };
+  const selectSite = (idx: number) => setHeroIndex(idx);
 
   const isAdmin = user?.role === 'admin';
 
@@ -241,6 +217,50 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
         </div>
       </div>
 
+      {/*  Technician Labour*/}
+      {Array.isArray((job as any).time_entries) && (job as any).time_entries.length > 0 && (
+        <div className="jcD-card">
+          <div className="jcD-card-title">Technician Labour</div>
+          <div className="jcD-card-body">
+            <table className="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th style={{ width: '40%' }}>Technician</th>
+                  <th style={{ width: '20%', textAlign: 'center' }}>Hours</th>
+                  <th style={{ width: '20%', textAlign: 'right' }}>Rate</th>
+                  <th style={{ width: '20%', textAlign: 'right' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(job as any).time_entries.map((te: any) => (
+                  <tr key={te.id}>
+                    <td>{te.user_name || te.user_id}</td>
+                    <td style={{ textAlign: 'center' }}>{Number(te.hours).toFixed(1)}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {formatCurrency(Number(te.hourly_rate_at_time))}
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                      {formatCurrency(Number(te.amount))}
+                    </td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700 }}>Total</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                    {formatCurrency(
+                      (job as any).time_entries.reduce(
+                        (s: number, te: any) => s + Number(te.amount || 0),
+                        0
+                      )
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Labour */}
       {(assistantsCount > 0 || assistantHours > 0 || assistantTotalCost) && (
         <div className="jcD-card">
@@ -309,7 +329,7 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
               <div className="jcD-veh-item">
                 <div className="jcD-veh-label">Travel Cost</div>
                 <div className="jcD-veh-value">
-                  {travelKm > 0 && travelRate > 0
+                  {travelKm > 0 &&  travelRate > 0
                     ? formatCurrency(travelCost)
                     : "—"}
                 </div>
@@ -410,68 +430,71 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
 
       {/* Site Photos */}
       <div className="jcD-card">
-        <div className="jcD-card-title d-flex justify-content-between align-items-center">
-          <span>Site Photos</span>
-          <div className="d-flex gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="d-none"
-              onChange={handleUploadSitePhoto}
-            />
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-primary"
-              onClick={handleSelectSitePhoto}
-              disabled={uploadingSite}
-            >
-              {uploadingSite ? "Uploading..." : "+ Add"}
-            </button>
-          </div>
-        </div>
+        <div className="jcD-card-title">Site Photos</div>
         <div className="jcD-card-body">
           {hero ? (
             <div className="jcD-siteHeroWrap position-relative">
-              <img src={hero} alt="Site primary" className="jcD-siteHero" />
-              {sitePhotos[0].caption && (
+              <img
+                src={hero}
+                alt={`Site ${heroIndex + 1} of ${sitePhotos.length}`}
+                className="jcD-siteHero"
+              />
+              {sitePhotos[heroIndex].caption && (
                 <div className="jcD-caption-overlay">
-                  {sitePhotos[0].caption}
+                  {sitePhotos[heroIndex].caption}
                 </div>
               )}
-              <button
-                type="button"
-                className="jcD-caption-edit-btn"
-                onClick={() => handleEditCaption(sitePhotos[0].id, sitePhotos[0].caption)}
-              >
-                Edit Caption
-              </button>
+              {sitePhotos.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="jcD-heroNav jcD-heroNav-left"
+                    onClick={prevSite}
+                    aria-label="Previous photo"
+                  >
+                    <i className="bi bi-chevron-left" />
+                  </button>
+                  <button
+                    type="button"
+                    className="jcD-heroNav jcD-heroNav-right"
+                    onClick={nextSite}
+                    aria-label="Next photo"
+                  >
+                    <i className="bi bi-chevron-right" />
+                  </button>
+                  <div className="jcD-heroCounter">
+                    {heroIndex + 1} / {sitePhotos.length}
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="jcD-empty">No site photos</div>
           )}
+
           {sitePhotos.length > 1 && (
             <div className="jcD-siteGrid">
-              {sitePhotos.slice(1).map((p: any) => (
-                <div key={p.id || p.url} className="jcD-siteThumbWrap">
-                  <button
-                    className="jcD-siteThumb"
-                    onClick={() => window.open(processUrl(p.url), "_blank")}
-                    title={p.filename || "Photo"}
+              {sitePhotos.map((p: any, idx: number) => {
+                const thumbUrl = processUrl(p.url);
+                const active = idx === heroIndex;
+                return (
+                  <div
+                    key={p.id || p.url}
+                    className={`jcD-siteThumbWrap ${active ? 'active' : ''}`}
                   >
-                    <img src={processUrl(p.url)} alt="Site" />
-                  </button>
-                  {p.caption && <div className="jcD-thumb-cap">{p.caption}</div>}
-                  <button
-                    type="button"
-                    className="jcD-cap-edit-mini"
-                    onClick={() => handleEditCaption(p.id, p.caption)}
-                    title="Edit caption"
-                  >
-                    <i className="bi bi-pencil"></i>
-                  </button>
-                </div>
-              ))}
+                    <button
+                      type="button"
+                      className={`jcD-siteThumb ${active ? 'active' : ''}`}
+                      onClick={() => selectSite(idx)}
+                      aria-label={`Show photo ${idx + 1}`}
+                      title={p.filename || "Photo"}
+                    >
+                      <img src={thumbUrl} alt={p.caption || `Site ${idx + 1}`} />
+                    </button>
+                    {p.caption && <div className="jcD-thumb-cap">{p.caption}</div>}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
