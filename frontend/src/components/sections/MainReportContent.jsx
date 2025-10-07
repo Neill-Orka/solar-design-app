@@ -2133,7 +2133,6 @@ function MainReportContent({
                     <li>It was assumed that all existing infrastructure on site are installed according to the relevant standards and complies with regulation.</li>
                     <li>Unless specified otherwise:
                         <ol type="a" className="ps-4">
-                            <li>Generator integration is excluded.</li>
                             <li>Generator integration is {settings.generatorIncluded ? "included" : "excluded"}.</li>
                             <li>No roof inspection for possible roof mounted panels were included, it is recommended that the client conduct such an inspection or contact Orka Solar to facilitate an inspection with a qualified third party.</li>
                             <li>Tree trimming/removal is excluded from the scope of work.</li>
@@ -2146,7 +2145,6 @@ function MainReportContent({
                     </li>
                     <li>Orka Solar guarantees the production output of the system if an active Orka Solar SLA is in place.</li>
                 </ol>
-
         </StandardPage>
 
     </>
