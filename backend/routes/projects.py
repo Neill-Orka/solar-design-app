@@ -1,10 +1,21 @@
 # routes/projects.py
+from datetime import datetime
+
 from flask import Blueprint, request, jsonify
 from models import db, Projects, Clients, LoadProfiles, QuickDesignData, Product, ComponentRule, User, UserRole, EnergyData, BOMComponent
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .tariffs import serialize_tariff
 
 projects_bp = Blueprint('projects', __name__)
+
+def mark_project_activity(project_id: int, user_id: int):
+    """Touch project last-updated fields (only for dashboard-origin changes)."""
+    proj = Projects.query.get(project_id)
+    if not proj:
+        return
+    proj.updated_at = datetime.now()
+    proj.updated_by_id = user_id
+    db.session.add(proj)
 
 @projects_bp.route('/projects', methods=['GET'])
 def get_projects():
@@ -45,6 +56,8 @@ def get_projects():
                 'custom_flat_rate': p.custom_flat_rate,
                 'created_at': p.created_at.isoformat() if p.created_at else None,
                 'created_by': p.created_by.full_name if p.created_by else '',
+                'updated_at': p.updated_at.isoformat() if p.updated_at else None,
+                'updated_by': p.updated_by.full_name if p.updated_by else None,
                 'tariff_details': serialize_tariff(p.tariff) if p.tariff else None,
             }
             for p in projects
@@ -121,6 +134,8 @@ def get_project_by_id(project_id):
             'surface_tilt': project.surface_tilt,
             'surface_azimuth': project.surface_azimuth,
             'use_pvgis': project.use_pvgis,
+            'updated_at': project.updated_at.isoformat() if project.updated_at else None,
+            'updated_by': project.updated_by.full_name if project.updated_by else None,
             'generation_profile_name': project.generation_profile_name,
             # Make sure these fields are included
             'from_standard_template': from_standard_template,

@@ -1,5 +1,8 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import get_jwt_identity
+
 from models import db, Projects, BOMComponent, Product
+from routes.projects import mark_project_activity
 
 bom_bp = Blueprint('bom', __name__)
 
@@ -49,6 +52,9 @@ def save_project_bom(project_id):
             
         # Mark BOM as modified (user has saved/exported)
         project.bom_modified = True
+
+        # user_id = int(get_jwt_identity())
+        # mark_project_activity(project_id, user_id)
             
         db.session.commit()
         return jsonify({'message': 'Bill of Materials saved successfully'}), 200

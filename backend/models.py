@@ -245,6 +245,9 @@ class Projects(db.Model):
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     profile_id = db.Column(db.Integer, db.ForeignKey('load_profiles.id'), nullable=True)
     profile_scaler = db.Column(db.Float, nullable=True, default=1.0)
+    updated_at = db.Column(db.DateTime, default=datetime.now())
+    updated_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_by = db.relationship('User', foreign_keys=[updated_by_id])
 
     energy_data = db.relationship('EnergyData', backref='project', lazy=True, cascade="all, delete-orphan")
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")

@@ -16,6 +16,14 @@ const ProjectStat = ({ icon, label, value, variant = "secondary" }) => (
   </div>
 );
 
+function formatShortDate(dt) {
+  if (!dt) return '-';
+  const d = new Date(dt);
+  if (isNaN(d)) return '-';
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+
 function Projects() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -32,6 +40,7 @@ function Projects() {
     systemType: 'all',
     projectType: 'all'
   });
+
   
   useEffect(() => {
     loadProjects();
@@ -433,6 +442,7 @@ function Projects() {
                             <th>Status</th>
                             <th>Design Type</th>
                             <th>Created</th>
+                            <th>Updated</th>
                             <th className="text-end pe-4">Actions</th>
                           </tr>
                         </thead>
@@ -452,6 +462,16 @@ function Projects() {
                                     by {project.created_by}
                                   </div>
                                 )}
+                              </td>
+                              <td>
+                                {project.updated_at ? (
+                                  <>
+                                    {formatShortDate(project.updated_at)}
+                                    <div className="small text-muted">
+                                      {project.updated_by ? `by ${project.updated_by}` : ''}
+                                    </div>
+                                  </>
+                                ): '-'}
                               </td>
                               <td className="text-end pe-3">
                                 <Link to={`/projects/${project.id}`} className="btn btn-primary btn-sm me-2">
