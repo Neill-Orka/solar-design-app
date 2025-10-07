@@ -1049,7 +1049,12 @@ class JobCardMaterial(db.Model):
         # Get the related product if available
         product_name = None
         if hasattr(self, 'product') and self.product:
-            product_name = self.product.model or f"{self.product.brand} {self.product.model}"
+            brand = self.product.brand
+            model = self.product.model
+            if brand:
+                product_name = f"{brand} {model}"
+            else:
+                product_name = model
         return {
             "id": self.id,
             "job_card_id": self.job_card_id,
@@ -1073,6 +1078,8 @@ class JobCardAttachment(db.Model):
     size_bytes = db.Column(db.Integer, nullable=True)
     uploaded_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    attachment_type = db.Column(db.String(20), nullable=False, default="site")
+    caption = db.Column(db.String(255), nullable=True)
 
     uploaded_by = db.relationship("User")
 
@@ -1085,6 +1092,8 @@ class JobCardAttachment(db.Model):
             "content_type": self.content_type,
             "size_bytes": self.size_bytes,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "attachment_type": self.attachment_type,
+            "caption": self.caption,
         }
 
 class JobCardMaterialReceipt(db.Model):
