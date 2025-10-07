@@ -167,7 +167,7 @@ const softRefreshProducts = async () => {
                 product: prod,
                 quantity: Number(s.quantity) || 1,
                 override_margin: s.override_margin ?? null,
-                unit_cost_at_time: null,
+                unit_cost_at_time: s.unit_cost_at_time ?? null,
               } : null;
             })
             .filter(Boolean);
@@ -304,7 +304,7 @@ const softRefreshProducts = async () => {
         const keepMargin = out.find(x => x.product?.id === prod.id)?.override_margin ?? null;
         out = out.filter(x => x.product?.category !== 'panel');
         const qty = Number(proj.num_panels) || 1;
-        out.push({ product: prod, quantity: qty, override_margin: keepMargin, unit_cost_at_time: null });
+        out.push({ product: prod, quantity: qty, override_margin: keepMargin, unit_cost_at_time: out.find(x => x.product?.id === prod.id)?.unit_cost_at_time ?? null });
       }
     }
 
@@ -317,7 +317,7 @@ const softRefreshProducts = async () => {
         const prod = prods.find(p => p.id === id);
         if (prod) {
           const keep = existing.find(e => e.product?.id === id)?.override_margin ?? null;
-          out.push({ product: prod, quantity: idx === 0 ? qtyFirst : 1, override_margin: keep, unit_cost_at_time: null });
+          out.push({ product: prod, quantity: idx === 0 ? qtyFirst : 1, override_margin: keep, unit_cost_at_time: existing.find(e => e.product?.id === id)?.unit_cost_at_time ?? null });
         }
       });
     }
@@ -331,7 +331,7 @@ const softRefreshProducts = async () => {
         const prod = prods.find(p => p.id === id);
         if (prod) {
           const keep = existing.find(e => e.product?.id === id)?.override_margin ?? null;
-          out.push({ product: prod, quantity: idx === 0 ? qtyFirst : 1, override_margin: keep, unit_cost_at_time: null });
+          out.push({ product: prod, quantity: idx === 0 ? qtyFirst : 1, override_margin: keep, unit_cost_at_time: existing.find(e => e.product?.id === id)?.unit_cost_at_time ?? null });
         }
       });
     }
@@ -385,7 +385,11 @@ const softRefreshProducts = async () => {
   const commitUnitCost = (pid) => {
     const val = editingCosts[pid];
     const next = bom.map(r => r.product.id === pid
-      ? { ...r, unit_cost_at_time: (val === '' || val == null) ? null : Math.max(0, Number(val)) }
+      ? { ...r,
+            unit_cost_at_time: (val === '' || val == null) ? null : Math.max(0, Number(val)),
+            // Invalidate locked price if user manually changed cost
+            price_at_time: r.price_at_time
+        }
       : r
     );
     setBom(next);
