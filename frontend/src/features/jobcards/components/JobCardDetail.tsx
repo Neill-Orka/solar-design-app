@@ -78,7 +78,7 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
           (async () => {
               try {
                   const token = localStorage.getItem("access_token");
-                  const res = await fetch(`{API_URL}/api/vehicles`, {
+                  const res = await fetch(`${API_URL}/api/vehicles`, {
                       headers: { Authorization: `Bearer ${token || ""}` }
                   });
                   if (res.ok) {

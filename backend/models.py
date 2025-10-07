@@ -639,6 +639,7 @@ class Document(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    job_card_id = db.Column(db.Integer, db.ForeignKey('job_cards.id'), nullable=True)
     kind = db.Column(db.Enum(DocumentKind), nullable=False)
     number = db.Column(db.String(64), unique=True, index=True)
     current_version_no = db.Column(db.Integer, nullable=False, default=1)
@@ -731,6 +732,7 @@ class Document(db.Model):
         return {
             "id": self.id,
             "project_id": self.project_id,
+            "job_card_id": self.job_card_id,
             "kind": self.kind.value,
             "number": self.number,
             "current_version_no": self.current_version_no,
