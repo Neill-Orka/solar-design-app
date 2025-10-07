@@ -62,7 +62,11 @@ function ProjectDashboard() {
     setLoading(true);
     try {
       const projectRes = await axios.get(`${API_URL}/api/projects/${projectId}`);
-      setProject(projectRes.data);
+      setProject({
+        ...projectRes.data,
+        updated_at: projectRes.data.updated_at,
+        updated_by: projectRes.data.updated_by
+      })
       // Set the consumerType based on project_type from the project
       setQuickDesignData(prevData => ({
           ...prevData,

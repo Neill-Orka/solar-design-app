@@ -3,18 +3,26 @@ from datetime import datetime
 
 from flask import Blueprint, request, jsonify
 from models import db, Projects, Clients, LoadProfiles, QuickDesignData, Product, ComponentRule, User, UserRole, EnergyData, BOMComponent
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 from .tariffs import serialize_tariff
 
 projects_bp = Blueprint('projects', __name__)
 
-def mark_project_activity(project_id: int, user_id: int):
+def optional_user_id():
+    try:
+        verify_jwt_in_request(optional=True)
+        return get_jwt_identity()
+    except Exception:
+        return None
+
+def mark_project_activity(project_id: int, user_id: int | None):
     """Touch project last-updated fields (only for dashboard-origin changes)."""
     proj = Projects.query.get(project_id)
     if not proj:
         return
     proj.updated_at = datetime.now()
-    proj.updated_by_id = user_id
+    if user_id:
+        proj.updated_by_id = user_id
     db.session.add(proj)
 
 @projects_bp.route('/projects', methods=['GET'])
@@ -191,6 +199,7 @@ def add_project():
 
 
 @projects_bp.route('/projects/<int:project_id>', methods=['PUT'])
+@jwt_required(optional=True)
 def update_project(project_id):
     try:
         project = Projects.query.get(project_id)
@@ -240,6 +249,7 @@ def update_project(project_id):
             project.custom_flat_rate = data['custom_flat_rate']
             project.tariff_id = None # Clear the other type
             
+        mark_project_activity(project_id, optional_user_id())
 
         db.session.commit()
         return jsonify({'message': 'Project updated successfully!'})
