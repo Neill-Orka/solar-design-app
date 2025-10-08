@@ -38,10 +38,6 @@ import ProjectRecycleBin from './ProjectRecycleBin';
 
 import axios from 'axios';
 
-import 'bootstrap/dist/css/bootstrap.min.css';
-import 'bootstrap-icons/font/bootstrap-icons.css';
-import './index.css'; 
-
 function LiveBus({ projectId }) {
   useEffect(() => {
 
