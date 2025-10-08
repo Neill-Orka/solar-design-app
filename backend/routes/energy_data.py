@@ -4,6 +4,8 @@ from models import db, Projects, EnergyData
 import pandas as pd
 import io
 
+from routes.projects import mark_project_activity, optional_user_id
+
 energy_data_bp = Blueprint("energy_data", __name__)
 
 # ---------- helpers -------------------------------------------------------
@@ -69,6 +71,7 @@ def list_energy_data(project_id):
 @energy_data_bp.route("/projects/<int:project_id>/energy-data", methods=["DELETE"])
 def delete_energy_data(project_id):
     deleted = EnergyData.query.filter_by(project_id=project_id).delete()
+    mark_project_activity(project_id, optional_user_id())
     db.session.commit()
     return jsonify({"message": f"Deleted {deleted} rows"}), 200
 
@@ -131,6 +134,7 @@ def use_profile_as_energy_data(project_id):
 
     if not rows:
         return jsonify({"error": "No valid points after parsing profile"}), 400
+    mark_project_activity(project_id, optional_user_id())
 
     db.session.bulk_save_objects(rows)
     db.session.commit()

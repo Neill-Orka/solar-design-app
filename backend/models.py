@@ -245,6 +245,13 @@ class Projects(db.Model):
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     profile_id = db.Column(db.Integer, db.ForeignKey('load_profiles.id'), nullable=True)
     profile_scaler = db.Column(db.Float, nullable=True, default=1.0)
+    updated_at = db.Column(db.DateTime, default=datetime.now())
+    updated_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_by = db.relationship('User', foreign_keys=[updated_by_id])
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    deleted_by = db.relationship('User', foreign_keys=[deleted_by_id])
+    is_deleted = db.Column(db.Boolean, default=False)
 
     energy_data = db.relationship('EnergyData', backref='project', lazy=True, cascade="all, delete-orphan")
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")
@@ -639,6 +646,7 @@ class Document(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    job_card_id = db.Column(db.Integer, db.ForeignKey('job_cards.id'), nullable=True)
     kind = db.Column(db.Enum(DocumentKind), nullable=False)
     number = db.Column(db.String(64), unique=True, index=True)
     current_version_no = db.Column(db.Integer, nullable=False, default=1)
@@ -731,6 +739,7 @@ class Document(db.Model):
         return {
             "id": self.id,
             "project_id": self.project_id,
+            "job_card_id": self.job_card_id,
             "kind": self.kind.value,
             "number": self.number,
             "current_version_no": self.current_version_no,
@@ -995,6 +1004,9 @@ class JobCard(db.Model):
             "materials_used": bool(self.materials_used),
             "did_travel": bool(self.did_travel),
             "vehicle_id": self.vehicle_id,
+            "vehicle_name": self.vehicle.name if self.vehicle else None,
+            "vehicle_registration": self.vehicle.registration if self.vehicle else None,
+            "rate_per_km": self.vehicle.rate_per_km if self.vehicle else None,
             "travel_distance_km": float(self.travel_distance_km or 0),
             "coc_required": bool(self.coc_required),
             "status": self.status,
@@ -1028,6 +1040,7 @@ class JobCardTimeEntry(db.Model):
             "hours": float(self.hours or 0),
             "hourly_rate_at_time": float(self.hourly_rate_at_time or 0),
             "amount": float((self.hours or 0) * (self.hourly_rate_at_time or 0)),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
 

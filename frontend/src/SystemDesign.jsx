@@ -1276,15 +1276,21 @@ function SystemDesign({ projectId }) {
     // Effect to set default date range when simulation data loads
     useEffect(() => {
         if (simulationData?.timestamps?.length > 0) {
-            const timestamps = simulationData.timestamps;
-            const firstDate = new Date(timestamps[0]);
-            const lastDate = new Date(timestamps[timestamps.length - 1]);
+            // Start at midnight of first timestamp
+            const firstTs = new Date(simulationData.timestamps[0]);
+            const firstDayStart = new Date(firstTs);
+            firstDayStart.setHours(0, 0, 0, 0);
 
-            const defaultEndDate = new Date(firstDate);
-            defaultEndDate.setDate(firstDate.getDate() + 7); // Default to 7 days later
+            // Last timestamp in dataset
+            const rawLast = new Date(simulationData.timestamps[simulationData.timestamps.length - 1]);
+            const lastDayEnd = toEndOfDay(rawLast);
 
-            setStartDate(firstDate);
-            setEndDate(defaultEndDate > lastDate ? lastDate : defaultEndDate);
+            // We want an inclusive 7 day window: day 0 .. day 6
+            const desiredEnd = new Date(firstDayStart.getTime() + 6 * 24 * 60 * 60 * 1000);
+            const effectiveEnd = desiredEnd > lastDayEnd ? lastDayEnd : desiredEnd;
+
+            setStartDate(firstDayStart);
+            setEndDate(toEndOfDay(effectiveEnd));
         }
     }, [simulationData]);
 

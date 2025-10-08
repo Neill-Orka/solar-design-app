@@ -30,6 +30,7 @@ function EditProject() {
   const handleChange = (e) => {
     setProject({
       ...project,
+      
       [e.target.name]: e.target.value
     });
   };

@@ -1,6 +1,7 @@
 # routes/financial.py
 from flask import Blueprint, request, jsonify
 from models import db, Projects, EnergyData
+from routes.projects import mark_project_activity, optional_user_id
 from services.financial_calcs import run_quick_financials
 from datetime import datetime
 import logging
@@ -34,6 +35,9 @@ def financial_model():
         if result.get("error"):
             logging.error(f"Financial calculation error: {result['error']}")
             return jsonify(result), 500
+        
+        mark_project_activity(project_id, optional_user_id())
+        db.session.commit()
         
         return jsonify(result), 200
 

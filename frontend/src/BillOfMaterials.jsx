@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import Fuse from 'fuse.js';
 import './BillOfMaterials.css';
 import axios from 'axios';
@@ -13,7 +13,7 @@ import { useNotification } from './NotificationContext';
  * ---------------------------
  *  SIMPLE BOM – single source of truth
  *
- *  Rules (matching your spec):
+ *  Rules ():
  *  - If project.bom_modified === true ⇒ load saved BOM from DB, then overlay latest core components from SystemDesign.
  *  - Else if a standard template is selected ⇒ load template extras, overlay core components from SystemDesign.
  *  - Else ⇒ build from SystemDesign core only.
@@ -94,6 +94,10 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
   const [project, setProject] = useState(null);
   const [bom, setBom] = useState([]); // [{ product, quantity, override_margin?, unit_cost_at_time? }]
 
+  const [lastSavedBom, setLastSavedBom] = useState([]);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [nextRoute, setNextRoute] = useState(null);
+
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [bomSearch, setBomSearch] = useState('');
@@ -101,29 +105,92 @@ export default function BillOfMaterials({ projectId, onNavigateToPrintBom, quote
   const [fullSystemMode, setFullSystemMode] = useState(true);
   const [newTemplateType, setNewTemplateType] = useState('hybrid');
 
+  const latestValues = useRef({ hasUnsavedChanges: false, bom: [], lastSavedBom: [] });
 
-// Soft refresh: refetch products and patch product objects into existing BOM rows
-const softRefreshProducts = async () => {
-  try {
-    const res = await axios.get(`${API_URL}/api/products`);
-    const prods = (res.data || []).map(p => ({
-      ...p,
-      originalCategory: p.category,
-      category: slugify(p.category),   // ← use same transform as initial load
-    }));
-    setProducts(prods);
 
-    setBom(prev => prev.map(r => {
-      const updated = prods.find(p => p.id === r.product.id);
-      if (!updated) return r;
-      // keep manual override if present; otherwise use live product pricing
-      const keepManual = (r.unit_cost_at_time != null) ? r.unit_cost_at_time : null;
-      return { ...r, product: updated, unit_cost_at_time: keepManual };
-    }));
-  } catch (e) {
-    console.error('softRefreshProducts failed', e);
-  }
-};
+  useEffect(() => {
+    // Only set when loading completes - not on every bom change
+    if (loading === false) {
+      // Create a deep copy to avoid reference issues
+      setLastSavedBom(JSON.parse(JSON.stringify(bom)));
+    }
+  }, [loading]); // <-- Only depends on loading, not bom
+
+  const hasUnsavedChanges = useMemo(() => {
+    // First check lengths as a quick test
+    if (lastSavedBom.length !== bom.length) return true;
+    
+    // Then do a more precise item-by-item comparison
+    return bom.some((item, index) => {
+      const savedItem = lastSavedBom[index];
+      if (!savedItem) return true;
+      
+      // Check key properties that matter for saving
+      return item.product.id !== savedItem.product.id ||
+            item.quantity !== savedItem.quantity ||
+            item.override_margin !== savedItem.override_margin ||
+            item.unit_cost_at_time !== savedItem.unit_cost_at_time;
+    });
+  }, [bom, lastSavedBom]);
+
+  useEffect(() => {
+    const handleAttemptTabChange = (e) => {
+      console.log('Tab change attempt intercepted in BillOfMaterials', e.detail);
+      console.log('Current unsaved state:', hasUnsavedChanges);
+      
+      if (hasUnsavedChanges) {
+        // Prevent default tab change
+        e.preventDefault();
+        console.log('Preventing default tab change due to unsaved changes');
+        
+        // Save routing data for later use after user decision
+        setNextRoute(e.detail);
+        
+        // Show the modal
+        setShowUnsavedModal(true);
+        console.log('Showing unsaved changes modal');
+      } else {
+        // If no unsaved changes, allow the tab change
+        console.log('No unsaved changes, proceeding with tab change');
+        e.detail.actuallyChangeTab(e.detail.newTab);
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('attempt-tab-change', handleAttemptTabChange);
+    
+    // Cleanup function
+    return () => {
+      window.removeEventListener('attempt-tab-change', handleAttemptTabChange);
+    };
+  }, [hasUnsavedChanges]); // Include hasUnsavedChanges in dependencies
+
+  console.log('hasUnsavedChanges:', hasUnsavedChanges, 
+  'bom:', bom.length, 
+  'lastSavedBom:', lastSavedBom.length);
+
+  // Soft refresh: refetch products and patch product objects into existing BOM rows
+  const softRefreshProducts = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/products`);
+      const prods = (res.data || []).map(p => ({
+        ...p,
+        originalCategory: p.category,
+        category: slugify(p.category),   // ← use same transform as initial load
+      }));
+      setProducts(prods);
+
+      setBom(prev => prev.map(r => {
+        const updated = prods.find(p => p.id === r.product.id);
+        if (!updated) return r;
+        // keep manual override if present; otherwise use live product pricing
+        const keepManual = (r.unit_cost_at_time != null) ? r.unit_cost_at_time : null;
+        return { ...r, product: updated, unit_cost_at_time: keepManual };
+      }));
+    } catch (e) {
+      console.error('softRefreshProducts failed', e);
+    }
+  };
 
 
   // Persist only for this project
@@ -422,12 +489,16 @@ const softRefreshProducts = async () => {
       await axios.put(`${API_URL}/api/projects/${projectId}`, {
         project_value_excl_vat: totals.subtotal
       });
-      console.log(" Project VALUE from BOM save: ", totals.subtotal);
+
+      const savedCopy = JSON.parse(JSON.stringify(merged));
+      setLastSavedBom(savedCopy);
 
       showNotification('BOM saved', 'success');
+      return true;
     } catch (e) {
       console.error(e);
       showNotification('Failed to save BOM', 'danger');
+      return false;
     }
   };
 
@@ -1088,6 +1159,52 @@ const softRefreshProducts = async () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      <Modal
+        show={showUnsavedModal}
+        onHide={() => setShowUnsavedModal(false)}
+        backdrop="static"
+        centered
+      >
+          <Modal.Header closeButton>
+              <Modal.Title>Unsaved Changes</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+              You have unsaved changes in your Bill of Materials.
+              Would you like to save before leaving this page?
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                console.log('Discarding changes and navigating to', nextRoute?.newTab);
+                setShowUnsavedModal(false);
+                if (nextRoute) {
+                  nextRoute.actuallyChangeTab(nextRoute.newTab);
+                }
+              }}
+            >
+              Discard Changes
+            </Button>
+            <Button
+              variant="primary"
+              onClick={async () => {
+                console.log('Saving changes before navigation');
+                const success = await saveBOM();
+                console.log('Save result:', success);
+                
+                setShowUnsavedModal(false);
+                if (success && nextRoute) {
+                  console.log('Navigating after save to', nextRoute.newTab);
+                  nextRoute.actuallyChangeTab(nextRoute.newTab);
+                }
+              }}
+            >
+              Save and Continue
+            </Button>
+          </Modal.Footer>
+      </Modal>
+
     </div>
   );
 }
