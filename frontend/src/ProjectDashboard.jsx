@@ -46,12 +46,53 @@ function ProjectDashboard() {
   const [error, setError] = useState('');
 
   // Function to handle tab changes with URL updates
-  const handleTabChange = (newTab) => {
+  const actuallyChangeTab = (newTab) => {
     setActiveTab(newTab);
     // Update URL with new tab parameter
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('tab', newTab);
     setSearchParams(newSearchParams);
+  };
+
+  const handleTabChange = (newTab) => {
+    console.log('Tab change requested:', newTab, 'from current:', activeTab);
+    
+    // Skip if already on this tab
+    if (newTab === activeTab) return;
+    
+    // Special case: BOM tab needs special handling
+    if (activeTab === 'bom') {
+      // Create and dispatch a custom event that BillOfMaterials will intercept
+      const customEvent = new CustomEvent('attempt-tab-change', {
+        detail: { 
+          newTab, 
+          actuallyChangeTab: (tab) => {
+            console.log('Actually changing tab to:', tab);
+            setActiveTab(tab);
+            const newSearchParams = new URLSearchParams(searchParams);
+            newSearchParams.set('tab', tab);
+            setSearchParams(newSearchParams);
+          }
+        },
+        cancelable: true // Make event cancelable
+      });
+      
+      // Dispatch the event
+      const eventResult = window.dispatchEvent(customEvent);
+      console.log('Event dispatch result:', eventResult);
+      
+      // If event was cancelled (by preventDefault), we don't change the tab
+      if (!eventResult) {
+        console.log('Tab change prevented by event handler');
+        return;
+      }
+    } else {
+      // For tabs other than BOM, change immediately
+      setActiveTab(newTab);
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.set('tab', newTab);
+      setSearchParams(newSearchParams);
+    }
   };
 
   const openQuote = (docId) => {
@@ -274,7 +315,7 @@ function ProjectDashboard() {
           <button className={`nav-link ${activeTab === 'design' ? 'active' : ''}`} onClick={() => handleTabChange('design')}>System Design</button>
         </li>
         {/* <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'optimize' ? 'active' : ''}`} onClick={() => handleTabChange('optimize')}>Optimize System</button>
+          <button className={`nav-link ${activeTab === 'optimize' ? 'active' : ''}`} onClick={() => actuallyChangeTab('optimize')}>Optimize System</button>
         </li> */}
         <li className="nav-item">
           <button className={`nav-link ${activeTab === 'bom' ? 'active' : ''}`} onClick={() => handleTabChange('bom')}>Bill of Materials</button>
@@ -310,7 +351,7 @@ function ProjectDashboard() {
         {activeTab === 'bom' && (
           <BillOfMaterials 
             projectId={projectId} 
-            onNavigateToPrintBom={() => handleTabChange('printbom')} 
+            onNavigateToPrintBom={() => handleTabChange('printbom')}
             quoteContext={{
               docId: searchParams.get('quoteDoc'),
               number: searchParams.get('quoteNo'),
