@@ -248,6 +248,10 @@ class Projects(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.now())
     updated_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     updated_by = db.relationship('User', foreign_keys=[updated_by_id])
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    deleted_by = db.relationship('User', foreign_keys=[deleted_by_id])
+    is_deleted = db.Column(db.Boolean, default=False)
 
     energy_data = db.relationship('EnergyData', backref='project', lazy=True, cascade="all, delete-orphan")
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")

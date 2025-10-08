@@ -2,13 +2,10 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 
 from models import db, Projects, BOMComponent, Product
-from routes.projects import mark_project_activity
+from routes.projects import mark_project_activity, optional_user_id
 
 bom_bp = Blueprint('bom', __name__)
 
-def optional_user_id():
-    verify_jwt_in_request(optional=True)
-    return get_jwt_identity()
 
 @bom_bp.route('/projects/<int:project_id>/bom', methods=['POST'])
 def save_project_bom(project_id):

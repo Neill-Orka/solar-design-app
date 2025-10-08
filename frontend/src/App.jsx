@@ -34,6 +34,7 @@ import JobCardCreatePage from './features/jobcards/pages/JobCardCreatePage';
 import JobCardDetailPage from './features/jobcards/pages/JobCardDetailPage';
 import PageTransition from './features/jobcards/components/PageTransition';
 import RecycleBin from './RecycleBin';
+import ProjectRecycleBin from './ProjectRecycleBin';
 
 import axios from 'axios';
 
@@ -213,9 +214,17 @@ function AuthenticatedApp() {
                   <RecycleBin />
                 </ProtectedRoute>
               </PageTransition>
-            } 
-            />
+            } />
             
+            <Route path="/projects/recycle-bin" element={
+              <PageTransition>
+                <ProtectedRoute requiredRole={["admin", "manager", 'design']}>
+                  <ProjectRecycleBin />
+                </ProtectedRoute>
+              </PageTransition>
+            } />
+
+
             {/* System builder and other tools - accessible to all */}
             <Route path="/system-builder" element={<SystemBuilder />} />
             <Route path="/load-profile-manager" element={<LoadProfileManager />} />

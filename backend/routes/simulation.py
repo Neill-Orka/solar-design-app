@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify
 from models import db, Projects, EnergyData
 import pandas as pd
 from datetime import datetime
+from routes.projects import mark_project_activity, optional_user_id
 from services.simulation_engine import simulate_system_inner
 from pvlib.location import Location
 from pvlib.pvsystem import PVSystem
@@ -40,6 +41,9 @@ def simulate_system():
 
         if inverter_kva is None:
             return jsonify({"error": "Inverter size (kVA) is required"}), 400
+        
+        mark_project_activity(project_id, optional_user_id())
+        db.session.commit()
 
         # Pass the battery_soc_limit to the simulation function
         result = simulate_system_inner(project_id, panel_kw, battery_kwh, system_type, inverter_kva, 
@@ -47,6 +51,7 @@ def simulate_system():
                                       battery_soc_limit=battery_soc_limit,
                                       generator_config=generator_cfg)
         return jsonify(result)
+    
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

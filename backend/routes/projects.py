@@ -2,21 +2,18 @@
 from datetime import datetime
 
 from flask import Blueprint, request, jsonify
-from models import db, Projects, Clients, LoadProfiles, QuickDesignData, Product, ComponentRule, User, UserRole, EnergyData, BOMComponent
+from models import Document, db, Projects, Clients, LoadProfiles, QuickDesignData, Product, ComponentRule, User, UserRole, EnergyData, BOMComponent
 from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 from .tariffs import serialize_tariff
 
 projects_bp = Blueprint('projects', __name__)
 
 def optional_user_id():
-    try:
-        verify_jwt_in_request(optional=True)
-        return get_jwt_identity()
-    except Exception:
-        return None
+    verify_jwt_in_request(optional=True)
+    return get_jwt_identity()
 
 def mark_project_activity(project_id: int, user_id: int | None):
-    """Touch project last-updated fields (only for dashboard-origin changes)."""
+    """Touch project last-updated fields (only for dashboard changes)."""
     proj = Projects.query.get(project_id)
     if not proj:
         return
@@ -33,9 +30,13 @@ def get_projects():
 
         # Apply filter if client_id is provided
         if client_id:
-            projects = Projects.query.filter_by(client_id = client_id)
+            projects = Projects.query.filter_by(client_id = client_id).filter(
+                (Projects.is_deleted.is_(False)) | (Projects.is_deleted.is_(None))
+            )  
         else:
-            projects = Projects.query.all()
+            projects = Projects.query.filter(
+                (Projects.is_deleted.is_(False)) | (Projects.is_deleted.is_(None))
+            ).all()
 
         return jsonify([
             {
@@ -81,7 +82,7 @@ def get_projects():
 def get_project_by_id(project_id):
     try:
         project = Projects.query.get(project_id)
-        if not project:
+        if not project or project.is_deleted:
             return jsonify({'error': 'Project not found'}), 404
 
         # Update debug logging to remove panel_id
@@ -271,14 +272,21 @@ def delete_project(project_id):
         project = Projects.query.get(project_id)
         if not project:
             return jsonify({'error': 'Project not found'}), 404
+        if project.is_deleted:
+            return jsonify({'error': 'Project already deleted'}), 400
+        
+        project.is_deleted = True
+        project.deleted_at = datetime.now()
+        project.deleted_by_id = user.id
         # Bulk delete children to avoid per-row cascade overhead
-        db.session.query(EnergyData).filter_by(project_id=project_id).delete(synchronize_session=False)
-        db.session.query(BOMComponent).filter_by(project_id=project_id).delete(synchronize_session=False)
-        db.session.query(QuickDesignData).filter_by(project_id=project_id).delete(synchronize_session=False)
-     
-        db.session.delete(project)
+        # db.session.query(EnergyData).filter_by(project_id=project_id).delete(synchronize_session=False)
+        # db.session.query(BOMComponent).filter_by(project_id=project_id).delete(synchronize_session=False)
+        # db.session.query(QuickDesignData).filter_by(project_id=project_id).delete(synchronize_session=False)
+        # db.session.delete(project)
+
+        db.session.add(project)
         db.session.commit()
-        return jsonify({'message': 'Project deleted successfully!'})
+        return jsonify({'message': 'Project moved to recycle bin!'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -414,3 +422,73 @@ def get_quick_design_data(project_id):
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+@projects_bp.route('/projects/recyclebin', methods=['GET'])
+@jwt_required()
+def list_deleted_projects():
+    try:
+        rows = (Projects.query
+                .filter(Projects.is_deleted.is_(True))
+                .order_by(Projects.deleted_at.desc())
+                .all())
+        return jsonify([
+            {
+                'id': p.id,
+                'name': p.name,
+                'client_name': p.client.client_name if p.client else None,
+                'location': p.location,
+                'system_type': p.system_type,
+                'design_type': p.design_type,
+                'deleted_at': p.deleted_at.isoformat() if p.deleted_at else None,
+                'deleted_by_name': p.deleted_by.full_name if p.deleted_by else None,
+                'created_at': p.created_at.isoformat() if p.created_at else None,
+            } for p in rows
+        ])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@projects_bp.route('/projects/<int:project_id>/restore', methods=['POST'])
+@jwt_required()
+def restore_project(project_id):
+    try:
+        project = Projects.query.get(project_id)
+        if not project or not project.is_deleted:
+            return jsonify({'error': 'Project not found or not deleted'}), 404
+        project.is_deleted = False
+        project.deleted_at = None
+        project.deleted_by_id = None
+        db.session.add(project)
+        db.session.commit()
+        return jsonify({'message': 'Project restored'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@projects_bp.route('/projects/<int:project_id>/permanent', methods=['DELETE'])
+@jwt_required()
+def permanent_delete_project(project_id):
+    """
+    Optional: irreversible removal. Only allow if you genuinely want to purge.
+    """
+    user = User.query.get(get_jwt_identity())
+    if not user or user.role != UserRole.ADMIN:
+        return jsonify({'error': 'forbidden'}), 403
+    try:
+        project = Projects.query.get(project_id)
+        if not project or not project.is_deleted:
+            return jsonify({'error': 'Project not found or not in recycle bin'}), 404
+
+        # You can decide NOT to delete related documents to keep historical records.
+        # Safer approach: reject permanent delete if documents exist.
+        doc_exists = Document.query.filter_by(project_id=project_id).first()
+        if doc_exists:
+            return jsonify({'error': 'Project has documents; permanent delete blocked'}), 400
+
+        db.session.delete(project)
+        db.session.commit()
+        return jsonify({'message': 'Project permanently deleted'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+

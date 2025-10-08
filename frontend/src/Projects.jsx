@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { Container, Row, Col, Card, Button, Modal, Badge, Spinner, Alert, Dropdown, Table, InputGroup, ButtonGroup, Form } from 'react-bootstrap';
 import { API_URL } from './apiConfig';
+import { useNotification } from './NotificationContext';
 
 // A compact styled component for key project metrics
 const ProjectStat = ({ icon, label, value, variant = "secondary" }) => (
@@ -40,6 +41,7 @@ function Projects() {
     systemType: 'all',
     projectType: 'all'
   });
+  const { showNotification } = useNotification();
 
   
   useEffect(() => {
@@ -102,6 +104,7 @@ function Projects() {
         setShowDeleteModal(false);
         setProjectToDelete(null);
         loadProjects();
+        showNotification('Project moved to recycle bin', 'info');
       })
       .catch((err) => {
         console.error('Error deleting project:', err);
@@ -155,12 +158,19 @@ function Projects() {
                   </h2>
                   <p className="text-muted mb-0">Manage your solar design projects</p>
                 </div>
+                <div className='d-flex'>
+                {user?.role === 'admin' && (
+                  <Link to="/projects/recycle-bin" className="btn btn-outline-secondary ms-2">
+                    <i className="bi bi-trash"></i>
+                  </Link>
+                )}
                 <Link
                   to="/projects/add"
-                  className="btn btn-primary shadow-sm"
+                  className="btn btn-primary shadow-sm ms-1"
                 >
                   <i className="bi bi-plus-lg me-2"></i>New Project
                 </Link>
+                </div>
               </div>
 
               {/* Search and View Controls */}

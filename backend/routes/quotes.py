@@ -10,6 +10,7 @@ from models import (
     Document, DocumentVersion, DocumentLineItem, DocumentEvent,
     DocumentKind, DocumentStatus, VersionStatus
 )
+from routes.projects import mark_project_activity, optional_user_id
 
 quotes_bp = Blueprint("quotes", __name__)
 SA_TZ = ZoneInfo("Africa/Johannesburg")
@@ -196,6 +197,8 @@ def create_quote_from_bom(project_id: int):
     )
     db.session.add(evt)
 
+    mark_project_activity(project_id, optional_user_id())
+
     db.session.commit()
 
     return jsonify({
@@ -241,6 +244,9 @@ def list_project_quotes(project_id):
                 "full_name": d.created_by.full_name if d.created_by else "Unknown",
             }
         })
+
+        mark_project_activity(project_id, optional_user_id())
+        db.session.commit()
     return jsonify(out), 200
 
 @quotes_bp.get("/quotes/<int:document_id>")
@@ -383,7 +389,7 @@ def load_version_to_bom(version_id):
         )
         db.session.add(bom)
         count += 1
-
+    mark_project_activity(project_id, optional_user_id())
     db.session.commit()
     
     # Update the project's core components to match the quote
@@ -592,6 +598,7 @@ def send_quote(document_id):
     
     try:
         doc.mark_sent(user_id)
+        
         db.session.commit()
         return jsonify({
             "message": "Quote sent successfully",
