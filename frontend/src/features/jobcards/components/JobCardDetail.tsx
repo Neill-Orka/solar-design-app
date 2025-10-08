@@ -226,22 +226,26 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
               <thead>
                 <tr>
                   <th style={{ width: '40%' }}>Technician</th>
-                  <th style={{ width: '20%', textAlign: 'center' }}>Hours</th>
-                  <th style={{ width: '20%', textAlign: 'right' }}>Rate</th>
-                  <th style={{ width: '20%', textAlign: 'right' }}>Amount</th>
+                    <th></th>
+                    <th></th>
+                  <th style={{ width: '20%', textAlign: 'right' }}>Hours</th>
+                  {/*<th style={{ width: '20%', textAlign: 'right' }}>Rate</th>*/}
+                  {/*<th style={{ width: '20%', textAlign: 'right' }}>Amount</th>*/}
                 </tr>
               </thead>
               <tbody>
                 {(job as any).time_entries.map((te: any) => (
                   <tr key={te.id}>
                     <td>{te.user_name || te.user_id}</td>
-                    <td style={{ textAlign: 'center' }}>{Number(te.hours).toFixed(1)}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      {formatCurrency(Number(te.hourly_rate_at_time))}
-                    </td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                      {formatCurrency(Number(te.amount))}
-                    </td>
+                      <td></td>
+                      <td></td>
+                    <td style={{ textAlign: 'right' }}>{Number(te.hours).toFixed(1)}</td>
+                    {/*<td style={{ textAlign: 'right' }}>*/}
+                    {/*  {formatCurrency(Number(te.hourly_rate_at_time))}*/}
+                    {/*</td>*/}
+                    {/*<td style={{ textAlign: 'right', fontWeight: 600 }}>*/}
+                    {/*  {formatCurrency(Number(te.amount))}*/}
+                    {/*</td>*/}
                   </tr>
                 ))}
                 <tr>
@@ -262,33 +266,33 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
       )}
 
       {/* Labour */}
-      {(assistantsCount > 0 || assistantHours > 0 || assistantTotalCost) && (
-        <div className="jcD-card">
-          <div className="jcD-card-title">Labour</div>
-          <div className="jcD-card-body">
-            <div className="jcD-labour-grid">
-              <div className="jcD-labour-item">
-                <div className="jcD-labour-label">Assistants</div>
-                <div className="jcD-labour-value">
-                  {assistantsCount > 0 ? assistantsCount : "—"}
-                </div>
-              </div>
-              <div className="jcD-labour-item">
-                <div className="jcD-labour-label">Hours Worked</div>
-                <div className="jcD-labour-value">
-                  {assistantHours > 0 ? assistantHours : "—"}
-                </div>
-              </div>
-              <div className="jcD-labour-item">
-                <div className="jcD-labour-label">Total Cost</div>
-                <div className="jcD-labour-value">
-                  {formatCurrency(Number(assistantTotalCost))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/*{(assistantsCount > 0 || assistantHours > 0 || assistantTotalCost) && (*/}
+      {/*  <div className="jcD-card">*/}
+      {/*    <div className="jcD-card-title">Labour</div>*/}
+      {/*    <div className="jcD-card-body">*/}
+      {/*      <div className="jcD-labour-grid">*/}
+      {/*        <div className="jcD-labour-item">*/}
+      {/*          <div className="jcD-labour-label">Assistants</div>*/}
+      {/*          <div className="jcD-labour-value">*/}
+      {/*            {assistantsCount > 0 ? assistantsCount : "—"}*/}
+      {/*          </div>*/}
+      {/*        </div>*/}
+      {/*        <div className="jcD-labour-item">*/}
+      {/*          <div className="jcD-labour-label">Hours Worked</div>*/}
+      {/*          <div className="jcD-labour-value">*/}
+      {/*            {assistantHours > 0 ? assistantHours : "—"}*/}
+      {/*          </div>*/}
+      {/*        </div>*/}
+      {/*        <div className="jcD-labour-item">*/}
+      {/*          <div className="jcD-labour-label">Total Cost</div>*/}
+      {/*          <div className="jcD-labour-value">*/}
+      {/*            {formatCurrency(Number(assistantTotalCost))}*/}
+      {/*          </div>*/}
+      {/*        </div>*/}
+      {/*      </div>*/}
+      {/*    </div>*/}
+      {/*  </div>*/}
+      {/*)}*/}
 
       {/* Vehicles */}
       {(didTravel || vehicleName || travelKm > 0) && (
@@ -318,12 +322,12 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
                   ) : (
                     "—"
                   )}
-                  {travelRate > 0 && travelKm > 0 && (
-                    <span className="jcD-veh-sub">
-                      {/* show rate subtly without emphasising */}
-                      at {travelRate.toFixed(2)}/km
-                    </span>
-                  )}
+                  {/*{travelRate > 0 && travelKm > 0 && (*/}
+                  {/*  <span className="jcD-veh-sub">*/}
+                  {/*    /!* show rate subtly without emphasising *!/*/}
+                  {/*    at {travelRate.toFixed(2)}/km*/}
+                  {/*  </span>*/}
+                  {/*)}*/}
                 </div>
               </div>
               <div className="jcD-veh-item">

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { API_URL } from './apiConfig';
 import './AdminDashboard.css';
+import axios from "axios";
 
 const AdminDashboard = () => {
   const { user: currentUser, loading: authLoading } = useAuth();
@@ -13,7 +14,7 @@ const AdminDashboard = () => {
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('users');
-  
+
   // User management modals
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
@@ -41,7 +42,6 @@ const AdminDashboard = () => {
   const [editingBum, setEditingBum] = useState(null);
   const [editingTechnician, setEditingTechnician] = useState(null);
 
-  
   const getAuthHeaders = useCallback(() => {
     const token = localStorage.getItem('access_token');
     return {
@@ -49,7 +49,8 @@ const AdminDashboard = () => {
       'Content-Type': 'application/json'
     };
   }, []);
-  
+
+
   const fetchVehicles = useCallback(async () => {
     setLoadingVehicles(true);
     try {
@@ -61,6 +62,7 @@ const AdminDashboard = () => {
         setVehicles(data);
       } else {
         setMessage('Failed to fetch vehicles');
+
       }
     } catch (error) {
       console.error('Error fetching vehicles:', error);
@@ -137,7 +139,7 @@ const fetchTechnicians = useCallback(async () => {
     const response = await fetch(`${API_URL}/api/technicians`, {
       headers: getAuthHeaders()
     });
-    
+
     if (response.ok) {
       const data = await response.json();
       setTechnicians(data);
@@ -160,9 +162,9 @@ const fetchTechnicians = useCallback(async () => {
       fetchBums();
       fetchTechnicians();
 
-      if (settingsSection === 'bums') {
-        fetchUsers();
-      }
+      // if (settingsSection === 'bums') {
+      //   fetchUsers();
+      // }
     }
   }, [activeTab, settingsSection, fetchVehicles, fetchCategories, fetchBums, fetchTechnicians, fetchUsers]);
 
@@ -170,16 +172,16 @@ const fetchTechnicians = useCallback(async () => {
 const handleSaveVehicle = async (vehicle) => {
   try {
     const method = vehicle.id ? 'PUT' : 'POST';
-    const url = vehicle.id ? 
-      `${API_URL}/api/vehicles/${vehicle.id}` : 
+    const url = vehicle.id ?
+      `${API_URL}/api/vehicles/${vehicle.id}` :
       `${API_URL}/api/vehicles`;
-    
+
     const response = await fetch(url, {
       method,
       headers: getAuthHeaders(),
       body: JSON.stringify(vehicle)
     });
-    
+
     if (response.ok) {
       setMessage(`Vehicle ${vehicle.id ? 'updated' : 'added'} successfully`);
       fetchVehicles();
@@ -196,13 +198,13 @@ const handleSaveVehicle = async (vehicle) => {
 
 const handleDeleteVehicle = async (id) => {
   if (!confirm('Are you sure you want to delete this vehicle?')) return;
-  
+
   try {
     const response = await fetch(`${API_URL}/api/vehicles/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    
+
     if (response.ok) {
       setMessage('Vehicle deleted successfully');
       fetchVehicles();
@@ -220,16 +222,16 @@ const handleDeleteVehicle = async (id) => {
 const handleSaveCategory = async (category) => {
   try {
     const method = category.id ? 'PUT' : 'POST';
-    const url = category.id ? 
-      `${API_URL}/api/jobcategories/${category.id}` : 
+    const url = category.id ?
+      `${API_URL}/api/jobcategories/${category.id}` :
       `${API_URL}/api/jobcategories`;
-    
+
     const response = await fetch(url, {
       method,
       headers: getAuthHeaders(),
       body: JSON.stringify(category)
     });
-    
+
     if (response.ok) {
       setMessage(`Category ${category.id ? 'updated' : 'added'} successfully`);
       fetchCategories();
@@ -246,13 +248,13 @@ const handleSaveCategory = async (category) => {
 
 const handleDeleteCategory = async (id) => {
   if (!confirm('Are you sure you want to delete this category? This may affect existing job cards.')) return;
-  
+
   try {
     const response = await fetch(`${API_URL}/api/jobcategories/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    
+
     if (response.ok) {
       setMessage('Category deleted successfully');
       fetchCategories();
@@ -275,16 +277,16 @@ const handleToggleBumStatus = async (userId, isBum) => {
       setMessage('User not found');
       return;
     }
-    
+
     // Use a dedicated endpoint for BUM status - this is more appropriate
     const response = await fetch(`${API_URL}/api/auth/admin/users/${userId}/update-bum-status`, {
       method: 'POST', // Changed to POST since we're performing an action
       headers: getAuthHeaders(),
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         is_bum: !isBum   // Toggle the BUM status
       })
     });
-    
+
     if (response.ok) {
       setMessage(`User ${isBum ? 'removed from' : 'set as'} BUM successfully`);
 
@@ -308,21 +310,21 @@ const handleSaveTechnician = async (tech) => {
   try {
     // Log what we're sending for debugging
     console.log('Saving technician:', tech);
-    
+
     const method = tech.tech_profile_id ? 'PUT' : 'POST';
-    
+
     // Fix the endpoint URLs - they should be under jobcards API, not auth
-    const url = tech.tech_profile_id ? 
-      `${API_URL}/api/technicians/${tech.tech_profile_id}` : 
+    const url = tech.tech_profile_id ?
+      `${API_URL}/api/technicians/${tech.tech_profile_id}` :
       `${API_URL}/api/technicians`;
-    
+
     // Clean the payload to only include what the API expects
     const payload = {
       user_id: tech.user_id,
       hourly_rate: parseFloat(tech.hourly_rate),
       active: tech.active
     };
-    
+
     if (tech.tech_profile_id) {
       payload.id = tech.tech_profile_id;
     }
@@ -332,7 +334,7 @@ const handleSaveTechnician = async (tech) => {
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
-    
+
     if (response.ok) {
       setMessage(`Technician ${tech.tech_profile_id ? 'updated' : 'added'} successfully`);
       fetchTechnicians();
@@ -350,14 +352,14 @@ const handleSaveTechnician = async (tech) => {
 // Update the handleDeleteTechnician function
 const handleDeleteTechnician = async (id) => {
   if (!confirm('Are you sure you want to remove this technician profile?')) return;
-  
+
   try {
     // Use the correct endpoint - it should be under jobcards API, not auth
     const response = await fetch(`${API_URL}/api/technicians/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    
+
     if (response.ok) {
       setMessage('Technician profile removed successfully');
       fetchTechnicians();
@@ -456,7 +458,7 @@ const handleDeleteTechnician = async (id) => {
 
   const handleToggleUserStatus = async (userId, currentStatus) => {
     const action = currentStatus ? 'deactivate' : 'activate';
-    
+
     try {
       const response = await fetch(`${API_URL}/api/auth/admin/users/${userId}/${action}`, {
         method: 'POST',
@@ -478,7 +480,7 @@ const handleDeleteTechnician = async (id) => {
 
   const handleDeleteUser = async () => {
     if (!selectedUser) return;
-    
+
     setUserActionLoading(true);
     try {
       const response = await fetch(`${API_URL}/api/auth/admin/users/${selectedUser.id}/delete`, {
@@ -505,7 +507,7 @@ const handleDeleteTechnician = async (id) => {
 
   const handleChangeRole = async () => {
     if (!selectedUser || !newRole) return;
-    
+
     setUserActionLoading(true);
     try {
       const response = await fetch(`${API_URL}/api/auth/admin/users/${selectedUser.id}/role`, {
@@ -585,23 +587,23 @@ const handleDeleteTechnician = async (id) => {
       <div className="admin-tabs">
         <button
           className={`tab-button ${activeTab === 'settings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('settings')}  
+          onClick={() => setActiveTab('settings')}
         >
           System Settings
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
           onClick={() => setActiveTab('users')}
         >
           User Management
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'tokens' ? 'active' : ''}`}
           onClick={() => setActiveTab('tokens')}
         >
           Registration Tokens
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'logs' ? 'active' : ''}`}
           onClick={() => setActiveTab('logs')}
         >
@@ -620,28 +622,28 @@ const handleDeleteTechnician = async (id) => {
     <div className="settings-header">
       <h2>System Settings</h2>
       <div className="settings-nav">
-        <button 
+        <button
           className={`settings-nav-btn ${settingsSection === 'vehicles' ? 'active' : ''}`}
           onClick={() => setSettingsSection('vehicles')}
         >
           <i className="bi bi-truck me-2"></i>
           Vehicles
         </button>
-        <button 
+        <button
           className={`settings-nav-btn ${settingsSection === 'categories' ? 'active' : ''}`}
           onClick={() => setSettingsSection('categories')}
         >
           <i className="bi bi-tags me-2"></i>
           Job Categories
         </button>
-        <button 
+        <button
           className={`settings-nav-btn ${settingsSection === 'bums' ? 'active' : ''}`}
           onClick={() => setSettingsSection('bums')}
         >
           <i className="bi bi-person-badge me-2"></i>
           Business Unit Managers
         </button>
-        <button 
+        <button
           className={`settings-nav-btn ${settingsSection === 'technicians' ? 'active' : ''}`}
           onClick={() => setSettingsSection('technicians')}
         >
@@ -656,7 +658,7 @@ const handleDeleteTechnician = async (id) => {
       <div className="vehicles-section">
         <div className="section-header">
           <h3>Vehicles Management</h3>
-          <button 
+          <button
             className="add-btn"
             onClick={() => setEditingVehicle({ name: '', registration: '', rate_per_km: 0, active: true })}
           >
@@ -689,14 +691,14 @@ const handleDeleteTechnician = async (id) => {
                     </span>
                   </td>
                   <td>
-                    <button 
-                      className="action-button edit" 
+                    <button
+                      className="action-button edit"
                       onClick={() => setEditingVehicle(vehicle)}
                     >
                       Edit
                     </button>
-                    <button 
-                      className="action-button delete" 
+                    <button
+                      className="action-button delete"
                       onClick={() => handleDeleteVehicle(vehicle.id)}
                     >
                       Delete
@@ -717,58 +719,66 @@ const handleDeleteTechnician = async (id) => {
         {editingVehicle && (
           <div className="modal-overlay">
             <div className="modal-content">
-              <h3>{editingVehicle.id ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveVehicle(editingVehicle);
-              }}>
-                <div className="form-group">
-                  <label>Name</label>
-                  <input 
-                    type="text" 
-                    value={editingVehicle.name} 
-                    onChange={(e) => setEditingVehicle({...editingVehicle, name: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Registration</label>
-                  <input 
-                    type="text" 
-                    value={editingVehicle.registration || ''} 
-                    onChange={(e) => setEditingVehicle({...editingVehicle, registration: e.target.value})}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Rate per km (R)</label>
-                  <input 
-                    type="number" 
-                    step="0.01"
-                    min="0"
-                    value={editingVehicle.rate_per_km} 
-                    onChange={(e) => setEditingVehicle({...editingVehicle, rate_per_km: parseFloat(e.target.value)})}
-                    required
-                  />
-                </div>
-                <div className="form-group checkbox">
-                  <label>
-                    <input 
-                      type="checkbox" 
-                      checked={editingVehicle.active} 
-                      onChange={(e) => setEditingVehicle({...editingVehicle, active: e.target.checked})}
+              <div className="modal-header">
+                <h3>{editingVehicle.id ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
+                <button className="modal-close" onClick={() => setEditingVehicle(null)}>×</button>
+              </div>
+              <div className="modal-body">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSaveVehicle(editingVehicle);
+                }}>
+                  <div className="form-group">
+                    <label>Name</label>
+                    <input
+                      type="text"
+                      value={editingVehicle.name}
+                      onChange={(e) => setEditingVehicle({...editingVehicle, name: e.target.value})}
+                      required
                     />
-                    Active
-                  </label>
-                </div>
-                <div className="modal-actions">
-                  <button type="button" className="cancel-btn" onClick={() => setEditingVehicle(null)}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="save-btn">
-                    {editingVehicle.id ? 'Update Vehicle' : 'Add Vehicle'}
-                  </button>
-                </div>
-              </form>
+                  </div>
+                  <div className="form-group">
+                    <label>Registration</label>
+                    <input
+                      type="text"
+                      value={editingVehicle.registration || ''}
+                      onChange={(e) => setEditingVehicle({...editingVehicle, registration: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Rate per km (R)</label>
+                    <div className="field-description">The rate charged per kilometer traveled</div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editingVehicle.rate_per_km}
+                      onChange={(e) => setEditingVehicle({...editingVehicle, rate_per_km: parseFloat(e.target.value)})}
+                      required
+                    />
+                  </div>
+                  <div className="form-group checkbox">
+                    <input
+                      type="checkbox"
+                      checked={editingVehicle.active}
+                      onChange={(e) => setEditingVehicle({...editingVehicle, active: e.target.checked})}
+                      id="vehicle-active"
+                    />
+                    <label htmlFor="vehicle-active">Active</label>
+                  </div>
+                </form>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="cancel-btn" onClick={() => setEditingVehicle(null)}>
+                  Cancel
+                </button>
+                <button
+                  className="save-btn"
+                  onClick={() => handleSaveVehicle(editingVehicle)}
+                >
+                  {editingVehicle.id ? 'Update Vehicle' : 'Add Vehicle'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -780,7 +790,7 @@ const handleDeleteTechnician = async (id) => {
       <div className="categories-section">
         <div className="section-header">
           <h3>Job Categories Management</h3>
-          <button 
+          <button
             className="add-btn"
             onClick={() => setEditingCategory({ name: '', active: true })}
           >
@@ -809,14 +819,14 @@ const handleDeleteTechnician = async (id) => {
                     </span>
                   </td>
                   <td>
-                    <button 
-                      className="action-button edit" 
+                    <button
+                      className="action-button edit"
                       onClick={() => setEditingCategory(category)}
                     >
                       Edit
                     </button>
-                    <button 
-                      className="action-button delete" 
+                    <button
+                      className="action-button delete"
                       onClick={() => handleDeleteCategory(category.id)}
                     >
                       Delete
@@ -837,39 +847,41 @@ const handleDeleteTechnician = async (id) => {
         {editingCategory && (
           <div className="modal-overlay">
             <div className="modal-content">
-              <h3>{editingCategory.id ? 'Edit Category' : 'Add New Category'}</h3>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveCategory(editingCategory);
-              }}>
+              <div className="modal-header">
+                <h3>{editingCategory.id ? 'Edit Category' : 'Add New Category'}</h3>
+                <button className="modal-close" onClick={() => setEditingCategory(null)}>×</button>
+              </div>
+              <div className="modal-body">
                 <div className="form-group">
                   <label>Name</label>
-                  <input 
-                    type="text" 
-                    value={editingCategory.name} 
+                  <input
+                    type="text"
+                    value={editingCategory.name}
                     onChange={(e) => setEditingCategory({...editingCategory, name: e.target.value})}
                     required
                   />
                 </div>
                 <div className="form-group checkbox">
-                  <label>
-                    <input 
-                      type="checkbox" 
-                      checked={editingCategory.active} 
-                      onChange={(e) => setEditingCategory({...editingCategory, active: e.target.checked})}
-                    />
-                    Active
-                  </label>
+                  <input
+                    type="checkbox"
+                    id="category-active"
+                    checked={editingCategory.active}
+                    onChange={(e) => setEditingCategory({...editingCategory, active: e.target.checked})}
+                  />
+                  <label htmlFor="category-active">Active</label>
                 </div>
-                <div className="modal-actions">
-                  <button type="button" className="cancel-btn" onClick={() => setEditingCategory(null)}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="save-btn">
-                    {editingCategory.id ? 'Update Category' : 'Add Category'}
-                  </button>
-                </div>
-              </form>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="cancel-btn" onClick={() => setEditingCategory(null)}>
+                  Cancel
+                </button>
+                <button
+                  className="save-btn"
+                  onClick={() => handleSaveCategory(editingCategory)}
+                >
+                  {editingCategory.id ? 'Update Category' : 'Add Category'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -905,8 +917,8 @@ const handleDeleteTechnician = async (id) => {
                     <td>{bum.full_name}</td>
                     <td>{bum.email}</td>
                     <td>
-                      <button 
-                        className="action-button remove" 
+                      <button
+                        className="action-button remove"
                         onClick={() => handleToggleBumStatus(bum.id, true)}
                       >
                         Remove BUM Status
@@ -937,7 +949,7 @@ const handleDeleteTechnician = async (id) => {
                 </tr>
               </thead>
               <tbody>
-                {users.filter(user => 
+                {users.filter(user =>
                   // Only show active users who aren't already BUMs
                   user.is_active && !user.is_bum
                 ).map(user => (
@@ -946,8 +958,8 @@ const handleDeleteTechnician = async (id) => {
                     <td>{user.email}</td>
                     <td>{user.role}</td>
                     <td>
-                      <button 
-                        className="action-button assign" 
+                      <button
+                        className="action-button assign"
                         onClick={() => handleToggleBumStatus(user.id, false)}
                       >
                         Assign as BUM
@@ -974,13 +986,13 @@ const handleDeleteTechnician = async (id) => {
       <div className="technicians-section">
         <div className="section-header">
           <h3>Technicians Management</h3>
-          <button 
+          <button
             className="add-btn"
             onClick={() => {
               // Create a new technician form with dropdown of eligible users
-              setEditingTechnician({ 
-                user_id: '', 
-                hourly_rate: 0, 
+              setEditingTechnician({
+                user_id: '',
+                hourly_rate: 0,
                 active: true,
                 eligible_users: users.filter(u => u.is_active && !technicians.some(t => t.id === u.id))
               });
@@ -1013,8 +1025,8 @@ const handleDeleteTechnician = async (id) => {
                     </span>
                   </td>
                   <td>
-                    <button 
-                      className="action-button edit" 
+                    <button
+                      className="action-button edit"
                       onClick={() => setEditingTechnician({
                         tech_profile_id: tech.tech_profile_id,
                         user_id: tech.id,
@@ -1025,8 +1037,8 @@ const handleDeleteTechnician = async (id) => {
                     >
                       Edit
                     </button>
-                    <button 
-                      className="action-button delete" 
+                    <button
+                      className="action-button delete"
                       onClick={() => handleDeleteTechnician(tech.tech_profile_id)}
                     >
                       Remove
@@ -1047,16 +1059,16 @@ const handleDeleteTechnician = async (id) => {
         {editingTechnician && (
           <div className="modal-overlay">
             <div className="modal-content">
-              <h3>{editingTechnician.tech_profile_id ? 'Edit Technician' : 'Add New Technician'}</h3>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveTechnician(editingTechnician);
-              }}>
+              <div className="modal-header">
+                <h3>{editingTechnician.tech_profile_id ? 'Edit Technician' : 'Add New Technician'}</h3>
+                <button className="modal-close" onClick={() => setEditingTechnician(null)}>×</button>
+              </div>
+              <div className="modal-body">
                 {!editingTechnician.tech_profile_id ? (
                   <div className="form-group">
                     <label>Select User</label>
-                    <select 
-                      value={editingTechnician.user_id} 
+                    <select
+                      value={editingTechnician.user_id}
                       onChange={(e) => setEditingTechnician({...editingTechnician, user_id: e.target.value})}
                       required
                     >
@@ -1076,34 +1088,37 @@ const handleDeleteTechnician = async (id) => {
                 )}
                 <div className="form-group">
                   <label>Hourly Rate (R)</label>
-                  <input 
-                    type="number" 
+                  <div className="field-description">The rate charged per hour for this technician's work</div>
+                  <input
+                    type="number"
                     step="0.01"
                     min="0"
-                    value={editingTechnician.hourly_rate} 
+                    value={editingTechnician.hourly_rate}
                     onChange={(e) => setEditingTechnician({...editingTechnician, hourly_rate: parseFloat(e.target.value)})}
                     required
                   />
                 </div>
                 <div className="form-group checkbox">
-                  <label>
-                    <input 
-                      type="checkbox" 
-                      checked={editingTechnician.active} 
-                      onChange={(e) => setEditingTechnician({...editingTechnician, active: e.target.checked})}
-                    />
-                    Active
-                  </label>
+                  <input
+                    type="checkbox"
+                    id="technician-active"
+                    checked={editingTechnician.active}
+                    onChange={(e) => setEditingTechnician({...editingTechnician, active: e.target.checked})}
+                  />
+                  <label htmlFor="technician-active">Active</label>
                 </div>
-                <div className="modal-actions">
-                  <button type="button" className="cancel-btn" onClick={() => setEditingTechnician(null)}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="save-btn">
-                    {editingTechnician.tech_profile_id ? 'Update Technician' : 'Add Technician'}
-                  </button>
-                </div>
-              </form>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="cancel-btn" onClick={() => setEditingTechnician(null)}>
+                  Cancel
+                </button>
+                <button
+                  className="save-btn"
+                  onClick={() => handleSaveTechnician(editingTechnician)}
+                >
+                  {editingTechnician.tech_profile_id ? 'Update Technician' : 'Add Technician'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1136,8 +1151,8 @@ const handleDeleteTechnician = async (id) => {
                   </select>
                 </div>
                 <div className="form-group">
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="generate-button"
                     disabled={generating}
                   >
@@ -1231,7 +1246,7 @@ const handleDeleteTechnician = async (id) => {
                           >
                             {user.is_active ? 'Deactivate' : 'Activate'}
                           </button>
-                          
+
                           <button
                             className="action-button"
                             onClick={() => openRoleModal(user)}
@@ -1239,7 +1254,7 @@ const handleDeleteTechnician = async (id) => {
                           >
                             Change Role
                           </button>
-                          
+
                           {user.email !== currentUser.email && (
                             <button
                               className="action-button"
@@ -1289,8 +1304,8 @@ const handleDeleteTechnician = async (id) => {
                     <td>{log.resource_id || '-'}</td>
                     <td>
                       {log.details ? (
-                        typeof log.details === 'object' ? 
-                          JSON.stringify(log.details) : 
+                        typeof log.details === 'object' ?
+                          JSON.stringify(log.details) :
                           log.details
                       ) : '-'}
                     </td>
@@ -1327,15 +1342,15 @@ const handleDeleteTechnician = async (id) => {
             <p>Are you sure you want to delete <strong>{selectedUser?.email}</strong>?</p>
             <p style={{ color: '#dc3545', fontSize: '14px' }}>This action cannot be undone.</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
-              <button 
-                className="btn btn-secondary" 
+              <button
+                className="btn btn-secondary"
                 onClick={closeModals}
                 disabled={userActionLoading}
               >
                 Cancel
               </button>
-              <button 
-                className="btn btn-danger" 
+              <button
+                className="btn btn-danger"
                 onClick={handleDeleteUser}
                 disabled={userActionLoading}
               >
@@ -1371,7 +1386,7 @@ const handleDeleteTechnician = async (id) => {
             <p>Change role for <strong>{selectedUser?.email}</strong></p>
             <div className="form-group" style={{ marginBottom: '20px' }}>
               <label htmlFor="roleSelect">New Role:</label>
-              <select 
+              <select
                 id="roleSelect"
                 className="form-control"
                 value={newRole}
@@ -1387,15 +1402,15 @@ const handleDeleteTechnician = async (id) => {
               </select>
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button 
-                className="btn btn-secondary" 
+              <button
+                className="btn btn-secondary"
                 onClick={closeModals}
                 disabled={userActionLoading}
               >
                 Cancel
               </button>
-              <button 
-                className="btn btn-primary" 
+              <button
+                className="btn btn-primary"
                 onClick={handleChangeRole}
                 disabled={userActionLoading || !newRole}
               >

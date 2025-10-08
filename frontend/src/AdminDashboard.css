@@ -606,160 +606,313 @@
   color: #721c24;
 }
 
-/* Modal styling */
+/* Replace the existing modal styling section with these improved styles */
+
+/* Modal styling - Enhanced */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.65); /* Darker overlay for better focus */
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 1050; /* Higher z-index to ensure it's above other elements */
   padding: 20px;
+  backdrop-filter: blur(3px); /* Subtle blur effect */
 }
 
 .modal-content {
   background: white;
-  border-radius: 8px;
-  padding: 24px;
-  width: 500px;
-  max-width: 90%;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: 12px; /* More rounded corners */
+  padding: 0; /* Remove default padding for better header styling */
+  width: 600px; /* Wider default width */
+  max-width: 95%;
+  max-height: 85vh; /* Prevent modals from being taller than viewport */
+  overflow-y: auto; /* Enable scrolling for tall content */
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18), 0 6px 12px rgba(0, 0, 0, 0.12);
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
-.modal-content h3 {
-  margin-top: 0;
-  margin-bottom: 24px;
-  color: #333;
-  font-weight: 600;
-  padding-bottom: 16px;
+/* Modal header with close button */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  background: linear-gradient(to right, #f8f9fa, #ffffff);
   border-bottom: 1px solid #e9ecef;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
 }
 
+.modal-header h3 {
+  margin: 0;
+  color: #2d3748;
+  font-weight: 600;
+  font-size: 20px;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  color: #718096;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background-color: #f1f5f9;
+  color: #e53e3e;
+}
+
+/* Modal body with padding */
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+/* Form styling improvements */
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .form-group label {
   display: block;
   margin-bottom: 8px;
-  font-weight: 500;
-  color: #495057;
+  font-weight: 600;
+  color: #4a5568;
+  font-size: 15px;
+}
+
+.form-group .field-description {
+  font-size: 13px;
+  color: #718096;
+  margin-top: 4px;
+  margin-bottom: 8px;
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: border-color 0.2s ease;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 15px;
+  transition: all 0.2s ease;
+  background-color: #fff;
 }
 
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
-  border-color: #80bdff;
-  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
 }
 
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #a0aec0;
+}
+
+/* Checkbox styling */
 .form-group.checkbox {
   display: flex;
   align-items: center;
 }
 
 .form-group.checkbox input {
-  width: auto;
-  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+  margin-right: 12px;
+  accent-color: #4299e1;
 }
 
 .form-group.checkbox label {
   margin-bottom: 0;
+  cursor: pointer;
+  user-select: none;
 }
 
+/* Radio button group */
+.radio-group {
+  display: flex;
+  gap: 16px;
+  margin: 8px 0;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+}
+
+.radio-option input {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  accent-color: #4299e1;
+}
+
+/* Modal footer with actions */
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 24px;
-  padding-top: 16px;
+  padding: 16px 24px;
+  background: #f8fafc;
   border-top: 1px solid #e9ecef;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
 }
 
 .cancel-btn {
-  padding: 8px 16px;
-  background: #f8f9fa;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  color: #495057;
-  font-weight: 500;
+  padding: 10px 18px;
+  background: #fff;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  color: #4a5568;
+  font-weight: 600;
+  font-size: 15px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .cancel-btn:hover {
-  background: #e9ecef;
+  background: #f1f5f9;
+  border-color: #a0aec0;
 }
 
 .save-btn {
-  padding: 8px 16px;
-  background: #007bff;
+  padding: 10px 18px;
+  background: #4299e1;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   color: white;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 15px;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(66, 153, 225, 0.12);
 }
 
 .save-btn:hover {
-  background: #0069d9;
+  background: #3182ce;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(66, 153, 225, 0.18);
 }
 
-/* Loading state */
-.loading {
+.save-btn:active {
+  transform: translateY(0);
+}
+
+/* Input validation styles */
+.form-group.has-error input,
+.form-group.has-error select {
+  border-color: #fc8181;
+}
+
+.form-error-message {
+  color: #e53e3e;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+/* Field groups (horizontal layout) */
+.field-group {
+  display: flex;
+  gap: 16px;
+}
+
+.field-group .form-group {
+  flex: 1;
+}
+
+/* Switch styling for boolean fields */
+.switch-field {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 40px;
-  color: #6c757d;
-  font-style: italic;
 }
 
-.loading::before {
-  content: '';
-  width: 20px;
-  height: 20px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #3498db;
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+  margin-right: 12px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e0;
+  transition: .4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
   border-radius: 50%;
-  margin-right: 10px;
-  animation: spin 1s linear infinite;
 }
 
-/* Media queries for responsiveness */
-@media (max-width: 768px) {
-  .settings-nav {
-    overflow-x: auto;
-    padding-bottom: 5px;
+input:checked + .slider {
+  background-color: #4299e1;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+}
+
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+/* Responsive modal adjustments */
+@media (max-width: 640px) {
+  .modal-content {
+    width: 95%;
+    max-height: 90vh;
   }
-  
-  .section-header {
+
+  .field-group {
     flex-direction: column;
-    align-items: flex-start;
+    gap: 10px;
   }
-  
-  .section-header .add-btn {
-    margin-top: 10px;
+
+  .modal-header h3 {
+    font-size: 18px;
   }
-  
-  .settings-table {
-    margin: 20px 0;
-    width: 100%;
+
+  .modal-actions {
+    padding: 12px 16px;
   }
 }

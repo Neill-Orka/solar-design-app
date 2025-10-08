@@ -270,14 +270,9 @@
   gap: 8px;
   justify-content: start;
 }
-.jcM-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  border: 2px solid #c7d1e0;
-  background: #fff;
-}
-.jcM-dot:active { transform: scale(.92); }
+
+
+
 
 /* photos placeholders */
 .jcM-photoRow {
@@ -353,4 +348,111 @@
   gap: 5px;
 }
 
+/* Add to your existing CSS file */
+.jcM-hoursRow {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.jcM-tech {
+  min-width: 120px;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jcM-dotbar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+
+.jcM-dot:checked {
+  border-color: #0d6efd;
+  background-color: #0d6efd;
+}
+
+/* Labels should align perfectly with dots */
+.jcM-hourLabel {
+  padding: 0;
+  height: 20px;
+  line-height: 20px;
+}
+
+/* Add to your existing CSS file */
+.jcM-hoursRow {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.jcM-tech {
+  width: 120px;
+  min-width: 120px;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jcM-dotbar {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 400px;
+}
+
+.jcM-hourLabel {
+  width: 24px;
+  height: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: #6c757d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jcM-dot:checked {
+  border-color: #0d6efd;
+  background-color: #0d6efd;
+}
+
+.jcM-hourSuffix {
+  min-width: 50px;
+  text-align: right;
+  font-size: 12px;
+  color: #495057;
+  font-weight: 500;
+}
+
+.jcM-dot {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #dee2e6;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin: 0;
+}
+
+.jcM-dot:hover {
+  border-color: #a5c7f3;
+}
+
+.jcM-dot-selected {
+  border-color: #0d6efd;
+  background-color: #0d6efd;
+}
+
+.jcM-dot:active {
+  transform: scale(0.92);
+}
 
