@@ -151,6 +151,7 @@ def get_project_by_id(project_id):
             'template_id': template_id,
             'template_name': template_name,
             'bom_modified': bom_modified,
+            'generator_config': project.generator_config
         })
     except Exception as e:
         # Add better error logging
@@ -238,6 +239,9 @@ def update_project(project_id):
             project.use_pvgis = data['use_pvgis']
         if 'generation_profile_name' in data:
             project.generation_profile_name = data['generation_profile_name']
+
+        if 'generator_config' in data:
+            project.generator_config = data['generator_config']
 
         tariff_id = data.get('tariff_id')
         custom_flat_rate = data.get('custom_flat_rate')
