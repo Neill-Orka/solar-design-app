@@ -1613,7 +1613,7 @@ function MainReportContent({
                         <tr>
                             <td>Payback (years)</td>
                             <td className="text-end">
-                                {(data?.financials?.payback_period || 0).toFixed(2)}
+                                {typeof data.financials?.payback_period === 'number' ? data.financials.payback_period.toFixed(1) : data.financials.payback_period}
                             </td>
                         </tr>
                     </tbody>

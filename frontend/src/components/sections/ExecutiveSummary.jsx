@@ -167,7 +167,7 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
           <img src={batteryIcon} className="orka-summary-icon" alt="" />
           <div className="orka-summary-label">Backup</div>
           <div className="orka-summary-sublabel">Chemistry: {project.battery_chem || 'LFP'}</div>
-          <div className="orka-summary-sublabel">{project.battery_nominal_rating} kWh @ 100%</div>
+          <div className="orka-summary-sublabel">{project.battery_nominal_rating || '0'} kWh @ 100%</div>
           <div className="orka-summary-sublabel">{displayValue(project.battery_kwh, "0", "battery_kwh_80")} kWh @ 80%</div>
         </div>
       </div>
@@ -186,7 +186,7 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
           <div className="orka-summary-label">Savings</div>
           <div className="orka-summary-sublabel">Savings year 1: R {formatValue(financials.annual_savings)}</div>
           <div className="orka-summary-sublabel">First year yield: {financials.yield_year1}%</div>
-          <div className="orka-summary-sublabel">Payback (years): {(financials.payback_period).toFixed(1)}</div>
+          <div className="orka-summary-sublabel">Payback (years): {typeof financials.payback_period === 'number' ? financials.payback_period.toFixed(1) : financials.payback_period}</div>
           <div className="orka-summary-sublabel">LCOE (25y): R {financials.lcoe}</div>
         </div>
       </div>
