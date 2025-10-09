@@ -43,6 +43,7 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
     usedActualConsumption: false,
     threePhase: true,
     bomPriceMode: 'none',
+    generatorIncluded: false,
     projectSchedule: [
       { activity: "Deposit received & document compilation", timeline: "Week 1" },
       { activity: "Equipment procurement & delivery", timeline: "Week 2 (provided no major supplier delays)" },
@@ -156,6 +157,7 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
     axios.get(`${API_URL}/api/projects/${projectId}`)
       .then((projectRes) => {
         const project = projectRes.data;
+        console.log('Project data loaded:', project);
 
         // --- Add inverter and battery brand/model from products ---
         const getBrandModel = (products, ids, category) => {
@@ -173,7 +175,8 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
         project.inverter_brand_model = getBrandModel(products, project.inverter_ids, 'Inverter');
         project.battery_brand_model = getBrandModel(products, project.battery_ids, 'Battery');
 
-        project.battery_nominal_rating = Number(getNominalRating(products, project.battery_ids, 'Battery') * project.battery_kwh.quantity).toFixed(2);
+        project.battery_nominal_rating = project.battery_kwh > 0 ? 
+        Number(getNominalRating(products, project.battery_ids, 'Battery') * project.battery_kwh.quantity).toFixed(2) : 0;
      
         
         const reportData = {
@@ -283,6 +286,14 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
               />
               Three Phase?
             </label>  
+            <label>
+              <input 
+                type="checkbox"
+                checked={reportSettings.generatorIncluded}
+                onChange={() => setReportSettings(prev => ({ ...prev, generatorIncluded: !prev.generatorIncluded }))}
+              />
+              Include Generator Integration
+            </label>            
             
             <div>
               Adjust Project Schedule
@@ -304,6 +315,7 @@ function ReportBuilder({ projectId, onNavigateToTab }) {
                 </div>
               ))}
             </div>
+
             <label style={{display:'flex',gap:'6px',alignItems:'center',marginTop:8}}>
               <span style={{minWidth:115}}>BOM prices:</span>
               <select

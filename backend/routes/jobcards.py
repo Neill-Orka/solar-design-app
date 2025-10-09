@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify, abort, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 import json
-from models import Document, JobCardMaterial, db, JobCard, Clients, JobCategory, Vehicle, DocumentKind, DocumentStatus, DocumentVersion, Product, User, UserRole
+from models import Document, JobCardMaterial, db, JobCard, Clients, JobCategory, Vehicle, DocumentKind, DocumentStatus, DocumentVersion, Product, User, UserRole, JobCardTimeEntry, TechnicianProfile
 from werkzeug.utils import secure_filename
 import os
 from routes.auth import log_user_action
@@ -79,6 +79,26 @@ def jobcards_collection():
         jc.client_address_snapshot= _str255(getattr(client, "address", None))
 
     db.session.add(jc)
+    db.session.commit()
+
+    time_entries = data.get("time_entries") or []
+    if isinstance(time_entries, list):
+        for te in time_entries:
+            try:
+                uid = int(te.get("user_id"))
+                hours = float(te.get("hours", 0))
+                if hours <= 0:
+                    continue
+            except Exception:
+                continue
+            prof = TechnicianProfile.query.filter_by(user_id=uid, active=True).first()
+            rate = float(prof.hourly_rate) if prof else 0.0
+            db.session.add(JobCardTimeEntry(
+                job_card_id=jc.id,
+                user_id=uid,
+                hours=hours,
+                hourly_rate_at_time=rate
+            ))
     db.session.commit()
     return jsonify(jc.to_dict()), 201
 
@@ -226,6 +246,9 @@ def upload_jobcard_attachment(jid: int):
   public_base = current_app.config.get("PUBLIC_UPLOAD_BASE", "/uploads")
   url = f"{public_base}/jobcards/{jid}/{fname}"
 
+  kind = request.form.get("attachment_type") or request.form.get("type") or "site"
+  caption = request.form.get("caption") or None
+
   att = JobCardAttachment(
       job_card_id=jid,
       filename=fname,
@@ -233,9 +256,23 @@ def upload_jobcard_attachment(jid: int):
       content_type=file.mimetype,
       size_bytes=os.path.getsize(path),
       uploaded_by_id=get_jwt_identity(),
+      attachment_type=kind if kind in ("site", "receipt") else "site",
+      caption=caption,
   )
   db.session.add(att); db.session.commit()
   return att.to_dict(), 201
+
+@jobcards_bp.route("/jobcards/<int:jid>/attachments/<int:aid>/caption", methods=["PATCH"])
+@jwt_required()
+def update_jobcard_attachment_caption(jid: int, aid: int):
+    from models import JobCardAttachment, db
+    att = JobCardAttachment.query.get_or_404(aid)
+    if att.job_card_id != jid:
+        return jsonify({"error": "Attachment not found"}), 400
+    data = request.get_json() or {}
+    att.caption = (data.get("caption") or "").strip() or None
+    db.session.commit()
+    return jsonify(att.to_dict())
 
 @jobcards_bp.route("/jobcards/<int:jid>/attachments/<int:aid>", methods=["DELETE","OPTIONS"])
 @jwt_required()
@@ -384,7 +421,7 @@ def upload_material_receipt(jid: int, material_id: int):
         content_type=file.mimetype,
         size_bytes=os.path.getsize(path),
         uploaded_by_id=get_jwt_identity(),
-        # metadata_json={"type": "material_receipt", "material_id": material_id}
+        attachment_type="receipt",
     )
     
     db.session.add(att)
@@ -433,7 +470,7 @@ def create_jobcard_material():
             "id": material.id,
             "job_card_id": material.job_card_id,
             "product_id": material.product_id,
-            "product_name": product.description or f"{product.brand_name} {product.description}",
+            "product_name": f"{product.brand_name} {product.description}",
             "quantity": material.quantity,
             "unit_cost_at_time": material.unit_cost_at_time,
             "unit_price_at_time": material.unit_price_at_time,

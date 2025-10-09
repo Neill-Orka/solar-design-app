@@ -1,5 +1,5 @@
 // src/features/jobcards/components/JobCardFormMobile.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useForm, Controller, SubmitHandler, SubmitErrorHandler } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,6 +25,7 @@ import axios from "axios";
 import { API_URL } from '../../../apiConfig'
 import { useAuth } from '../../../AuthContext';
 import { http } from '../api';
+
 
 /** === utilities for datetime-local <-> ISO === */
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -115,6 +116,51 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
     receiptRequired?: boolean;
     used?: boolean;
   };
+
+  const [sitePhotos, setSitePhotos] = useState<SitePhotoDraft[]>([]);
+  const siteFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  type SitePhotoDraft = {
+    id?: string;
+    file: File;
+    preview: string;
+    caption: string;
+  };  
+
+  // hanlde file choose
+  const handleSelectSitePhotos = () => siteFileInputRef.current?.click();
+
+  const handleSiteFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setSitePhotos(prev => [
+      ...prev,
+      ...files.map(f => ({
+        id: crypto.randomUUID(),
+        file: f,
+        preview: URL.createObjectURL(f),
+        caption: ""
+      }))
+    ]);
+    e.target.value = "";
+  };
+
+  const updateSiteCaption = (id: string, caption: string) => {
+    setSitePhotos(prev => prev.map(p => p.id === id ? { ...p, caption } : p));
+  }
+
+  const removeSitePhoto = (id: string) => {
+    setSitePhotos(prev => {
+      const ph = prev.find(p => p.id === id);
+      if (ph) URL.revokeObjectURL(ph.preview);
+      return prev.filter(p => p.id !== id);
+    });
+  };
+
+  // cleanup previews on unmount
+  useEffect(() => () => {
+    sitePhotos.forEach(photo => URL.revokeObjectURL(photo.preview));
+  }, [sitePhotos]);
 
   // fetch BUMs once
   useEffect(() => {
@@ -403,15 +449,6 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
       }
     }
 
-    // Make sure tech_id is properly transferred to owner_id when a BUM submits the form
-    // if (isCurrentUserBum && techIdSelect && techIdSelect.value) {
-    //   const techId = parseInt(techIdSelect.value, 10);
-    //   if (!isNaN(techId) && techId > 0) {
-    //     setValue('owner_id', techId, { shouldDirty: true });
-    //     console.log('Setting owner_id to selected technician:', techId);
-    //   }
-    // }
-
     setValue("is_quoted", isQuotedJC, { shouldDirty: true });
     if (isQuotedJC && selectedProjectId) {
       setValue("project_id" as any, selectedProjectId, { shouldDirty: true });
@@ -422,10 +459,15 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
 
     // Create an enhanced version of onSubmit that includes material data and ensures values
     const enhancedSubmit = (values: JobCardFormValues) => {
+      const time_entries = Object.entries(techHoursById)
+        .filter(([, h]) => Number(h) > 0)
+        .map(([uid, hours]) => ({ user_id: Number(uid), hours: Number(hours) }));
       return onSubmit(values, {
         materialLines,
         usedMaterials,
-        materialFileUploads
+        materialFileUploads,
+        sitePhotos,
+        time_entries
       });
     };
     
@@ -444,16 +486,22 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
     });
   }, []);
 
-  const [technicianHours, setTechnicianHours] = useState<Record<string, number>>({
-    "Jurgens Hamman": 0,
-    "Divan Beukes": 0,
-    "Justin Pretorius": 0,
-    "Muller van Eeden-Olivier": 0,
-    "George Knell": 0,
-    "Marco Henning": 0,
-    "Tristan Potgieter": 0,
-    "Additional hours": 0,
-  });
+  const [techHoursById, setTechHoursById] = useState<Record<number, number>>({});
+
+  // When techOptions load, ensure map has keys
+    useEffect(() => {
+        setTechHoursById(prev => {
+            const next = { ...prev };
+            techOptions.forEach(t => {
+                if (next[t.id] == null) next[t.id] = 0;
+            });
+            return next;
+        });
+    }, [techOptions]);
+
+    const setTechHours = (id: number, hours: number) => {
+        setTechHoursById(prev => ({ ...prev, [id]: prev[id] === hours ? 0 : hours}));
+    };
 
   const [materialsOpen, setMaterialsOpen] = useState(false);
 
@@ -554,13 +602,6 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
   const travelRate = Number(selVehicle?.rate_per_km || 0);
   const travelTotal = didTravel ? travelKm * travelRate : 0;
   const grandTotal = labourTotal + travelTotal;
-
-  const setTechHours = (name: string, hours: number) => {
-    setTechnicianHours(prev => ({
-      ...prev,
-      [name]: prev[name] === hours ? 0 : hours
-    }));
-  };
 
   return (
     <>
@@ -868,32 +909,29 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
 
       {/* HOURS quick dots (visual like screenshot) */}
       <section className="jcM-card">
-        <h6 className="jcM-section">HOURS</h6>
-        <div className="jcM-hoursHeader">
-          <span className="jcM-tech" />
-          <div className="jcM-dotbar"> 
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-              <span key={n} className="jcM-num">{n}</span>
-            ))}
-          </div>
-        </div>
-
-        {["Jurgens Hamman", "Divan Beukes", "Justin Pretorius", "Muller van Eeden-Olivier", "George Knell", "Tristan Potgieter", "Marco Henning", "Additional Hours"].map((name) => (
-          <div key={name} className="jcM-hoursRow">
-            <span className="jcM-tech">{name}</span>
+        <h6 className="jcM-section">TECHNICIAN HOURS</h6>
+        {techOptions.length === 0 && (
+          <div className="small text-muted">No technicians loaded.</div>
+        )}
+        {techOptions.map(t => (
+          <div key={t.id} className="jcM-hoursRow">
+            <span className="jcM-tech">{t.full_name}</span>
             <div className="jcM-dotbar">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+              {[0,1,2,3,4,5,6,7,8,9,10].map(n => (
                 <input
                   key={n}
                   type="radio"
-                  name={`hours_${name}`}
+                  name={`hours_${t.id}`}
                   value={n}
                   className="jcM-dot"
-                  onClick={() => setTechHours(name, n)}
-                  aria-label={`${name} ${n}h`}
-                  checked={technicianHours[name] === n && technicianHours[name] !== 0}
+                  aria-label={`${t.full_name} ${n}h`}
+                  onChange={() => setTechHours(t.id, n)}
+                  checked={techHoursById[t.id] === n && n !== 0}
                 />
               ))}
+            </div>
+            <div style={{ minWidth: 50, textAlign: 'right', fontSize: 12 }}>
+              {techHoursById[t.id] ? `${techHoursById[t.id]}h` : ''}
             </div>
           </div>
         ))}
@@ -983,204 +1021,204 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
 
       {/* MATERIALS & COC */}
       <section className="jcM-card">
-<div className="card shadow-sm mb-3">
-  <div className="card-body">
-    <div className="d-flex justify-content-between align-items-center mb-2">
-      <h5 className="card-title mb-0">Materials</h5>
-      <span className="badge text-bg-secondary">R {materialTotal.toFixed(2)}</span>
-    </div>
-
-    <div className="form-check form-switch mb-2">
-      <input className="form-check-input" type="checkbox" id="materials_used" {...register('materials_used')} />
-      <label className="form-check-label" htmlFor="materials_used">Materials used</label>
-    </div>
-
-    {watch('materials_used') && (
-      <>
-        {selectedQuoteId && (
-          <div className="alert alert-info py-2">
-            <i className="bi bi-info-circle me-2"></i>
-            Materials loaded from selected quote
-          </div>
-        )}
-
-        {/* Quote selection if multiple accepted quotes exist */}
-        {isQuotedJC && selectedProjectId && acceptedQuotes.length > 0 && (
-          <div className="mb-3">
-            <label className="form-label">Select Quote:</label>
-            <div className="list-group">
-              {acceptedQuotes.map(quote => (
-                <button
-                  key={quote.id}
-                  type="button"
-                  className={`list-group-item list-group-item-action ${selectedQuoteId === quote.id ? 'active' : ''}`}
-                  onClick={() => setSelectedQuoteId(quote.id)}
-                >
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <div className="fw-bold">{quote.number}</div>
-                      <small>{new Date(quote.created_at).toLocaleDateString()}</small>
-                    </div>
-                    <div className="text-end">
-                      <div className="fw-bold">R {quote.totals?.total_incl_vat?.toFixed(2) || '0.00'}</div>
-                      <span className="badge bg-success">Accepted</span>
-                    </div>
-                  </div>
-                </button>
-              ))}
+        <div className="card shadow-sm mb-3">
+          <div className="card-body">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <h5 className="card-title mb-0">Materials</h5>
+              <span className="badge text-bg-secondary">R {materialTotal.toFixed(2)}</span>
             </div>
-          </div>
-        )}
 
-        <button type="button" className="btn btn-sm btn-outline-primary mb-2" onClick={() => setMaterialsOpen(true)}>
-          + Add products
-        </button>
+            <div className="form-check form-switch mb-2">
+              <input className="form-check-input" type="checkbox" id="materials_used" {...register('materials_used')} />
+              <label className="form-check-label" htmlFor="materials_used">Materials used</label>
+            </div>
 
-        {materialLines.length > 0 ? (
-          <ul className="list-group mb-3">
-            {materialLines.map((line, index) => (
-              <li key={index} className="list-group-item">
-                <div className="form-check mb-2">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id={`material-used-${index}`}
-                    checked={usedMaterials[index] ?? true}
-                    onChange={() => toggleUsed(index)}
-                  />
-                  <label className="form-check-label d-flex justify-content-between w-100" htmlFor={`material-used-${index}`}>
-                    <div>
-                      <span className="fw-semibold">{line.name}</span>
-                      {line.fromQuote && <span className="badge bg-info ms-2">From Quote</span>}
-                    </div>
-                    <span className="text-nowrap">R {line.unit_price.toFixed(2)} × {line.qty}</span>
-                  </label>
-                </div>
-                
-                {usedMaterials[index] && (
-                  <div className="ms-4">
-                    {!line.fromQuote && (
-                      <div className="mb-2">
-                        <div className="row g-2 align-items-center">
-                          <div className="col-6">
-                            <div className="input-group input-group-sm">
-                              <span className="input-group-text">Actual Cost</span>
-                              <input
-                                type="number"
-                                className="form-control"
-                                value={line.unit_cost}
-                                onChange={(e) => {
-                                  const newCost = parseFloat(e.target.value) || 0;
-                                  setMaterialLines(prev => 
-                                    prev.map((item, i) => i === index ? {...item, unit_cost: newCost} : item)
-                                  );
-                                }}
-                                min="0"
-                                step="0.01"
-                              />
-                            </div>
-                          </div>
-                          <div className="col-6">
-                            <div className="input-group input-group-sm">
-                              <span className="input-group-text">Price</span>
-                              <input
-                                type="number"
-                                className="form-control"
-                                value={line.unit_price}
-                                onChange={(e) => {
-                                  const newPrice = parseFloat(e.target.value) || 0;
-                                  setMaterialLines(prev => 
-                                    prev.map((item, i) => i === index ? {...item, unit_price: newPrice} : item)
-                                  );
-                                }}
-                                min="0"
-                                step="0.01"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-2">
-                          <input
-                            type="file"
-                            id={`material-receipt-${index}`}
-                            className="d-none"
-                            accept="image/*"
-                            onChange={(e) => handleFileUpload(index, e.target.files?.[0] || null)}
-                          />
-                          <label 
-                            htmlFor={`material-receipt-${index}`}
-                            className={`btn btn-sm ${materialFileUploads[index] ? 'btn-success' : 'btn-outline-secondary'}`}
-                          >
-                            {materialFileUploads[index] ? 
-                              <><i className="bi bi-check-circle"></i> Receipt Uploaded</> : 
-                              <><i className="bi bi-receipt"></i> Upload Receipt (Required)</>
-                            }
-                          </label>
-                          
-                          {materialFileUploads[index] && (
-                            <span className="ms-2 text-muted small">
-                              {materialFileUploads[index]?.name} 
-                              ({Math.round(materialFileUploads[index]?.size as number / 1024)} KB)
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="d-flex justify-content-between align-items-center mt-1">
-                      <div className="input-group input-group-sm" style={{maxWidth: '180px'}}>
-                        <span className="input-group-text">Qty</span>
-                        <input
-                          type="number"
-                          className="form-control"
-                          min="0"
-                          step="1"
-                          value={line.qty}
-                          onChange={(e) => {
-                            const newQty = Math.max(0, parseInt(e.target.value) || 0);
-                            setMaterialLines(prev => 
-                              prev.map((item, i) => i === index ? {...item, qty: newQty} : item)
-                            );
-                          }}
-                        />
-                      </div>
-                      
-                      <div>
-                        <span className="fw-bold me-2">Total: R {(line.unit_price * line.qty).toFixed(2)}</span>
+            {watch('materials_used') && (
+              <>
+                {selectedQuoteId && (
+                  <div className="alert alert-info py-2">
+                    <i className="bi bi-info-circle me-2"></i>
+                    Materials loaded from selected quote
+                  </div>
+                )}
+
+                {/* Quote selection if multiple accepted quotes exist */}
+                {isQuotedJC && selectedProjectId && acceptedQuotes.length > 0 && (
+                  <div className="mb-3">
+                    <label className="form-label">Select Quote:</label>
+                    <div className="list-group">
+                      {acceptedQuotes.map(quote => (
                         <button
+                          key={quote.id}
                           type="button"
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => {
-                            setMaterialLines(prev => prev.filter((_, i) => i !== index));
-                            setUsedMaterials(prev => {
-                              const newUsed = {...prev};
-                              delete newUsed[index];
-                              return newUsed;
-                            });
-                            setMaterialFileUploads(prev => {
-                              const newUploads = {...prev};
-                              delete newUploads[index];
-                              return newUploads;
-                            });
-                          }}
+                          className={`list-group-item list-group-item-action ${selectedQuoteId === quote.id ? 'active' : ''}`}
+                          onClick={() => setSelectedQuoteId(quote.id)}
                         >
-                          <i className="bi bi-trash"></i>
+                          <div className="d-flex justify-content-between align-items-center">
+                            <div>
+                              <div className="fw-bold">{quote.number}</div>
+                              <small>{new Date(quote.created_at).toLocaleDateString()}</small>
+                            </div>
+                            <div className="text-end">
+                              <div className="fw-bold">R {quote.totals?.total_incl_vat?.toFixed(2) || '0.00'}</div>
+                              <span className="badge bg-success">Accepted</span>
+                            </div>
+                          </div>
                         </button>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="alert alert-warning">No materials added yet.</div>
-        )}
-      </>
-    )}
-  </div>
-</div>
+
+                <button type="button" className="btn btn-sm btn-outline-primary mb-2" onClick={() => setMaterialsOpen(true)}>
+                  + Add products
+                </button>
+
+                {materialLines.length > 0 ? (
+                  <ul className="list-group mb-3">
+                    {materialLines.map((line, index) => (
+                      <li key={index} className="list-group-item">
+                        <div className="form-check mb-2">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id={`material-used-${index}`}
+                            checked={usedMaterials[index] ?? true}
+                            onChange={() => toggleUsed(index)}
+                          />
+                          <label className="form-check-label d-flex justify-content-between w-100" htmlFor={`material-used-${index}`}>
+                            <div>
+                              <span className="fw-semibold">{line.name}</span>
+                              {line.fromQuote && <span className="badge bg-info ms-2">From Quote</span>}
+                            </div>
+                            <span className="text-nowrap">R {line.unit_price.toFixed(2)} × {line.qty}</span>
+                          </label>
+                        </div>
+                        
+                        {usedMaterials[index] && (
+                          <div className="ms-4">
+                            {!line.fromQuote && (
+                              <div className="mb-2">
+                                <div className="row g-2 align-items-center">
+                                  <div className="col-6">
+                                    <div className="input-group input-group-sm">
+                                      <span className="input-group-text">Actual Cost</span>
+                                      <input
+                                        type="number"
+                                        className="form-control"
+                                        value={line.unit_cost}
+                                        onChange={(e) => {
+                                          const newCost = parseFloat(e.target.value) || 0;
+                                          setMaterialLines(prev => 
+                                            prev.map((item, i) => i === index ? {...item, unit_cost: newCost} : item)
+                                          );
+                                        }}
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="col-6">
+                                    <div className="input-group input-group-sm">
+                                      <span className="input-group-text">Price</span>
+                                      <input
+                                        type="number"
+                                        className="form-control"
+                                        value={line.unit_price}
+                                        onChange={(e) => {
+                                          const newPrice = parseFloat(e.target.value) || 0;
+                                          setMaterialLines(prev => 
+                                            prev.map((item, i) => i === index ? {...item, unit_price: newPrice} : item)
+                                          );
+                                        }}
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="mt-2">
+                                  <input
+                                    type="file"
+                                    id={`material-receipt-${index}`}
+                                    className="d-none"
+                                    accept="image/*"
+                                    onChange={(e) => handleFileUpload(index, e.target.files?.[0] || null)}
+                                  />
+                                  <label 
+                                    htmlFor={`material-receipt-${index}`}
+                                    className={`btn btn-sm ${materialFileUploads[index] ? 'btn-success' : 'btn-outline-secondary'}`}
+                                  >
+                                    {materialFileUploads[index] ? 
+                                      <><i className="bi bi-check-circle"></i> Receipt Uploaded</> : 
+                                      <><i className="bi bi-receipt"></i> Upload Receipt (Required)</>
+                                    }
+                                  </label>
+                                  
+                                  {materialFileUploads[index] && (
+                                    <span className="ms-2 text-muted small">
+                                      {materialFileUploads[index]?.name} 
+                                      ({Math.round(materialFileUploads[index]?.size as number / 1024)} KB)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="d-flex justify-content-between align-items-center mt-1">
+                              <div className="input-group input-group-sm" style={{maxWidth: '180px'}}>
+                                <span className="input-group-text">Qty</span>
+                                <input
+                                  type="number"
+                                  className="form-control"
+                                  min="0"
+                                  step="1"
+                                  value={line.qty}
+                                  onChange={(e) => {
+                                    const newQty = Math.max(0, parseInt(e.target.value) || 0);
+                                    setMaterialLines(prev => 
+                                      prev.map((item, i) => i === index ? {...item, qty: newQty} : item)
+                                    );
+                                  }}
+                                />
+                              </div>
+                              
+                              <div>
+                                <span className="fw-bold me-2">Total: R {(line.unit_price * line.qty).toFixed(2)}</span>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-danger"
+                                  onClick={() => {
+                                    setMaterialLines(prev => prev.filter((_, i) => i !== index));
+                                    setUsedMaterials(prev => {
+                                      const newUsed = {...prev};
+                                      delete newUsed[index];
+                                      return newUsed;
+                                    });
+                                    setMaterialFileUploads(prev => {
+                                      const newUploads = {...prev};
+                                      delete newUploads[index];
+                                      return newUploads;
+                                    });
+                                  }}
+                                >
+                                  <i className="bi bi-trash"></i>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="alert alert-warning">No materials added yet.</div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
         <div className="d-flex align-items-center justify-content-between mt-2">
           <h6 className="jcM-section mb-0">COC</h6>
           <div className="form-check form-switch m-0">
@@ -1189,17 +1227,65 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
         </div>
       </section>
 
-      {/* PHOTOS (placeholder on create) */}
       <section className="jcM-card">
-        <h6 className="jcM-section">PHOTOS</h6>
-        <div className="alert alert-warning py-2 mb-2">
-          Save the job card first, then add photos.
-        </div>
+        <h6 className="jcM-section d-flex justify-content-between align-items-center">
+          <span>SITE PHOTOS</span>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-primary"
+            onClick={handleSelectSitePhotos}
+          >
+            + Add
+          </button>
+        </h6>
 
-        <div className="jcM-photoRow">
-          <div className="jcM-photo ph" />
-          <div className="jcM-photo ph" />
-        </div>
+        <input
+          ref={siteFileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="d-none"
+          onChange={handleSiteFilesChange}
+        />
+
+        {sitePhotos.length === 0 && (
+          <div className="alert alert-warning py-2 mb-2">
+            No photos selected. You can add photos now; they will upload after save.
+          </div>
+        )}
+
+        {sitePhotos.length > 0 && (
+          <div className="row g-3">
+            {sitePhotos.map(p => (
+              <div key={p.id} className="col-6 col-md-4">
+                <div className="border rounded position-relative">
+                  <img
+                    src={p.preview}
+                    alt="preview"
+                    style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', borderRadius: '4px 4px 0 0' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger position-absolute"
+                    style={{ top: 4, right: 4 }}
+                    onClick={() => removeSitePhoto(p.id!)}
+                    title="Remove"
+                  >
+                    <i className="bi bi-x" />
+                  </button>
+                  <textarea
+                    className="form-control form-control-sm"
+                    placeholder="Caption (optional)"
+                    style={{ fontSize: '12px', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
+                    rows={2}
+                    value={p.caption}
+                    onChange={e => updateSiteCaption(p.id!, e.target.value)}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Sticky actions */}

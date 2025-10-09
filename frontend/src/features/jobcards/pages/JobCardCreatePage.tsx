@@ -5,6 +5,7 @@ import { createJobCard, createJobCardMaterial, uploadMaterialReceipt,setAuthToke
 import type { JobCardFormValues } from '../schemas';
 import { useAuth } from '../../../AuthContext';
 import { useEffect, useState } from 'react';
+import { API_URL } from '../../../apiConfig';
 
 export default function JobCardCreatePage() {
   const nav = useNavigate();
@@ -20,10 +21,10 @@ export default function JobCardCreatePage() {
     try {
       setIsSubmitting(true);
 
+      const time_entries = materialData?.time_entries || [];
+
       // 1. Create the job card
-      const created= await createJobCard({
-        ...values
-      });
+      const created = await createJobCard({ ...values, time_entries });
 
       // 2. If materials are used, save the material lines
       if (values.materials_used && materialData?.materialLines?.length > 0) {
@@ -56,7 +57,23 @@ export default function JobCardCreatePage() {
         }
       }
 
-      // 3. Navigate to the job card details page
+      // 3. Upload site photos
+      if (materialData?.sitePhotos?.length) {
+        const token = localStorage.getItem('access_token');
+        for (const sp of materialData.sitePhotos) {
+          const fd = new FormData();
+          fd.append('file', sp.file);
+          fd.append('attachement_type', 'site');
+          if (sp.caption.trim()) fd.append('caption', sp.caption.trim());
+          await fetch(`${API_URL}/api/jobcards/${created.id}/attachments`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token || ''}` },
+            body: fd
+          });
+        }
+      }
+
+      // 4. Navigate to the job card details page
       nav(`/jobcards/${created.id}`);
     } catch (error) {
       console.error("Failed to create job card: ", error);

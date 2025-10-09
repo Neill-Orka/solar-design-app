@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { Container, Row, Col, Card, Button, Modal, Badge, Spinner, Alert, Dropdown, Table, InputGroup, ButtonGroup, Form } from 'react-bootstrap';
 import { API_URL } from './apiConfig';
+import { useNotification } from './NotificationContext';
 
 // A compact styled component for key project metrics
 const ProjectStat = ({ icon, label, value, variant = "secondary" }) => (
@@ -15,6 +16,14 @@ const ProjectStat = ({ icon, label, value, variant = "secondary" }) => (
     </div>
   </div>
 );
+
+function formatShortDate(dt) {
+  if (!dt) return '-';
+  const d = new Date(dt);
+  if (isNaN(d)) return '-';
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 
 function Projects() {
   const { user } = useAuth();
@@ -32,6 +41,8 @@ function Projects() {
     systemType: 'all',
     projectType: 'all'
   });
+  const { showNotification } = useNotification();
+
   
   useEffect(() => {
     loadProjects();
@@ -93,6 +104,7 @@ function Projects() {
         setShowDeleteModal(false);
         setProjectToDelete(null);
         loadProjects();
+        showNotification('Project moved to recycle bin', 'info');
       })
       .catch((err) => {
         console.error('Error deleting project:', err);
@@ -146,12 +158,19 @@ function Projects() {
                   </h2>
                   <p className="text-muted mb-0">Manage your solar design projects</p>
                 </div>
+                <div className='d-flex'>
+                {user?.role === 'admin' && (
+                  <Link to="/projects/recycle-bin" className="btn btn-outline-secondary ms-2">
+                    <i className="bi bi-trash"></i>
+                  </Link>
+                )}
                 <Link
                   to="/projects/add"
-                  className="btn btn-primary shadow-sm"
+                  className="btn btn-primary shadow-sm ms-1"
                 >
                   <i className="bi bi-plus-lg me-2"></i>New Project
                 </Link>
+                </div>
               </div>
 
               {/* Search and View Controls */}
@@ -433,6 +452,7 @@ function Projects() {
                             <th>Status</th>
                             <th>Design Type</th>
                             <th>Created</th>
+                            <th>Updated</th>
                             <th className="text-end pe-4">Actions</th>
                           </tr>
                         </thead>
@@ -452,6 +472,16 @@ function Projects() {
                                     by {project.created_by}
                                   </div>
                                 )}
+                              </td>
+                              <td>
+                                {project.updated_at ? (
+                                  <>
+                                    {formatShortDate(project.updated_at)}
+                                    <div className="small text-muted">
+                                      {project.updated_by ? `by ${project.updated_by}` : ''}
+                                    </div>
+                                  </>
+                                ): '-'}
                               </td>
                               <td className="text-end pe-3">
                                 <Link to={`/projects/${project.id}`} className="btn btn-primary btn-sm me-2">

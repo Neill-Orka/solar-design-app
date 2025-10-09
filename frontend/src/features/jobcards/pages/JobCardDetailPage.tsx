@@ -1,4 +1,5 @@
 // src/features/jobcards/pages/JobCardDetailPage.tsx
+// @ts-ignore
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getJobCard, listCategories } from "../api";

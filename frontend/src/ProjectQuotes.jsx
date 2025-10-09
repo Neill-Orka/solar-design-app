@@ -273,7 +273,6 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
               {q.created_by && (
                 <div className='small text-muted'>
                   by {q.created_by.full_name}
-                  {console.log('User info:', q.created_by)}
                 </div>
               )}
             </td>

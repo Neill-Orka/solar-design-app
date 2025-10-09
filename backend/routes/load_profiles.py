@@ -155,5 +155,3 @@ def delete_load_profile(profile_id):
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# Note: The GET route for /load_profiles is already in your projects.py
-# For better organization, you could move it here. If so, remember to remove it from projects.py.
