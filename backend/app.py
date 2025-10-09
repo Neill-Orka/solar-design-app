@@ -40,11 +40,19 @@ from routes.technicians import technicians_bp
 app = Flask(__name__)
 app.config.from_object(Config)
 # Update CORS for production - add your Vercel domain
-CORS(app, origins=["http://localhost:3000", "https://solar-design-app.vercel.app", "http://localhost:5173"], supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
+LAN = "http://192.168.8.181:5173"
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "https://solar-design-app.vercel.app",
+    "http://localhost:5173",
+    LAN
+]
+
+CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
 
 socketio = SocketIO(
     app,
-    cors_allowed_origins=["http://localhost:3000", "https://solar-design-app.vercel.app", "http://localhost:5173"],
+    cors_allowed_origins=ALLOWED_ORIGINS,
     async_mode='eventlet'
 )
 

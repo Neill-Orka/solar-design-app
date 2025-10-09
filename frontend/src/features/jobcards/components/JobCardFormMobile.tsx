@@ -913,65 +913,78 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
         {techOptions.length === 0 && (
           <div className="small text-muted">No technicians loaded.</div>
         )}
-        {techOptions.map(t => (
-          <div key={t.id} className="jcM-hoursRow">
-            <span className="jcM-tech">{t.full_name}</span>
-            <div className="jcM-dotbar">
-              {[0,1,2,3,4,5,6,7,8,9,10].map(n => (
-                <input
-                  key={n}
-                  type="radio"
-                  name={`hours_${t.id}`}
-                  value={n}
-                  className="jcM-dot"
-                  aria-label={`${t.full_name} ${n}h`}
-                  onChange={() => setTechHours(t.id, n)}
-                  checked={techHoursById[t.id] === n && n !== 0}
-                />
-              ))}
+          {/* Hour labels row */}
+          {techOptions.length > 0 && (
+            <div className="jcM-hoursRow">
+              <span className="jcM-tech"></span>
+              <div className="jcM-dotbar">
+                {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                  <div key={n} className="jcM-hourLabel">{n}</div>
+                ))}
+              </div>
+              <div className="jcM-hourSuffix"></div>
             </div>
-            <div style={{ minWidth: 50, textAlign: 'right', fontSize: 12 }}>
-              {techHoursById[t.id] ? `${techHoursById[t.id]}h` : ''}
+          )}
+
+          {techOptions.map(t => (
+            <div key={t.id} className="jcM-hoursRow">
+              <span className="jcM-tech">{t.full_name}</span>
+              <div className="jcM-dotbar">
+                {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                  // Use custom element instead of native radio button for better control
+                  <span
+                    key={n}
+                    className={`jcM-dot ${techHoursById[t.id] === n ? 'jcM-dot-selected' : ''}`}
+                    onClick={() => setTechHours(t.id, n)}
+                    role="radio"
+                    aria-checked={techHoursById[t.id] === n}
+                    aria-label={`${t.full_name} ${n}h`}
+                    tabIndex={0}
+                  ></span>
+                ))}
+              </div>
+              <div className="jcM-hourSuffix">
+                {techHoursById[t.id] ? `${techHoursById[t.id]}h` : ''}
+              </div>
             </div>
-          </div>
-        ))}
-      </section>
+          ))}
+        </section>
 
       {/* LABOUR */}
-      <section className="jcM-card">
-        <h6 className="jcM-section">ASSISTANTS</h6>
-        <div className="jcM-grid3">
-          <div>
-            <label className="jcM-label">People</label>
-            <input
-              type="number"
-              min={0}
-              className="form-control form-control-sm"
-              {...register("labourers_count", { valueAsNumber: true })}
-            />
-          </div>
-          <div>
-            <label className="jcM-label">Hours</label>
-            <input
-              type="number"
-              min={0}
-              step="0.25"
-              className="form-control form-control-sm"
-              {...register("labour_hours", { valueAsNumber: true })}
-            />
-          </div>
-          <div>
-            <label className="jcM-label">Rate / Hour</label>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              className="form-control form-control-sm"
-              {...register("labour_rate_per_hour", { valueAsNumber: true })}
-            />
-          </div>
-        </div>
-      </section>
+      {/*<section className="jcM-card">*/}
+      {/*  <h6 className="jcM-section">ASSISTANTS</h6>*/}
+      {/*  <div className="jcM-grid3">*/}
+      {/*    <div>*/}
+      {/*      <label className="jcM-label">People</label>*/}
+      {/*      <input*/}
+      {/*        type="number"*/}
+      {/*        min={0}*/}
+      {/*        className="form-control form-control-sm"*/}
+      {/*        {...register("labourers_count", { valueAsNumber: true })}*/}
+      {/*      />*/}
+      {/*    </div>*/}
+      {/*    <div>*/}
+      {/*      <label className="jcM-label">Hours</label>*/}
+      {/*      <input*/}
+      {/*        type="number"*/}
+      {/*        min={0}*/}
+      {/*        step="0.25"*/}
+      {/*        className="form-control form-control-sm"*/}
+      {/*        {...register("labour_hours", { valueAsNumber: true })}*/}
+      {/*      />*/}
+      {/*    </div>*/}
+      {/*    <div>*/}
+      {/*      <label className="jcM-label">Rate / Hour</label>*/}
+      {/*      <input*/}
+      {/*        type="number"*/}
+      {/*        min={0}*/}
+      {/*        step="0.01"*/}
+      {/*        className="form-control form-control-sm"*/}
+      {/*        {...register("labour_rate_per_hour", { valueAsNumber: true })}*/}
+      {/*      />*/}
+      {/*    </div>*/}
+      {/*  </div>*/}
+      {/*</section>*/}
 
       {/* TRAVEL */}
       <section className="jcM-card">
@@ -982,7 +995,7 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
         </div>
 
         {didTravel && (
-          <div className="jcM-grid3">
+          <div className="jcM-grid2">
             <div>
               <label className="jcM-label">Vehicle</label>
               <select className="form-select form-select-sm" {...register("vehicle_id", { valueAsNumber: true })}>
@@ -1004,17 +1017,17 @@ export default function JobCardFormMobile({ initial, onSubmit, onCancel }: Props
                 {...register("travel_distance_km", { valueAsNumber: true })}
               />
             </div>
-            <div>
-              <label className="jcM-label">Rate / km</label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                className="form-control form-control-sm"
-                value={selVehicle?.rate_per_km ?? ""}
-                readOnly
-              />
-            </div>
+            {/*<div>*/}
+            {/*  <label className="jcM-label">Rate / km</label>*/}
+            {/*  <input*/}
+            {/*    type="number"*/}
+            {/*    min={0}*/}
+            {/*    step="0.01"*/}
+            {/*    className="form-control form-control-sm"*/}
+            {/*    value={selVehicle?.rate_per_km ?? ""}*/}
+            {/*    readOnly*/}
+            {/*  />*/}
+            {/*</div>*/}
           </div>
         )}
       </section>

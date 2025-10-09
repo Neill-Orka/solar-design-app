@@ -60,6 +60,8 @@ export interface JobCardAttachment {
     caption?: string | null;
 }
 
+export type JobCardReviewStatus = 'pending' | 'approved' | 'needs_fix' | 'declined';
+
 export interface JobCard {
     id: number;
     client_id: number;
@@ -91,6 +93,10 @@ export interface JobCard {
     travel_distance_km: number;
     coc_required: boolean;
     status: JobStatus;
+    bum_status?: JobCardReviewStatus;
+    bum_comment?: string | null;
+    bum_reviewed_at?: string | null;
+    bum_reviewed_by_id?: number | null;
     created_at: string | null;
     updated_at: string | null;
     time_entries?: JobCardTimeEntry[];

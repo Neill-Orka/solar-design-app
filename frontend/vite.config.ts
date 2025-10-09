@@ -20,6 +20,8 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       // Optional: Open the browser on server start
+        port: 5173,
+        host: '0.0.0.0',
       open: true,
       // Optional: Configure proxy for your backend API
       proxy: {

@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify, abort, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 import json
-from models import Document, JobCardMaterial, db, JobCard, Clients, JobCategory, Vehicle, DocumentKind, DocumentStatus, DocumentVersion, Product, User, UserRole, JobCardTimeEntry, TechnicianProfile
+from models import Document, JobCardMaterial, db, JobCard, Clients, JobCategory, Vehicle, DocumentKind, DocumentStatus, DocumentVersion, Product, User, UserRole, JobCardTimeEntry, TechnicianProfile, JobCardReviewStatus
 from werkzeug.utils import secure_filename
 import os
 from routes.auth import log_user_action
@@ -69,6 +69,7 @@ def jobcards_collection():
         travel_distance_km=data.get("travel_distance_km", 0),
         coc_required=data.get("coc_required", False),
         status=data.get("status", "draft"),
+        bum_comment=data.get("bum_comment"),
         created_by_id=int(get_jwt_identity()),
     )
     # snapshot client
@@ -77,6 +78,29 @@ def jobcards_collection():
         jc.client_name_snapshot   = _str255(getattr(client, "client_name", None))
         jc.client_email_snapshot  = _str255(getattr(client, "email", None))
         jc.client_address_snapshot= _str255(getattr(client, "address", None))
+
+    # optional BUM status at creation
+    if "bum_status" in data and data.get("bum_status"):
+        raw = str(data.get("bum_status"))
+        new_stat = None
+        try:
+            new_stat = JobCardReviewStatus(raw)
+        except Exception:
+            # Try normalized variants
+            norm = raw.strip().lower().replace("-", "_").replace(" ", "_")
+            try:
+                new_stat = JobCardReviewStatus(norm)
+            except Exception:
+                new_stat = None
+
+        if new_stat:
+            jc.bum_status = new_stat
+            if new_stat != JobCardReviewStatus.PENDING:
+                current_user_id = int(get_jwt_identity())
+                jc.bum_reviewed_by_id = current_user_id
+                jc.bum_reviewed_at = datetime.now()
+        else: jc.bum_status = JobCardReviewStatus.PENDING
+
 
     db.session.add(jc)
     db.session.commit()
@@ -116,11 +140,35 @@ def jobcards_item(jid: int):
             "title","description","is_quoted","project_id","category_id","start_at","complete_at",
             "labourers_count","labour_hours","labour_rate_per_hour",
             "materials_used","did_travel","vehicle_id","travel_distance_km",
-            "coc_required","status","owner_id", "bum_id"
+            "coc_required","status","owner_id", "bum_id",
+            "bum_comment"
         ]:
             if f in data:
                 val = _parse_dt(data[f]) if f in ("start_at","complete_at") else data[f]
                 setattr(jc, f, val)
+
+        # Handle BUM status update (only BUMs or admins)
+        if "bum_status" in data:
+            current_user_id = int(get_jwt_identity())
+            user = User.query.get(current_user_id)
+            if not user or (not user.is_bum and user.role != UserRole.ADMIN):
+                return jsonify({"error": "Only BUMs or administrators can set bum_status"}), 403
+
+            raw = str(data.get("bum_status"))
+            try:
+                # Accept enum value first
+                new_status = JobCardReviewStatus(raw)
+            except Exception:
+                try:
+                    # Accept ENUM name ("APPROVED")
+                    new_status = JobCardReviewStatus[raw.upper()]
+                except Exception:
+                    return jsonify({"error": f"Invalid bum_status {raw}"}), 400
+
+            jc.bum_status = new_status
+            jc.bum_reviewed_by_id = current_user_id
+            jc.bum_reviewed_at = datetime.now()
+
         db.session.commit()
         return jsonify(jc.to_dict())
 
@@ -129,7 +177,7 @@ def jobcards_item(jid: int):
         current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
 
-        # Check if user is admin
+        # Check if the user is admin
         if not user or user.role != UserRole.ADMIN:
             return jsonify({"error": "Only administrators can delete job cards"}), 403
         
