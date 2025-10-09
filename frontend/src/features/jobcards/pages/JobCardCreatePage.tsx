@@ -24,7 +24,7 @@ export default function JobCardCreatePage() {
       const time_entries = materialData?.time_entries || [];
 
       // 1. Create the job card
-      const created = await createJobCard({ ...values, time_entries });
+      const created = await createJobCard(values);
 
       // 2. If materials are used, save the material lines
       if (values.materials_used && materialData?.materialLines?.length > 0) {

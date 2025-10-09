@@ -868,6 +868,13 @@ class DocumentEvent(db.Model):
 # Job Cards models
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Review status for BUM decisions on Job Cards
+class JobCardReviewStatus(Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    NEEDS_FIX = "needs_fix"
+    DECLINED = "declined"
+
 class TechnicianProfile(db.Model):
     __tablename__ = "technician_profiles"
     id = db.Column(db.Integer, primary_key=True)
@@ -958,6 +965,22 @@ class JobCard(db.Model):
     status = db.Column(db.String(20), default="open")
     metadata_json = db.Column(JSONB, nullable=True)
 
+    # BUM review state
+    bum_status = db.Column(
+        SAEnum(
+            JobCardReviewStatus,
+            name="jobcardreviewstatus",
+            values_callable=lambda e: [m.value for m in e],
+            native_enum=True,
+            validate_strings=True,
+        ),
+        nullable=False,
+        default=JobCardReviewStatus.PENDING,
+    )
+    bum_comment = db.Column(db.Text, nullable=True)
+    bum_reviewed_at = db.Column(db.DateTime, nullable=True)
+    bum_reviewed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
     # Audit
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -969,6 +992,7 @@ class JobCard(db.Model):
     category = db.relationship("JobCategory")
     vehicle = db.relationship("Vehicle")
     bum = db.relationship("User", foreign_keys=[bum_id])
+    bum_reviewed_by = db.relationship("User", foreign_keys=[bum_reviewed_by_id])
 
     time_entries = db.relationship(
         "JobCardTimeEntry", backref="job_card", cascade="all, delete-orphan", lazy=True
@@ -1010,6 +1034,10 @@ class JobCard(db.Model):
             "travel_distance_km": float(self.travel_distance_km or 0),
             "coc_required": bool(self.coc_required),
             "status": self.status,
+            "bum_status": self.bum_status.value if self.bum_status else JobCardReviewStatus.PENDING.value,
+            "bum_comment": self.bum_comment,
+            "bum_reviewed_at": self.bum_reviewed_at.isoformat() if self.bum_reviewed_at else None,
+            "bum_reviewed_by_id": self.bum_reviewed_by_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

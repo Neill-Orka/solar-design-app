@@ -70,8 +70,12 @@ http.interceptors.response.use(
     }
 );
 
-export async function listJobCards(): Promise<JobCard[]> {
-    const { data } = await http.get('/jobcards');
+export async function listJobCards(params?: {
+    scope?: 'mine' | 'bum' | 'all';
+    status?: string;
+    q?: string;
+}): Promise<JobCard[]> {
+    const { data } = await http.get('/jobcards', { params });
     return data;
 }
 

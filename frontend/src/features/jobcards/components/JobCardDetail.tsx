@@ -5,7 +5,9 @@
 import React , {useEffect, useState} from "react";
 import { useNavigate } from "react-router-dom";
 import type {JobCard, Vehicle} from "../types";
+// @ts-ignore
 import { API_URL } from "../../../apiConfig";
+// @ts-ignore
 import { useAuth } from '../../../AuthContext';
 import { deleteJobCard } from "../api";
 import "./jobcard-detail.css";
@@ -42,6 +44,9 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
   const [attachments, setAttachments] = useState<any[]>(() => (job as any).attachments || []);
   const [resolvedVehicle, setResolvedVehicle] = useState<Vehicle | any>(null);
   const [heroIndex, setHeroIndex] = useState(0);
+
+  const isBumOnThis: boolean = user?.id && job.bum_id === user.id;
+  const isOwner: boolean = user?.id && job.owner_id === user.id;
   
   useEffect(() => {
     setAttachments((job as any).attachments || []);
@@ -58,13 +63,8 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
     (job as any).client?.address?.street ||
     "Location";
 
-  const assistantsCount = Number(job.labourers_count) || 0;
-  const assistantHours = Number(job.labour_hours) || 0;
-  const assistantRate = Number(job.labour_rate_per_hour) || 0;
-  const assistantTotalCost = (assistantsCount * assistantHours * assistantRate);
-
   // Vehicle / Travel
-  const didTravel = !!job.did_travel;
+  const didTravel = job.did_travel;
   const vehicleName = job.vehicle_name || (resolvedVehicle && resolvedVehicle.name) || null;
   const vehicleReg = job.vehicle_registration || (resolvedVehicle && resolvedVehicle.vehicle_registration) || "";
 
@@ -265,35 +265,6 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
         </div>
       )}
 
-      {/* Labour */}
-      {/*{(assistantsCount > 0 || assistantHours > 0 || assistantTotalCost) && (*/}
-      {/*  <div className="jcD-card">*/}
-      {/*    <div className="jcD-card-title">Labour</div>*/}
-      {/*    <div className="jcD-card-body">*/}
-      {/*      <div className="jcD-labour-grid">*/}
-      {/*        <div className="jcD-labour-item">*/}
-      {/*          <div className="jcD-labour-label">Assistants</div>*/}
-      {/*          <div className="jcD-labour-value">*/}
-      {/*            {assistantsCount > 0 ? assistantsCount : "—"}*/}
-      {/*          </div>*/}
-      {/*        </div>*/}
-      {/*        <div className="jcD-labour-item">*/}
-      {/*          <div className="jcD-labour-label">Hours Worked</div>*/}
-      {/*          <div className="jcD-labour-value">*/}
-      {/*            {assistantHours > 0 ? assistantHours : "—"}*/}
-      {/*          </div>*/}
-      {/*        </div>*/}
-      {/*        <div className="jcD-labour-item">*/}
-      {/*          <div className="jcD-labour-label">Total Cost</div>*/}
-      {/*          <div className="jcD-labour-value">*/}
-      {/*            {formatCurrency(Number(assistantTotalCost))}*/}
-      {/*          </div>*/}
-      {/*        </div>*/}
-      {/*      </div>*/}
-      {/*    </div>*/}
-      {/*  </div>*/}
-      {/*)}*/}
-
       {/* Vehicles */}
       {(didTravel || vehicleName || travelKm > 0) && (
         <div className="jcD-card">
@@ -322,12 +293,6 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
                   ) : (
                     "—"
                   )}
-                  {/*{travelRate > 0 && travelKm > 0 && (*/}
-                  {/*  <span className="jcD-veh-sub">*/}
-                  {/*    /!* show rate subtly without emphasising *!/*/}
-                  {/*    at {travelRate.toFixed(2)}/km*/}
-                  {/*  </span>*/}
-                  {/*)}*/}
                 </div>
               </div>
               <div className="jcD-veh-item">
@@ -503,6 +468,28 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
           )}
         </div>
       </div>
+
+        {isBumOnThis && (
+          <>
+            <button className="btn btn-sm btn-success" onClick={async () => {
+              const c = prompt('Approval comment (optional)');
+              await approveJobCard(job.id, c || undefined);
+              nav(0);
+            }}>Approve</button>
+            <button className="btn btn-sm btn-outline-danger ms-2" onClick={async () => {
+              const c = prompt('Why declining? (required)') || '';
+              if (!c.trim()) return;
+              await declineJobCard(job.id, c);
+              nav(0);
+            }}>Decline</button>
+          </>
+        )}
+        {(isOwner || isBumOnThis) && job.status !== 'completed' && (
+          <button className="btn btn-sm btn-dark ms-2" onClick={async () => {
+            await closeJobCard(job.id);
+            nav(0);
+          }}>Close</button>
+        )}
 
       {/* Delete Confirmation Model */}
       {showDeleteConfirm && (

@@ -32,6 +32,7 @@ import PrintableBOM from './PrintableBOM';
 import JobCardsPage from './features/jobcards/pages/JobCardsPage';
 import JobCardCreatePage from './features/jobcards/pages/JobCardCreatePage';
 import JobCardDetailPage from './features/jobcards/pages/JobCardDetailPage';
+import JobCardEditPage from './features/jobcards/pages/JobCardEditPage';
 import PageTransition from './features/jobcards/components/PageTransition';
 import RecycleBin from './RecycleBin';
 import ProjectRecycleBin from './ProjectRecycleBin';
@@ -255,11 +256,11 @@ function AuthenticatedApp() {
               </PageTransition>
             } />
 
-            {/* <Route path="/jobcards/:id/edit" element={
+            <Route path="/jobcards/:id/edit" element={
               <ProtectedRoute requiredRole={["admin", "manager", "team_leader"]}>
                 <JobCardEditPage />
               </ProtectedRoute>
-            } />             */}
+            } />
 
             {/* Admin only routes */}
             <Route path="/admin" element={

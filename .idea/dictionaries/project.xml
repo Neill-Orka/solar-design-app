@@ -3,6 +3,7 @@
     <words>
       <w>fname</w>
       <w>jobcard</w>
+      <w>jobcardreviewstatus</w>
       <w>jobcards</w>
     </words>
   </dictionary>
