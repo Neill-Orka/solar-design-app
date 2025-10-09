@@ -252,6 +252,7 @@ class Projects(db.Model):
     deleted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     deleted_by = db.relationship('User', foreign_keys=[deleted_by_id])
     is_deleted = db.Column(db.Boolean, default=False)
+    generator_config = db.Column(JSONB, nullable=True)
 
     energy_data = db.relationship('EnergyData', backref='project', lazy=True, cascade="all, delete-orphan")
     quick_design_entry = db.relationship('QuickDesignData', backref='project', uselist=False, lazy=True, cascade="all, delete-orphan")

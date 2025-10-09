@@ -123,7 +123,7 @@ function ExecutiveSummary({ data, settings, pageNumber = 1, totalPages = 24 }) {
           {project.name} - 
           {project.inverter_brand_model ? ` ${project.inverter_brand_model} ` : " "}
           {displayValue(project.inverter_kva, "0", "inverter_kva")} kVA
-          {Number(displayValue(project.battery_kwh, "0", "battery_kwh")) > 0 && `& ${displayValue(project.battery_nominal_rating, "0", "battery_kwh")} kWh`}
+          {Number(displayValue(project.battery_kwh, "0", "battery_kwh")) > 0 && ` & ${displayValue(project.battery_nominal_rating, "0", "battery_kwh")} kWh`}
         </div>
         <img className="orka-summary-logo" src={logo} alt="Orka Solar Logo" />
       </div>

@@ -707,7 +707,20 @@ const interpolateFuelConsumption = (lphData, loadFactor) => {
     return lphData[1.00] * loadFactor;
 };
 
+const LoadingOverlay = ({ show, message }) => {
+    if (!show) return null;
 
+    return (
+        <div className="loading-overlay">
+        <div className="loading-spinner-container">
+            <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+            </div>
+            <p className="mt-3 text-white">{message || 'Processing simulation...'}</p>
+        </div>
+        </div>
+    );
+};
 
 function SystemDesign({ projectId }) {
     const simulateButtonRef = useRef(null);
@@ -716,7 +729,12 @@ function SystemDesign({ projectId }) {
 
     // UI Control State
     const [loading, setLoading] = useState(false);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+    const [loadingProject, setLoadingProect] = useState(false);
+
     const [simulationData, setSimulationData] = useState(null);
+    const [simulationLoading, setSimulationLoading] = useState(false);
+
     const [startDate, setStartDate] = useState(null); // Changed to null like QuickResults
     const [endDate, setEndDate] = useState(null); // Changed to null like QuickResults
     const [showLosses, setShowLosses] = useState(false);
@@ -730,11 +748,18 @@ function SystemDesign({ projectId }) {
 
     const [designMode, setDesignMode] = useState('custom');
     const [systemTemplates, setSystemTemplates] = useState([]);
-    const [loadingTemplates, setLoadingTemplates] = useState(true);
+    const [loadingTemplates, setLoadingTemplates] = useState(false);
     const [tempStartDate, setTempStartDate] = useState('');
     const [tempEndDate, setTempEndDate] = useState('');
 
     const { showNotification } = useNotification();
+
+    const isLoading = 
+        loading || 
+        loadingProducts || 
+        loadingProject || 
+        simulationLoading || 
+        (designMode === 'standard' && loadingTemplates);
 
     // The single, unified state object for the entire design
     // Load generator settings synchronously from sessionStorage in the initializer
@@ -827,24 +852,26 @@ function SystemDesign({ projectId }) {
 
     // Effect to fetch all system templates
     useEffect(() => {
-        if (designMode === 'standard') {
-            setLoadingTemplates(true);
-            axios.get(`${API_URL}/api/system_templates`)
-                .then(res => {
-                    setSystemTemplates(res.data);
-                    setLoadingTemplates(false);
-                })
-                .catch(err => {
-                    console.error("Error fetching system templates:", err);
-                    showNotification("Failed to load standard designs.", 'danger');
-                    setLoadingTemplates(false);
-                });
-        }
-    }, [designMode, showNotification]); // Only runs when designMode changes
+    if (designMode !== 'standard') {
+        setLoadingTemplates(false); // <- important: make sure it's off in custom mode
+        return;
+    }
+    setLoadingTemplates(true);
+    axios.get(`${API_URL}/api/system_templates`)
+        .then(res => {
+        setSystemTemplates(res.data);
+        })
+        .catch(err => {
+        console.error("Error fetching system templates:", err);
+        showNotification("Failed to load standard designs.", 'danger');
+        })
+        .finally(() => setLoadingTemplates(false));
+    }, [designMode, showNotification]);
 
     // Effect to fetch all product lists once
     useEffect(() => {
         const fetchAllProducts = async () => {
+            setLoadingProducts(true);
             try {
                 // Fetch all product categories in parallel for efficiency
                 const [panelsRes, invertersRes, batteriesRes] = await Promise.all([
@@ -859,7 +886,10 @@ function SystemDesign({ projectId }) {
                 });
             } catch (err) {
                 showNotification('Failed to load product lists.', 'danger');
+            } finally {
+                setLoadingProducts(false);
             }
+
         };
         fetchAllProducts();
     }, [showNotification]); // The dependency array is empty so it only runs once
@@ -934,6 +964,8 @@ function SystemDesign({ projectId }) {
     useEffect(() => {
         // Wait until we have products before trying to match them
         if (!projectId || products.inverters.length === 0) return;
+
+        setLoading(true);
         
         // Check for core components from quote first
         const coreComponentsKey = `quoteLoadCoreComponents_${projectId}`;
@@ -999,11 +1031,11 @@ function SystemDesign({ projectId }) {
                     }));
                     
                     // Set quote info when loading from quote
-                    setLoadedFromQuote(true);
                     setQuoteInfo({
                         name: coreComponents.quote_name || 'Quote Components',
                         number: coreComponents.quote_number || 'Unknown'
                     });
+                    setLoadedFromQuote(true);
                     
                     // Clear standard template state since we're now using quote components
                     setUsingStandardTemplate(false);
@@ -1018,6 +1050,8 @@ function SystemDesign({ projectId }) {
             } catch (error) {
                 console.error('Failed to parse core components data:', error);
                 sessionStorage.removeItem(coreComponentsKey);
+            } finally {
+                setLoading(false);
             }
             
             // Don't continue with normal project loading if we used core components
@@ -1025,7 +1059,8 @@ function SystemDesign({ projectId }) {
         }
         
         // Normal project data loading (only if no core components from quote)
-        axios.get(`${API_URL}/api/projects/${projectId}`).then(res => {
+        axios.get(`${API_URL}/api/projects/${projectId}`)
+        .then(res => {
             const p = res.data;
             if (!p) return;
 
@@ -1040,13 +1075,13 @@ function SystemDesign({ projectId }) {
             }
 
             // Check for core components from quote first - if present, skip normal project loading
-        const coreComponentsKey = `quoteLoadCoreComponents_${projectId}`;
-        const coreComponentsData = sessionStorage.getItem(coreComponentsKey);
-        
-        if (coreComponentsData) {
-            // Core components will be handled by the other effect, skip normal project loading
-            return;
-        }
+            const coreComponentsKey = `quoteLoadCoreComponents_${projectId}`;
+            const coreComponentsData = sessionStorage.getItem(coreComponentsKey);
+            
+            if (coreComponentsData) {
+                // Core components will be handled by the other effect, skip normal project loading
+                return;
+            }
             const savedKw = p.panel_kw || '';
             const defaultPanelId = p.panel_id;
             const currentPanel = defaultPanelId ?
@@ -1084,6 +1119,35 @@ function SystemDesign({ projectId }) {
                 allowExport: p.allow_export || false,
                 batterySocLimit: p.battery_soc_limit || 20,
             }));
+
+            console.log("API RESPONSE: ", res.data);
+            console.log("GENERATOR CONFIG: ", res.data.generator_config);
+
+            // add generator settings if it exists
+            if (res.data.generator_config) {
+                const gen = res.data.generator_config;
+                setDesign(prevDesign => ({
+                    ...prevDesign,
+                    generatorEnabled: gen.enabled || false,
+                    generatorKva: gen.kva || 50,
+                    generatorMinLoading: gen.min_loading_pct || 25,
+                    generatorChargeBattery: gen.can_charge_battery !== undefined ? gen.can_charge_battery : true,
+                    generatorMinRunTime: gen.min_run_time_hours || 0,
+                    generatorBatteryStartSoc: gen.battery_start_soc || 20,
+                    generatorBatteryStopSoc: gen.battery_stop_soc || 100,
+                    generatorServiceCost: gen.service_cost || 1000,
+                    generatorServiceInterval: gen.service_interval_hours || 1000,
+                    dieselPrice: gen.diesel_price_r_per_liter || 20.4
+                }))
+            }
+
+        })
+        .catch(err => {
+            console.error("Error loading project: ", err);
+            showNotification('Error loading project data', 'danger');
+        })
+        .finally(() => {
+            setLoading(false);
         });
     }, [projectId, products]); // Reruns if projectId or the loaded products change
 
@@ -1837,7 +1901,7 @@ function SystemDesign({ projectId }) {
     const [quoteInfo, setQuoteInfo] = useState(null);
 
     const handleSimulate = () => {
-        setLoading(true);
+        setSimulationLoading(true);
         
         // If we're modifying a standard design, we should indicate that
         if (usingStandardTemplate) {
@@ -1864,9 +1928,24 @@ function SystemDesign({ projectId }) {
                     capacity: design.selectedBattery.product.capacity_kwh,
                     quantity: design.batteryQuantity
                 } : null,
+                battery_soc_limit: design.batterySocLimit,
+
+                // Adding generator to the payload
+                generator_config: design.generatorEnabled ? {
+                    enabled: design.generatorEnabled,
+                    kva: design.generatorKva,
+                    min_loading_pct: design.generatorMinLoading,
+                    can_charge_battery: design.generatorChargeBattery,
+                    min_run_time_hours: design.generatorMinRunTime,
+                    battery_start_soc: design.generatorBatteryStartSoc,
+                    battery_stop_soc: design.generatorBatteryStopSoc,
+                    service_cost: design.generatorServiceCost,
+                    service_interval_hours: design.generatorServiceInterval,
+                    diesel_price_r_per_liter: design.dieselPrice
+                } : null,
+
                 use_pvgis: usePvgis,
                 generation_profile_name: profileName,
-                battery_soc_limit: design.batterySocLimit,
                 inverter_ids: design.selectedInverter ? [design.selectedInverter.product.id] : [],
                 battery_ids: design.systemType !== 'grid' && design.selectedBattery ? [design.selectedBattery.product.id] : [],
 
@@ -1925,8 +2004,6 @@ function SystemDesign({ projectId }) {
 
                 try {
                     sessionStorage.setItem(`simulationData_${projectId}`, JSON.stringify(res.data));
-                    console.log('Simulation Data: ', res.data);
-                    console.log('Cached simulation data:', projectId);
                 } catch (err) {
                     console.error('Failed to cache simulation data:', err);
                 }
@@ -1937,7 +2014,7 @@ function SystemDesign({ projectId }) {
                 const errorMsg = err.response?.data?.error || 'Failed to save system or run simulation.';
                 showNotification(errorMsg, 'danger');
             })
-            .finally(() => setLoading(false));
+            .finally(() => setSimulationLoading(false));
     };
 
     // --- Piece 3: Data Filtering & Metrics Calculation ---
@@ -2098,6 +2175,10 @@ function SystemDesign({ projectId }) {
     // The main return statement that renders the component UI
     return (
         <>
+            <LoadingOverlay 
+                show={isLoading}
+                message={simulationLoading ? 'Running simulation...' : 'Loading data...'}
+            />
             <div className='mb-4'>
                 <Card className='shadow-sm border-0'>
                     <Card.Body>
@@ -2206,9 +2287,13 @@ function SystemDesign({ projectId }) {
             {/* --- Action Buttons --- */}
             <div className="row g-3 my-4">
                 <div className="col-12 d-flex gap-2">
-                    <Button variant="primary" onClick={handleSimulate} disabled={loading} >
-                        {loading ? <Spinner as="span" animation="border" size="sm" className="me-2" /> : <i className="bi bi-play-fill me-2"></i>}
-                        {loading ? 'Simulating…' : 'Simulate'}
+                    <Button variant="primary" onClick={handleSimulate} disabled={isLoading}>
+                    {simulationLoading ? (
+                        <Spinner as="span" animation="border" size="sm" className="me-2" />
+                    ) : (
+                        <i className="bi bi-play-fill me-2"></i>
+                    )}
+                    {simulationLoading ? 'Simulating…' : 'Simulate'}
                     </Button>
                 </div>
             </div>
