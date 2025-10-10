@@ -19,3 +19,5 @@ backend/DEPLOYMENT.md
 backend/uploads/
 ~$Generator_Simulation.xlsx
 Generator_Simulation.xlsx
+/backend/.env.development
+/backend/.env.production
