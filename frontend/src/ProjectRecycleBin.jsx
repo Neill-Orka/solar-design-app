@@ -1,26 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { Table, Button, Alert, Spinner, Badge, Modal } from 'react-bootstrap';
-import { API_URL } from './apiConfig';
-import { useAuth } from './AuthContext';
+import React, { useEffect, useState } from "react";
+import { Table, Button, Alert, Spinner, Badge, Modal } from "react-bootstrap";
+import { API_URL } from "./apiConfig";
+import { useAuth } from "./AuthContext";
 
 const ProjectRecycleBin = () => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === "admin";
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [confirmPermanent, setConfirmPermanent] = useState(false);
   const [selected, setSelected] = useState(null);
 
   const loadDeleted = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem("access_token");
       const res = await fetch(`${API_URL}/api/projects/recyclebin`, {
-        headers: { Authorization: `Bearer ${token || ''}` }
+        headers: { Authorization: `Bearer ${token || ""}` },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
+      if (!res.ok) throw new Error(data.error || "Failed");
       setRows(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e.message);
@@ -35,15 +35,15 @@ const ProjectRecycleBin = () => {
   }, [isAdmin]);
 
   const restore = async (id) => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem("access_token");
     try {
       const res = await fetch(`${API_URL}/api/projects/${id}/restore`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token || ''}` }
+        method: "POST",
+        headers: { Authorization: `Bearer ${token || ""}` },
       });
       if (!res.ok) {
-        const j = await res.json().catch(()=>({}));
-        throw new Error(j.error || 'Restore failed');
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Restore failed");
       }
       await loadDeleted();
     } catch (e) {
@@ -53,14 +53,17 @@ const ProjectRecycleBin = () => {
 
   const permanentDelete = async () => {
     if (!selected) return;
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem("access_token");
     try {
-      const res = await fetch(`${API_URL}/api/projects/${selected.id}/permanent`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token || ''}` }
-      });
-      const j = await res.json().catch(()=>({}));
-      if (!res.ok) throw new Error(j.error || 'Delete failed');
+      const res = await fetch(
+        `${API_URL}/api/projects/${selected.id}/permanent`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token || ""}` },
+        }
+      );
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || "Delete failed");
       setConfirmPermanent(false);
       setSelected(null);
       await loadDeleted();
@@ -70,7 +73,11 @@ const ProjectRecycleBin = () => {
   };
 
   if (!isAdmin) {
-    return <Alert variant="danger" className="m-4">Access denied.</Alert>;
+    return (
+      <Alert variant="danger" className="m-4">
+        Access denied.
+      </Alert>
+    );
   }
 
   return (
@@ -80,7 +87,10 @@ const ProjectRecycleBin = () => {
           <i className="bi bi-trash"></i> Project Recycle Bin
         </h2>
         <div>
-          <Button variant="outline-secondary" onClick={() => window.history.back()}>
+          <Button
+            variant="outline-secondary"
+            onClick={() => window.history.back()}
+          >
             <i className="bi bi-arrow-left"></i> Back
           </Button>
         </div>
@@ -109,20 +119,22 @@ const ProjectRecycleBin = () => {
             </tr>
           </thead>
           <tbody>
-            {rows.map(p => (
+            {rows.map((p) => (
               <tr key={p.id}>
                 <td>{p.id}</td>
                 <td>{p.name}</td>
                 <td>{p.client_name}</td>
                 <td>
-                  <Badge bg="info">{p.system_type || '—'}</Badge>
+                  <Badge bg="info">{p.system_type || "—"}</Badge>
                 </td>
                 <td>
-                  <Badge bg="secondary">{p.design_type || '—'}</Badge>
+                  <Badge bg="secondary">{p.design_type || "—"}</Badge>
                 </td>
-                <td>{p.location || '—'}</td>
-                <td>{p.deleted_at ? new Date(p.deleted_at).toLocaleString() : '—'}</td>
-                <td>{p.deleted_by_name || '—'}</td>
+                <td>{p.location || "—"}</td>
+                <td>
+                  {p.deleted_at ? new Date(p.deleted_at).toLocaleString() : "—"}
+                </td>
+                <td>{p.deleted_by_name || "—"}</td>
                 <td>
                   <Button
                     variant="success"
@@ -135,8 +147,10 @@ const ProjectRecycleBin = () => {
                   <Button
                     variant="danger"
                     size="sm"
-                    onClick={() => { setSelected(p); setConfirmPermanent(true); }}
-                    disabled /* enable only if you truly allow permanent removal */
+                    onClick={() => {
+                      setSelected(p);
+                      setConfirmPermanent(true);
+                    }}
                   >
                     <i className="bi bi-trash"></i> Permanent
                   </Button>
@@ -154,14 +168,21 @@ const ProjectRecycleBin = () => {
         <Modal.Body>
           {selected && (
             <p>
-              Permanently delete project <strong>{selected.name}</strong>?<br/>
+              Permanently delete project <strong>{selected.name}</strong>?<br />
               This cannot be undone.
             </p>
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setConfirmPermanent(false)}>Cancel</Button>
-          <Button variant="danger" onClick={permanentDelete}>Delete Forever</Button>
+          <Button
+            variant="secondary"
+            onClick={() => setConfirmPermanent(false)}
+          >
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={permanentDelete}>
+            Delete Forever
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>
