@@ -3,6 +3,7 @@ from datetime import datetime
 
 from flask import Blueprint, request, jsonify
 from models import (
+    SA_TZ,
     Document,
     db,
     Projects,
@@ -28,7 +29,7 @@ def mark_project_activity(project_id: int, user_id: int | None):
     proj = Projects.query.get(project_id)
     if not proj:
         return
-    proj.updated_at = datetime.now()
+    proj.updated_at = datetime.now(SA_TZ)
     if user_id:
         proj.updated_by_id = user_id
     db.session.add(proj)
