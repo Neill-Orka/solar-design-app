@@ -60,7 +60,7 @@ export interface JobCardAttachment {
     caption?: string | null;
 }
 
-export type JobCardReviewStatus = 'pending' | 'approved' | 'needs_fix' | 'declined';
+export type JobCardReviewStatus = 'open' | 'submitted' | 'invoiced' | 'completed';
 
 export interface JobCard {
     id: number;

@@ -21,3 +21,4 @@ backend/uploads/
 Generator_Simulation.xlsx
 /backend/.env.development
 /backend/.env.production
+.idea

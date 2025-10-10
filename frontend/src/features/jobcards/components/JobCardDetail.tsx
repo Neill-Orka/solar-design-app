@@ -9,7 +9,7 @@ import type {JobCard, Vehicle} from "../types";
 import { API_URL } from "../../../apiConfig";
 // @ts-ignore
 import { useAuth } from '../../../AuthContext';
-import { deleteJobCard } from "../api";
+import { deleteJobCard, approveJobCard, declineJobCard } from "../api";
 import "./jobcard-detail.css";
 
 type Props = {
@@ -44,6 +44,32 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
   const [attachments, setAttachments] = useState<any[]>(() => (job as any).attachments || []);
   const [resolvedVehicle, setResolvedVehicle] = useState<Vehicle | any>(null);
   const [heroIndex, setHeroIndex] = useState(0);
+
+  // Approve Jobcard Modal
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approveLoading, setApproveLoading] = useState(false);
+  const [approveComment, setApproveComment] = useState("");
+  const [approveWithInvoice, setApproveWithInvoice] = useState<boolean | null>(true);
+
+  // helper submit
+  async function handleApproveSubmit() {
+      if (approveWithInvoice === null) return; // require a choice
+      try {
+          setApproveLoading(true);
+          await approveJobCard(job.id, {
+              invoice: approveWithInvoice,
+              comment: approveComment?.trim() || undefined,
+          });
+
+          // NAVIGATE TO APPROPRIATE TABS HERE
+          nav('/jobcards', { replace: true });
+      } finally {
+          setApproveLoading(false);
+          setShowApproveModal(false);
+          setApproveComment('');
+          setApproveWithInvoice(null);
+      }
+  }
 
   const isBumOnThis: boolean = user?.id && job.bum_id === user.id;
   const isOwner: boolean = user?.id && job.owner_id === user.id;
@@ -471,17 +497,24 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
 
         {isBumOnThis && (
           <>
-            <button className="btn btn-sm btn-success" onClick={async () => {
-              const c = prompt('Approval comment (optional)');
-              await approveJobCard(job.id, c || undefined);
-              nav(0);
-            }}>Approve</button>
-            <button className="btn btn-sm btn-outline-danger ms-2" onClick={async () => {
-              const c = prompt('Why declining? (required)') || '';
-              if (!c.trim()) return;
-              await declineJobCard(job.id, c);
-              nav(0);
-            }}>Decline</button>
+            <button
+                className="btn btn-sm btn-success"
+                onClick={() => setShowApproveModal(true)}
+            >
+                Approve
+            </button>
+
+            <button
+                className="btn btn-sm btn-outline-danger ms-2"
+                onClick={async () => {
+                    const c = prompt("Enter reason for declining (required)") || '';
+                    if (!c.trim()) return;
+                    await declineJobCard(job.id, c);
+                    nav('/jobcards', { replace: true });
+                }}
+            >
+                Decline
+            </button>
           </>
         )}
         {(isOwner || isBumOnThis) && job.status !== 'completed' && (
@@ -489,6 +522,75 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
             await closeJobCard(job.id);
             nav(0);
           }}>Close</button>
+        )}
+
+      {/*  Approve Modal  */}
+        {showApproveModal && (
+          <div className="jcD-modal-overlay" role="dialog" aria-modal="true">
+            <div className="jcD-modal-content jcD-approve-modal">
+              <div className="jcD-modal-header">
+                <h3>Approve Job Card</h3>
+                <button
+                  type="button"
+                  className="jcD-modal-close"
+                  onClick={() => setShowApproveModal(false)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+
+              <p className="jcD-modal-lead">Choose how you want to proceed:</p>
+
+              <div className="jcD-choice-grid">
+                <button
+                  type="button"
+                  className={`jcD-choice ${approveWithInvoice === true ? 'selected' : ''}`}
+                  onClick={() => setApproveWithInvoice(true)}
+                >
+                  <div className="jcD-choice-title">Approve & Create Invoice</div>
+                  <div className="jcD-choice-desc">Marks as <strong>Invoiced</strong> and proceeds to billing.</div>
+                </button>
+
+                <button
+                  type="button"
+                  className={`jcD-choice ${approveWithInvoice === false ? 'selected' : ''}`}
+                  onClick={() => setApproveWithInvoice(false)}
+                >
+                  <div className="jcD-choice-title">Approve (no invoice)</div>
+                  <div className="jcD-choice-desc">Marks as <strong>Completed</strong> without creating an invoice.</div>
+                </button>
+              </div>
+
+              <label className="jcD-field">
+                <div className="jcD-field-label">Comment (optional)</div>
+                <textarea
+                  className="jcD-textarea"
+                  rows={3}
+                  placeholder="Add a note for this approval"
+                  value={approveComment}
+                  onChange={(e) => setApproveComment(e.target.value)}
+                />
+              </label>
+
+              <div className="jcD-modal-actions">
+                <button
+                  className="jcD-modal-cancel-btn"
+                  onClick={() => setShowApproveModal(false)}
+                  disabled={approveLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="jcD-modal-primary-btn"
+                  onClick={handleApproveSubmit}
+                  disabled={approveLoading || approveWithInvoice === null}
+                >
+                  {approveLoading ? 'Saving...' : approveWithInvoice === true ? 'Approve & Invoice' : 'Approve'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
       {/* Delete Confirmation Model */}

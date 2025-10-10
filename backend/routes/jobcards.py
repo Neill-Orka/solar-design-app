@@ -7,6 +7,7 @@ from models import Document, JobCardMaterial, db, JobCard, Clients, JobCategory,
 from werkzeug.utils import secure_filename
 import os
 from routes.auth import log_user_action
+from sqlalchemy.orm import aliased
 
 jobcards_bp = Blueprint("jobcards", __name__)
 
@@ -45,7 +46,45 @@ def _preflight():
 @jwt_required()
 def jobcards_collection():
     if request.method == "GET":
-        rows = JobCard.query.order_by(JobCard.created_at.desc()).all()
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
+
+        scope = (request.args.get("scope") or "").strip().lower() or None
+        status = (request.args.get("status") or "").strip().lower() or None
+        q = (request.args.get("q") or "").strip()
+
+        qry = JobCard.query
+
+        # Join the owner to allow filtering by technician name (an owner is the technician)
+        Owner = aliased(User)
+        qry = qry.join(Owner, JobCard.owner_id == Owner.id)
+
+        # Hard security: technician users see only their own job cards
+        if user and (not getattr(user, "is_bum", False)) and user.role not in (UserRole.ADMIN,):
+            qry = qry.filter(JobCard.owner_id == current_user_id)
+        else:
+            # BUM / ADMIN logic: allow scopes
+            if scope == 'bum':
+                qry = qry.filter(JobCard.bum_id == current_user_id)
+            elif scope == 'mine':
+                qry = qry.filter(JobCard.owner_id == current_user_id)
+
+        # status filter: try bum_status enum first, else fall back to lifecycle strings
+        if status:
+            try:
+                enum_val = JobCardReviewStatus(status)
+                qry = qry.filter(JobCard.bum_status == enum_val)
+            except Exception:
+                qry = qry.filter(JobCard.status.ilike(status))
+
+        # technician name search against owner name
+        if q:
+            term = f"%{q.lower()}%"
+            qry = qry.filter(
+                (Owner.first_name.ilike(term)) | (Owner.last_name.ilike(term))  #| (Owner.first_name + " " + Owner.last_name.ilike(term))
+            )
+
+        rows = qry.order_by(JobCard.created_at.desc()).all()
         return jsonify([j.to_dict(with_lines=True) for j in rows])
 
     data = request.get_json() or {}
@@ -95,11 +134,11 @@ def jobcards_collection():
 
         if new_stat:
             jc.bum_status = new_stat
-            if new_stat != JobCardReviewStatus.PENDING:
+            if new_stat != JobCardReviewStatus.OPEN:
                 current_user_id = int(get_jwt_identity())
                 jc.bum_reviewed_by_id = current_user_id
                 jc.bum_reviewed_at = datetime.now()
-        else: jc.bum_status = JobCardReviewStatus.PENDING
+        else: jc.bum_status = JobCardReviewStatus.OPEN
 
 
     db.session.add(jc)
