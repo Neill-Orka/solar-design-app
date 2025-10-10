@@ -98,6 +98,23 @@ export async function deleteJobCard(id: number): Promise<void> {
     await http.delete(`/jobcards/${id}`);
 }
 
+export async function approveJobCard(id: number, options?: { invoice? : boolean; comment?: string }
+) {
+    const invoice = !!options?.invoice;
+    const comment = options?.comment;
+    return updateJobCard(id, {
+        bum_status: invoice ? 'invoiced' : 'completed',
+        bum_comment: comment,
+    });
+}
+
+export async function declineJobCard(id: number, comment?: string) {
+    return updateJobCard(id, {
+        bum_status: 'open',
+        bum_comment: comment
+    })
+}
+
 export async function listCategories(): Promise<JobCategory[]> {
     const { data } = await http.get(`/jobcategories`);
     return data;

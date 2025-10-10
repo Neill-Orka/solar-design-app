@@ -871,10 +871,10 @@ class DocumentEvent(db.Model):
 
 # Review status for BUM decisions on Job Cards
 class JobCardReviewStatus(Enum):
-    PENDING = "pending"
-    APPROVED = "approved"
-    NEEDS_FIX = "needs_fix"
-    DECLINED = "declined"
+    OPEN = "open"
+    SUBMITTED = "submitted"
+    INVOICED = "invoiced"
+    COMPLETED = "completed"
 
 class TechnicianProfile(db.Model):
     __tablename__ = "technician_profiles"
@@ -976,7 +976,7 @@ class JobCard(db.Model):
             validate_strings=True,
         ),
         nullable=False,
-        default=JobCardReviewStatus.PENDING,
+        default=JobCardReviewStatus.OPEN,
     )
     bum_comment = db.Column(db.Text, nullable=True)
     bum_reviewed_at = db.Column(db.DateTime, nullable=True)
@@ -1035,7 +1035,7 @@ class JobCard(db.Model):
             "travel_distance_km": float(self.travel_distance_km or 0),
             "coc_required": bool(self.coc_required),
             "status": self.status,
-            "bum_status": self.bum_status.value if self.bum_status else JobCardReviewStatus.PENDING.value,
+            "bum_status": self.bum_status.value if self.bum_status else JobCardReviewStatus.OPEN.value,
             "bum_comment": self.bum_comment,
             "bum_reviewed_at": self.bum_reviewed_at.isoformat() if self.bum_reviewed_at else None,
             "bum_reviewed_by_id": self.bum_reviewed_by_id,
