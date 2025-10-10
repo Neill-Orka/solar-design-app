@@ -1,77 +1,104 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { useAuth } from './AuthContext';
-import { Link } from 'react-router-dom';
-import axios from 'axios';
-import { Container, Row, Col, Card, Button, Modal, Badge, Spinner, Alert, Dropdown, Table, InputGroup, ButtonGroup, Form } from 'react-bootstrap';
-import { API_URL } from './apiConfig';
-import { useNotification } from './NotificationContext';
+import React, { useEffect, useState, useMemo } from "react";
+import { useAuth } from "./AuthContext";
+import { Link } from "react-router-dom";
+import axios from "axios";
+import {
+  Container,
+  Row,
+  Col,
+  Card,
+  Button,
+  Modal,
+  Badge,
+  Spinner,
+  Alert,
+  Dropdown,
+  Table,
+  InputGroup,
+  ButtonGroup,
+  Form,
+} from "react-bootstrap";
+import { API_URL } from "./apiConfig";
+import { useNotification } from "./NotificationContext";
 
 // A compact styled component for key project metrics
 const ProjectStat = ({ icon, label, value, variant = "secondary" }) => (
   <div className="d-flex align-items-center">
-    <i className={`bi ${icon} me-2 text-muted`} style={{ fontSize: '0.9rem' }}></i>
+    <i
+      className={`bi ${icon} me-2 text-muted`}
+      style={{ fontSize: "0.9rem" }}
+    ></i>
     <div>
-      <small className="text-muted d-block" style={{ fontSize: '0.75rem', lineHeight: '1' }}>{label}</small>
-      <Badge bg={variant} className="mt-1" style={{ fontSize: '0.7rem' }}>{value}</Badge>
+      <small
+        className="text-muted d-block"
+        style={{ fontSize: "0.75rem", lineHeight: "1" }}
+      >
+        {label}
+      </small>
+      <Badge bg={variant} className="mt-1" style={{ fontSize: "0.7rem" }}>
+        {value}
+      </Badge>
     </div>
   </div>
 );
 
 function formatShortDate(dt) {
-  if (!dt) return '-';
+  if (!dt) return "-";
   const d = new Date(dt);
-  if (isNaN(d)) return '-';
-  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isNaN(d)) return "-";
+  return (
+    d.toLocaleDateString() +
+    " " +
+    d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  );
 }
-
 
 function Projects() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === "admin";
   const [projects, setProjects] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [viewMode, setViewMode] = useState('grid');
+  const [error, setError] = useState("");
+  const [viewMode, setViewMode] = useState("grid");
   const [activeFilters, setActiveFilters] = useState({
-    status: 'all',
-    designType: 'all',
-    systemType: 'all',
-    projectType: 'all'
+    status: "all",
+    designType: "all",
+    systemType: "all",
+    projectType: "all",
   });
   const { showNotification } = useNotification();
 
-  
   useEffect(() => {
     loadProjects();
   }, []);
 
   useEffect(() => {
     const onProjectListChange = () => loadProjects();
-    window.addEventListener('refresh-projects', onProjectListChange);
+    window.addEventListener("refresh-projects", onProjectListChange);
     // Optional: also refetch on any single-project update
-    window.addEventListener('refresh-project', onProjectListChange);
+    window.addEventListener("refresh-project", onProjectListChange);
     return () => {
-      window.removeEventListener('refresh-projects', onProjectListChange);
-      window.removeEventListener('refresh-project', onProjectListChange);
+      window.removeEventListener("refresh-projects", onProjectListChange);
+      window.removeEventListener("refresh-project", onProjectListChange);
     };
   }, []);
 
-
   const loadProjects = () => {
     setLoading(true);
-    axios.get(`${API_URL}/api/projects`)
+    axios
+      .get(`${API_URL}/api/projects`)
       .then((response) => {
         setProjects(response.data);
-        setError('');
+        setError("");
       })
       .catch((err) => {
-        console.error('Error fetching projects:', err);
+        console.error("Error fetching projects:", err);
         setError(
           err.response?.data?.error ||
-          'Failed to load projects. Please ensure the server is running and accessible.'
+            "Failed to load projects. Please ensure the server is running and accessible."
         );
         setProjects([]); // Prevent crash if response is not an array
       })
@@ -82,10 +109,9 @@ function Projects() {
 
   useEffect(() => {
     const onRefetch = () => loadProjects();
-    window.addEventListener('refresh-project', onRefetch);
-    return () => window.removeEventListener('refresh-project', onRefetch);
+    window.addEventListener("refresh-project", onRefetch);
+    return () => window.removeEventListener("refresh-project", onRefetch);
   }, []);
-
 
   const handleDeleteRequest = (id) => {
     setProjectToDelete(id);
@@ -94,59 +120,85 @@ function Projects() {
 
   const handleConfirmDelete = () => {
     if (!isAdmin) {
-      setError('Access Denied: Only administrators can delete projects.');
+      setError("Access Denied: Only administrators can delete projects.");
       setShowDeleteModal(false);
       return;
     }
     if (!projectToDelete) return;
-    axios.delete(`${API_URL}/api/projects/${projectToDelete}`, { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } })
+    axios
+      .delete(`${API_URL}/api/projects/${projectToDelete}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+      })
       .then(() => {
         setShowDeleteModal(false);
         setProjectToDelete(null);
         loadProjects();
-        showNotification('Project moved to recycle bin', 'info');
+        showNotification("Project moved to recycle bin", "info");
       })
       .catch((err) => {
-        console.error('Error deleting project:', err);
+        console.error("Error deleting project:", err);
         setError(
           err.response?.data?.message ||
-          err.response?.data?.error ||
-          'Failed to delete project'
+            err.response?.data?.error ||
+            "Failed to delete project"
         );
         setShowDeleteModal(false);
       });
   };
   // Memoize the filtering logic to prevent re-calculation on every render
   const filteredProjects = useMemo(() => {
-    let filtered = projects.filter(p =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.location.toLowerCase().includes(searchTerm.toLowerCase())
+    let filtered = projects.filter(
+      (p) =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.location.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Apply additional filters
-    if (activeFilters.status !== 'all') {
-      filtered = filtered.filter(p => (p.status || 'active').toLowerCase() === activeFilters.status);
+    if (activeFilters.status !== "all") {
+      filtered = filtered.filter(
+        (p) => (p.status || "active").toLowerCase() === activeFilters.status
+      );
     }
-    if (activeFilters.designType !== 'all') {
-      filtered = filtered.filter(p => (p.design_type || '').toLowerCase() === activeFilters.designType);
+    if (activeFilters.designType !== "all") {
+      filtered = filtered.filter(
+        (p) => (p.design_type || "").toLowerCase() === activeFilters.designType
+      );
     }
-    if (activeFilters.systemType !== 'all') {
-      filtered = filtered.filter(p => (p.system_type || '').toLowerCase() === activeFilters.systemType);
+    if (activeFilters.systemType !== "all") {
+      filtered = filtered.filter(
+        (p) => (p.system_type || "").toLowerCase() === activeFilters.systemType
+      );
     }
-    if (activeFilters.projectType !== 'all') {
-      filtered = filtered.filter(p => (p.project_type || '').toLowerCase() === activeFilters.projectType);
+    if (activeFilters.projectType !== "all") {
+      filtered = filtered.filter(
+        (p) =>
+          (p.project_type || "").toLowerCase() === activeFilters.projectType
+      );
     }
 
-    // Sort by creation date (newest first)
+    // With this updated code that uses updated_at with created_at fallback:
     return filtered.sort((a, b) => {
-      const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
-      const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+      // Use updated_at if available, otherwise fall back to created_at
+      const dateA = a.updated_at
+        ? new Date(a.updated_at)
+        : a.created_at
+          ? new Date(a.created_at)
+          : new Date(0);
+
+      const dateB = b.updated_at
+        ? new Date(b.updated_at)
+        : b.created_at
+          ? new Date(b.created_at)
+          : new Date(0);
+
       return dateB - dateA;
     });
   }, [projects, searchTerm, activeFilters]);
   return (
-    <div className='min-vh-100' style={{ backgroundColor: '#f8f9fa' }}>
+    <div className="min-vh-100" style={{ backgroundColor: "#f8f9fa" }}>
       <Container fluid className="py-4 py-md-5">
         <Row className="justify-content-center">
           <Col lg={12} xl={12}>
@@ -156,45 +208,65 @@ function Projects() {
                   <h2 className="text-3xl font-bold text-gray-800 mb-1">
                     <i className="bi bi-folder-fill me-3"></i>Projects
                   </h2>
-                  <p className="text-muted mb-0">Manage your solar design projects</p>
+                  <p className="text-muted mb-0">
+                    Manage your solar design projects
+                  </p>
                 </div>
-                <div className='d-flex'>
-                {user?.role === 'admin' && (
-                  <Link to="/projects/recycle-bin" className="btn btn-outline-secondary ms-2">
-                    <i className="bi bi-trash"></i>
+                <div className="d-flex">
+                  {user?.role === "admin" && (
+                    <Link
+                      to="/projects/recycle-bin"
+                      className="btn btn-outline-secondary ms-2"
+                    >
+                      <i className="bi bi-trash"></i>
+                    </Link>
+                  )}
+                  <Link
+                    to="/projects/add"
+                    className="btn btn-primary shadow-sm ms-1"
+                  >
+                    <i className="bi bi-plus-lg me-2"></i>New Project
                   </Link>
-                )}
-                <Link
-                  to="/projects/add"
-                  className="btn btn-primary shadow-sm ms-1"
-                >
-                  <i className="bi bi-plus-lg me-2"></i>New Project
-                </Link>
                 </div>
               </div>
 
               {/* Search and View Controls */}
-              <Card className='shadow-sm border-0 rounded-xl p-3 mb-4'>
-                <Row className='g-3 align-items-center'>
+              <Card className="shadow-sm border-0 rounded-xl p-3 mb-4">
+                <Row className="g-3 align-items-center">
                   <Col md={8}>
                     <InputGroup>
-                      <InputGroup.Text className='bg-light border-end-0'>
-                        <i className="bi bi-search" style={{ color: '#6b7280', fontSize: '1.1rem' }}></i>
+                      <InputGroup.Text className="bg-light border-end-0">
+                        <i
+                          className="bi bi-search"
+                          style={{ color: "#6b7280", fontSize: "1.1rem" }}
+                        ></i>
                       </InputGroup.Text>
-                      <Form.Control 
+                      <Form.Control
                         value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
+                        onChange={(e) => setSearchTerm(e.target.value)}
                         placeholder="Search by project or client name.."
-                        className='border-start-0 border-light rounded-lg'
+                        className="border-start-0 border-light rounded-lg"
                       />
                     </InputGroup>
-                  </Col> 
+                  </Col>
                   <Col md={4} className="d-flex justify-content-end">
                     <ButtonGroup>
-                      <Button variant={viewMode === 'card' ? 'primary' : 'outline-secondary'} onClick={() => setViewMode('card')} title='Card View'>
+                      <Button
+                        variant={
+                          viewMode === "card" ? "primary" : "outline-secondary"
+                        }
+                        onClick={() => setViewMode("card")}
+                        title="Card View"
+                      >
                         <i className="bi bi-grid-3x3-gap-fill"></i>
                       </Button>
-                      <Button variant={viewMode === 'list' ? 'primary' : 'outline-secondary'} onClick={() => setViewMode('list')} title='List View'>
+                      <Button
+                        variant={
+                          viewMode === "list" ? "primary" : "outline-secondary"
+                        }
+                        onClick={() => setViewMode("list")}
+                        title="List View"
+                      >
                         <i className="bi bi-list-ul"></i>
                       </Button>
                     </ButtonGroup>
@@ -208,63 +280,126 @@ function Projects() {
               </Card>
 
               {/* Filter Controls */}
-              <Card className='shadow-sm border-0 rounded-xl p-3 mb-4'>
-                <Row className='g-3'>
+              <Card className="shadow-sm border-0 rounded-xl p-3 mb-4">
+                <Row className="g-3">
                   <Col lg={4} md={6}>
                     <div className="mb-2">
                       <small className="text-muted fw-bold">Design Type</small>
                     </div>
                     <ButtonGroup size="sm" className="w-100">
-                      <Button 
-                        variant={activeFilters.designType === 'all' ? 'primary' : 'outline-secondary'}
-                        onClick={() => setActiveFilters(prev => ({...prev, designType: 'all'}))}
+                      <Button
+                        variant={
+                          activeFilters.designType === "all"
+                            ? "primary"
+                            : "outline-secondary"
+                        }
+                        onClick={() =>
+                          setActiveFilters((prev) => ({
+                            ...prev,
+                            designType: "all",
+                          }))
+                        }
                       >
                         All
                       </Button>
-                      <Button 
-                        variant={activeFilters.designType === 'quick' ? 'primary' : 'outline-secondary'}
-                        onClick={() => setActiveFilters(prev => ({...prev, designType: 'quick'}))}
+                      <Button
+                        variant={
+                          activeFilters.designType === "quick"
+                            ? "primary"
+                            : "outline-secondary"
+                        }
+                        onClick={() =>
+                          setActiveFilters((prev) => ({
+                            ...prev,
+                            designType: "quick",
+                          }))
+                        }
                       >
                         Quick
                       </Button>
-                      <Button 
-                        variant={activeFilters.designType === 'detailed' ? 'primary' : 'outline-secondary'}
-                        onClick={() => setActiveFilters(prev => ({...prev, designType: 'detailed'}))}
+                      <Button
+                        variant={
+                          activeFilters.designType === "detailed"
+                            ? "primary"
+                            : "outline-secondary"
+                        }
+                        onClick={() =>
+                          setActiveFilters((prev) => ({
+                            ...prev,
+                            designType: "detailed",
+                          }))
+                        }
                       >
                         Detailed
                       </Button>
                     </ButtonGroup>
                   </Col>
-                  
+
                   <Col lg={4} md={6}>
                     <div className="mb-2">
                       <small className="text-muted fw-bold">System Type</small>
                     </div>
                     <ButtonGroup size="sm" className="w-100">
-                      <Button 
-                        variant={activeFilters.systemType === 'all' ? 'primary' : 'outline-secondary'}
-                        onClick={() => setActiveFilters(prev => ({...prev, systemType: 'all'}))}
+                      <Button
+                        variant={
+                          activeFilters.systemType === "all"
+                            ? "primary"
+                            : "outline-secondary"
+                        }
+                        onClick={() =>
+                          setActiveFilters((prev) => ({
+                            ...prev,
+                            systemType: "all",
+                          }))
+                        }
                       >
                         All
                       </Button>
-                      <Button 
-                        variant={activeFilters.systemType === 'grid' ? 'primary' : 'outline-secondary'}
-                        onClick={() => setActiveFilters(prev => ({...prev, systemType: 'grid'}))}
+                      <Button
+                        variant={
+                          activeFilters.systemType === "grid"
+                            ? "primary"
+                            : "outline-secondary"
+                        }
+                        onClick={() =>
+                          setActiveFilters((prev) => ({
+                            ...prev,
+                            systemType: "grid",
+                          }))
+                        }
                       >
                         Grid-Tied
                       </Button>
-                      <Button 
-                        variant={activeFilters.systemType === 'hybrid' ? 'primary' : 'outline-secondary'}
-                        onClick={() => setActiveFilters(prev => ({...prev, systemType: 'hybrid'}))}
+                      <Button
+                        variant={
+                          activeFilters.systemType === "hybrid"
+                            ? "primary"
+                            : "outline-secondary"
+                        }
+                        onClick={() =>
+                          setActiveFilters((prev) => ({
+                            ...prev,
+                            systemType: "hybrid",
+                          }))
+                        }
                       >
                         Hybrid
                       </Button>
-                      <Button 
-                        variant={activeFilters.systemType === 'off-grid' ? 'primary' : 'outline-secondary'}
-                        onClick={() => setActiveFilters(prev => ({...prev, systemType: 'off-grid'}))}
+                      <Button
+                        variant={
+                          activeFilters.systemType === "off-grid"
+                            ? "primary"
+                            : "outline-secondary"
+                        }
+                        onClick={() =>
+                          setActiveFilters((prev) => ({
+                            ...prev,
+                            systemType: "off-grid",
+                          }))
+                        }
                       >
                         Off-Grid
-                      </Button>                      
+                      </Button>
                     </ButtonGroup>
                   </Col>
 
@@ -273,27 +408,54 @@ function Projects() {
                       <small className="text-muted fw-bold">Project Type</small>
                     </div>
                     <ButtonGroup size="sm" className="w-100">
-                      <Button 
-                        variant={activeFilters.projectType === 'all' ? 'primary' : 'outline-secondary'}
-                        onClick={() => setActiveFilters(prev => ({...prev, projectType: 'all'}))}
+                      <Button
+                        variant={
+                          activeFilters.projectType === "all"
+                            ? "primary"
+                            : "outline-secondary"
+                        }
+                        onClick={() =>
+                          setActiveFilters((prev) => ({
+                            ...prev,
+                            projectType: "all",
+                          }))
+                        }
                       >
                         All
                       </Button>
-                      <Button 
-                        variant={activeFilters.projectType === 'residential' ? 'primary' : 'outline-secondary'}
-                        onClick={() => setActiveFilters(prev => ({...prev, projectType: 'residential'}))}
+                      <Button
+                        variant={
+                          activeFilters.projectType === "residential"
+                            ? "primary"
+                            : "outline-secondary"
+                        }
+                        onClick={() =>
+                          setActiveFilters((prev) => ({
+                            ...prev,
+                            projectType: "residential",
+                          }))
+                        }
                       >
                         Residential
                       </Button>
-                      <Button 
-                        variant={activeFilters.projectType === 'commercial' ? 'primary' : 'outline-secondary'}
-                        onClick={() => setActiveFilters(prev => ({...prev, projectType: 'commercial'}))}
+                      <Button
+                        variant={
+                          activeFilters.projectType === "commercial"
+                            ? "primary"
+                            : "outline-secondary"
+                        }
+                        onClick={() =>
+                          setActiveFilters((prev) => ({
+                            ...prev,
+                            projectType: "commercial",
+                          }))
+                        }
                       >
                         Commercial
                       </Button>
                     </ButtonGroup>
                   </Col>
-{/* 
+                  {/* 
                   <Col lg={3} md={6}>
                     <div className="mb-2">
                       <small className="text-muted fw-bold">Status</small>
@@ -324,7 +486,8 @@ function Projects() {
 
               {error && (
                 <Alert variant="danger" className="mb-4">
-                  <i className="bi bi-exclamation-triangle-fill me-2"></i>{error}
+                  <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                  {error}
                 </Alert>
               )}
 
@@ -332,106 +495,152 @@ function Projects() {
                 <>
                   {filteredProjects.length === 0 ? (
                     <div className="text-center py-5">
-                      <i className="bi bi-folder-x" style={{fontSize: '4rem', color: '#9ca3af'}}></i>
+                      <i
+                        className="bi bi-folder-x"
+                        style={{ fontSize: "4rem", color: "#9ca3af" }}
+                      ></i>
                       <h4 className="mt-3 text-gray-700">No Projects Found</h4>
                       <p className="text-muted mb-4">
-                        {searchTerm ? `No projects match "${searchTerm}"` : 'Start creating your first solar project.'}
+                        {searchTerm
+                          ? `No projects match "${searchTerm}"`
+                          : "Start creating your first solar project."}
                       </p>
                       {!searchTerm && (
                         <Link to="/projects/add" className="btn btn-primary">
-                          <i className="bi bi-plus-lg me-2"></i>Create Your First Project
+                          <i className="bi bi-plus-lg me-2"></i>Create Your
+                          First Project
                         </Link>
                       )}
                     </div>
-                  ) : viewMode === 'card' ? (
+                  ) : viewMode === "card" ? (
                     <Row xs={1} md={2} lg={3} className="g-4">
                       {filteredProjects.map((project) => (
                         <Col key={project.id}>
                           <Card className="h-100 shadow-sm border-light hover-shadow">
-                            <Card.Body className="p-4">                              {/* Header with badges */}
+                            <Card.Body className="p-4">
+                              {" "}
+                              {/* Header with badges */}
                               <div className="d-flex align-items-start justify-content-between mb-3">
                                 <div className="d-flex flex-wrap gap-1">
-                                  <Badge bg="primary" className="mb-1">{project.project_type || 'Commercial'}</Badge>
-                                  <Badge bg="secondary" className="mb-1">{project.design_type || 'Detailed'}</Badge>
+                                  <Badge bg="primary" className="mb-1">
+                                    {project.project_type || "Commercial"}
+                                  </Badge>
+                                  <Badge bg="secondary" className="mb-1">
+                                    {project.design_type || "Detailed"}
+                                  </Badge>
                                   {project.system_type && (
-                                    <Badge bg="info" className="mb-1 text-capitalize">{project.system_type}</Badge>
+                                    <Badge
+                                      bg="info"
+                                      className="mb-1 text-capitalize"
+                                    >
+                                      {project.system_type}
+                                    </Badge>
                                   )}
                                 </div>
                                 <Dropdown align="end">
-                                  <Dropdown.Toggle 
-                                    variant="link" 
+                                  <Dropdown.Toggle
+                                    variant="link"
                                     className="p-0 text-muted border-0 shadow-none"
-                                    style={{ boxShadow: 'none !important' }}
+                                    style={{ boxShadow: "none !important" }}
                                   >
                                     <i className="bi bi-three-dots-vertical"></i>
                                   </Dropdown.Toggle>
 
                                   <Dropdown.Menu>
-                                    <Dropdown.Item as={Link} to={`/projects/${project.id}`}>
-                                      <i className="bi bi-eye me-2"></i>View Project
+                                    <Dropdown.Item
+                                      as={Link}
+                                      to={`/projects/${project.id}`}
+                                    >
+                                      <i className="bi bi-eye me-2"></i>View
+                                      Project
                                     </Dropdown.Item>
-                                    <Dropdown.Item as={Link} to={`/projects/edit/${project.id}`}>
-                                      <i className="bi bi-pencil me-2"></i>Edit Project
+                                    <Dropdown.Item
+                                      as={Link}
+                                      to={`/projects/edit/${project.id}`}
+                                    >
+                                      <i className="bi bi-pencil me-2"></i>Edit
+                                      Project
                                     </Dropdown.Item>
                                     <Dropdown.Divider />
-                                    <Dropdown.Item 
-                                      className="text-danger" 
-                                      onClick={() => handleDeleteRequest(project.id)}
+                                    <Dropdown.Item
+                                      className="text-danger"
+                                      onClick={() =>
+                                        handleDeleteRequest(project.id)
+                                      }
                                     >
-                                      <i className="bi bi-trash me-2"></i>Delete Project
+                                      <i className="bi bi-trash me-2"></i>Delete
+                                      Project
                                     </Dropdown.Item>
                                   </Dropdown.Menu>
                                 </Dropdown>
                               </div>
-
                               {/* Project name and client */}
-                              <Card.Title className="h5 mb-2 text-truncate">{project.name}</Card.Title>
+                              <Card.Title className="h5 mb-2 text-truncate">
+                                {project.name}
+                              </Card.Title>
                               <div className="mb-3">
                                 <div className="d-flex align-items-center mb-1">
-                                  <i className="bi bi-person me-2 text-muted" style={{fontSize: '0.9rem'}}></i>
-                                  <small className="text-muted text-truncate">{project.client_name}</small>
+                                  <i
+                                    className="bi bi-person me-2 text-muted"
+                                    style={{ fontSize: "0.9rem" }}
+                                  ></i>
+                                  <small className="text-muted text-truncate">
+                                    {project.client_name}
+                                  </small>
                                 </div>
                                 <div className="d-flex align-items-center">
-                                  <i className="bi bi-geo-alt me-2 text-muted" style={{fontSize: '0.9rem'}}></i>
-                                  <small className="text-muted text-truncate">{project.location || 'No location'}</small>
+                                  <i
+                                    className="bi bi-geo-alt me-2 text-muted"
+                                    style={{ fontSize: "0.9rem" }}
+                                  ></i>
+                                  <small className="text-muted text-truncate">
+                                    {project.location || "No location"}
+                                  </small>
                                 </div>
                               </div>
-
                               {/* System specs in compact format */}
                               <div className="mb-3">
                                 <Row className="g-2">
                                   <Col xs={6}>
-                                    <ProjectStat 
-                                      icon="bi-sun" 
-                                      label="Solar" 
-                                      value={project.panel_kw ? `${project.panel_kw}kWp` : 'N/A'}
+                                    <ProjectStat
+                                      icon="bi-sun"
+                                      label="Solar"
+                                      value={
+                                        project.panel_kw
+                                          ? `${project.panel_kw}kWp`
+                                          : "N/A"
+                                      }
                                       variant="warning"
                                     />
                                   </Col>
                                   <Col xs={6}>
-                                    <ProjectStat 
-                                      icon="bi-lightning" 
-                                      label="Inverter" 
-                                      value={project.inverter_kva ? `${project.inverter_kva}kVA` : 'N/A'}
+                                    <ProjectStat
+                                      icon="bi-lightning"
+                                      label="Inverter"
+                                      value={
+                                        project.inverter_kva
+                                          ? `${project.inverter_kva}kVA`
+                                          : "N/A"
+                                      }
                                       variant="info"
                                     />
                                   </Col>
-                                  {project.system_type !== 'grid' && project.battery_kwh && (
-                                    <Col xs={12}>
-                                      <ProjectStat 
-                                        icon="bi-battery-half" 
-                                        label="Battery" 
-                                        value={`${project.battery_kwh}kWh`}
-                                        variant="success"
-                                      />
-                                    </Col>
-                                  )}
+                                  {project.system_type !== "grid" &&
+                                    project.battery_kwh && (
+                                      <Col xs={12}>
+                                        <ProjectStat
+                                          icon="bi-battery-half"
+                                          label="Battery"
+                                          value={`${project.battery_kwh}kWh`}
+                                          variant="success"
+                                        />
+                                      </Col>
+                                    )}
                                 </Row>
                               </div>
-
                               {/* Action button */}
-                              <Link 
-                                to={`/projects/${project.id}`} 
+                              <Link
+                                to={`/projects/${project.id}`}
                                 className="btn btn-outline-primary btn-sm w-100"
                               >
                                 <i className="bi bi-arrow-right-circle me-2"></i>
@@ -457,18 +666,33 @@ function Projects() {
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredProjects.map(project => (
-                            <tr key={project.id} style={{ verticalAlign: 'middle' }}>
+                          {filteredProjects.map((project) => (
+                            <tr
+                              key={project.id}
+                              style={{ verticalAlign: "middle" }}
+                            >
                               <td className="ps-4">
                                 <span className="fw-bold">{project.name}</span>
                               </td>
-                              <td>{project.client_name || 'N/A'}</td>
-                              <td><Badge bg="success" pill>{project.status || 'N/A'}</Badge></td>
-                              <td><Badge bg="info" pill>{project.design_type || 'N/A'}</Badge></td>
+                              <td>{project.client_name || "N/A"}</td>
                               <td>
-                                {project.created_at ? new Date(project.created_at).toLocaleDateString() : 'N/A'}
+                                <Badge bg="success" pill>
+                                  {project.status || "N/A"}
+                                </Badge>
+                              </td>
+                              <td>
+                                <Badge bg="info" pill>
+                                  {project.design_type || "N/A"}
+                                </Badge>
+                              </td>
+                              <td>
+                                {project.created_at
+                                  ? new Date(
+                                      project.created_at
+                                    ).toLocaleDateString()
+                                  : "N/A"}
                                 {project.created_by && (
-                                  <div className='small text-muted'>
+                                  <div className="small text-muted">
                                     by {project.created_by}
                                   </div>
                                 )}
@@ -478,19 +702,37 @@ function Projects() {
                                   <>
                                     {formatShortDate(project.updated_at)}
                                     <div className="small text-muted">
-                                      {project.updated_by ? `by ${project.updated_by}` : ''}
+                                      {project.updated_by
+                                        ? `by ${project.updated_by}`
+                                        : ""}
                                     </div>
                                   </>
-                                ): '-'}
+                                ) : (
+                                  "-"
+                                )}
                               </td>
                               <td className="text-end pe-3">
-                                <Link to={`/projects/${project.id}`} className="btn btn-primary btn-sm me-2">
-                                  <i className="bi bi-folder-fill me-1"></i> Open
+                                <Link
+                                  to={`/projects/${project.id}`}
+                                  className="btn btn-primary btn-sm me-2"
+                                >
+                                  <i className="bi bi-folder-fill me-1"></i>{" "}
+                                  Open
                                 </Link>
-                                <Link to={`/projects/edit/${project.id}`} className="btn btn-outline-secondary btn-sm me-2">
-                                  <i className="bi bi-pencil-fill me-1"></i> Edit
+                                <Link
+                                  to={`/projects/edit/${project.id}`}
+                                  className="btn btn-outline-secondary btn-sm me-2"
+                                >
+                                  <i className="bi bi-pencil-fill me-1"></i>{" "}
+                                  Edit
                                 </Link>
-                                <Button variant="outline-danger" size="sm" onClick={() => handleDeleteRequest(project.id)}>
+                                <Button
+                                  variant="outline-danger"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDeleteRequest(project.id)
+                                  }
+                                >
                                   <i className="bi bi-trash-fill"></i>
                                 </Button>
                               </td>
@@ -498,7 +740,7 @@ function Projects() {
                           ))}
                         </tbody>
                       </Table>
-                    </Card>                    
+                    </Card>
                   )}
                 </>
               )}
@@ -508,7 +750,11 @@ function Projects() {
       </Container>
 
       {/* Delete Modal */}
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+      <Modal
+        show={showDeleteModal}
+        onHide={() => setShowDeleteModal(false)}
+        centered
+      >
         <Modal.Header closeButton className="bg-light">
           <Modal.Title>
             <i className="bi bi-exclamation-triangle-fill text-danger me-2"></i>
@@ -517,7 +763,9 @@ function Projects() {
         </Modal.Header>
         <Modal.Body className="p-4">
           <p className="mb-2">Are you sure you want to delete this project?</p>
-          <p className="text-muted mb-3">All associated data will be permanently removed.</p>
+          <p className="text-muted mb-3">
+            All associated data will be permanently removed.
+          </p>
           <div className="bg-danger bg-opacity-10 border border-danger border-opacity-25 rounded p-3">
             <p className="fw-bold text-danger mb-0">
               <i className="bi bi-exclamation-circle me-2"></i>
@@ -526,7 +774,10 @@ function Projects() {
           </div>
         </Modal.Body>
         <Modal.Footer className="bg-light">
-          <Button variant="outline-secondary" onClick={() => setShowDeleteModal(false)}>
+          <Button
+            variant="outline-secondary"
+            onClick={() => setShowDeleteModal(false)}
+          >
             Cancel
           </Button>
           <Button variant="danger" onClick={handleConfirmDelete}>
