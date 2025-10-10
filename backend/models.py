@@ -262,7 +262,7 @@ class Projects(db.Model):
     created_by = db.relationship("User", foreign_keys=[created_by_id])
     profile_id = db.Column(db.Integer, db.ForeignKey("load_profiles.id"), nullable=True)
     profile_scaler = db.Column(db.Float, nullable=True, default=1.0)
-    updated_at = db.Column(db.DateTime, default=datetime.now())
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
     updated_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     updated_by = db.relationship("User", foreign_keys=[updated_by_id])
     deleted_at = db.Column(db.DateTime, nullable=True)
@@ -737,9 +737,11 @@ class BOMComponent(db.Model):
     extras_cost = db.Column(db.Float, nullable=True, default=0)
 
     # optional lifecycle timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        db.DateTime,
+        default=lambda: datetime.now(SA_TZ),
+        onupdate=lambda: datetime.now(SA_TZ),
     )
 
     quote_number = db.Column(db.String(50), nullable=True)
@@ -1167,7 +1169,9 @@ class JobCard(db.Model):
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        db.DateTime,
+        default=lambda: datetime.now(SA_TZ),
+        onupdate=lambda: datetime.now(SA_TZ),
     )
 
     # Relationships
