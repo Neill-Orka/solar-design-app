@@ -1280,7 +1280,7 @@ function SystemDesign({ projectId }) {
           if (inverterProduct) {
             updates.selectedInverter = {
               value: inverterProduct.id,
-              label: `${inverterProduct.model} (${inverterProduct.rating_kva}kVA)`,
+              label: `${inverterProduct.brand} ${inverterProduct.model} (${inverterProduct.rating_kva}kVA)`,
               product: inverterProduct,
             };
             updates.inverterQuantity = coreComponents.inverter.quantity;
@@ -1306,10 +1306,16 @@ function SystemDesign({ projectId }) {
           if (batteryProduct) {
             updates.selectedBattery = {
               value: batteryProduct.id,
-              label: `${batteryProduct.description} (${batteryProduct.capacity_kwh}kWh)`,
+              label: `${batteryProduct.brand} ${batteryProduct.model} (${batteryProduct.capacity_kwh}kWh)`,
               product: batteryProduct,
             };
             updates.batteryQuantity = coreComponents.battery.quantity;
+            console.log(
+              "Set battery:",
+              updates.selectedBattery,
+              "quantity:",
+              updates.batteryQuantity
+            );
           }
         }
 
@@ -1325,6 +1331,9 @@ function SystemDesign({ projectId }) {
             number: coreComponents.quote_number || "Unknown",
           });
           setLoadedFromQuote(true);
+
+          console.log("Set quote info:", quoteInfo);
+          console.log("Design updated with core components:", design);
 
           // Clear standard template state since we're now using quote components
           setUsingStandardTemplate(false);
