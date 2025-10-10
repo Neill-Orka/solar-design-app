@@ -1,10 +1,12 @@
 import React from "react";
 import logo from "../../assets/OrkaLogoWithText.png";
 import panelBg from "../../assets/solar_panel_bg.png";
+import { useAuth } from "../../AuthContext"
 
 import "../../ReportBuilder.css";
 
 function CoverPage({ data }) {
+    const { user } = useAuth();
   // Helper function to safely display JSON fields
   const displayValue = (value, fallback, field = "") => {
     if (value === undefined || value === null) return fallback;
@@ -76,7 +78,7 @@ function CoverPage({ data }) {
           Prepared for: {displayValue(project.client_name, "Client")}<br />
           Project Owner: {displayValue(project.client_name, "Owner")}<br />
           Document version: {displayValue(project.version, "1.0")}<br />
-          Compiled by: {displayValue(project.compiled_by, "Orka Solar")}
+          Compiled by: {displayValue(user.full_name, "Orka Solar")}
         </div>
       </div>
     </section>
