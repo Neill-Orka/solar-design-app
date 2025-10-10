@@ -1325,6 +1325,31 @@ function SystemDesign({ projectId }) {
             ...updates,
           }));
 
+          if (coreComponents.system_type) {
+            console.log(
+              `Setting system type from quote: ${coreComponents.system_type}`
+            );
+            setDesign((prevDesign) => ({
+              ...prevDesign,
+              systemType: coreComponents.system_type,
+            }));
+          } else {
+            // if system_type is not in core components, fetch it from project
+            axios
+              .get(`${API_URL}/api/projects/${projectId}`)
+              .then((res) => {
+                const systemType = res.data.system_type || "hybrid";
+                console.log(`Setting system type from project: ${systemType}`);
+                setDesign((prevDesign) => ({
+                  ...prevDesign,
+                  systemType: systemType,
+                }));
+              })
+              .catch((err) =>
+                console.error("Error getting system type: ", err)
+              );
+          }
+
           // Set quote info when loading from quote
           setQuoteInfo({
             name: coreComponents.quote_name || "Quote Components",

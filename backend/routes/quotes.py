@@ -496,7 +496,11 @@ def load_version_to_bom(version_id):
     response_data = {
         "message": "Version loaded into BOM",
         "rows": count,
-        "core_components": {"quote_name": f"{doc.number}", "quote_number": doc.number},
+        "core_components": {
+            "quote_name": f"{doc.number}",
+            "quote_number": doc.number,
+            "system_type": project.system_type,
+        },
     }
 
     # Add core component details to response
