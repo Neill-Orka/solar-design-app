@@ -10,7 +10,18 @@ from models import db, bcrypt
 from flask_migrate import Migrate
 from flask_socketio import SocketIO, join_room
 from sqlalchemy import event
-from models import Product, Projects, BOMComponent, LoadProfiles, Tariffs, TariffRates, Document, DocumentKind, User, Clients
+from models import (
+    Product,
+    Projects,
+    BOMComponent,
+    LoadProfiles,
+    Tariffs,
+    TariffRates,
+    Document,
+    DocumentKind,
+    User,
+    Clients,
+)
 import logging
 import os
 
@@ -24,9 +35,9 @@ from routes.consumption import consumption_bp
 from routes.optimize import optimize_bp
 from routes.products import products_bp
 from routes.energy_data import energy_data_bp
-from routes.system_templates import system_templates_bp
+
+# from routes.system_templates import system_templates_bp
 from routes.system_builder import system_builder_bp
-from routes.quick_design import quick_design_bp
 from routes.proposal_data import proposal_data_bp
 from routes.load_profiles import load_profiles_bp
 from routes.tariffs import tariffs_bp
@@ -45,16 +56,17 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://solar-design-app.vercel.app",
     "http://localhost:5173",
-    LAN
+    LAN,
 ]
 
-CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
-
-socketio = SocketIO(
+CORS(
     app,
-    cors_allowed_origins=ALLOWED_ORIGINS,
-    async_mode='eventlet'
+    origins=ALLOWED_ORIGINS,
+    supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization"],
 )
+
+socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS, async_mode="eventlet")
 
 # Initialize extensions
 db.init_app(app)
@@ -68,14 +80,17 @@ logging.basicConfig(level=logging.INFO)
 app.config["UPLOAD_FOLDER"] = os.path.join(os.getcwd(), "uploads")
 app.config["PUBLIC_UPLOAD_BASE"] = "/uploads"
 
-@app.route('/uploads/<path:filename>')
+
+@app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
 
 @socketio.on("join")
 def on_join(data):
     for r in data.get("rooms", []):
         join_room(r)
+
 
 def _emit(kind, payload, room=None):
     try:
@@ -83,79 +98,84 @@ def _emit(kind, payload, room=None):
     except Exception as e:
         app.logger.warning(f"socket emit failed: {e}")
 
+
 # JWT error handlers
 @jwt.expired_token_loader
 def expired_token_callback(jwt_header, jwt_payload):
-    return {'message': 'Token has expired'}, 401
+    return {"message": "Token has expired"}, 401
+
 
 @jwt.invalid_token_loader
 def invalid_token_callback(error):
     print(f"Invalid token error: {error}")
-    return {'message': 'Invalid token'}, 401
+    return {"message": "Invalid token"}, 401
+
 
 @jwt.unauthorized_loader
 def missing_token_callback(error):
     print(f"Missing token error: {error}")
-    return {'message': 'Authorization token is required'}, 401
+    return {"message": "Authorization token is required"}, 401
+
 
 @jwt.needs_fresh_token_loader
 def token_not_fresh_callback(jwt_header, jwt_payload):
-    return {'message': 'Fresh token required'}, 401
+    return {"message": "Fresh token required"}, 401
 
 
+app.register_blueprint(auth_bp, url_prefix="/api/auth")
+app.register_blueprint(clients_bp, url_prefix="/api")
+app.register_blueprint(projects_bp, url_prefix="/api")
+app.register_blueprint(simulation_bp, url_prefix="/api")
+app.register_blueprint(financial_bp, url_prefix="/api")
+app.register_blueprint(consumption_bp, url_prefix="/api")
+app.register_blueprint(optimize_bp, url_prefix="/api")
+app.register_blueprint(products_bp, url_prefix="/api")
+app.register_blueprint(energy_data_bp, url_prefix="/api")
+# app.register_blueprint(system_templates_bp, url_prefix='/api')
+app.register_blueprint(system_builder_bp, url_prefix="/api")
+app.register_blueprint(proposal_data_bp, url_prefix="/api")
+app.register_blueprint(load_profiles_bp, url_prefix="/api")
+app.register_blueprint(tariffs_bp, url_prefix="/api")
+app.register_blueprint(rules_bp, url_prefix="/api")
+app.register_blueprint(bom_bp, url_prefix="/api")
+app.register_blueprint(quotes_bp, url_prefix="/api")
+app.register_blueprint(jobcards_bp, url_prefix="/api")
+app.register_blueprint(technicians_bp, url_prefix="/api")
 
-app.register_blueprint(auth_bp, url_prefix='/api/auth')
-app.register_blueprint(clients_bp, url_prefix='/api')
-app.register_blueprint(projects_bp, url_prefix='/api')
-app.register_blueprint(simulation_bp, url_prefix='/api')
-app.register_blueprint(financial_bp, url_prefix='/api')
-app.register_blueprint(consumption_bp, url_prefix='/api')
-app.register_blueprint(optimize_bp, url_prefix='/api')
-app.register_blueprint(products_bp, url_prefix='/api')
-app.register_blueprint(energy_data_bp, url_prefix='/api')
-app.register_blueprint(system_templates_bp, url_prefix='/api')
-app.register_blueprint(system_builder_bp, url_prefix='/api')
-app.register_blueprint(quick_design_bp, url_prefix='/api')
-app.register_blueprint(proposal_data_bp, url_prefix='/api')
-app.register_blueprint(load_profiles_bp, url_prefix='/api')
-app.register_blueprint(tariffs_bp, url_prefix='/api')
-app.register_blueprint(rules_bp, url_prefix='/api')
-app.register_blueprint(bom_bp, url_prefix='/api')
-app.register_blueprint(quotes_bp, url_prefix='/api')
-app.register_blueprint(jobcards_bp, url_prefix='/api')
-app.register_blueprint(technicians_bp, url_prefix='/api')
 
-@event.listens_for(Product, 'after_insert')
-@event.listens_for(Product, 'after_update')
-@event.listens_for(Product, 'after_delete')
+@event.listens_for(Product, "after_insert")
+@event.listens_for(Product, "after_update")
+@event.listens_for(Product, "after_delete")
 def _product_changed(mapper, connection, target):
-    _emit("product:updated", {"id": getattr(target, 'id', None)}, room="products")
+    _emit("product:updated", {"id": getattr(target, "id", None)}, room="products")
 
-@event.listens_for(Projects, 'after_insert')
-@event.listens_for(Projects, 'after_update')
-@event.listens_for(Projects, 'after_delete')
+
+@event.listens_for(Projects, "after_insert")
+@event.listens_for(Projects, "after_update")
+@event.listens_for(Projects, "after_delete")
 def _projects_changed(mapper, connection, target):
-    pid = getattr(target, 'id', None)
+    pid = getattr(target, "id", None)
     _emit("projects:updated", {"id": pid}, room="projects")  # NEW
     if pid:
         _emit("project:updated", {"id": pid}, room=f"project:{pid}")  # existing pattern
 
-# clients -> NEW listener + broadcast
-@event.listens_for(Clients, 'after_insert')
-@event.listens_for(Clients, 'after_update')
-@event.listens_for(Clients, 'after_delete')
-def _clients_changed(mapper, connection, target):
-    _emit("clients:updated", {"id": getattr(target, 'id', None)}, room="clients")
 
-@event.listens_for(BOMComponent, 'after_insert')
-@event.listens_for(BOMComponent, 'after_update')
-@event.listens_for(BOMComponent, 'after_delete')
+# clients -> NEW listener + broadcast
+@event.listens_for(Clients, "after_insert")
+@event.listens_for(Clients, "after_update")
+@event.listens_for(Clients, "after_delete")
+def _clients_changed(mapper, connection, target):
+    _emit("clients:updated", {"id": getattr(target, "id", None)}, room="clients")
+
+
+@event.listens_for(BOMComponent, "after_insert")
+@event.listens_for(BOMComponent, "after_update")
+@event.listens_for(BOMComponent, "after_delete")
 def _bom_changed(mapper, connection, target):
     pid = getattr(target, "project_id", None)
     if pid:
         _emit("project:updated", {"id": pid}, room=f"project:{pid}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
-
-
