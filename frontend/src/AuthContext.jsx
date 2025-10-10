@@ -68,6 +68,30 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
+  useEffect(() => {
+      let timer;
+      const schedule = (token) => {
+          try {
+              const [, payload] = token.split('.');
+              const { exp } = JSON.parse(atob(payload));
+              const ms = exp * 1000 - Date.now() - 60_000; // refresh 60s early
+              if (ms > 0) {
+                  timer = setTimeout(async () => {
+                      // try a silent refresh; on failure logout() is already handled in refreshToken()
+                      const ok = await refreshToken();
+                      const t = localStorage.getItem('access_token');
+                      if (ok && t) schedule(t);
+                  }, ms);
+              }
+          } catch {}
+      };
+
+      const t = localStorage.getItem('access_token');
+      if (t) schedule(t);
+
+      return () => timer && clearTimeout(timer);
+  }, [user]);
+
 
   const login = (userData, tokens) => {
     setUser(userData);

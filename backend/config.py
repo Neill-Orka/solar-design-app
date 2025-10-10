@@ -1,9 +1,12 @@
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
+from pathlib import Path
 
 # Load environment variables from .env file
-load_dotenv()
+env_file = '.env.production' if os.environ.get('FLASK_ENV') == 'production' else '.env.development'
+load_dotenv(dotenv_path=Path(__file__).parent / env_file)
+
 
 class Config:
     # Get the database URL from the environment variable.
@@ -25,14 +28,14 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # JWT Configuration
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-super-secret-jwt-key-change-this-in-production')
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
-    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=12)
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=180)
     JWT_ALGORITHM = 'HS256'
     
     # Security
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'your-super-secret-key-change-this-in-production')
-    
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+
     # Email Configuration (for invitations)
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
     MAIL_PORT = int(os.environ.get('MAIL_PORT', '587'))

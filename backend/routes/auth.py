@@ -12,7 +12,7 @@ from functools import wraps
 auth_bp = Blueprint('auth', __name__)
 
 def validate_email_domain(email):
-    """Validate that email belongs to orkasolar.co.za domain"""
+    """Validate that email belongs to the orkasolar.co.za domain"""
     return email.lower().endswith(current_app.config['ALLOWED_EMAIL_DOMAIN'])
 
 def validate_password_strength(password):
@@ -145,7 +145,6 @@ def login():
         
         # Find user
         user = User.query.filter_by(email=email).first()
-        
         if not user or not user.check_password(data['password']):
             return jsonify({'message': 'Invalid email or password'}), 401
         
@@ -153,31 +152,31 @@ def login():
             return jsonify({'message': 'Account is inactive'}), 401
         
         # Update last login
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now()
         
         # Create tokens
         access_token = create_access_token(identity=str(user.id))
-        refresh_token_str = create_refresh_token(identity=str(user.id))
+        # refresh_token_str = create_refresh_token(identity=str(user.id))
         
         # Store refresh token in database
-        refresh_token = RefreshToken(
+        db_refresh = RefreshToken(
             user_id=user.id,
             token=RefreshToken.generate_token(),
-            expires_at=datetime.utcnow() + current_app.config['JWT_REFRESH_TOKEN_EXPIRES']
+            expires_at=datetime.now() + current_app.config['JWT_REFRESH_TOKEN_EXPIRES']
         )
         
-        db.session.add(refresh_token)
+        db.session.add(db_refresh)
         db.session.commit()
         
         # Log the action
         log_user_action(user.id, 'LOGIN', 'authentication', details={
-            'login_time': datetime.utcnow().isoformat()
+            'login_time': datetime.now().isoformat()
         })
         
         return jsonify({
             'message': 'Login successful',
             'access_token': access_token,
-            'refresh_token': refresh_token.token,
+            'refresh_token': db_refresh.token,
             'user': user.to_dict()
         }), 200
         
@@ -187,26 +186,28 @@ def login():
 
 @auth_bp.route('/refresh', methods=['POST'])
 def refresh():
-    """Refresh access token"""
+    """Refresh access token (SLIDING refresh expiry)"""
     try:
         data = request.get_json()
         refresh_token_str = data.get('refresh_token')
-        
         if not refresh_token_str:
             return jsonify({'message': 'Refresh token is required'}), 400
         
-        # Find refresh token
-        refresh_token = RefreshToken.query.filter_by(token=refresh_token_str).first()
-        
-        if not refresh_token or not refresh_token.is_valid():
+        # Find refresh token in DB
+        rt = RefreshToken.query.filter_by(token=refresh_token_str).first()
+        if not rt or not rt.is_valid():
             return jsonify({'message': 'Invalid or expired refresh token'}), 401
         
-        # Create new access token
-        access_token = create_access_token(identity=str(refresh_token.user_id))
-        
-        return jsonify({
-            'access_token': access_token
-        }), 200
+        # 1) Issue a new access token
+        access_token = create_access_token(identity=str(rt.user_id))
+
+        # 2) Slide refresh token expiry forward (user stays logged in while active)
+        rt.expires_at = datetime.now() + current_app.config['JWT_REFRESH_TOKEN_EXPIRES']
+
+        db.session.commit()
+        payload = { 'access_token': access_token}
+
+        return jsonify(payload), 200
         
     except Exception as e:
         return jsonify({'message': str(e)}), 500
@@ -276,7 +277,7 @@ def generate_registration_token():
             token=token_string,
             role=role,  # Store uppercase role to match database constraint
             created_by_id=current_user_id,
-            expires_at=datetime.utcnow() + timedelta(days=7)
+            expires_at=datetime.now() + timedelta(days=7)
         )
         
         db.session.add(registration_token)

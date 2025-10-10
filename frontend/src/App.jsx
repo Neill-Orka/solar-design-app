@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useParams } from 'react-router-dom';
 import { NotificationProvider } from './NotificationContext';
 import { AuthProvider, useAuth } from './AuthContext';
+import { API_URL} from "./apiConfig";
 import { io } from 'socket.io-client';
 import { useEffect } from 'react';
 import { SOCKET_URL, SOCKET_ENABLED } from './apiConfig';
@@ -114,6 +115,74 @@ axios.interceptors.request.use(
   error => {
     return Promise.reject(error);
   }
+);
+
+let isRefreshing = false;
+let pending = [];
+
+function onRefreshed(newToken) {
+    pending.forEach(cb => cb(newToken));
+    pending = [];
+}
+
+axios.interceptors.response.use(
+    (res) => res,
+    async (error) => {
+        const { config, response } = error;
+        if (!response) return Promise.reject(error); // network error
+
+        const url = config?.url || '';
+        const isAuthEndpoint = url.includes('/api/auth/login') || url.includes('/api/auth/refresh');
+
+        if (response.status === 401 && isAuthEndpoint) {
+            if (isRefreshing) {
+                return new Promise(resolve => {
+                    pending.push((newToken) => {
+                        if (newToken) config.headers['Authorization'] = `Bearer ${newToken}`;
+                        resolve(axios(config));
+                    });
+                });
+            }
+
+            isRefreshing = true;
+            try {
+                const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh_token: localStorage.getItem('refresh_token') })
+                });
+                if (!refreshRes.ok) throw new Error('refresh failed');
+
+                const data = await refreshRes.json();
+                const newToken = data.access_token;
+
+                localStorage.setItem('access_token', newToken);
+                axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+
+                // if backend returns rotated refresh token, also store it
+                if (data.refresh_token) {
+                    localStorage.setItem('refresh_token', data.refresh_token);
+                }
+
+                isRefreshing = false;
+                onRefreshed(newToken);
+
+                config.headers['Authorization'] = `Bearer ${newToken}`;
+                return axios(config);
+            } catch (e) {
+                isRefreshing = false;
+                onRefreshed(null);
+                // hard logout on refresh failure
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+                return Promise.reject(e);
+            }
+        }
+
+        return Promise.reject(error);
+    }
 );
 
 
