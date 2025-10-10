@@ -3,6 +3,7 @@ import axios from "axios";
 import { Line } from "react-chartjs-2";
 import Modal from "react-bootstrap/Modal";
 import Button from "react-bootstrap/Button";
+import { ButtonGroup } from "react-bootstrap";
 import {
   Row,
   Col,
@@ -734,6 +735,9 @@ const toEndOfDay = (d) => {
 
 // Component for the Standard Desing feature
 const StandardDesignSelector = ({ templates, loading, onSelectSystem }) => {
+  // Add state for view mode - default to "categorized"
+  const [viewMode, setViewMode] = useState("categorized");
+
   if (loading) {
     return (
       <div className="text-center p-5">
@@ -755,72 +759,189 @@ const StandardDesignSelector = ({ templates, loading, onSelectSystem }) => {
     );
   }
 
-  return (
-    <div className="row g-4 mb-4">
-      {templates.map((system) => (
-        <div className="col-md-6 col-lg-4" key={system.id}>
-          <Card className="h-100 shadow-sm hover-card">
-            <Card.Body className="d-flex flex-column">
-              <div className="d-flex align-items-center mb-3">
-                <div
-                  className={`rounded-circle bg-${getSystemTypeColor(system.system_type)} p-2 me-2`}
-                >
-                  <i
-                    className={`bi ${getSystemTypeIcon(system.system_type)} text-white`}
-                  ></i>
-                </div>
-                <Card.Title className="mb-0 fs-5">{system.name}</Card.Title>
-              </div>
+  // Group templates by system_type for categorized view
+  const groupedTemplates = {
+    grid: templates.filter(
+      (t) =>
+        t.system_type?.toLowerCase() === "grid" ||
+        t.system_type?.toLowerCase() === "grid-tied"
+    ),
+    hybrid: templates.filter((t) => t.system_type?.toLowerCase() === "hybrid"),
+    "off-grid": templates.filter(
+      (t) => t.system_type?.toLowerCase() === "off-grid"
+    ),
+  };
 
-              <Card.Text className="small text-muted mb-3">
-                {system.description || "No description available."}
-              </Card.Text>
-              <div className="small mb-3">
-                <div className="small mb-3">
-                  <span>PV Size:</span>
-                  <Badge bg="warning" text="dark">
-                    {system.panel_kw} kWp
-                  </Badge>
-                </div>
-                <div className="d-flex justify-content-between mb-1">
-                  <span>Inverter:</span>
-                  <Badge bg="info">{system.inverter_kva} kVA</Badge>
-                </div>
-                <div className="d-flex justify-content-between mb-1">
-                  <span>Battery:</span>
-                  <Badge bg="success">
-                    {system.battery_kwh > 0
-                      ? `${system.battery_kwh} kWh`
-                      : "None"}
-                  </Badge>
-                </div>
-                <div className="d-flex justify-content-between mb-1">
-                  <span>Type:</span>
-                  <span className="fw-semibold">
-                    {formatSystemType(system.system_type)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-auto pt-3 border-top">
-                <div className="d-flex justify-content-between align-items-center">
-                  <span className="fw-bold text-primary">
-                    R{system.total_cost.toLocaleString()}
-                  </span>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => onSelectSystem(system)}
-                  >
-                    Use This System
-                  </Button>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
+  // Helper to render a system template card (reused in both views)
+  const renderTemplateCard = (system) => (
+    <Card
+      className={`h-100 ${viewMode === "grid" ? "hover-card" : "system-template-card"}`}
+    >
+      <Card.Body className="d-flex flex-column">
+        <div className="d-flex align-items-center mb-3">
+          <div
+            className={`template-card-type-icon bg-${getSystemTypeColor(system.system_type)}`}
+          >
+            <i
+              className={`bi ${getSystemTypeIcon(system.system_type)} text-white`}
+            ></i>
+          </div>
+          <Card.Title className="mb-0 fs-5">{system.name}</Card.Title>
         </div>
-      ))}
-    </div>
+
+        <Card.Text className="small text-muted mb-3">
+          {system.description || "No description available."}
+        </Card.Text>
+        <div className="small mb-3">
+          <div className="d-flex justify-content-between mb-2">
+            <span>PV Size:</span>
+            <Badge bg="warning" text="dark" className="fw-medium">
+              {system.panel_kw} kWp
+            </Badge>
+          </div>
+          <div className="d-flex justify-content-between mb-2">
+            <span>Inverter:</span>
+            <Badge bg="info" className="fw-medium">
+              {system.inverter_kva} kVA
+            </Badge>
+          </div>
+          <div className="d-flex justify-content-between mb-2">
+            <span>Battery:</span>
+            <Badge bg="success" className="fw-medium">
+              {system.battery_kwh > 0 ? `${system.battery_kwh} kWh` : "None"}
+            </Badge>
+          </div>
+          <div className="d-flex justify-content-between mb-1">
+            <span>Type:</span>
+            <span className="fw-semibold">
+              {formatSystemType(system.system_type)}
+            </span>
+          </div>
+        </div>
+
+        <div className="template-divider"></div>
+
+        <div className="mt-auto">
+          <div className="d-flex justify-content-between align-items-center">
+            <span className="fw-bold text-primary">
+              R{system.total_cost.toLocaleString()}
+            </span>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => onSelectSystem(system)}
+              className="px-3"
+            >
+              Use This System
+            </Button>
+          </div>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+
+  return (
+    <>
+      {/* View toggle buttons */}
+      <div className="d-flex justify-content-end mb-4">
+        <ButtonGroup size="sm">
+          <Button
+            variant={viewMode === "categorized" ? "primary" : "outline-primary"}
+            onClick={() => setViewMode("categorized")}
+            className="view-toggle-button"
+          >
+            <i className="bi bi-columns-gap me-1"></i> Categorized
+          </Button>
+          <Button
+            variant={viewMode === "grid" ? "primary" : "outline-primary"}
+            onClick={() => setViewMode("grid")}
+            className="view-toggle-button"
+          >
+            <i className="bi bi-grid me-1"></i> Grid
+          </Button>
+        </ButtonGroup>
+      </div>
+
+      {viewMode === "categorized" ? (
+        // Categorized View - Three columns for each system type
+        <Row className="g-4 mb-4">
+          <Col md={4}>
+            <Card className="system-category-card">
+              <Card.Header className="system-category-header-grid text-white">
+                <h5 className="mb-0">
+                  <i className="bi bi-lightning-charge-fill"></i>
+                  Grid-Tied Systems
+                </h5>
+              </Card.Header>
+              <Card.Body>
+                {groupedTemplates.grid.length === 0 ? (
+                  <p className="text-muted">No grid-tied systems available</p>
+                ) : (
+                  <div className="d-flex flex-column gap-3">
+                    {groupedTemplates.grid.map((system) => (
+                      <div key={system.id}>{renderTemplateCard(system)}</div>
+                    ))}
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+
+          <Col md={4}>
+            <Card className="system-category-card">
+              <Card.Header className="system-category-header-hybrid text-white">
+                <h5 className="mb-0">
+                  <i className="bi bi-battery-charging"></i>
+                  Hybrid Systems
+                </h5>
+              </Card.Header>
+              <Card.Body>
+                {groupedTemplates.hybrid.length === 0 ? (
+                  <p className="text-muted">No hybrid systems available</p>
+                ) : (
+                  <div className="d-flex flex-column gap-3">
+                    {groupedTemplates.hybrid.map((system) => (
+                      <div key={system.id}>{renderTemplateCard(system)}</div>
+                    ))}
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+
+          <Col md={4}>
+            <Card className="system-category-card">
+              <Card.Header className="system-category-header-offgrid text-white">
+                <h5 className="mb-0">
+                  <i className="bi bi-power"></i>
+                  Off-Grid Systems
+                </h5>
+              </Card.Header>
+              <Card.Body>
+                {groupedTemplates["off-grid"].length === 0 ? (
+                  <p className="text-muted">No off-grid systems available</p>
+                ) : (
+                  <div className="d-flex flex-column gap-3">
+                    {groupedTemplates["off-grid"].map((system) => (
+                      <div key={system.id}>{renderTemplateCard(system)}</div>
+                    ))}
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      ) : (
+        // Grid View (original)
+        <div className="row g-4 mb-4">
+          {templates.map((system) => (
+            <div className="col-md-6 col-lg-4" key={system.id}>
+              {renderTemplateCard(system)}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 };
 
