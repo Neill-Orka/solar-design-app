@@ -454,6 +454,7 @@ def load_version_to_bom(version_id):
         if core_components["panel"] and core_components["panel"]["product"]:
             project.panel_id = core_components["panel"]["product_id"]
             project.num_panels = core_components["panel"]["quantity"]
+            panel_product = core_components["panel"]["product"]
             panel_power_w = getattr(
                 core_components["panel"]["product"], "power_w", None
             )
@@ -461,6 +462,13 @@ def load_version_to_bom(version_id):
                 project.panel_kw = (
                     panel_power_w * core_components["panel"]["quantity"] / 1000.0
                 )
+
+            # panel metadata
+            project.panel_metadata = {
+                "brand": getattr(panel_product, "brand_name", ""),
+                "model": getattr(panel_product, "description", ""),
+                "power_w": panel_power_w,
+            }
 
         # Update inverter_ids (stored as JSON array) and inverter_kva with quantity
         if core_components["inverter"] and core_components["inverter"]["product"]:

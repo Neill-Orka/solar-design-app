@@ -1252,7 +1252,7 @@ function SystemDesign({ projectId }) {
           if (panelProduct) {
             updates.selectedPanel = {
               value: panelProduct.id,
-              label: `${panelProduct.brand_name} ${panelProduct.model}`,
+              label: `${panelProduct.brand} ${panelProduct.model}`,
               product: panelProduct,
             };
             updates.panelKw = (
