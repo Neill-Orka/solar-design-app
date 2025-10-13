@@ -1,4 +1,5 @@
 # models.py
+from email.policy import default
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from sqlalchemy.dialects.postgresql import JSONB
@@ -290,7 +291,7 @@ class Projects(db.Model):
 class EnergyData(db.Model):
     __tablename__ = "energy_data"
     id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey("projects.id"), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey("projects.id"), nullable=True)
     timestamp = db.Column(db.DateTime)
     demand_kw = db.Column(db.Float)
 
@@ -1387,3 +1388,69 @@ class JobCardMaterialReceipt(db.Model):
             "filename": self.attachment.filename if self.attachment else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+class Invoice(db.Model):
+    __tablename__ = "invoices"
+    id = db.Column(db.Integer, primary_key=True)
+
+    project_id = db.Column(db.Integer, db.ForeignKey("projects.id"), nullable=True)
+
+    # lineage back to the quote snapshot used
+    quote_number = db.Column(db.String(50), nullable=True)
+    quote_version = db.Column(db.Integer, nullable=True)
+
+    # numbering & lifecycle
+    invoice_number = db.Column(db.String(50), unique=True, nullable=False)
+    invoice_type = db.Column(db.String(30), nullable=False) # `deposit` or `final`
+    status = db.Column(db.String(30), default='draft')
+
+    issue_date = db.Column(db.Date, nullable=False, default=lambda: datetime.now(SA_TZ))
+    due_date = db.Column(db.Date, nullable=True)
+
+    # proration for deposit/final
+    percent_of_quote = db.Column(db.Float, nullable=True)
+
+    # billing snapshot (so changes to Client later don't alter this doc)
+    billing_name = db.Column(db.String(255))
+    billing_company = db.Column(db.String(255), nullable=True)
+    billing_vat_no = db.Column(db.String(64))
+    billing_address = db.Column(db.Text)
+
+    currency = db.Column(db.String(10), nullable=True, default='ZAR')
+    vat_rate = db.Column(db.Numeric(5, 2), default=15.00)
+
+    subtotal_excl_vat = db.Column(db.Numeric(12, 2), default=0)
+    vat_amount = db.Column(db.Numeric(12, 2), default=0)
+    total_incl_vat = db.Column(db.Numeric(12, 2), default=0)
+
+    amount_paid = db.Column(db.Numeric(12, 2), default=0)
+    notes = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
+    updated_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(SA_TZ),
+        onupdate=lambda: datetime.now(SA_TZ),
+    )
+
+    items = db.relationship('InvoiceItem', backref='invoice', cascade="all, delete-orphan")
+
+class InvoiceItem(db.Model):
+    __tablename__ = "invoice_items"
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_id = db.Column(db.Integer, db.ForeignKey("invoices.id"), nullable=False)
+
+    # snapshot of the line
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=True)  # optional link back
+    description = db.Column(db.String(255), nullable=False)
+    sku = db.Column(db.String(128), nullable=True)
+
+    quantity = db.Column(db.Float, nullable=False, default=1.0)
+    unit = db.Column(db.String(32), nullable=True)
+
+    unit_price_excl_vat = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    line_total_excl_vat = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    vat_rate = db.Column(db.Numeric(5, 2), nullable=False, default=15.00)
+    line_vat = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    line_total_incl_vat = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    

@@ -568,3 +568,159 @@ def create_jobcard_material():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500    
+    
+@jobcards_bp.route("/jobcards/<int:jid>/invoices", methods=["POST", "OPTIONS"])
+@jwt_required()
+def create_invoice_for_jobcard(jid: int):
+    """
+    Create an invoice from a Job Card (standalone or project-linked).
+    Request body (optional):
+      {
+        "type": "final" | "misc",   # default 'final' (for now this only influences the title/notes)
+        "note": "string note to include on invoice"
+      }
+    Returns:
+      { "invoice_id": number, "project_id": number|null }
+    """
+    from models import JobCard, Invoice, InvoiceItem, Clients, Product, db
+    from datetime import datetime, timedelta
+
+    # CORS preflight shortcut
+    if request.method == "OPTIONS":
+        return ("", 204)
+    
+    jc = JobCard.query.get_or_404(jid)
+
+    body = request.get_json() or {}
+    inv_type = (body.get("type") or "final").lower()
+    vat_rate = 15.0
+
+    # Build billing snapshot
+    client_name = jc.client_name_snapshot or (jc.client.client_name if jc.client else None)
+    billing = {
+        "name": client_name,
+        "company": getattr(jc.client, "company", None) if jc.client else None,
+        "vat_no": getattr(jc.client, "vat_number", None) if jc.client else None,
+        "address": jc.client_address_snapshot,
+    }
+
+    # Complete invoice items from job card
+    items = []
+    subtotal = 0.0
+
+    # Labour (per item entry) 
+    for te in jc.time_entries:
+        hours = float(te.hours or 0)
+        rate = float(te.hourly_rate_at_time or 0)
+        if hours <= 0 or rate < 0:
+            continue
+        line_excl = round(hours * rate, 2)
+        items.append({
+            "product_id": None,
+            "description": f"Labour — {te.user.full_name if te.user else 'Technician'}",
+            "sku": None,
+            "quantity": hours,
+            "unit": "hour",
+            "unit_price_excl_vat": rate,
+            "line_total_excl_vat": line_excl,
+            "vat_rate": vat_rate,            
+        })
+        subtotal += line_excl
+
+    # Materials (per material line)
+    for m in jc.materials:
+        qty = float(m.quantity or 0)
+        unit = float(m.unit_price_at_time or 0)
+        if unit == 0:  # fallback to current catalog price if snapshot missing
+            if m.product:
+                unit = float(m.product.price or 0) or float(m.product.unit_cost or 0)
+        if qty <= 0 or unit < 0:
+            continue
+        line_excl = round(qty * unit, 2)
+        name = None
+        if m.product:
+            brand = m.product.brand if hasattr(m.product, "brand") else getattr(m.product, "brand_name", "")
+            model = m.product.model if hasattr(m.product, "model") else getattr(m.product, "description", "")
+            name = f"{brand} {model}".strip()
+        items.append({
+            "product_id": m.product_id,
+            "description": name or (m.product_name or "Material"),
+            "sku": getattr(m.product, "model_code_sku", None) if m.product else None,
+            "quantity": qty,
+            "unit": "ea",
+            "unit_price_excl_vat": round(unit, 2),
+            "line_total_excl_vat": line_excl,
+            "vat_rate": vat_rate,
+        })
+        subtotal += line_excl
+
+    # Travel (optional)
+    km = float(jc.travel_distance_km or 0)
+    rate_per_km = float(getattr(jc.vehicle, "rate_per_km", 0) or 0)
+    if km > 0 and rate_per_km > 0:
+        line_excl = round(km * rate_per_km, 2)
+        veh_name = jc.vehicle.name if jc.vehicle else "Travel"
+        veh_reg = f" ({jc.vehicle.registration})" if (jc.vehicle and jc.vehicle.registration) else ""
+        items.append({
+            "product_id": None,
+            "description": f"Travel — {veh_name}{veh_reg}",
+            "sku": None,
+            "quantity": km,
+            "unit": "km",
+            "unit_price_excl_vat": float(rate_per_km),
+            "line_total_excl_vat": line_excl,
+            "vat_rate": vat_rate,
+        })
+        subtotal += line_excl
+
+    # Summaries
+    vat_amount = round(subtotal * (vat_rate / 100.0), 2)
+    total_incl = round(subtotal + vat_amount, 2)
+
+    # ---- Create invoice header ----
+    from routes.invoices import _next_invoice_number  # reuse same numbering
+    inv = Invoice(
+        project_id=jc.project_id,  # can be None for callouts
+        quote_number=None,
+        quote_version=None,
+        invoice_number=_next_invoice_number(),
+        invoice_type=inv_type,        # 'final' for jobcards by default
+        status="draft",
+        issue_date=datetime.utcnow().date(),
+        due_date=(datetime.utcnow() + timedelta(days=7)).date(),
+        percent_of_quote=None,
+        billing_name=billing.get("name"),
+        billing_company=billing.get("company"),
+        billing_vat_no=billing.get("vat_no"),
+        billing_address=billing.get("address"),
+        vat_rate=vat_rate,
+        subtotal_excl_vat=subtotal,
+        vat_amount=vat_amount,
+        total_incl_vat=total_incl,
+        notes=(body.get("note") or None),
+    )
+    db.session.add(inv)
+    db.session.flush()  # get inv.id
+
+    # Lines
+    for it in items:
+        db.session.add(InvoiceItem(
+            invoice_id=inv.id,
+            product_id=it["product_id"],
+            description=it["description"] or "Line Item",
+            sku=it["sku"],
+            quantity=it["quantity"],
+            unit=it["unit"],
+            unit_price_excl_vat=it["unit_price_excl_vat"],
+            line_total_excl_vat=it["line_total_excl_vat"],
+            vat_rate=it["vat_rate"],
+            line_vat=round(it["line_total_excl_vat"] * (it["vat_rate"] / 100.0), 2),
+            line_total_incl_vat=round(it["line_total_excl_vat"] * (1 + it["vat_rate"] / 100.0), 2),
+        ))
+
+    # Mark BUM review state if caller already set it via PATCH earlier — we don't change here.
+    db.session.commit()
+
+    return jsonify({"invoice_id": inv.id, "project_id": inv.project_id}), 201
+
+    

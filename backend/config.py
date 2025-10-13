@@ -3,43 +3,22 @@ from datetime import timedelta
 from dotenv import load_dotenv
 from pathlib import Path
 
-# Load environment variables from .env file
-env_file = (
-    ".env.production"
-    if os.environ.get("FLASK_ENV") == "production"
-    else ".env.development"
-)
+# Load .env based on FLASK_ENV
+env = os.environ.get("FLASK_ENV", "development")
+env_file = f".env.{env}"
 load_dotenv(dotenv_path=Path(__file__).parent / env_file)
 
+print('Loaded env file: ', env_file)
+print('FLASK_ENV:', env)
 
 class Config:
-    # Get the database URL from the environment variable.
-    # If the environment variable is not set, use the default local database URI.
-    database_url = os.environ.get(
-        "DATABASE_URL", "postgresql://postgres:1234@localhost/client_onboarding"
-    )
-
-    # Render's database URLs start with 'postgres://', but SQLAlchemy requires 'postgresql://'.
-    # This line ensures the URI is in the correct format.
-    if database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-    # Set the final URI for SQLAlchemy
-    SQLALCHEMY_DATABASE_URI = database_url
-
-    # Other configurations
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-    # JWT Configuration
+    # Shared configurations
+    SECRET_KEY = os.environ.get("SECRET_KEY")
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=12)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=180)
     JWT_ALGORITHM = "HS256"
-
-    # Security
-    SECRET_KEY = os.environ.get("SECRET_KEY")
-
-    # Email Configuration (for invitations)
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
     MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(os.environ.get("MAIL_PORT", "587"))
     MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "true").lower() in ["true", "on", "1"]
@@ -48,17 +27,33 @@ class Config:
     MAIL_DEFAULT_SENDER = os.environ.get(
         "MAIL_DEFAULT_SENDER", "noreply@orkasolar.co.za"
     )
-
-    # Domain restriction
     ALLOWED_EMAIL_DOMAIN = "@orkasolar.co.za"
-
-    # Application settings
     ADMIN_EMAIL = os.environ.get(
-        "ADMIN_EMAIL", "your-email@orkasolar.co.za"
-    )  # Your admin email
+        "ADMIN_EMAIL", "neill@orkasolar.co.za"
+    )
     FRONTEND_URL = os.environ.get(
         "FRONTEND_URL", "http://localhost:3000"
-    )  # Frontend URL for invitation links
-    ENV = os.environ.get(
-        "FLASK_ENV", "development"
-    )  # Environment (development/production)
+    )
+    ENV = env  # Use the detected env
+    LAN = "http://192.168.8.181:5173"
+    ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "https://solar-design-app.vercel.app",
+        "http://localhost:5173",
+        LAN,
+    ]
+
+class DevelopmentConfig(Config):
+    DEBUG = True
+    # Use local DB URI (override via DEV_DATABASE_URI in .env.development if needed)
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        "DEV_DATABASE_URI", "postgresql://postgres:1234@localhost/client_onboarding"
+    )
+
+class ProductionConfig(Config):
+    DEBUG = False
+    # Use prod DB from DATABASE_URL (as provided by Render)
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url and database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    SQLALCHEMY_DATABASE_URI = database_url
