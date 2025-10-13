@@ -62,7 +62,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "master",
+    "git-widget-placeholder": "Invoice",
     "ignore.virus.scanning.warn.message": "true",
     "junie.onboarding.icon.badge.shown": "true",
     "node.js.detected.package.eslint": "true",
@@ -101,7 +101,7 @@
       <workItem from="1759822987274" duration="16589000" />
       <workItem from="1759909432001" duration="13562000" />
       <workItem from="1759990033675" duration="15713000" />
-      <workItem from="1760336585657" duration="843000" />
+      <workItem from="1760336585657" duration="1460000" />
     </task>
     <task id="LOCAL-00001" summary="Added full name to report">
       <option name="closed" value="true" />
