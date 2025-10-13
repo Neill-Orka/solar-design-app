@@ -1103,6 +1103,15 @@ class Vehicle(db.Model):
 
 class JobCard(db.Model):
     __tablename__ = "job_cards"
+    __table_args__ = (
+        db.Index('ix_job_cards_category_id', 'category_id'),
+        db.Index('ix_job_cards_client_id', 'client_id'),
+        db.Index('ix_job_cards_owner_id', 'owner_id'),
+        db.Index('ix_job_cards_project_id', 'project_id'),
+        db.Index('ix_job_cards_status', 'status'),
+        db.Index('ix_job_cards_vehicle_id', 'vehicle_id'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
 
     # Assignment
@@ -1250,6 +1259,11 @@ class JobCard(db.Model):
 
 class JobCardTimeEntry(db.Model):
     __tablename__ = "job_card_time_entries"
+    __table_args__ = (
+        db.Index('ix_time_entries_job_card_id', 'job_card_id'),
+        db.Index('ix_time_entries_user_id', 'user_id'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
@@ -1274,6 +1288,11 @@ class JobCardTimeEntry(db.Model):
 
 class JobCardMaterial(db.Model):
     __tablename__ = "job_card_materials"
+    __table_args__ = (
+        db.Index('ix_materials_job_card_id', 'job_card_id'),
+        db.Index('ix_materials_product_id', 'product_id'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
@@ -1311,6 +1330,11 @@ class JobCardMaterial(db.Model):
 
 class JobCardAttachment(db.Model):
     __tablename__ = "job_card_attachments"
+    __table_args__ = (
+        db.Index('ix_attachments_job_card_id', 'job_card_id'),
+        db.Index('ix_attachments_uploaded_by', 'uploaded_by_id'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=False)
     filename = db.Column(db.String(200), nullable=False)
