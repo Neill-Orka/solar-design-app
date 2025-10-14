@@ -1394,6 +1394,7 @@ class Invoice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     project_id = db.Column(db.Integer, db.ForeignKey("projects.id"), nullable=True)
+    job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=True)
 
     # lineage back to the quote snapshot used
     quote_number = db.Column(db.String(50), nullable=True)
@@ -1434,6 +1435,34 @@ class Invoice(db.Model):
     )
 
     items = db.relationship('InvoiceItem', backref='invoice', cascade="all, delete-orphan")
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'project_id': self.project_id,
+            'job_card_id': self.job_card_id,
+            'invoice_number': self.invoice_number,
+            'status': self.status,
+            'invoice_type': self.invoice_type,
+            'issue_date': self.issue_date.isoformat() if self.issue_date else None,
+            'due_date': self.due_date.isoformat() if self.due_date else None,
+            'percent_of_quote': float(self.percent_of_quote) if self.percent_of_quote else None,
+            'quote_number': self.quote_number,
+            'quote_version': self.quote_version,
+            'subtotal_excl_vat': float(self.subtotal_excl_vat),
+            'vat_amount': float(self.vat_amount),
+            'total_incl_vat': float(self.total_incl_vat),
+            'amount_paid': float(self.amount_paid) if self.amount_paid else 0,
+            'currency': self.currency,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            # For UI compatibility
+            'number': self.invoice_number,
+            'version_count': 1,
+            'latest_totals': {
+                'total_incl_vat': float(self.total_incl_vat)
+            }
+        }
 
 class InvoiceItem(db.Model):
     __tablename__ = "invoice_items"

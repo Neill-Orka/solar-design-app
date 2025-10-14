@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { getInvoice } from "./api";
+import { getInvoice, getProject, getJobCard } from "./api";
 import logo from "../../assets/orka_logo_text.png";
 import "../../PrintableBOM.css";
 import { Button, Spinner } from "react-bootstrap";
+import { useAuth } from "../../AuthContext";
 
 type InvoiceItem = {
   id: number;
@@ -53,6 +54,8 @@ export default function PrintableInvoice() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const [project, setProject] = useState<{ name: string } | null>(null);
 
   // Get the 'from' parameter to determine where to navigate back to
   const fromParam = searchParams.get("from");
@@ -68,6 +71,32 @@ export default function PrintableInvoice() {
     getInvoice(Number(invoiceId))
       .then((data) => {
         setInv(data);
+
+        // If we have a projectId, fetch project details
+        if (data.project_id) {
+          getProject(data.project_id)
+            .then((projectData) => {
+              setProject(projectData);
+              console.log("Loaded project: ", projectData);
+            })
+            .catch((err) => {
+              console.error("Failed to load project: ", err);
+            });
+        }
+
+        // If we have a job card ID, fetch job card details
+        else if (data.job_card_id) {
+          getJobCard(data.job_card_id)
+            .then((jobCardData) => {
+              // Store job card title in the project state for simplicity
+              setProject({ name: jobCardData.title || "Job Card" });
+              console.log("Loaded job card: ", jobCardData);
+            })
+            .catch((err) => {
+              console.error("Failed to load job card: ", err);
+            });
+        }
+
         setLoading(false);
 
         // Auto-download if requested
@@ -83,8 +112,10 @@ export default function PrintableInvoice() {
       });
   }, [invoiceId, shouldAutoDownload]);
 
+  // If we have a projectId, get the project details too
+
   const currentDate = useMemo(() => {
-    return new Date(inv?.issue_date || Date.now()).toLocaleDateString("en-ZA");
+    return new Date(inv?.issue_date || Date.now()).toLocaleDateString("en-GB");
   }, [inv]);
 
   const handleBack = () => {
@@ -274,7 +305,6 @@ export default function PrintableInvoice() {
 
   const totalPages = pagesWithKinds.length;
 
-  // Render functions
   const renderHeader = () => (
     <header className="bom-header">
       <div className="bom-header-top">
@@ -289,76 +319,68 @@ export default function PrintableInvoice() {
           </div>
         </div>
       </div>
-
-      <div className="bom-title">Tax Invoice</div>
-
+      <div className="bom-title">{"Tax Invoice"}</div>
       <div className="bom-info-grid">
         <div>
-          <span className="label">Bill To:</span>{" "}
-          {inv?.billing?.name || inv?.billing?.company || "Client"}
+          <span className="label">For attention:</span>{" "}
+          {inv?.billing?.name || "Client Name"}
         </div>
         <div>
           <span className="label">Date:</span> {currentDate}
         </div>
         <div>
           <span className="label">Company:</span>{" "}
-          {inv?.billing?.company || inv?.billing?.name || "Company"}
+          {inv?.billing?.company || "Company Name"}
         </div>
         <div>
-          <span className="label">Invoice #:</span> {inv?.invoice_number}
+          <span className="label">Invoice #:</span>{" "}
+          {inv?.invoice_number || "INV-0000"}
         </div>
         <div>
-          <span className="label">Billing Address:</span>{" "}
-          {inv?.billing?.address || "—"}
+          <span className="label">Address:</span>{" "}
+          {inv?.billing?.address || "Address"}
         </div>
         <div>
-          <span className="label">VAT No:</span> {inv?.billing?.vat_no || "—"}
+          <span className="label">Contact Person:</span>{" "}
+          {user?.first_name || "Lourens"} {user?.last_name || "de Jongh"}
         </div>
-        {inv?.quote_number && (
-          <div>
-            <span className="label">Quote Ref:</span> {inv.quote_number}
-          </div>
-        )}
-        {inv?.due_date && (
-          <div>
-            <span className="label">Due Date:</span>{" "}
-            {new Date(inv.due_date).toLocaleDateString("en-ZA")}
-          </div>
-        )}
+        <div>
+          <span className="label">Tel:</span> {user?.phone || "-"}
+        </div>
+        <div>
+          <span className="label">Tel:</span> {user?.phone || "082 660 0851"}
+        </div>
+        <div>
+          <span className="label">VAT No:</span> {inv?.billing?.vat_no || "-"}
+        </div>
+        <div>
+          <span className="label">Email:</span>{" "}
+          {user?.email || "lourens@orkasolar.co.za"}
+        </div>
+        <div />
       </div>
+      <div className="bom-project-strip">
+        {project?.name || "Invoice"}
+        {/* {(() => {
+          // This is if we have the project_id (so it is a quoted project)
+          const name = inv?.project_id?.name || "Job Card Title";
 
-      {inv?.invoice_type === "deposit" && (
-        <div
-          className="bom-project-strip"
-          style={{
-            fontSize: "0.95rem",
-            backgroundColor: "#fff3cd",
-            color: "#664d03",
-            fontWeight: "normal",
-            padding: "4px 12px",
-            marginTop: "6px",
-          }}
-        >
-          Deposit Invoice: {inv.percent_of_quote?.toFixed(0) || 50}% of
-          Quotation {inv.quote_number}
-        </div>
-      )}
+          // const inverter = projectData?.inverter_brand_model;
+          // const battery = projectData?.battery_brand_model;
 
-      {inv?.invoice_type === "final" && (
-        <div
-          className="bom-project-strip"
-          style={{
-            fontSize: "0.95rem",
-            backgroundColor: "#d1e7dd",
-            color: "#0f5132",
-            fontWeight: "normal",
-            padding: "4px 12px",
-            marginTop: "6px",
-          }}
-        >
-          Final Invoice for Quotation {inv.quote_number}
-        </div>
-      )}
+          // let details = "";
+          // if (inverter && battery) {
+          //   details = ` - ${inverter} & ${battery}`;
+          // } else if (inverter) {
+          //   details = ` - ${inverter}`;
+          // } else if (battery) {
+          //   details = ` - ${battery}`;
+          // }
+
+          // return `${name}${details}`;
+          return `${name}`;
+        })()} */}
+      </div>
     </header>
   );
 
@@ -428,7 +450,7 @@ export default function PrintableInvoice() {
               }}
             >
               <div>Due Date</div>
-              <div>{new Date(inv.due_date).toLocaleDateString("en-ZA")}</div>
+              <div>{new Date(inv.due_date).toLocaleDateString("en-GB")}</div>
             </div>
           )}
         </div>

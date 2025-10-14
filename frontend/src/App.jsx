@@ -43,6 +43,7 @@ import PageTransition from "./features/jobcards/components/PageTransition";
 import RecycleBin from "./RecycleBin";
 import ProjectRecycleBin from "./ProjectRecycleBin";
 import PrintableInvoice from "./features/invoices/PrintableInvoice";
+import InvoicesPage from "./features/invoices/InvoicesPage";
 
 import axios from "axios";
 
@@ -234,12 +235,10 @@ function AuthenticatedApp() {
           <LiveBus />
           <Routes>
             <Route path="/" element={<Home />} />
-
             {/* Client routes - accessible to all authenticated users */}
             <Route path="/clients" element={<Clients />} />
             <Route path="/clients/add" element={<ClientForm />} />
             <Route path="/clients/edit/:id" element={<EditClient />} />
-
             {/* Project routes - only for design team and admin */}
             <Route
               path="/projects"
@@ -297,7 +296,6 @@ function AuthenticatedApp() {
                 </ProtectedRoute>
               }
             />
-
             {/* Product routes - only for sales team and admin */}
             <Route
               path="/products-admin"
@@ -307,7 +305,6 @@ function AuthenticatedApp() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/recycle-bin"
               element={
@@ -318,7 +315,6 @@ function AuthenticatedApp() {
                 </PageTransition>
               }
             />
-
             <Route
               path="/projects/recycle-bin"
               element={
@@ -329,7 +325,6 @@ function AuthenticatedApp() {
                 </PageTransition>
               }
             />
-
             {/* System builder and other tools - accessible to all */}
             <Route path="/system-builder" element={<SystemBuilder />} />
             <Route
@@ -350,7 +345,6 @@ function AuthenticatedApp() {
               path="/projects/:projectId/quotes/:docId"
               element={<PrintableBOM />}
             />
-
             {/* Pages with animations */}
             <Route
               path="/jobcards"
@@ -369,7 +363,6 @@ function AuthenticatedApp() {
                 </PageTransition>
               }
             />
-
             <Route
               path="/jobcards/new"
               element={
@@ -380,7 +373,6 @@ function AuthenticatedApp() {
                 </PageTransition>
               }
             />
-
             <Route
               path="/jobcards/:id"
               element={
@@ -398,7 +390,6 @@ function AuthenticatedApp() {
                 </PageTransition>
               }
             />
-
             <Route
               path="/jobcards/:id/edit"
               element={
@@ -409,7 +400,6 @@ function AuthenticatedApp() {
                 </ProtectedRoute>
               }
             />
-
             {/* Admin only routes */}
             <Route
               path="/admin"
@@ -427,7 +417,6 @@ function AuthenticatedApp() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/projects/:projectId/invoices/:invoiceId/print"
               element={
@@ -436,12 +425,19 @@ function AuthenticatedApp() {
                 </PageTransition>
               }
             />
-
             <Route
               path="/invoices/:invoiceId/print"
               element={
                 <PageTransition>
                   <PrintableInvoice />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/invoices"
+              element={
+                <PageTransition>
+                  <InvoicesPage />
                 </PageTransition>
               }
             />

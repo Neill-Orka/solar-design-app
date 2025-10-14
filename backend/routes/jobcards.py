@@ -681,6 +681,7 @@ def create_invoice_for_jobcard(jid: int):
     from routes.invoices import _next_invoice_number  # reuse same numbering
     inv = Invoice(
         project_id=jc.project_id,  # can be None for callouts
+        job_card_id =jid,
         quote_number=None,
         quote_version=None,
         invoice_number=_next_invoice_number(),

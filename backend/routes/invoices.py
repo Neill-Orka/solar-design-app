@@ -62,6 +62,39 @@ def _compute_items_from_quote(lines, percent=100.0, vat_rate=15.0):
     total_incl = round(subtotal + vat_amount, 2)
     return items, subtotal, vat_amount, total_incl
 
+@invoices_bp.route('/invoices', methods=['GET'])
+def list_invoices():
+    """List all invoices"""
+    try:
+        invoices = Invoice.query.order_by(Invoice.created_at.desc()).all()
+        
+        result = []
+        for inv in invoices:
+            if hasattr(inv, 'to_dict'):
+                result.append(inv.to_dict())
+            else:
+                # Fallback serialization
+                result.append({
+                    'id': inv.id,
+                    'invoice_number': inv.invoice_number,
+                    'number': inv.invoice_number,  # UI compatibility 
+                    'status': inv.status,
+                    'issue_date': inv.issue_date.isoformat() if inv.issue_date else None,
+                    'due_date': inv.due_date.isoformat() if inv.due_date else None,
+                    'subtotal_excl_vat': float(inv.subtotal_excl_vat),
+                    'vat_amount': float(inv.vat_amount),
+                    'total_incl_vat': float(inv.total_incl_vat),
+                    'created_at': inv.created_at.isoformat() if hasattr(inv, 'created_at') else None,
+                    'version_count': 1,  # UI compatibility
+                    'latest_totals': {
+                        'total_incl_vat': float(inv.total_incl_vat)
+                    }
+                })                
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @invoices_bp.route('/projects/<int:project_id>/invoices', methods=['POST'])
 def create_invoice(project_id):
     """
@@ -158,6 +191,7 @@ def get_invoice(invoice_id):
     return jsonify({
         "id": inv.id,
         "project_id": inv.project_id,
+        "job_card_id": inv.job_card_id,
         "invoice_number": inv.invoice_number,
         "invoice_type": inv.invoice_type,
         "status": inv.status,

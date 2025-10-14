@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from './AuthContext';
-import logo from './assets/orka_logo_transparent_background.png';
-import './Navbar.css';
+import React, { useState, useEffect, useRef } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "./AuthContext";
+import logo from "./assets/orka_logo_transparent_background.png";
+import "./Navbar.css";
 
 const Navbar = () => {
   const { user, logout, canModifyProjects, canModifyProducts } = useAuth();
@@ -14,11 +14,11 @@ const Navbar = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login', { replace: true });
+      navigate("/login", { replace: true });
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
       // Even if logout fails, clear local state and redirect
-      navigate('/login', { replace: true });
+      navigate("/login", { replace: true });
     }
   };
 
@@ -45,51 +45,67 @@ const Navbar = () => {
         closeDropdown();
       }
       // Close mobile menu when clicking outside navbar
-      if (!event.target.closest('.navbar')) {
+      if (!event.target.closest(".navbar")) {
         closeMobileMenu();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
   const getNavLinks = () => {
     const baseLinks = [
-      { to: '/', label: 'Home', exact: true },
-      { to: '/clients', label: 'Clients' },
+      { to: "/", label: "Home", exact: true },
+      { to: "/clients", label: "Clients" },
     ];
 
     // Only show Projects if user can modify them (design team, manager, or admin)
-    if (user && (user.role === 'admin' || user.role === 'design' || user.role === 'manager')) {
-      baseLinks.push({ to: '/projects', label: 'Projects' });
+    if (
+      user &&
+      (user.role === "admin" ||
+        user.role === "design" ||
+        user.role === "manager")
+    ) {
+      baseLinks.push({ to: "/projects", label: "Projects" });
     }
 
     // Only show Products if user can modify them (sales team, manager, or admin)
-    if (user && (user.role === 'admin' || user.role === 'sales' || user.role === 'manager')) {
-      baseLinks.push({ to: '/products-admin', label: 'Products' });
+    if (
+      user &&
+      (user.role === "admin" ||
+        user.role === "sales" ||
+        user.role === "manager")
+    ) {
+      baseLinks.push({ to: "/products-admin", label: "Products" });
     }
 
     // Update System Builder access (everyone except sales)
-    if (user && user.role !== 'sales') {
-      baseLinks.push({ to: '/system-builder', label: 'System Builder' });
+    if (user && user.role !== "sales") {
+      baseLinks.push(
+        { to: "/system-builder", label: "System Builder" },
+        { to: "/invoices", label: "Invoices" }
+      );
     }
-    
+
     // Update Load Profile Manager access (everyone except sales)
-    if (user && user.role !== 'sales') {
-      baseLinks.push({ to: '/load-profile-manager', label: 'Load Profile Manager' });
+    if (user && user.role !== "sales") {
+      baseLinks.push({
+        to: "/load-profile-manager",
+        label: "Load Profile Manager",
+      });
     }
 
     // Tariff Manager is still accessible to all
-    baseLinks.push({ to: '/tariffs', label: 'Tariff Manager' });
+    baseLinks.push({ to: "/tariffs", label: "Tariff Manager" });
 
     // Only show admin features to admins
-    if (user?.role === 'admin') {
+    if (user?.role === "admin") {
       baseLinks.push(
-        { to: '/rules', label: 'Engine Rules' },
-        { to: '/admin', label: 'Admin' }
+        // { to: '/rules', label: 'Engine Rules' },
+        { to: "/admin", label: "Admin" }
       );
     }
 
@@ -115,16 +131,19 @@ const Navbar = () => {
           <span className="navbar-toggler-icon"></span>
         </button>
 
-        <div className={`navbar-collapse justify-content-center ${isMobileMenuOpen ? 'show' : 'collapse'}`} id="navbarNav">
+        <div
+          className={`navbar-collapse justify-content-center ${isMobileMenuOpen ? "show" : "collapse"}`}
+          id="navbarNav"
+        >
           <div className="position-absolute top-1 start-50 translate-middle-x">
             <ul className="navbar-nav">
-              {getNavLinks().map(link => (
+              {getNavLinks().map((link) => (
                 <li className="nav-item" key={link.to}>
                   <NavLink
                     to={link.to}
                     end={link.exact}
                     className={({ isActive }) =>
-                      `nav-link navbar-link ${isActive ? 'active' : ''}`
+                      `nav-link navbar-link ${isActive ? "active" : ""}`
                     }
                     onClick={closeMobileMenu}
                   >
@@ -142,24 +161,36 @@ const Navbar = () => {
                   className="nav-link dropdown-toggle d-flex align-items-center btn btn-link"
                   type="button"
                   onClick={toggleDropdown}
-                  style={{ border: 'none', padding: '0.5rem 0.75rem' }}
+                  style={{ border: "none", padding: "0.5rem 0.75rem" }}
                 >
                   <span className="user-avatar me-2">
-                    {user.first_name ? user.first_name.charAt(0).toUpperCase() : 'U'}
+                    {user.first_name
+                      ? user.first_name.charAt(0).toUpperCase()
+                      : "U"}
                   </span>
                   <span className={`role-badge ms-2 role-${user.role}`}>
                     {user.role}
                   </span>
                 </button>
-                <ul className={`dropdown-menu dropdown-menu-end ${isDropdownOpen ? 'show' : ''}`}>
+                <ul
+                  className={`dropdown-menu dropdown-menu-end ${isDropdownOpen ? "show" : ""}`}
+                >
                   <li>
                     <span className="dropdown-item-text">
                       <small>{user.email}</small>
                     </span>
                   </li>
-                  <li><hr className="dropdown-divider" /></li>
                   <li>
-                    <button className="dropdown-item" onClick={() => { handleLogout(); closeDropdown(); }}>
+                    <hr className="dropdown-divider" />
+                  </li>
+                  <li>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        handleLogout();
+                        closeDropdown();
+                      }}
+                    >
                       <i className="bi bi-box-arrow-right me-2"></i>
                       Sign Out
                     </button>

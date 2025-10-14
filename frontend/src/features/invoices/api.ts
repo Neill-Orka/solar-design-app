@@ -28,3 +28,13 @@ export async function getInvoice(invoiceId: number) {
   const { data } = await axios.get(`${API_URL}/api/invoices/${invoiceId}`);
   return data;
 }
+
+export async function getProject(projectId: number) {
+  const { data } = await axios.get(`${API_URL}/api/projects/${projectId}`);
+  return data;
+}
+
+export async function getJobCard(jobCardId: number) {
+  const { data } = await axios.get(`${API_URL}/api/jobcards/${jobCardId}`);
+  return data;
+}
