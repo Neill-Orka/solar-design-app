@@ -2,14 +2,19 @@
 // Read-only job card detail view (mobile-first, works great on desktop too)
 
 // @ts-ignore
-import React , {useEffect, useState} from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type {JobCard, Vehicle} from "../types";
+import type { JobCard, Vehicle } from "../types";
 // @ts-ignore
 import { API_URL } from "../../../apiConfig";
 // @ts-ignore
-import { useAuth } from '../../../AuthContext';
-import { deleteJobCard, approveJobCard, declineJobCard } from "../api";
+import { useAuth } from "../../../AuthContext";
+import {
+  deleteJobCard,
+  approveJobCard,
+  declineJobCard,
+  createInvoiceForJobCard,
+} from "../api";
 import "./jobcard-detail.css";
 
 type Props = {
@@ -29,11 +34,13 @@ const fmtDate = (iso?: string | null) => {
   return `${dd}/${mm}/${yy}`;
 };
 
-const formatCurrency = (v: number | null | undefined) => 
-  (v == null || isNaN(Number(v)))
+const formatCurrency = (v: number | null | undefined) =>
+  v == null || isNaN(Number(v))
     ? "-"
-    : new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(Number(v));
-
+    : new Intl.NumberFormat("en-ZA", {
+        style: "currency",
+        currency: "ZAR",
+      }).format(Number(v));
 
 export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
   const nav = useNavigate();
@@ -41,7 +48,9 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showMaterials, setShowMaterials] = useState(false);
-  const [attachments, setAttachments] = useState<any[]>(() => (job as any).attachments || []);
+  const [attachments, setAttachments] = useState<any[]>(
+    () => (job as any).attachments || []
+  );
   const [resolvedVehicle, setResolvedVehicle] = useState<Vehicle | any>(null);
   const [heroIndex, setHeroIndex] = useState(0);
 
@@ -49,76 +58,89 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [approveLoading, setApproveLoading] = useState(false);
   const [approveComment, setApproveComment] = useState("");
-  const [approveWithInvoice, setApproveWithInvoice] = useState<boolean | null>(true);
+  const [approveWithInvoice, setApproveWithInvoice] = useState<boolean | null>(
+    true
+  );
 
   // helper submit
   async function handleApproveSubmit() {
-      if (approveWithInvoice === null) return; // require a choice
-      try {
-          setApproveLoading(true);
-          await approveJobCard(job.id, {
-              invoice: approveWithInvoice,
-              comment: approveComment?.trim() || undefined,
-          });
+    if (approveWithInvoice === null) return; // require a choice
+    try {
+      setApproveLoading(true);
+      const updated = await approveJobCard(job.id, {
+        invoice: approveWithInvoice,
+        comment: approveComment?.trim() || undefined,
+      });
 
-          // NAVIGATE TO APPROPRIATE TABS HERE
-          nav('/jobcards', { replace: true });
-      } finally {
-          setApproveLoading(false);
-          setShowApproveModal(false);
-          setApproveComment('');
-          setApproveWithInvoice(null);
+      // NAVIGATE TO APPROPRIATE TABS HERE
+      if (approveWithInvoice) {
+        const ref = await createInvoiceForJobCard(job.id, { type: "final" });
+
+        // Route supports BOTH project-scoped and standalone invoices
+        if (ref.project_id) {
+          nav(`/projects/${ref.project_id}/invoices/${ref.invoice_id}/print`, {
+            replace: true,
+          });
+        } else {
+          nav(`/invoices/${ref.invoice_id}/print`, { replace: true });
+        }
+      } else {
+        nav(`/jobcards`, { replace: true });
       }
+    } finally {
+      setApproveLoading(false);
+      setShowApproveModal(false);
+      setApproveComment("");
+      setApproveWithInvoice(null);
+    }
   }
 
   const isBumOnThis: boolean = user?.id && job.bum_id === user.id;
   const isOwner: boolean = user?.id && job.owner_id === user.id;
-  
+
   useEffect(() => {
     setAttachments((job as any).attachments || []);
   }, [job]);
 
-
   const clientName =
-    job.client_name ||
-    (job as any).client?.client_name ||
-    "Client";
+    job.client_name || (job as any).client?.client_name || "Client";
 
   const address =
-    job.client_address ||
-    (job as any).client?.address?.street ||
-    "Location";
+    job.client_address || (job as any).client?.address?.street || "Location";
 
   // Vehicle / Travel
   const didTravel = job.did_travel;
-  const vehicleName = job.vehicle_name || (resolvedVehicle && resolvedVehicle.name) || null;
-  const vehicleReg = job.vehicle_registration || (resolvedVehicle && resolvedVehicle.vehicle_registration) || "";
+  const vehicleName =
+    job.vehicle_name || (resolvedVehicle && resolvedVehicle.name) || null;
+  const vehicleReg =
+    job.vehicle_registration ||
+    (resolvedVehicle && resolvedVehicle.vehicle_registration) ||
+    "";
 
   const travelKm = Number(job.travel_distance_km) || 0; // already round trip
   const travelRate = Number(job.rate_per_km) ? Number(job.rate_per_km) : 0;
   const travelCost = travelKm * travelRate;
 
   useEffect(() => {
-      // Fetch only if we have an id but backend didn't include name
-      if (job.vehicle_id && !job.vehicle_name) {
-          (async () => {
-              try {
-                  const token = localStorage.getItem("access_token");
-                  const res = await fetch(`${API_URL}/api/vehicles`, {
-                      headers: { Authorization: `Bearer ${token || ""}` }
-                  });
-                  if (res.ok) {
-                      const list = await res.json();
-                      const found = list.find((v: any) => v.id === job.vehicle_id);
-                      if (found) setResolvedVehicle(found);
-                  }
-              } catch (e) {
-                  console.warn('Failed loading vehicles: ', e);
-              }
-          })();
-      }
+    // Fetch only if we have an id but backend didn't include name
+    if (job.vehicle_id && !job.vehicle_name) {
+      (async () => {
+        try {
+          const token = localStorage.getItem("access_token");
+          const res = await fetch(`${API_URL}/api/vehicles`, {
+            headers: { Authorization: `Bearer ${token || ""}` },
+          });
+          if (res.ok) {
+            const list = await res.json();
+            const found = list.find((v: any) => v.id === job.vehicle_id);
+            if (found) setResolvedVehicle(found);
+          }
+        } catch (e) {
+          console.warn("Failed loading vehicles: ", e);
+        }
+      })();
+    }
   }, [job.vehicle_id, job.vehicle_name]);
-    
 
   // Process URLs to ensure they have the full API URL prefix
   const processUrl = (url: string) => {
@@ -129,10 +151,14 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
     }
     // otherwise, prepend the API_URL
     return `${API_URL}${url}`;
-  }
+  };
 
-  const sitePhotosAll = attachments.filter(a => (a.attachment_type || 'site').toLowerCase() === 'site');
-  const receiptPhotosAll = attachments.filter(a => (a.attachment_type || '').toLowerCase() === 'receipt');
+  const sitePhotosAll = attachments.filter(
+    (a) => (a.attachment_type || "site").toLowerCase() === "site"
+  );
+  const receiptPhotosAll = attachments.filter(
+    (a) => (a.attachment_type || "").toLowerCase() === "receipt"
+  );
 
   const receipts = receiptPhotosAll;
   const sitePhotos = sitePhotosAll;
@@ -141,23 +167,25 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
   useEffect(() => {
     if (heroIndex >= sitePhotos.length) setHeroIndex(0);
   }, [sitePhotos.length, heroIndex]);
-  
-  const hero = sitePhotos[heroIndex]?.url ? processUrl(sitePhotos[heroIndex].url) : undefined;
+
+  const hero = sitePhotos[heroIndex]?.url
+    ? processUrl(sitePhotos[heroIndex].url)
+    : undefined;
 
   // Hero Navigation
   const prevSite = () => {
     if (sitePhotos.length < 2) return;
-    setHeroIndex(i => (i - 1 + sitePhotos.length) % sitePhotos.length);
-  }
+    setHeroIndex((i) => (i - 1 + sitePhotos.length) % sitePhotos.length);
+  };
 
   const nextSite = () => {
     if (sitePhotos.length < 2) return;
-    setHeroIndex(i => (i + 1) % sitePhotos.length);
-  }
+    setHeroIndex((i) => (i + 1) % sitePhotos.length);
+  };
 
   const selectSite = (idx: number) => setHeroIndex(idx);
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === "admin";
 
   const handleDelete = async () => {
     if (!isAdmin) return;
@@ -165,7 +193,7 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
     try {
       setDeleting(true);
       await deleteJobCard(job.id);
-      nav('/jobcards', { replace: true });
+      nav("/jobcards", { replace: true });
     } catch (error) {
       console.error("Failed to delete job card:", error);
       alert("Failed to delete job card. Please try again later");
@@ -178,13 +206,15 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
     <div className="jcD-page">
       {/* App bar */}
       <div className="jcD-appbar">
-        <button className="jcD-back" onClick={() => nav("/jobcards")} aria-label="Back">
+        <button
+          className="jcD-back"
+          onClick={() => nav("/jobcards")}
+          aria-label="Back"
+        >
           <i className="bi bi-chevron-left" />
           <span>Back</span>
         </button>
-        <div className="jcD-appbar-title">
-          {clientName}
-        </div>
+        <div className="jcD-appbar-title">{clientName}</div>
         <button className="jcD-done" onClick={onEdit} aria-label="Edit">
           Edit
         </button>
@@ -218,7 +248,9 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
           <div className="jcD-chip-label">Start Date</div>
         </div>
         <div className="jcD-chip">
-          <div className="jcD-chip-value">{fmtDate(job.complete_at as any)}</div>
+          <div className="jcD-chip-value">
+            {fmtDate(job.complete_at as any)}
+          </div>
           <div className="jcD-chip-label">End Date</div>
         </div>
         <div className="jcD-chip">
@@ -228,11 +260,9 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
           <div className="jcD-chip-label">Job Owner</div>
         </div>
         <div className="jcD-chip">
-          <div className="jcD-chip-value">
-            {job.bum_name || "Not assigned"}
-          </div>
+          <div className="jcD-chip-value">{job.bum_name || "Not assigned"}</div>
           <div className="jcD-chip-label">BUM</div>
-        </div>        
+        </div>
       </div>
 
       {/* Description */}
@@ -244,52 +274,60 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
       </div>
 
       {/*  Technician Labour*/}
-      {Array.isArray((job as any).time_entries) && (job as any).time_entries.length > 0 && (
-        <div className="jcD-card">
-          <div className="jcD-card-title">Technician Labour</div>
-          <div className="jcD-card-body">
-            <table className="table table-sm mb-0">
-              <thead>
-                <tr>
-                  <th style={{ width: '40%' }}>Technician</th>
+      {Array.isArray((job as any).time_entries) &&
+        (job as any).time_entries.length > 0 && (
+          <div className="jcD-card">
+            <div className="jcD-card-title">Technician Labour</div>
+            <div className="jcD-card-body">
+              <table className="table table-sm mb-0">
+                <thead>
+                  <tr>
+                    <th style={{ width: "40%" }}>Technician</th>
                     <th></th>
                     <th></th>
-                  <th style={{ width: '20%', textAlign: 'right' }}>Hours</th>
-                  {/*<th style={{ width: '20%', textAlign: 'right' }}>Rate</th>*/}
-                  {/*<th style={{ width: '20%', textAlign: 'right' }}>Amount</th>*/}
-                </tr>
-              </thead>
-              <tbody>
-                {(job as any).time_entries.map((te: any) => (
-                  <tr key={te.id}>
-                    <td>{te.user_name || te.user_id}</td>
-                      <td></td>
-                      <td></td>
-                    <td style={{ textAlign: 'right' }}>{Number(te.hours).toFixed(1)}</td>
-                    {/*<td style={{ textAlign: 'right' }}>*/}
-                    {/*  {formatCurrency(Number(te.hourly_rate_at_time))}*/}
-                    {/*</td>*/}
-                    {/*<td style={{ textAlign: 'right', fontWeight: 600 }}>*/}
-                    {/*  {formatCurrency(Number(te.amount))}*/}
-                    {/*</td>*/}
+                    <th style={{ width: "20%", textAlign: "right" }}>Hours</th>
+                    {/*<th style={{ width: '20%', textAlign: 'right' }}>Rate</th>*/}
+                    {/*<th style={{ width: '20%', textAlign: 'right' }}>Amount</th>*/}
                   </tr>
-                ))}
-                <tr>
-                  <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700 }}>Total</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                    {formatCurrency(
-                      (job as any).time_entries.reduce(
-                        (s: number, te: any) => s + Number(te.amount || 0),
-                        0
-                      )
-                    )}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {(job as any).time_entries.map((te: any) => (
+                    <tr key={te.id}>
+                      <td>{te.user_name || te.user_id}</td>
+                      <td></td>
+                      <td></td>
+                      <td style={{ textAlign: "right" }}>
+                        {Number(te.hours).toFixed(1)}
+                      </td>
+                      {/*<td style={{ textAlign: 'right' }}>*/}
+                      {/*  {formatCurrency(Number(te.hourly_rate_at_time))}*/}
+                      {/*</td>*/}
+                      {/*<td style={{ textAlign: 'right', fontWeight: 600 }}>*/}
+                      {/*  {formatCurrency(Number(te.amount))}*/}
+                      {/*</td>*/}
+                    </tr>
+                  ))}
+                  <tr>
+                    <td
+                      colSpan={3}
+                      style={{ textAlign: "right", fontWeight: 700 }}
+                    >
+                      Total
+                    </td>
+                    <td style={{ textAlign: "right", fontWeight: 700 }}>
+                      {formatCurrency(
+                        (job as any).time_entries.reduce(
+                          (s: number, te: any) => s + Number(te.amount || 0),
+                          0
+                        )
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Vehicles */}
       {(didTravel || vehicleName || travelKm > 0) && (
@@ -314,7 +352,8 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
                 <div className="jcD-veh-value">
                   {travelKm > 0 ? (
                     <>
-                      {travelKm.toFixed(1)} <span className="jcD-veh-unit">km</span>
+                      {travelKm.toFixed(1)}{" "}
+                      <span className="jcD-veh-unit">km</span>
                     </>
                   ) : (
                     "—"
@@ -324,7 +363,7 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
               <div className="jcD-veh-item">
                 <div className="jcD-veh-label">Travel Cost</div>
                 <div className="jcD-veh-value">
-                  {travelKm > 0 &&  travelRate > 0
+                  {travelKm > 0 && travelRate > 0
                     ? formatCurrency(travelCost)
                     : "—"}
                 </div>
@@ -335,76 +374,91 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
       )}
 
       {/* Materials */}
-      {Array.isArray((job as any).materials) && (job as any).materials.length > 0 && (
-        <div className="jcD-card jcD-mats">
-          <button
-            type="button"
-            className="jcD-mats-header"
-            onClick={() => setShowMaterials((v) => !v)}
-            aria-expanded={showMaterials}
-          >
-            <div className="jcD-mats-header-left">
-              <span className="jcD-mats-title">Materials</span>
-              <span className="jcD-mats-count">
-                {(job as any).materials.length} item{(job as any).materials.length !== 1 && 's'}
-              </span>
-            </div>
-            <div className="jcD-mats-header-right">
-              <span className="jcD-mats-total">
-                {formatCurrency(
-                  (job as any).materials.reduce(
-                    (s: number, m: any) =>
-                      s + Number(m.unit_price_at_time || 0) * Number(m.quantity || 0),
-                    0
-                  )
-                )}
-              </span>
-              <i
-                className={`bi bi-chevron-${showMaterials ? 'up' : 'down'} jcD-mats-chevron`}
-                aria-hidden
-              />
-            </div>
-          </button>
+      {Array.isArray((job as any).materials) &&
+        (job as any).materials.length > 0 && (
+          <div className="jcD-card jcD-mats">
+            <button
+              type="button"
+              className="jcD-mats-header"
+              onClick={() => setShowMaterials((v) => !v)}
+              aria-expanded={showMaterials}
+            >
+              <div className="jcD-mats-header-left">
+                <span className="jcD-mats-title">Materials</span>
+                <span className="jcD-mats-count">
+                  {(job as any).materials.length} item
+                  {(job as any).materials.length !== 1 && "s"}
+                </span>
+              </div>
+              <div className="jcD-mats-header-right">
+                <span className="jcD-mats-total">
+                  {formatCurrency(
+                    (job as any).materials.reduce(
+                      (s: number, m: any) =>
+                        s +
+                        Number(m.unit_price_at_time || 0) *
+                          Number(m.quantity || 0),
+                      0
+                    )
+                  )}
+                </span>
+                <i
+                  className={`bi bi-chevron-${showMaterials ? "up" : "down"} jcD-mats-chevron`}
+                  aria-hidden
+                />
+              </div>
+            </button>
 
-          <div className={`jcD-mats-body ${showMaterials ? 'open' : ''}`}>
-            <table className="jcD-mats-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '42%' }}>Material</th>
-                  <th style={{ width: '14%' }} className="ta-center">Qty</th>
-                  <th style={{ width: '20%' }} className="ta-end">Unit Price</th>
-                  <th style={{ width: '24%' }} className="ta-end">Line Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(job as any).materials.map((m: any) => {
-                  const qty = Number(m.quantity || 0);
-                  const unit = Number(m.unit_price_at_time || 0);
-                  const lineTotal = unit * qty;
-                  return (
-                    <tr key={m.id}>
-                      <td>
-                        <div className="jcD-mat-name">
-                          {m.brand_name} {m.product_name || `#${m.product_id}`}
-                        </div>
-                      </td>
-                      <td className="ta-center">{qty}</td>
-                      <td className="ta-end">{formatCurrency(unit)}</td>
-                      <td className="ta-end fw-semibold">{formatCurrency(lineTotal)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className={`jcD-mats-body ${showMaterials ? "open" : ""}`}>
+              <table className="jcD-mats-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "42%" }}>Material</th>
+                    <th style={{ width: "14%" }} className="ta-center">
+                      Qty
+                    </th>
+                    <th style={{ width: "20%" }} className="ta-end">
+                      Unit Price
+                    </th>
+                    <th style={{ width: "24%" }} className="ta-end">
+                      Line Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(job as any).materials.map((m: any) => {
+                    const qty = Number(m.quantity || 0);
+                    const unit = Number(m.unit_price_at_time || 0);
+                    const lineTotal = unit * qty;
+                    return (
+                      <tr key={m.id}>
+                        <td>
+                          <div className="jcD-mat-name">
+                            {m.brand_name}{" "}
+                            {m.product_name || `#${m.product_id}`}
+                          </div>
+                        </td>
+                        <td className="ta-center">{qty}</td>
+                        <td className="ta-end">{formatCurrency(unit)}</td>
+                        <td className="ta-end fw-semibold">
+                          {formatCurrency(lineTotal)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Receipt Photos */}
       <div className="jcD-card">
         <div className="jcD-card-title">Receipt Photos</div>
         <div className="jcD-card-body">
-          {receipts.length === 0 && <div className="jcD-empty">No receipt photos</div>}
+          {receipts.length === 0 && (
+            <div className="jcD-empty">No receipt photos</div>
+          )}
           {receipts.length > 0 && (
             <div className="jcD-photoStrip" role="list">
               {receipts.map((r: any) => (
@@ -475,18 +529,23 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
                 return (
                   <div
                     key={p.id || p.url}
-                    className={`jcD-siteThumbWrap ${active ? 'active' : ''}`}
+                    className={`jcD-siteThumbWrap ${active ? "active" : ""}`}
                   >
                     <button
                       type="button"
-                      className={`jcD-siteThumb ${active ? 'active' : ''}`}
+                      className={`jcD-siteThumb ${active ? "active" : ""}`}
                       onClick={() => selectSite(idx)}
                       aria-label={`Show photo ${idx + 1}`}
                       title={p.filename || "Photo"}
                     >
-                      <img src={thumbUrl} alt={p.caption || `Site ${idx + 1}`} />
+                      <img
+                        src={thumbUrl}
+                        alt={p.caption || `Site ${idx + 1}`}
+                      />
                     </button>
-                    {p.caption && <div className="jcD-thumb-cap">{p.caption}</div>}
+                    {p.caption && (
+                      <div className="jcD-thumb-cap">{p.caption}</div>
+                    )}
                   </div>
                 );
               })}
@@ -495,129 +554,146 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
         </div>
       </div>
 
-        {isBumOnThis && (
-          <>
-            <button
-                className="btn btn-sm btn-success"
-                onClick={() => setShowApproveModal(true)}
-            >
-                Approve
-            </button>
+      {isBumOnThis && (
+        <>
+          <button
+            className="btn btn-sm btn-success"
+            onClick={() => setShowApproveModal(true)}
+          >
+            Approve
+          </button>
 
-            <button
-                className="btn btn-sm btn-outline-danger ms-2"
-                onClick={async () => {
-                    const c = prompt("Enter reason for declining (required)") || '';
-                    if (!c.trim()) return;
-                    await declineJobCard(job.id, c);
-                    nav('/jobcards', { replace: true });
-                }}
-            >
-                Decline
-            </button>
-          </>
-        )}
-        {(isOwner || isBumOnThis) && job.status !== 'completed' && (
-          <button className="btn btn-sm btn-dark ms-2" onClick={async () => {
+          <button
+            className="btn btn-sm btn-outline-danger ms-2"
+            onClick={async () => {
+              const c = prompt("Enter reason for declining (required)") || "";
+              if (!c.trim()) return;
+              await declineJobCard(job.id, c);
+              nav("/jobcards", { replace: true });
+            }}
+          >
+            Decline
+          </button>
+        </>
+      )}
+      {(isOwner || isBumOnThis) && job.status !== "completed" && (
+        <button
+          className="btn btn-sm btn-dark ms-2"
+          onClick={async () => {
             await closeJobCard(job.id);
             nav(0);
-          }}>Close</button>
-        )}
+          }}
+        >
+          Close
+        </button>
+      )}
 
       {/*  Approve Modal  */}
-        {showApproveModal && (
-          <div className="jcD-modal-overlay" role="dialog" aria-modal="true">
-            <div className="jcD-modal-content jcD-approve-modal">
-              <div className="jcD-modal-header">
-                <h3>Approve Job Card</h3>
-                <button
-                  type="button"
-                  className="jcD-modal-close"
-                  onClick={() => setShowApproveModal(false)}
-                  aria-label="Close"
-                >
-                  ×
-                </button>
-              </div>
+      {showApproveModal && (
+        <div className="jcD-modal-overlay" role="dialog" aria-modal="true">
+          <div className="jcD-modal-content jcD-approve-modal">
+            <div className="jcD-modal-header">
+              <h3>Approve Job Card</h3>
+              <button
+                type="button"
+                className="jcD-modal-close"
+                onClick={() => setShowApproveModal(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
 
-              <p className="jcD-modal-lead">Choose how you want to proceed:</p>
+            <p className="jcD-modal-lead">Choose how you want to proceed:</p>
 
-              <div className="jcD-choice-grid">
-                <button
-                  type="button"
-                  className={`jcD-choice ${approveWithInvoice === true ? 'selected' : ''}`}
-                  onClick={() => setApproveWithInvoice(true)}
-                >
-                  <div className="jcD-choice-title">Approve & Create Invoice</div>
-                  <div className="jcD-choice-desc">Marks as <strong>Invoiced</strong> and proceeds to billing.</div>
-                </button>
+            <div className="jcD-choice-grid">
+              <button
+                type="button"
+                className={`jcD-choice ${approveWithInvoice === true ? "selected" : ""}`}
+                onClick={() => setApproveWithInvoice(true)}
+              >
+                <div className="jcD-choice-title">Approve & Create Invoice</div>
+                <div className="jcD-choice-desc">
+                  Marks as <strong>Invoiced</strong> and proceeds to billing.
+                </div>
+              </button>
 
-                <button
-                  type="button"
-                  className={`jcD-choice ${approveWithInvoice === false ? 'selected' : ''}`}
-                  onClick={() => setApproveWithInvoice(false)}
-                >
-                  <div className="jcD-choice-title">Approve (no invoice)</div>
-                  <div className="jcD-choice-desc">Marks as <strong>Completed</strong> without creating an invoice.</div>
-                </button>
-              </div>
+              <button
+                type="button"
+                className={`jcD-choice ${approveWithInvoice === false ? "selected" : ""}`}
+                onClick={() => setApproveWithInvoice(false)}
+              >
+                <div className="jcD-choice-title">Approve (no invoice)</div>
+                <div className="jcD-choice-desc">
+                  Marks as <strong>Completed</strong> without creating an
+                  invoice.
+                </div>
+              </button>
+            </div>
 
-              <label className="jcD-field">
-                <div className="jcD-field-label">Comment (optional)</div>
-                <textarea
-                  className="jcD-textarea"
-                  rows={3}
-                  placeholder="Add a note for this approval"
-                  value={approveComment}
-                  onChange={(e) => setApproveComment(e.target.value)}
-                />
-              </label>
+            <label className="jcD-field">
+              <div className="jcD-field-label">Comment (optional)</div>
+              <textarea
+                className="jcD-textarea"
+                rows={3}
+                placeholder="Add a note for this approval"
+                value={approveComment}
+                onChange={(e) => setApproveComment(e.target.value)}
+              />
+            </label>
 
-              <div className="jcD-modal-actions">
-                <button
-                  className="jcD-modal-cancel-btn"
-                  onClick={() => setShowApproveModal(false)}
-                  disabled={approveLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="jcD-modal-primary-btn"
-                  onClick={handleApproveSubmit}
-                  disabled={approveLoading || approveWithInvoice === null}
-                >
-                  {approveLoading ? 'Saving...' : approveWithInvoice === true ? 'Approve & Invoice' : 'Approve'}
-                </button>
-              </div>
+            <div className="jcD-modal-actions">
+              <button
+                className="jcD-modal-cancel-btn"
+                onClick={() => setShowApproveModal(false)}
+                disabled={approveLoading}
+              >
+                Cancel
+              </button>
+              <button
+                className="jcD-modal-primary-btn"
+                onClick={handleApproveSubmit}
+                disabled={approveLoading || approveWithInvoice === null}
+              >
+                {approveLoading
+                  ? "Saving..."
+                  : approveWithInvoice === true
+                    ? "Approve & Invoice"
+                    : "Approve"}
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
       {/* Delete Confirmation Model */}
       {showDeleteConfirm && (
         <div className="jcD-modal-overlay">
           <div className="jcD-modal-content">
             <h3>Delete Job Card</h3>
-            <p>Are you sure you want to delete this job card? This action cannot be undone.</p>
+            <p>
+              Are you sure you want to delete this job card? This action cannot
+              be undone.
+            </p>
             <div className="jcD-modal-actions">
-              <button 
+              <button
                 className="jcD-modal-cancel-btn"
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={deleting}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 className="jcD-modal-delete-btn"
                 onClick={handleDelete}
                 disabled={deleting}
               >
-                {deleting ? 'Deleting...' : 'Delete'}
+                {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
         </div>
-      )}     
+      )}
     </div>
   );
 }

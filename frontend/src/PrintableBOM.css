@@ -39,17 +39,17 @@
   width: 21cm;
   height: 29.7cm;
   background: #fff;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  font-family: Calibri, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  font-family: Calibri, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 }
 
 /* Fixed-size header/footer so JS can paginate accurately */
 .bom-header {
   height: 7.3cm; /* MUST match HEADER_HEIGHT_CM in JS */
-  padding: 1.0cm 1.5cm 0.4cm 1.5cm;
+  padding: 1cm 1.5cm 0.4cm 1.5cm;
   box-sizing: border-box;
   /* border-bottom: 1px solid #bfbfbf; */
 }
@@ -66,7 +66,9 @@
   font-size: 0.92rem;
 }
 
-.bom-block { margin-top: 8px; }
+.bom-block {
+  margin-top: 8px;
+}
 
 /* Company header layout */
 .bom-header-top {
@@ -99,7 +101,7 @@
 
 .bom-info-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 3fr 2fr;
   gap: 4px 18px;
   font-size: 10px;
   margin-bottom: 8px;
@@ -138,10 +140,22 @@
   font-size: 11px;
 }
 
-.bom-col-desc { width: auto; text-align: left; }
-.bom-col-units { width: 2cm; text-align: center; }
-.bom-col-unitprice { width: 3cm; text-align: right; }
-.bom-col-total { width: 3cm; text-align: right; }
+.bom-col-desc {
+  width: auto;
+  text-align: left;
+}
+.bom-col-units {
+  width: 2cm;
+  text-align: center;
+}
+.bom-col-unitprice {
+  width: 3cm;
+  text-align: right;
+}
+.bom-col-total {
+  width: 3cm;
+  text-align: right;
+}
 
 /* fixed heights so pagination matches JS calculations */
 .bom-thead-row {
@@ -158,14 +172,27 @@
   height: 0.75cm; /* MUST match ROW_HEIGHT_CM */
 }
 
-.bom-terms-table { table-layout: fixed; width: 100%; }
+.bom-terms-table {
+  table-layout: fixed;
+  width: 100%;
+}
 
-.bom-terms-table .col-perc { width: 2cm; }
-.bom-terms-table .col-amount { width: 3.2cm; }   /* price column (left of label) */
-.bom-terms-table .col-incl   { width: 2.2cm; }   /* "Incl. VAT" at far right */
+.bom-terms-table .col-perc {
+  width: 2cm;
+}
+.bom-terms-table .col-amount {
+  width: 3.2cm;
+} /* price column (left of label) */
+.bom-terms-table .col-incl {
+  width: 2.2cm;
+} /* "Incl. VAT" at far right */
 .bom-terms-table .col-desc,
-.bom-terms-table .col-flex   { width: auto; }    /* flex to fill middle */
-.bom-terms-table td { vertical-align: middle; }
+.bom-terms-table .col-flex {
+  width: auto;
+} /* flex to fill middle */
+.bom-terms-table td {
+  vertical-align: middle;
+}
 
 .bom-terms-table .amount {
   text-align: right;
@@ -184,7 +211,6 @@
   border-bottom: 1px solid #000;
   font-weight: 700;
 }
-
 
 .bom-row-terms {
   height: 0.45cm; /* MUST match ROW_HEIGHT_CM */
@@ -208,7 +234,9 @@
 }
 
 /* Item description subline */
-.bom-item-model { font-weight: normal; }
+.bom-item-model {
+  font-weight: normal;
+}
 .bom-item-spec {
   font-size: 10px;
   color: #666;
@@ -294,7 +322,7 @@
 
 /* Footer page number */
 .bom-page-number {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: "Courier New", Courier, monospace;
   letter-spacing: 0.13em;
   color: #3333338f;
   font-size: 1rem;
@@ -310,17 +338,22 @@
   /* Global app has 'body * { visibility:hidden }'. Re-enable only the BOM. */
   .bom-report {
     position: absolute !important;
-    top: 0; left: 0; right:0;
+    top: 0;
+    left: 0;
+    right: 0;
     margin: 0 !important;
     padding: 0 !important;
     background: transparent !important;
     z-index: 20001 !important;
   }
 
-  header.bom-header, footer.bom-footer { margin: 0 !important ;}
+  header.bom-header,
+  footer.bom-footer {
+    margin: 0 !important ;
+  }
 
-
-  .bom-report, .bom-report * {
+  .bom-report,
+  .bom-report * {
     visibility: visible !important;
   }
 
@@ -329,13 +362,19 @@
     z-index: 20001 !important;
   }
 
-  .bom-block { margin-top: 0.3cm !important; } /* Matches BLOCK_GAP_CM */
+  .bom-block {
+    margin-top: 0.3cm !important;
+  } /* Matches BLOCK_GAP_CM */
 
   /* Hide explicit print controls */
-  .no-print, .bom-controls { display: none !important; }
+  .no-print,
+  .bom-controls {
+    display: none !important;
+  }
 
   /* Normalize layout for Firefox/Edge (avoid flex quirks) */
-  html, body {
+  html,
+  body {
     padding: 0 !important;
     margin: 0 !important;
     background: #fff !important;
@@ -343,8 +382,15 @@
     overflow: visible !important;
   }
 
-  .bom-report { display: block !important; min-height: auto !important; background: transparent !important; }
-  .bom-printarea { padding: 0 !important; display: block !important; }
+  .bom-report {
+    display: block !important;
+    min-height: auto !important;
+    background: transparent !important;
+  }
+  .bom-printarea {
+    padding: 0 !important;
+    display: block !important;
+  }
 
   .bom-page {
     width: 210mm !important;
@@ -389,5 +435,4 @@
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
-
 }

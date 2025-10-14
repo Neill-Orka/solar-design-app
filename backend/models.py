@@ -1,4 +1,5 @@
 # models.py
+from email.policy import default
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from sqlalchemy.dialects.postgresql import JSONB
@@ -290,7 +291,7 @@ class Projects(db.Model):
 class EnergyData(db.Model):
     __tablename__ = "energy_data"
     id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey("projects.id"), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey("projects.id"), nullable=True)
     timestamp = db.Column(db.DateTime)
     demand_kw = db.Column(db.Float)
 
@@ -1387,3 +1388,98 @@ class JobCardMaterialReceipt(db.Model):
             "filename": self.attachment.filename if self.attachment else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+class Invoice(db.Model):
+    __tablename__ = "invoices"
+    id = db.Column(db.Integer, primary_key=True)
+
+    project_id = db.Column(db.Integer, db.ForeignKey("projects.id"), nullable=True)
+    job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=True)
+
+    # lineage back to the quote snapshot used
+    quote_number = db.Column(db.String(50), nullable=True)
+    quote_version = db.Column(db.Integer, nullable=True)
+
+    # numbering & lifecycle
+    invoice_number = db.Column(db.String(50), unique=True, nullable=False)
+    invoice_type = db.Column(db.String(30), nullable=False) # `deposit` or `final`
+    status = db.Column(db.String(30), default='draft')
+
+    issue_date = db.Column(db.Date, nullable=False, default=lambda: datetime.now(SA_TZ))
+    due_date = db.Column(db.Date, nullable=True)
+
+    # proration for deposit/final
+    percent_of_quote = db.Column(db.Float, nullable=True)
+
+    # billing snapshot (so changes to Client later don't alter this doc)
+    billing_name = db.Column(db.String(255))
+    billing_company = db.Column(db.String(255), nullable=True)
+    billing_vat_no = db.Column(db.String(64))
+    billing_address = db.Column(db.Text)
+
+    currency = db.Column(db.String(10), nullable=True, default='ZAR')
+    vat_rate = db.Column(db.Numeric(5, 2), default=15.00)
+
+    subtotal_excl_vat = db.Column(db.Numeric(12, 2), default=0)
+    vat_amount = db.Column(db.Numeric(12, 2), default=0)
+    total_incl_vat = db.Column(db.Numeric(12, 2), default=0)
+
+    amount_paid = db.Column(db.Numeric(12, 2), default=0)
+    notes = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
+    updated_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(SA_TZ),
+        onupdate=lambda: datetime.now(SA_TZ),
+    )
+
+    items = db.relationship('InvoiceItem', backref='invoice', cascade="all, delete-orphan")
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'project_id': self.project_id,
+            'job_card_id': self.job_card_id,
+            'invoice_number': self.invoice_number,
+            'status': self.status,
+            'invoice_type': self.invoice_type,
+            'issue_date': self.issue_date.isoformat() if self.issue_date else None,
+            'due_date': self.due_date.isoformat() if self.due_date else None,
+            'percent_of_quote': float(self.percent_of_quote) if self.percent_of_quote else None,
+            'quote_number': self.quote_number,
+            'quote_version': self.quote_version,
+            'subtotal_excl_vat': float(self.subtotal_excl_vat),
+            'vat_amount': float(self.vat_amount),
+            'total_incl_vat': float(self.total_incl_vat),
+            'amount_paid': float(self.amount_paid) if self.amount_paid else 0,
+            'currency': self.currency,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            # For UI compatibility
+            'number': self.invoice_number,
+            'version_count': 1,
+            'latest_totals': {
+                'total_incl_vat': float(self.total_incl_vat)
+            }
+        }
+
+class InvoiceItem(db.Model):
+    __tablename__ = "invoice_items"
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_id = db.Column(db.Integer, db.ForeignKey("invoices.id"), nullable=False)
+
+    # snapshot of the line
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=True)  # optional link back
+    description = db.Column(db.String(255), nullable=False)
+    sku = db.Column(db.String(128), nullable=True)
+
+    quantity = db.Column(db.Float, nullable=False, default=1.0)
+    unit = db.Column(db.String(32), nullable=True)
+
+    unit_price_excl_vat = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    line_total_excl_vat = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    vat_rate = db.Column(db.Numeric(5, 2), nullable=False, default=15.00)
+    line_vat = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    line_total_incl_vat = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    

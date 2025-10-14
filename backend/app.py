@@ -46,27 +46,42 @@ from routes.bom import bom_bp
 from routes.quotes import quotes_bp
 from routes.jobcards import jobcards_bp
 from routes.technicians import technicians_bp
+from routes.invoices import invoices_bp
 
 # Initialize app
 app = Flask(__name__)
-app.config.from_object(Config)
-# Update CORS for production - add your Vercel domain
-LAN = "http://192.168.8.181:5173"
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "https://solar-design-app.vercel.app",
-    "http://localhost:5173",
-    LAN,
-]
+
+env = os.environ.get("FLASK_ENV", "development")
+if env == "production":
+    app.config.from_object('config.ProductionConfig')
+else:
+    app.config.from_object('config.DevelopmentConfig')
+
+print("Using SQLALCHEMY_DATABASE_URI:", app.config['SQLALCHEMY_DATABASE_URI'])
+
+
+
+# app.config.from_object(Config)
+# # Update CORS for production - add your Vercel domain
+# LAN = "http://192.168.8.181:5173"
+# ALLOWED_ORIGINS = [
+#     "http://localhost:3000",
+#     "https://solar-design-app.vercel.app",
+#     "http://localhost:5173",
+#     LAN,
+# ]
+
+app.config["UPLOAD_FOLDER"] = os.path.join(os.getcwd(), "uploads")
+app.config["PUBLIC_UPLOAD_BASE"] = "/uploads"
 
 CORS(
     app,
-    origins=ALLOWED_ORIGINS,
+    origins=app.config['ALLOWED_ORIGINS'],
     supports_credentials=True,
     allow_headers=["Content-Type", "Authorization"],
 )
 
-socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS, async_mode="eventlet")
+socketio = SocketIO(app, cors_allowed_origins=app.config['ALLOWED_ORIGINS'], async_mode="eventlet")
 
 # Initialize extensions
 db.init_app(app)
@@ -76,9 +91,6 @@ mail = Mail(app)
 migrate = Migrate(app, db)
 
 logging.basicConfig(level=logging.INFO)
-
-app.config["UPLOAD_FOLDER"] = os.path.join(os.getcwd(), "uploads")
-app.config["PUBLIC_UPLOAD_BASE"] = "/uploads"
 
 
 @app.route("/uploads/<path:filename>")
@@ -141,6 +153,7 @@ app.register_blueprint(bom_bp, url_prefix="/api")
 app.register_blueprint(quotes_bp, url_prefix="/api")
 app.register_blueprint(jobcards_bp, url_prefix="/api")
 app.register_blueprint(technicians_bp, url_prefix="/api")
+app.register_blueprint(invoices_bp, url_prefix="/api")
 
 
 @event.listens_for(Product, "after_insert")
