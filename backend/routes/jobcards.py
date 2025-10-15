@@ -97,6 +97,7 @@ def jobcards_collection():
         description=data.get("description"),
         is_quoted=data.get("is_quoted", False),
         project_id=data.get("project_id"),
+        quote_id=data.get("quote_id"),
         start_at=_parse_dt(data.get("start_at")),
         complete_at=_parse_dt(data.get("complete_at")),
         labourers_count=data.get("labourers_count", 0),
@@ -176,7 +177,7 @@ def jobcards_item(jid: int):
     if request.method in ("PATCH","PUT"):
         data = request.get_json() or {}
         for f in [
-            "title","description","is_quoted","project_id","category_id","start_at","complete_at",
+            "title","description","is_quoted","project_id", 'quote_id',"category_id","start_at","complete_at",
             "labourers_count","labour_hours","labour_rate_per_hour",
             "materials_used","did_travel","vehicle_id","travel_distance_km",
             "coc_required","status","owner_id", "bum_id",

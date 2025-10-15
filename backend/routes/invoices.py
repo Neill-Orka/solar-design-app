@@ -225,3 +225,15 @@ def get_invoice(invoice_id):
             "line_total_incl_vat": float(it.line_total_incl_vat),
         } for it in inv.items]
     })
+
+@invoices_bp.route('/invoices/<int:invoice_id>', methods=['DELETE'])
+def delete_invoice(invoice_id):
+    inv = Invoice.query.get(invoice_id)
+    if not inv:
+        return jsonify({"error":"Invoice not found"}), 404
+    # if inv.status != 'draft':
+    #     return jsonify({"error":"Only draft invoices can be deleted"}), 400
+    db.session.delete(inv)
+    db.session.commit()
+    return jsonify({"message":"Invoice deleted"}), 200
+

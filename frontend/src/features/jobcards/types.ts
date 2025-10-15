@@ -89,6 +89,8 @@ export interface JobCard {
   title: string | null;
   description: string | null;
   is_quoted: boolean;
+  project_id: number | null;
+  quote_id: number | null;
   start_at: string | null;
   complete_at: string | null;
   client_name: string | null;

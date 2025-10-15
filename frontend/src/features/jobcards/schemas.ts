@@ -1,8 +1,8 @@
 // src/features/jobcards/schemas.ts
-import { z } from 'zod';
+import { z } from "zod";
 
 const isoOrNull = z.preprocess(
-  (v) => (v === '' || v == null ? null : v),
+  (v) => (v === "" || v == null ? null : v),
   z.string().datetime().nullable()
 );
 
@@ -15,10 +15,11 @@ export const JobCardFormSchema = z.object({
 
   category_id: z.coerce.number().int().positive().nullable().default(null),
 
-  title: z.string().max(120).nullable().default(''),
-  description: z.string().nullable().default(''),
+  title: z.string().max(120).nullable().default(""),
+  description: z.string().nullable().default(""),
   is_quoted: z.boolean().default(false),
   project_id: z.coerce.number().int().positive().nullable().default(null),
+  quote_id: z.coerce.number().int().positive().nullable().default(null),
 
   start_at: isoOrNull.default(null),
   complete_at: isoOrNull.default(null),
@@ -35,9 +36,17 @@ export const JobCardFormSchema = z.object({
 
   coc_required: z.coerce.boolean().default(false),
 
-  status: z.enum([
-    'draft','scheduled','in_progress','paused','completed','cancelled','invoiced'
-  ]).default('draft'),
+  status: z
+    .enum([
+      "draft",
+      "scheduled",
+      "in_progress",
+      "paused",
+      "completed",
+      "cancelled",
+      "invoiced",
+    ])
+    .default("draft"),
 });
 
 export type JobCardFormValues = z.infer<typeof JobCardFormSchema>;
@@ -49,10 +58,11 @@ export const jobCardDefaults: JobCardFormValues = {
   bum_id: null,
   tech_id: null,
   category_id: null,
-  title: '',
-  description: '',
+  title: "",
+  description: "",
   is_quoted: false,
   project_id: null,
+  quote_id: null,
   start_at: null,
   complete_at: null,
   labourers_count: 0,
@@ -63,5 +73,5 @@ export const jobCardDefaults: JobCardFormValues = {
   vehicle_id: null,
   travel_distance_km: 0,
   coc_required: false,
-  status: 'draft',
+  status: "draft",
 };

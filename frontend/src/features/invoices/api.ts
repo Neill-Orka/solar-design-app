@@ -38,3 +38,8 @@ export async function getJobCard(jobCardId: number) {
   const { data } = await axios.get(`${API_URL}/api/jobcards/${jobCardId}`);
   return data;
 }
+
+export async function deleteInvoice(invoiceId: number) {
+  const { data } = await axios.delete(`${API_URL}/api/invoices/${invoiceId}`);
+  return data;
+}
