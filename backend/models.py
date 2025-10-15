@@ -1128,6 +1128,7 @@ class JobCard(db.Model):
     description = db.Column(db.Text, nullable=True)
     is_quoted = db.Column(db.Boolean, default=False)
     project_id = db.Column(db.Integer, db.ForeignKey("projects.id"), nullable=True)
+    quote_id = db.Column(db.Integer, db.ForeignKey("documents.id"), nullable=True)
 
     # Timing
     start_at = db.Column(db.DateTime, nullable=True)  # call out start
@@ -1191,6 +1192,8 @@ class JobCard(db.Model):
     vehicle = db.relationship("Vehicle")
     bum = db.relationship("User", foreign_keys=[bum_id])
     bum_reviewed_by = db.relationship("User", foreign_keys=[bum_reviewed_by_id])
+    project = db.relationship("Projects", foreign_keys=[project_id])
+    quote = db.relationship("Document", foreign_keys=[quote_id])
 
     time_entries = db.relationship(
         "JobCardTimeEntry", backref="job_card", cascade="all, delete-orphan", lazy=True
@@ -1221,6 +1224,7 @@ class JobCard(db.Model):
             "description": self.description,
             "is_quoted": self.is_quoted,
             "project_id": self.project_id,
+            "quote_id": self.quote_id,
             "start_at": self.start_at.isoformat() if self.start_at else None,
             "complete_at": self.complete_at.isoformat() if self.complete_at else None,
             "client_name": self.client_name_snapshot,
@@ -1395,6 +1399,7 @@ class Invoice(db.Model):
 
     project_id = db.Column(db.Integer, db.ForeignKey("projects.id"), nullable=True)
     job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=True)
+    quote_id = db.Column(db.Integer, db.ForeignKey("documents.id"), nullable=True)
 
     # lineage back to the quote snapshot used
     quote_number = db.Column(db.String(50), nullable=True)
@@ -1440,6 +1445,7 @@ class Invoice(db.Model):
         return {
             'id': self.id,
             'project_id': self.project_id,
+            'quote_id': self.quote_id,
             'job_card_id': self.job_card_id,
             'invoice_number': self.invoice_number,
             'status': self.status,

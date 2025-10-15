@@ -13,6 +13,7 @@ import { useNotification } from "../../NotificationContext";
 import { API_URL } from "../../apiConfig";
 import { useAuth } from "../../AuthContext";
 import { useNavigate } from "react-router-dom";
+import { deleteInvoice } from "./api";
 
 export default function InvoicesPage() {
   const [rows, setRows] = useState(null);
@@ -46,6 +47,27 @@ export default function InvoicesPage() {
   useEffect(() => {
     loadInvoices();
   }, []);
+
+  const handleDeleteInvoice = async (
+    invoiceId: number,
+    invoiceNumber: string,
+    e
+  ) => {
+    e.stopPropagation();
+    if (confirm(`Are you sure you want to delete invoice ${invoiceNumber}?`)) {
+      setActionLoading((prev) => ({ ...prev, [invoiceId]: "delete" }));
+      try {
+        await deleteInvoice(invoiceId);
+        showNotification(`Invoice ${invoiceNumber} deleted`, "success");
+        loadInvoices();
+      } catch (error) {
+        console.error("Failed to delete invoice:", error);
+        showNotification("Failed to delete invoice", "danger");
+      } finally {
+        setActionLoading((prev) => ({ ...prev, [invoiceId]: undefined }));
+      }
+    }
+  };
 
   if (loading)
     return (
@@ -159,12 +181,17 @@ export default function InvoicesPage() {
                   </div>
                 )}
               </td>
-              <td
-                onClick={() => openInvoice(q.id)}
-                style={{
-                  cursor: !editingQuote ? "pointer" : "default",
-                }}
-              ></td>
+              <td>
+                <Button
+                  variant="outline-danger"
+                  size="sm"
+                  onClick={(e) => handleDeleteInvoice(q.id, q.number, e)}
+                  // disabled={actionLoading[q.id] === "delete"}
+                  title="Delete Invoice"
+                >
+                  <i className="bi bi-trash"></i>
+                </Button>
+              </td>
             </tr>
           ))}
         </tbody>
