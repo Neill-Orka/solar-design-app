@@ -184,6 +184,8 @@ export default function BillOfMaterials({
   const [fullSystemMode, setFullSystemMode] = useState(true);
   const [newTemplateType, setNewTemplateType] = useState("hybrid");
 
+  const [editingQuantities, setEditingQuantities] = useState({});
+
   const latestValues = useRef({
     hasUnsavedChanges: false,
     bom: [],
@@ -578,6 +580,7 @@ export default function BillOfMaterials({
       );
     setBom(bom.filter((r) => r.product.id !== pid));
   };
+
   const updateQty = (pid, q) => {
     const target = bom.find((r) => r.product.id === pid);
     if (target && coreLocked(target.product.category))
@@ -585,11 +588,45 @@ export default function BillOfMaterials({
         "Core quantities are managed in System Design",
         "warning"
       );
+
+    // allow empty string during editing
+    if (q === "") {
+      setEditingQuantities((prev) => ({ ...prev, [pid]: "" }));
+      return;
+    }
+
     const qty = Math.max(1, parseInt(q || 1, 10));
     setBom(
       bom.map((r) => (r.product.id === pid ? { ...r, quantity: qty } : r))
     );
+
+    // Clear form editing state
+    setEditingQuantities((prev) => {
+      const next = { ...prev };
+      delete next[pid];
+      return next;
+    });
   };
+
+  // Add a normalize function for quantity
+  const normalizeQuantity = (pid) => {
+    // If it's an empty string, revert to previous value
+    if (editingQuantities[pid] === "") {
+      setEditingQuantities((prev) => {
+        const next = { ...prev };
+        delete next[pid];
+        return next;
+      });
+      return;
+    }
+
+    // otherwise, ensure the value is at least 1
+    const q = editingQuantities[pid];
+    if (q !== undefined) {
+      updateQty(pid, q);
+    }
+  };
+
   const updateMarginPct = (pid, pctStr) => {
     const pct = pctStr === "" ? "" : Math.max(0, Number(pctStr) || 0);
     setBom(
@@ -600,6 +637,7 @@ export default function BillOfMaterials({
       )
     );
   };
+
   const normalizeMargin = (pid) => {
     setBom(
       bom.map((r) =>
@@ -1442,12 +1480,25 @@ export default function BillOfMaterials({
                                       <Form.Control
                                         type="number"
                                         min="1"
-                                        value={r.quantity}
-                                        onChange={(e) =>
-                                          updateQty(
-                                            r.product.id,
-                                            e.target.value
-                                          )
+                                        value={
+                                          editingQuantities[r.product.id] !==
+                                          undefined
+                                            ? editingQuantities[r.product.id]
+                                            : r.quantity
+                                        }
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          if (val === "") {
+                                            setEditingQuantities((prev) => ({
+                                              ...prev,
+                                              [r.product.id]: "",
+                                            }));
+                                          } else {
+                                            updateQty(r.product.id, val);
+                                          }
+                                        }}
+                                        onBlur={() =>
+                                          normalizeQuantity(r.product.id)
                                         }
                                         className="py-0"
                                         disabled={coreLocked(
