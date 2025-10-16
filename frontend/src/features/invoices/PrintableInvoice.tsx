@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { getInvoice, getProject, getJobCard } from "./api";
 import logo from "../../assets/orka_logo_text.png";
 import "../../PrintableBOM.css";
-import { Button, Spinner } from "react-bootstrap";
+import { Button, Spinner, Form } from "react-bootstrap";
 import { useAuth } from "../../AuthContext";
 
 type InvoiceItem = {
@@ -34,6 +34,7 @@ type Invoice = {
     company?: string;
     vat_no?: string;
     address?: string;
+    phone?: string;
   };
   vat_rate: number;
   subtotal_excl_vat: number;
@@ -132,6 +133,14 @@ export default function PrintableInvoice() {
     const saved = localStorage.getItem(`bomTermsPerc_${projectId}`);
     return saved ? JSON.parse(saved) : [65, 25, 10];
   });
+
+  const [priceMode, setPriceMode] = useState(
+    () => localStorage.getItem("invoicePriceMode") || "all"
+  );
+  useEffect(
+    () => localStorage.setItem("invoicePriceMode", priceMode),
+    [priceMode]
+  );
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-ZA", {
@@ -361,7 +370,7 @@ export default function PrintableInvoice() {
           {user?.first_name || "Lourens"} {user?.last_name || "de Jongh"}
         </div>
         <div>
-          <span className="label">Tel:</span> {user?.phone || "-"}
+          <span className="label">Tel:</span> {inv?.billing?.phone || "-"}
         </div>
         <div>
           <span className="label">Tel:</span> {user?.phone || "082 660 0851"}
@@ -451,6 +460,7 @@ export default function PrintableInvoice() {
   const TermsBlock = () => {
     const totalIncl = inv?.total_incl_vat || 0;
     const [p0, p1, p2] = termsPerc.map((n: number) => +n || 0);
+    // const [p0, p1, p2] = [100, 0, 0];
     const amt = (p: number) => formatCurrency(totalIncl * (p / 100));
 
     return (
@@ -637,7 +647,32 @@ export default function PrintableInvoice() {
         >
           <i className="bi bi-printer"></i>
         </Button>
+
+        {/* Price Mode Selector */}
+        <div
+          style={{
+            backgroundColor: "white",
+            padding: "8px",
+            borderRadius: "6px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            border: "1px solid #dee2e6",
+          }}
+        >
+          <Form.Select
+            size="sm"
+            style={{ width: "180px", fontSize: "0.75rem" }}
+            value={priceMode}
+            onChange={(e) => setPriceMode(e.target.value)}
+            aria-label="Price visibility"
+          >
+            <option value="all">Show all prices</option>
+            <option value="category">Category prices</option>
+            <option value="qty">Qty only</option>
+          </Form.Select>
+        </div>
       </div>
+
+      {/* </div> */}
 
       {/* Right side controls */}
       <div

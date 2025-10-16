@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, Projects, BOMComponent, Invoice, InvoiceItem, Product
+from models import db, Projects, BOMComponent, Invoice, InvoiceItem, Product, JobCard, Clients
 from datetime import datetime, timedelta
 from sqlalchemy import func
 
@@ -188,6 +188,25 @@ def get_invoice(invoice_id):
     inv = Invoice.query.get(invoice_id)
     if not inv:
         return jsonify({"error":"Invoice not found"}), 404
+    
+    # Get client information
+    client = None
+    client_phone = None
+
+    # If invoice has a job card, get client from the job card
+    if inv.job_card_id:
+        job_card = db.session.query(JobCard).get(inv.job_card_id)
+        if job_card and job_card.client_id:
+            client = db.session.query(Clients).get(job_card.client_id)
+            client_phone = client.phone if client else None
+
+    # If no client found and invoice has project_id, get client from project
+    if client is None and inv.project_id:
+        project = db.session.query(Projects).get(inv.project_id)
+        if project and project.client_id:
+            client = db.session.query(Clients).get(project.client_id)
+            client_phone = client.phone if client else None
+
     return jsonify({
         "id": inv.id,
         "project_id": inv.project_id,
@@ -205,6 +224,7 @@ def get_invoice(invoice_id):
             "company": inv.billing_company,
             "vat_no": inv.billing_vat_no,
             "address": inv.billing_address,
+            "phone": client_phone,
         },
         "vat_rate": float(inv.vat_rate),
         "subtotal_excl_vat": float(inv.subtotal_excl_vat),
