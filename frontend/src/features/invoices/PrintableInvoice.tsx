@@ -128,6 +128,22 @@ export default function PrintableInvoice() {
     }
   };
 
+  const [termsPerc, setTermsPerc] = useState(() => {
+    const saved = localStorage.getItem(`bomTermsPerc_${projectId}`);
+    return saved ? JSON.parse(saved) : [65, 25, 10];
+  });
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("en-ZA", {
+      style: "currency",
+      currency: "ZAR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+      .format(value || 0)
+      .replace("R", "R ")
+      .replace(/,/g, " "); // Replace commas with spaces for thousands
+
   // ----- Pagination constants (keep in sync with CSS) -----
   const CM_TO_PX = 37.79527559;
   const PAGE_HEIGHT_CM = 29.7;
@@ -384,116 +400,169 @@ export default function PrintableInvoice() {
     </header>
   );
 
-  const TotalsBlock = () => (
-    <div className="bom-block" style={{ marginTop: "20px" }}>
-      <div
-        className="bom-inline-blocks"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "20px",
-        }}
-      >
-        <div
-          className="bom-totals"
-          style={{
-            flex: "1",
-            maxWidth: "300px",
-            marginLeft: "auto",
-          }}
-        >
-          <div
-            className="tot-row"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              margin: "4px 0",
-            }}
-          >
-            <div>Subtotal (excl VAT)</div>
-            <div>R{inv?.subtotal_excl_vat.toFixed(2)}</div>
-          </div>
-          <div
-            className="tot-row"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              margin: "4px 0",
-            }}
-          >
-            <div>VAT ({inv?.vat_rate.toFixed(0)}%)</div>
-            <div>R{inv?.vat_amount.toFixed(2)}</div>
-          </div>
-          <div
-            className="rule"
-            style={{ border: "1px solid #000", marginTop: "4px" }}
-          ></div>
-          <div
-            className="tot-row tot-grand"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontWeight: "bold",
-              margin: "4px 0",
-            }}
-          >
-            <div>Total (incl VAT)</div>
-            <div>R{inv?.total_incl_vat.toFixed(2)}</div>
-          </div>
-          {inv?.due_date && (
-            <div
-              className="tot-row"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                margin: "4px 0",
-              }}
-            >
-              <div>Due Date</div>
-              <div>{new Date(inv.due_date).toLocaleDateString("en-GB")}</div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  const TotalsBlock = () => {
+    const vatPerc = Number(inv?.vat_rate ?? 15);
 
-  const TermsBlock = () => (
-    <div className="bom-block" style={{ marginTop: "20px" }}>
-      <div className="bom-terms" style={{ flex: "1" }}>
-        <div
-          className="terms-title"
-          style={{ fontWeight: "bold", marginBottom: "4px" }}
+    return (
+      <section className="bom-block bom-block-totals">
+        <div className="bom-totals">
+          <div className="rule" />
+          <div className="row">
+            <div className="label">Total (excl. VAT)</div>
+            <div className="value">
+              {formatCurrency(inv?.subtotal_excl_vat || 0)}
+            </div>
+          </div>
+          <div className="row">
+            <div className="label">{vatPerc}% VAT</div>
+            <div className="value">{formatCurrency(inv?.vat_amount || 0)}</div>
+          </div>
+          <div className="rule" />
+          <div className="row grand">
+            <div className="label">Total (incl. VAT)</div>
+            <div className="value">
+              {formatCurrency(inv?.total_incl_vat || 0)}
+            </div>
+          </div>
+          <div className="rule double" />
+        </div>
+      </section>
+    );
+  };
+
+  // const TermsBlock = () => (
+  //   <div className="bom-block" style={{ marginTop: "20px" }}>
+  //     <div className="bom-terms" style={{ flex: "1" }}>
+  //       <div
+  //         className="terms-title"
+  //         style={{ fontWeight: "bold", marginBottom: "4px" }}
+  //       >
+  //         Terms
+  //       </div>
+  //       <div className="terms-body">
+  //         {inv?.invoice_type === "deposit"
+  //           ? "50% payable upfront to commence works. Balance invoiced upon completion."
+  //           : "Final payment due on completion handover."}
+  //       </div>
+  //     </div>
+  //   </div>
+  // );
+
+  const TermsBlock = () => {
+    const totalIncl = inv?.total_incl_vat || 0;
+    const [p0, p1, p2] = termsPerc.map((n: number) => +n || 0);
+    const amt = (p: number) => formatCurrency(totalIncl * (p / 100));
+
+    return (
+      <section className="bom-block bom-block-termsdeposit">
+        <div className="bom-terms">
+          <p style={{ margin: "5px 0", fontWeight: 700 }}>
+            Please note that a {p0}% deposit will be required before Orka Solar
+            will commence with any work.
+          </p>
+        </div>
+
+        <table
+          className="bom-table bom-terms-table"
+          style={{ marginTop: "6px" }}
         >
-          Terms
-        </div>
-        <div className="terms-body">
-          {inv?.invoice_type === "deposit"
-            ? "50% payable upfront to commence works. Balance invoiced upon completion."
-            : "Final payment due on completion handover."}
-        </div>
-      </div>
-    </div>
-  );
+          <colgroup>
+            <col className="col-desc" />
+            <col className="col-perc" />
+            <col className="col-flex" />
+            <col className="col-amount" />
+            <col className="col-incl" />
+          </colgroup>
+          <tbody>
+            <tr className="bom-row-terms">
+              <td className="bom-cell-terms">Deposit</td>
+              <td className="bom-cell-terms">{p0}%</td>
+              <td className="bom-cell-terms"></td>
+              <td className="bom-cell-terms amount">{amt(p0)}</td>
+              <td className="bom-cell-terms incl">
+                <span>Incl. VAT</span>
+              </td>
+            </tr>
+
+            <tr className="bom-row-terms">
+              <td className="bom-cell-terms">
+                On delivery of inverters and panels to site
+              </td>
+              <td className="bom-cell-terms">{p1}%</td>
+              <td className="bom-cell-terms"></td>
+              <td className="bom-cell-terms amount">{amt(p1)}</td>
+              <td className="bom-cell-terms incl">
+                <span>Incl. VAT</span>
+              </td>
+            </tr>
+
+            <tr className="bom-row-terms">
+              <td className="bom-cell-terms">On project completion</td>
+              <td className="bom-cell-terms">{p2}%</td>
+              <td className="bom-cell-terms"></td>
+              <td className="bom-cell-terms amount">{amt(p2)}</td>
+              <td className="bom-cell-terms incl">
+                <span>Incl. VAT</span>
+              </td>
+            </tr>
+
+            <tr className="bom-row-terms grand">
+              <td className="bom-cell-terms" colSpan={3}></td>
+              <td className="bom-cell-terms amount total-amount">
+                {formatCurrency(totalIncl)}
+              </td>
+              <td className="bom-cell-terms incl">
+                <span>Incl. VAT</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    );
+  };
+
+  // const BankingBlock = () => (
+  //   <div className="bom-block" style={{ marginTop: "20px" }}>
+  //     <div className="bom-banking" style={{ flex: "1" }}>
+  //       <div
+  //         className="banking-title"
+  //         style={{ fontWeight: "bold", marginBottom: "4px" }}
+  //       >
+  //         Banking Details
+  //       </div>
+  //       <div className="banking-body">
+  //         <div>Orka Solar (Pty) Ltd</div>
+  //         <div>Bank: Standard Bank</div>
+  //         <div>Account: 123456789</div>
+  //         <div>Branch: 051001</div>
+  //         <div>Reference: {inv?.invoice_number}</div>
+  //       </div>
+  //     </div>
+  //   </div>
+  // );
 
   const BankingBlock = () => (
-    <div className="bom-block" style={{ marginTop: "20px" }}>
-      <div className="bom-banking" style={{ flex: "1" }}>
-        <div
-          className="banking-title"
-          style={{ fontWeight: "bold", marginBottom: "4px" }}
-        >
-          Banking Details
-        </div>
-        <div className="banking-body">
-          <div>Orka Solar (Pty) Ltd</div>
-          <div>Bank: Standard Bank</div>
-          <div>Account: 123456789</div>
-          <div>Branch: 051001</div>
-          <div>Reference: {inv?.invoice_number}</div>
+    <section className="bom-block bom-block-bankingaccept">
+      <div className="bom-two-col">
+        <div className="bom-box" style={{ fontSize: "12px" }}>
+          <div
+            style={{
+              fontWeight: 700,
+              borderBottom: "1px solid #000",
+              paddingBottom: 4,
+              marginBottom: 4,
+            }}
+          >
+            Banking details:
+          </div>
+          <div>Company: Orka Solar (Pty) Ltd.</div>
+          <div>Branch: ABSA Mooirivier Mall</div>
+          <div>Account name: Orka Solar (PTY) Ltd</div>
+          <div>Account type: Cheque</div>
+          <div>Account number: 409 240 5135</div>
         </div>
       </div>
-    </div>
+    </section>
   );
 
   if (loading) {
@@ -696,11 +765,11 @@ export default function PrintableInvoice() {
               )}
             </div>
 
-            <footer className="bom-footer">
+            {/* <footer className="bom-footer">
               <div className="bom-page-number">
                 Page {pageIndex + 1} of {totalPages}
               </div>
-            </footer>
+            </footer> */}
           </section>
         ))}
       </main>
