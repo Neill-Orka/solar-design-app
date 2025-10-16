@@ -1246,14 +1246,15 @@ function SystemDesign({ projectId }) {
       setLoadingProducts(true);
       try {
         // Fetch all product categories in parallel for efficiency
-        const [panelsRes, invertersRes, batteriesRes] = await Promise.all([
-          axios.get(`${API_URL}/api/products?category=panel`),
-          axios.get(`${API_URL}/api/products?category=inverter`),
-          axios.get(`${API_URL}/api/products?category=battery`),
-        ]);
+        const [panelsRes, invertersAndVsdsRes, batteriesRes] =
+          await Promise.all([
+            axios.get(`${API_URL}/api/products?category=panel`),
+            axios.get(`${API_URL}/api/products?category=inverter,VSD`),
+            axios.get(`${API_URL}/api/products?category=battery`),
+          ]);
         setProducts({
           panels: panelsRes.data,
-          inverters: invertersRes.data,
+          inverters: invertersAndVsdsRes.data,
           batteries: batteriesRes.data,
         });
       } catch (err) {
@@ -1268,14 +1269,15 @@ function SystemDesign({ projectId }) {
   useEffect(() => {
     const refetch = async () => {
       try {
-        const [panelsRes, invertersRes, batteriesRes] = await Promise.all([
-          axios.get(`${API_URL}/api/products?category=panel`),
-          axios.get(`${API_URL}/api/products?category=inverter`),
-          axios.get(`${API_URL}/api/products?category=battery`),
-        ]);
+        const [panelsRes, invertersAndVsdsRes, batteriesRes] =
+          await Promise.all([
+            axios.get(`${API_URL}/api/products?category=panel`),
+            axios.get(`${API_URL}/api/products?category=inverter`),
+            axios.get(`${API_URL}/api/products?category=battery`),
+          ]);
         setProducts({
           panels: panelsRes.data,
-          inverters: invertersRes.data,
+          inverters: invertersAndVsdsRes.data,
           batteries: batteriesRes.data,
         });
       } catch (err) {

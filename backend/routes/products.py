@@ -64,7 +64,13 @@ def list_products():
         query = query.filter(Product.is_deleted == False)
 
     if category:
-        query = query.filter(Product.category.ilike(category))
+        # handle comma-separated categories as OR condition
+        if ',' in category:
+            categories = [c.strip() for c in category.split(',')]
+            filters = [Product.category.ilike(c) for c in categories]
+            query = query.filter(or_(*filters))
+        else:
+            query = query.filter(Product.category.ilike(category))
 
     return jsonify([p.as_dict() for p in query.all()])
 
