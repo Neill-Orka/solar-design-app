@@ -149,8 +149,12 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
     if (url.startsWith("http://") || url.startsWith("https://")) {
       return url;
     }
-    // otherwise, prepend the API_URL
-    return `${API_URL}${url}`;
+
+    // Ensure we don't double-slash when joining paths
+    const baseUrl = API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
+    const urlPath = url.startsWith("/") ? url : `/${url}`;
+
+    return `${baseUrl}${urlPath}`;
   };
 
   const sitePhotosAll = attachments.filter(
