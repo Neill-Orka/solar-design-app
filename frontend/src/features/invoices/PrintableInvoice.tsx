@@ -153,6 +153,30 @@ export default function PrintableInvoice() {
       .replace("R", "R ")
       .replace(/,/g, " "); // Replace commas with spaces for thousands
 
+  const fmtZAR = (v: number) => {
+    return new Intl.NumberFormat("en-ZA", {
+      style: "currency",
+      currency: "ZAR",
+    })
+      .format(v || 0)
+      .replace("R", "R ");
+  };
+
+  function deriveContractTotalsFromInvoice(inv: Invoice) {
+    const pct = (inv?.percent_of_quote || 100) / 100;
+    if (pct <= 0)
+      return {
+        excl: inv.subtotal_excl_vat,
+        vat: inv.vat_amount,
+        incl: inv.total_incl_vat,
+      };
+    return {
+      excl: Math.round((inv.subtotal_excl_vat / pct) * 100) / 100,
+      vat: Math.round((inv.vat_amount / pct) * 100) / 100,
+      incl: Math.round((inv.total_incl_vat / pct) * 100) / 100,
+    };
+  }
+
   // ----- Pagination constants (keep in sync with CSS) -----
   const CM_TO_PX = 37.79527559;
   const PAGE_HEIGHT_CM = 29.7;
@@ -423,7 +447,7 @@ export default function PrintableInvoice() {
             </div>
           </div>
           <div className="row">
-            <div className="label">{vatPerc}% VAT</div>
+            <div className="label">{inv?.vat_rate || 15}% VAT</div>
             <div className="value">{formatCurrency(inv?.vat_amount || 0)}</div>
           </div>
           <div className="rule" />
@@ -433,123 +457,157 @@ export default function PrintableInvoice() {
               {formatCurrency(inv?.total_incl_vat || 0)}
             </div>
           </div>
+
+          {/* Only show this section for partial payments (when percent < 100) */}
+          {inv?.percent_of_quote && inv.percent_of_quote < 100 && (
+            <>
+              <div className="rule" />
+              <div className="row payment-due">
+                <div className="label">Payment due now (incl. VAT)</div>
+                <div className="value highlight">
+                  {formatCurrency(
+                    (inv.total_incl_vat * inv.percent_of_quote) / 100 || 0
+                  )}
+                </div>
+              </div>
+            </>
+          )}
           <div className="rule double" />
         </div>
       </section>
     );
   };
 
-  // const TermsBlock = () => (
-  //   <div className="bom-block" style={{ marginTop: "20px" }}>
-  //     <div className="bom-terms" style={{ flex: "1" }}>
-  //       <div
-  //         className="terms-title"
-  //         style={{ fontWeight: "bold", marginBottom: "4px" }}
-  //       >
-  //         Terms
-  //       </div>
-  //       <div className="terms-body">
-  //         {inv?.invoice_type === "deposit"
-  //           ? "50% payable upfront to commence works. Balance invoiced upon completion."
-  //           : "Final payment due on completion handover."}
-  //       </div>
-  //     </div>
-  //   </div>
-  // );
-
-  const TermsBlock = () => {
-    const totalIncl = inv?.total_incl_vat || 0;
-    const [p0, p1, p2] = termsPerc.map((n: number) => +n || 0);
-    // const [p0, p1, p2] = [100, 0, 0];
-    const amt = (p: number) => formatCurrency(totalIncl * (p / 100));
-
+  function TermsBlock({
+    quoteNumber,
+    termsPerc,
+    activeStage, // 'deposit' | 'delivery' | 'final' | undefined
+  }: {
+    quoteNumber?: string;
+    termsPerc: number[];
+    activeStage?: "deposit" | "delivery" | "final";
+  }) {
+    const rows = [
+      { label: "Deposit", key: "deposit", pct: termsPerc?.[0] ?? 65 },
+      {
+        label: "On delivery of inverters and panels to site",
+        key: "delivery",
+        pct: termsPerc?.[1] ?? 25,
+      },
+      {
+        label: "On project completion",
+        key: "final",
+        pct: termsPerc?.[2] ?? 10,
+      },
+    ];
     return (
-      <section className="bom-block bom-block-termsdeposit">
-        <div className="bom-terms">
-          <p style={{ margin: "5px 0", fontWeight: 700 }}>
-            Please note that a {p0}% deposit will be required before Orka Solar
-            will commence with any work.
-          </p>
+      <div className="mt-3">
+        <div className="d-flex align-items-center gap-2 mb-2">
+          <div className="h6 mb-0">Payment Terms</div>
+          {quoteNumber && <small className="text-muted">({quoteNumber})</small>}
         </div>
-
-        <table
-          className="bom-table bom-terms-table"
-          style={{ marginTop: "6px" }}
-        >
-          <colgroup>
-            <col className="col-desc" />
-            <col className="col-perc" />
-            <col className="col-flex" />
-            <col className="col-amount" />
-            <col className="col-incl" />
-          </colgroup>
+        <table className="table table-sm table-bordered mb-0">
+          <thead className="table-light">
+            <tr>
+              <th style={{ width: "60%" }}>Milestone</th>
+              <th style={{ width: "40%" }} className="text-end">
+                Percent of Contract
+              </th>
+            </tr>
+          </thead>
           <tbody>
-            <tr className="bom-row-terms">
-              <td className="bom-cell-terms">Deposit</td>
-              <td className="bom-cell-terms">{p0}%</td>
-              <td className="bom-cell-terms"></td>
-              <td className="bom-cell-terms amount">{amt(p0)}</td>
-              <td className="bom-cell-terms incl">
-                <span>Incl. VAT</span>
-              </td>
-            </tr>
-
-            <tr className="bom-row-terms">
-              <td className="bom-cell-terms">
-                On delivery of inverters and panels to site
-              </td>
-              <td className="bom-cell-terms">{p1}%</td>
-              <td className="bom-cell-terms"></td>
-              <td className="bom-cell-terms amount">{amt(p1)}</td>
-              <td className="bom-cell-terms incl">
-                <span>Incl. VAT</span>
-              </td>
-            </tr>
-
-            <tr className="bom-row-terms">
-              <td className="bom-cell-terms">On project completion</td>
-              <td className="bom-cell-terms">{p2}%</td>
-              <td className="bom-cell-terms"></td>
-              <td className="bom-cell-terms amount">{amt(p2)}</td>
-              <td className="bom-cell-terms incl">
-                <span>Incl. VAT</span>
-              </td>
-            </tr>
-
-            <tr className="bom-row-terms grand">
-              <td className="bom-cell-terms" colSpan={3}></td>
-              <td className="bom-cell-terms amount total-amount">
-                {formatCurrency(totalIncl)}
-              </td>
-              <td className="bom-cell-terms incl">
-                <span>Incl. VAT</span>
-              </td>
-            </tr>
+            {rows.map((r) => {
+              const isActive = activeStage === r.key;
+              return (
+                <tr key={r.key} className={isActive ? "table-danger" : ""}>
+                  <td className="fw-semibold">{r.label}</td>
+                  <td className="text-end">{r.pct}%</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-      </section>
+        <small className="text-muted d-block mt-1">
+          * The highlighted row indicates the current invoice's payable
+          milestone.
+        </small>
+      </div>
     );
-  };
+  }
 
-  // const BankingBlock = () => (
-  //   <div className="bom-block" style={{ marginTop: "20px" }}>
-  //     <div className="bom-banking" style={{ flex: "1" }}>
-  //       <div
-  //         className="banking-title"
-  //         style={{ fontWeight: "bold", marginBottom: "4px" }}
+  // const TermsBlock = () => {
+  //   const totalIncl = inv?.total_incl_vat || 0;
+  //   const [p0, p1, p2] = termsPerc.map((n: number) => +n || 0);
+  //   // const [p0, p1, p2] = [100, 0, 0];
+  //   const amt = (p: number) => formatCurrency(totalIncl * (p / 100));
+
+  //   return (
+  //     <section className="bom-block bom-block-termsdeposit">
+  //       <div className="bom-terms">
+  //         <p style={{ margin: "5px 0", fontWeight: 700 }}>
+  //           Please note that a {p0}% deposit will be required before Orka Solar
+  //           will commence with any work.
+  //         </p>
+  //       </div>
+
+  //       <table
+  //         className="bom-table bom-terms-table"
+  //         style={{ marginTop: "6px" }}
   //       >
-  //         Banking Details
-  //       </div>
-  //       <div className="banking-body">
-  //         <div>Orka Solar (Pty) Ltd</div>
-  //         <div>Bank: Standard Bank</div>
-  //         <div>Account: 123456789</div>
-  //         <div>Branch: 051001</div>
-  //         <div>Reference: {inv?.invoice_number}</div>
-  //       </div>
-  //     </div>
-  //   </div>
-  // );
+  //         <colgroup>
+  //           <col className="col-desc" />
+  //           <col className="col-perc" />
+  //           <col className="col-flex" />
+  //           <col className="col-amount" />
+  //           <col className="col-incl" />
+  //         </colgroup>
+  //         <tbody>
+  //           <tr className="bom-row-terms">
+  //             <td className="bom-cell-terms">Deposit</td>
+  //             <td className="bom-cell-terms">{p0}%</td>
+  //             <td className="bom-cell-terms"></td>
+  //             <td className="bom-cell-terms amount">{amt(p0)}</td>
+  //             <td className="bom-cell-terms incl">
+  //               <span>Incl. VAT</span>
+  //             </td>
+  //           </tr>
+
+  //           <tr className="bom-row-terms">
+  //             <td className="bom-cell-terms">
+  //               On delivery of inverters and panels to site
+  //             </td>
+  //             <td className="bom-cell-terms">{p1}%</td>
+  //             <td className="bom-cell-terms"></td>
+  //             <td className="bom-cell-terms amount">{amt(p1)}</td>
+  //             <td className="bom-cell-terms incl">
+  //               <span>Incl. VAT</span>
+  //             </td>
+  //           </tr>
+
+  //           <tr className="bom-row-terms">
+  //             <td className="bom-cell-terms">On project completion</td>
+  //             <td className="bom-cell-terms">{p2}%</td>
+  //             <td className="bom-cell-terms"></td>
+  //             <td className="bom-cell-terms amount">{amt(p2)}</td>
+  //             <td className="bom-cell-terms incl">
+  //               <span>Incl. VAT</span>
+  //             </td>
+  //           </tr>
+
+  //           <tr className="bom-row-terms grand">
+  //             <td className="bom-cell-terms" colSpan={3}></td>
+  //             <td className="bom-cell-terms amount total-amount">
+  //               {formatCurrency(totalIncl)}
+  //             </td>
+  //             <td className="bom-cell-terms incl">
+  //               <span>Incl. VAT</span>
+  //             </td>
+  //           </tr>
+  //         </tbody>
+  //       </table>
+  //     </section>
+  //   );
+  // };
 
   const BankingBlock = () => (
     <section className="bom-block bom-block-bankingaccept">
@@ -781,9 +839,37 @@ export default function PrintableInvoice() {
                   {totalsPlacement.inlineKeys.includes("totals") && (
                     <TotalsBlock />
                   )}
-                  {totalsPlacement.inlineKeys.includes("terms") && (
-                    <TermsBlock />
-                  )}
+                  {/* Payment summary + terms */}
+                  {inv &&
+                    (() => {
+                      const contract = deriveContractTotalsFromInvoice(inv);
+                      return (
+                        <>
+                          {/* <div
+                            className="alert alert-warning d-flex justify-content-between align-items-center"
+                            role="alert"
+                            style={{ marginTop: 12 }}
+                          >
+                            <div>
+                              <strong>Amount due now:</strong>{" "}
+                              {fmtZAR(inv.total_incl_vat)}{" "}
+                              <span className="text-muted">
+                                ({inv.percent_of_quote}% of contract)
+                              </span>
+                            </div>
+                            <div>
+                              <strong>Contract value:</strong>{" "}
+                              {fmtZAR(contract.incl)}
+                            </div>
+                          </div> */}
+                          <TermsBlock
+                            quoteNumber={inv?.quote_number}
+                            termsPerc={termsPerc}
+                            activeStage={inv?.invoice_type}
+                          />
+                        </>
+                      );
+                    })()}
                   {totalsPlacement.inlineKeys.includes("banking") && (
                     <BankingBlock />
                   )}
@@ -794,7 +880,12 @@ export default function PrintableInvoice() {
               {page.kind === "totals" && (
                 <>
                   {page.blocks.includes("totals") && <TotalsBlock />}
-                  {page.blocks.includes("terms") && <TermsBlock />}
+                  {page.blocks.includes("terms") && (
+                    <TermsBlock
+                      quoteNumber={inv?.quote_number}
+                      termsPerc={termsPerc}
+                    />
+                  )}
                   {page.blocks.includes("banking") && <BankingBlock />}
                 </>
               )}

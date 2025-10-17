@@ -693,7 +693,7 @@ def create_invoice_for_jobcard(jid: int):
         status="draft",
         issue_date= datetime.now(SA_TZ).date(),
         due_date= (datetime.now(SA_TZ) + timedelta(days=7)).date(),
-        percent_of_quote=None,
+        percent_of_quote=100,
         billing_name=billing.get("name"),
         billing_company=billing.get("company"),
         billing_vat_no=billing.get("vat_no"),

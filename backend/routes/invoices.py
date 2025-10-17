@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import SA_TZ, db, Projects, BOMComponent, Invoice, InvoiceItem, Product, JobCard, Clients
+from models import SA_TZ, db, Projects, BOMComponent, Invoice, InvoiceItem, Product, JobCard, Clients, Document, DocumentVersion, DocumentLineItem, DocumentKind
 from datetime import datetime, timedelta
 from sqlalchemy import func
 
@@ -18,11 +18,56 @@ def _next_invoice_number():
     return f"{prefix}{n:04d}"
 
 def _load_quote_lines(project_id, quote_number, quote_version=None):
-    q = db.session.query(BOMComponent).filter_by(project_id=project_id, quote_number=quote_number)
+    """Load line items from a Document (quote) instead of BOMComponents."""
+    # Find the quote document
+    doc = Document.query.filter_by(
+        project_id=project_id, 
+        number=quote_number,
+        kind=DocumentKind.QUOTE
+    ).first()
+    
+    if not doc:
+        return []
+    
+    # Get the specific version if provided, otherwise get the latest
     if quote_version:
-        q = q.filter_by(quote_version=quote_version)
-    lines = q.all()
-    return lines
+        version = DocumentVersion.query.filter_by(
+            document_id=doc.id, 
+            version_no=quote_version
+        ).first()
+    else:
+        version = doc.versions.order_by(DocumentVersion.version_no.desc()).first()
+    
+    if not version:
+        return []
+    
+    # Convert DocumentLineItems to BOMComponent-compatible structure
+    bom_lines = []
+    for item in DocumentLineItem.query.filter_by(document_version_id=version.id).all():
+        # Get product name from the snapshot
+        snapshot = item.product_snapshot_json or {}
+        brand = snapshot.get('brand', '')
+        model = snapshot.get('model', '')
+        product_name = f"{brand} {model}".strip()
+
+        # Create a BOMComponent-like object with required attributes
+        component = BOMComponent(
+            project_id=project_id,
+            product_id=item.product_id,
+            quantity=item.qty,
+            unit_cost_at_time=item.unit_cost_locked,
+            price_at_time=item.unit_price_locked,
+            override_margin=item.margin_locked,
+            quote_number=quote_number,
+            quote_version=version.version_no
+        )
+
+        # Store the product name as a custom attribute
+        component.product_name = product_name
+
+        bom_lines.append(component)
+    
+    return bom_lines
 
 def _price_for_component(c: BOMComponent):
     # Prefer snapshot; fallback to live product price if snapshot is missing
@@ -40,34 +85,53 @@ def _price_for_component(c: BOMComponent):
     return float(unit)
 
 def _compute_items_from_quote(lines, percent=100.0, vat_rate=15.0):
-    factor = float(percent) / 100.0
     items = []
     subtotal = 0.0
     for c in lines:
         unit = _price_for_component(c)
         qty = float(c.quantity or 1)
-        line_excl = round(unit * qty * factor, 2)
+        line_excl = round(unit * qty, 2)
+
+        # Get product name from custom attribute, fallback to product relationship, then default
+        description = getattr(c, 'product_name', None)
+        if not description and c.product:
+            brand = getattr(c.product, 'brand_name', '') or getattr(c.product, 'brand', '')
+            model = getattr(c.product, 'description', '') or getattr(c.product, 'model', '')
+            description = f"{brand} {model}".strip()
+
+        # Final fallback
+        if not description:
+            description = "Line Item"
+
         items.append({
             'product_id': c.product_id,
-            'description': f"{c.product.brand if c.product else ''} {c.product.model if c.product else ''}".strip(),
+            'description': description, 
             'sku': None,
             'quantity': qty,
             'unit': 'ea',
-            'unit_price_excl_vat': round(unit * factor, 2),
+            'unit_price_excl_vat': round(unit, 2),
             'line_total_excl_vat': line_excl,
             'vat_rate': vat_rate,
         })
         subtotal += line_excl
     vat_amount = round(subtotal * (vat_rate / 100.0), 2)
     total_incl = round(subtotal + vat_amount, 2)
+
     return items, subtotal, vat_amount, total_incl
 
 @invoices_bp.route('/invoices', methods=['GET'])
 def list_invoices():
-    """List all invoices"""
+    """List all invoices with optional filtering"""
     try:
-        invoices = Invoice.query.order_by(Invoice.created_at.desc()).all()
-        
+        query = Invoice.query
+
+        # Filter by quote number if provided
+        quote_number = request.args.get('quote_number')
+        if quote_number:
+            query = query.filter(Invoice.quote_number == quote_number)
+
+        invoices = query.order_by(Invoice.created_at.desc()).all()
+
         result = []
         for inv in invoices:
             if hasattr(inv, 'to_dict'):
@@ -99,7 +163,7 @@ def list_invoices():
 def create_invoice(project_id):
     """
     body: {
-        "type": "deposit" | "final",
+        "type": "deposit" | "delivery" | "final",
         "quote_number": "Q-2024-0001",
         "quote_version": 1,  # optional
         "percent": 50.0,  # optional, default 100.0
@@ -125,21 +189,34 @@ def create_invoice(project_id):
     if not lines:
         return jsonify({"error": "No BOM lines found for the given quote"}), 400
     
+    # Defaults (change later from org settings)
+    default_map = {"deposit": 65.0, "delivery": 25.0}
+    percent_input = data.get('percent', None)
+
     # compute amounts
-    if inv_type == 'deposit':
-        items, subtotal, vat_amount, total_incl = _compute_items_from_quote(lines, percent=percent, vat_rate=vat_rate)
-        percent_of_quote = percent
-    elif inv_type == 'final':
-        # create final as (100% minus sum(deposit invoices already created)
-        items_full, sub_full, vat_full, tot_full = _compute_items_from_quote(lines, percent=100.0, vat_rate=vat_rate)
-        deposits = db.session.query(func.coalesce(func.sum(Invoice.subtotal_excl_vat), 0.0))\
-                    .filter_by(project_id=project_id, quote_number=quote_number, invoice_type='deposit')\
-                    .scalar() or 0.0
-        remaining_excl = max(0.0, float(sub_full) - float(deposits))
-        # scale items proportionally to remaining %
-        remaining_percent = 0.0 if sub_full <= 0 else (remaining_excl / float(sub_full)) * 100.0
-        items, subtotal, vat_amount, total_incl = _compute_items_from_quote(lines, percent=remaining_percent, vat_rate=vat_rate)
-        percent_of_quote = remaining_percent
+    if inv_type in ("deposit", "delivery"):
+        percent_of_quote = float(percent_input if percent_input is not None else default_map[inv_type])
+        if percent_of_quote <= 0 or percent_of_quote > 100:
+            return jsonify({"error": "percent must be between 0 and 100"}), 400
+        items, subtotal, vat_amount, total_incl= _compute_items_from_quote(lines, percent=percent_of_quote, vat_rate=vat_rate)
+
+    elif inv_type == "final":
+        # If explicit percent provided, use it; else compute remainder = 100 - sum(previous deposit+delivery percents)
+        if percent_input is not None:
+            percent_of_quote = float(percent_input)
+            if percent_of_quote <= 0 or percent_of_quote > 100:
+                return jsonify({"error": "percent must be between 0 and 100"}), 400
+        else:
+            from sqlalchemy import or_
+            existing_pct = db.session.query(func.coalesce(func.sum(Invoice.percent_of_quote), 0.0)) \
+                .filter(Invoice.project_id == project_id) \
+                .filter(Invoice.quote_number == quote_number) \
+                .filter(Invoice.invoice_type.in_(["deposit", "delivery"])) \
+                .scalar() or 0.0
+            percent_of_quote = max(0.0, 100.0 - float(existing_pct))
+
+        items, subtotal, vat_amount, total_incl = _compute_items_from_quote(lines, percent=percent_of_quote, vat_rate=vat_rate)
+
     else:
         return jsonify({"error": "Invalid invoice type"}), 400
     
