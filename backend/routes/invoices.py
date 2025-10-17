@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, Projects, BOMComponent, Invoice, InvoiceItem, Product, JobCard, Clients
+from models import SA_TZ, db, Projects, BOMComponent, Invoice, InvoiceItem, Product, JobCard, Clients
 from datetime import datetime, timedelta
 from sqlalchemy import func
 
@@ -150,8 +150,8 @@ def create_invoice(project_id):
         invoice_number=_next_invoice_number(),
         invoice_type=inv_type,
         status='draft',
-        issue_date=datetime.utcnow().date(),
-        due_date=(datetime.utcnow() + timedelta(days=due_in_days)).date(),
+        issue_date=lambda: datetime.now(SA_TZ).date(),
+        due_date=(lambda: datetime.now(SA_TZ) + timedelta(days=due_in_days)).date(),
         percent_of_quote=percent_of_quote,
         billing_name=data.get('billing', {}).get('name') or (project.client_name if hasattr(project, 'client_name') else None),
         billing_company=data.get('billing', {}).get('company') or getattr(project, 'company', None),

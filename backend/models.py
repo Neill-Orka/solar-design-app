@@ -47,7 +47,7 @@ class User(db.Model):
     role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.SALES)
     is_active = db.Column(db.Boolean, default=True)
     is_email_verified = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     last_login = db.Column(db.DateTime, nullable=True)
     profile_picture = db.Column(db.String(255), nullable=True)
@@ -101,7 +101,7 @@ class RegistrationToken(db.Model):
     )
 
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
     expires_at = db.Column(db.DateTime, nullable=False)
     is_used = db.Column(db.Boolean, default=False)
     used_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
@@ -122,13 +122,13 @@ class RegistrationToken(db.Model):
 
     def is_valid(self):
         """Check if token is still valid"""
-        return not self.is_used and self.expires_at > datetime.utcnow()
+        return not self.is_used and self.expires_at > datetime.datetime.now(SA_TZ)
 
     def use_token(self, user_id):
         """Mark token as used"""
         self.is_used = True
         self.used_by_id = user_id
-        self.used_at = datetime.utcnow()
+        self.used_at = datetime.datetime.now(SA_TZ)
 
     def to_dict(self):
         return {
@@ -159,7 +159,7 @@ class AuditLog(db.Model):
     details = db.Column(JSONB, nullable=True)  # Additional details about the action
     ip_address = db.Column(db.String(45), nullable=True)
     user_agent = db.Column(db.String(255), nullable=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
 
     # Relationship
     user = db.relationship("User", backref="audit_logs")
@@ -187,7 +187,7 @@ class RefreshToken(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     token = db.Column(db.String(255), nullable=False, unique=True)
     expires_at = db.Column(db.DateTime, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
     is_revoked = db.Column(db.Boolean, default=False)
 
     # Relationship
@@ -198,7 +198,7 @@ class RefreshToken(db.Model):
         return secrets.token_urlsafe(32)
 
     def is_valid(self):
-        return not self.is_revoked and self.expires_at > datetime.utcnow()
+        return not self.is_revoked and self.expires_at > datetime.now(SA_TZ)
 
     def revoke(self):
         self.is_revoked = True
@@ -242,7 +242,7 @@ class Projects(db.Model):
     longitude = db.Column(db.Float)
     surface_tilt = db.Column(db.Float, default=15.0)
     surface_azimuth = db.Column(db.Float, default=0.0)  # Default to North
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
     design_type = db.Column(db.String(20), nullable=False)  # 'detailed', 'quick'
     project_type = db.Column(
         db.String(50), nullable=False
@@ -317,7 +317,9 @@ class Product(db.Model):
     warranty_y = db.Column("Warranty (y)", db.Integer)
     # Audit fields
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+                db.DateTime,
+        default=lambda: datetime.now(SA_TZ),
+        onupdate=lambda: datetime.now(SA_TZ),
     )
     updated_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     updated_by = db.relationship("User", foreign_keys=[updated_by_id])
@@ -793,7 +795,7 @@ class Document(db.Model):
     )
 
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(SA_TZ))
 
     client_snapshot_json = db.Column(
         JSONB, nullable=True
@@ -834,8 +836,8 @@ class Document(db.Model):
 
         # Lock the version
         current_version.status = VersionStatus.SENT
-        current_version.valid_until = datetime.utcnow() + timedelta(days=30)
-        current_version.price_locked_at = datetime.utcnow()
+        current_version.valid_until = lambda: datetime.now(SA_TZ) + timedelta(days=30)
+        current_version.price_locked_at = lambda: datetime.now(SA_TZ)
 
         # Update document status
         self.status = DocumentStatus.OPEN  # Keep as OPEN when sent
@@ -932,7 +934,7 @@ class DocumentVersion(db.Model):
     html_hash = db.Column(db.String(64), nullable=True)
 
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ), nullable=False)
 
     created_by = db.relationship("User", foreign_keys=[created_by_id])
 
@@ -1023,7 +1025,7 @@ class DocumentEvent(db.Model):
     meta_json = db.Column(JSONB, nullable=True)
 
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ), nullable=False)
 
     created_by = db.relationship("User", foreign_keys=[created_by_id])
 
@@ -1178,7 +1180,7 @@ class JobCard(db.Model):
 
     # Audit
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
     updated_at = db.Column(
         db.DateTime,
         default=lambda: datetime.now(SA_TZ),
@@ -1276,7 +1278,7 @@ class JobCardTimeEntry(db.Model):
     hourly_rate_at_time = db.Column(db.Numeric(10, 2), nullable=False, default=0)
 
     user = db.relationship("User")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
 
     def to_dict(self):
         return {
@@ -1308,7 +1310,7 @@ class JobCardMaterial(db.Model):
     note = db.Column(db.String(200), nullable=True)
 
     product = db.relationship("Product")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
 
     def to_dict(self):
         # Get the related product if available
@@ -1347,7 +1349,7 @@ class JobCardAttachment(db.Model):
     content_type = db.Column(db.String(80), nullable=True)
     size_bytes = db.Column(db.Integer, nullable=True)
     uploaded_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
     attachment_type = db.Column(db.String(20), nullable=False, default="site")
     caption = db.Column(db.String(255), nullable=True)
 
@@ -1376,7 +1378,7 @@ class JobCardMaterialReceipt(db.Model):
     attachment_id = db.Column(
         db.Integer, db.ForeignKey("job_card_attachments.id"), nullable=False
     )
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
 
     material = db.relationship(
         "JobCardMaterial", backref=db.backref("receipts", lazy=True)

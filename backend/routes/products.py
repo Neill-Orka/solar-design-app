@@ -2,7 +2,7 @@ from datetime import datetime
 from math import e
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Product, User, UserRole
+from models import SA_TZ, db, Product, User, UserRole
 from sqlalchemy.inspection import inspect
 from sqlalchemy import Float, Integer, Numeric, or_
 
@@ -184,7 +184,7 @@ def delete_product(pid):
 
         # Perform soft delete
         p.is_deleted = True
-        p.deleted_at = datetime.utcnow()
+        p.deleted_at = lambda: datetime.now(SA_TZ)
         p.deleted_by_id = user_id
 
         db.session.commit()
