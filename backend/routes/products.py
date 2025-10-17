@@ -184,7 +184,7 @@ def delete_product(pid):
 
         # Perform soft delete
         p.is_deleted = True
-        p.deleted_at = lambda: datetime.now(SA_TZ)
+        p.deleted_at = datetime.now(SA_TZ)
         p.deleted_by_id = user_id
 
         db.session.commit()

@@ -152,7 +152,7 @@ def login():
             return jsonify({'message': 'Account is inactive'}), 401
         
         # Update last login
-        user.last_login = lambda: datetime.now(SA_TZ)
+        user.last_login = datetime.now(SA_TZ)
         
         # Create tokens
         access_token = create_access_token(identity=str(user.id))
@@ -162,7 +162,7 @@ def login():
         db_refresh = RefreshToken(
             user_id=user.id,
             token=RefreshToken.generate_token(),
-            expires_at=lambda: datetime.now(SA_TZ) + current_app.config['JWT_REFRESH_TOKEN_EXPIRES']
+            expires_at= datetime.now(SA_TZ) + current_app.config['JWT_REFRESH_TOKEN_EXPIRES']
         )
         
         db.session.add(db_refresh)
@@ -170,7 +170,7 @@ def login():
         
         # Log the action
         log_user_action(user.id, 'LOGIN', 'authentication', details={
-            'login_time': lambda: datetime.now(SA_TZ).isoformat()
+            'login_time': datetime.now(SA_TZ).isoformat()
         })
         
         return jsonify({
@@ -202,7 +202,7 @@ def refresh():
         access_token = create_access_token(identity=str(rt.user_id))
 
         # 2) Slide refresh token expiry forward (user stays logged in while active)
-        rt.expires_at = lambda: datetime.now(SA_TZ) + current_app.config['JWT_REFRESH_TOKEN_EXPIRES']
+        rt.expires_at = datetime.now(SA_TZ) + current_app.config['JWT_REFRESH_TOKEN_EXPIRES']
 
         db.session.commit()
         payload = { 'access_token': access_token}
@@ -277,7 +277,7 @@ def generate_registration_token():
             token=token_string,
             role=role,  # Store uppercase role to match database constraint
             created_by_id=current_user_id,
-            expires_at=lambda: datetime.now(SA_TZ) + timedelta(days=7)
+            expires_at= datetime.now(SA_TZ) + timedelta(days=7)
         )
         
         db.session.add(registration_token)

@@ -141,7 +141,7 @@ def jobcards_collection():
             if new_stat != JobCardReviewStatus.OPEN:
                 current_user_id = int(get_jwt_identity())
                 jc.bum_reviewed_by_id = current_user_id
-                jc.bum_reviewed_at = lambda: datetime.now(SA_TZ)
+                jc.bum_reviewed_at = datetime.now(SA_TZ)
         else: jc.bum_status = JobCardReviewStatus.OPEN
 
 
@@ -210,7 +210,7 @@ def jobcards_item(jid: int):
 
             jc.bum_status = new_status
             jc.bum_reviewed_by_id = current_user_id
-            jc.bum_reviewed_at = lambda: datetime.now(SA_TZ)
+            jc.bum_reviewed_at = datetime.now(SA_TZ)
 
         db.session.commit()
         return jsonify(jc.to_dict())
@@ -691,8 +691,8 @@ def create_invoice_for_jobcard(jid: int):
         invoice_number=_next_invoice_number(),
         invoice_type=inv_type,        # 'final' for jobcards by default
         status="draft",
-        issue_date=lambda: datetime.now(SA_TZ).date(),
-        due_date=lambda: (datetime.now(SA_TZ) + timedelta(days=7)).date(),
+        issue_date= datetime.now(SA_TZ).date(),
+        due_date= (datetime.now(SA_TZ) + timedelta(days=7)).date(),
         percent_of_quote=None,
         billing_name=billing.get("name"),
         billing_company=billing.get("company"),

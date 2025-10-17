@@ -29,7 +29,7 @@ def mark_project_activity(project_id: int, user_id: int | None):
     proj = Projects.query.get(project_id)
     if not proj:
         return
-    proj.updated_at = lambda: datetime.now(SA_TZ)
+    proj.updated_at = datetime.now(SA_TZ)
     if user_id:
         proj.updated_by_id = user_id
     db.session.add(proj)
@@ -298,7 +298,7 @@ def delete_project(project_id):
             return jsonify({"error": "Project already deleted"}), 400
 
         project.is_deleted = True
-        project.deleted_at = lambda: datetime.now(SA_TZ)
+        project.deleted_at = datetime.now(SA_TZ)
         project.deleted_by_id = user.id
         # Bulk delete children to avoid per-row cascade overhead
         # db.session.query(EnergyData).filter_by(project_id=project_id).delete(synchronize_session=False)
