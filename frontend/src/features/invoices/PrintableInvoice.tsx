@@ -801,13 +801,13 @@ export default function PrintableInvoice() {
                         className="bom-thead-cell bom-col-unitprice"
                         style={{ textAlign: "right" }}
                       >
-                        Unit Price (excl)
+                        Unit Price
                       </th>
                       <th
                         className="bom-thead-cell bom-col-total"
                         style={{ textAlign: "right" }}
                       >
-                        Line Total (excl)
+                        Line Total
                       </th>
                     </tr>
                   </thead>
@@ -822,10 +822,10 @@ export default function PrintableInvoice() {
                           {row.item.quantity}
                         </td>
                         <td className="bom-cell" style={{ textAlign: "right" }}>
-                          R{row.item.unit_price_excl_vat.toFixed(2)}
+                          {formatCurrency(row.item.unit_price_excl_vat)}
                         </td>
                         <td className="bom-cell" style={{ textAlign: "right" }}>
-                          R{row.item.line_total_excl_vat.toFixed(2)}
+                          {formatCurrency(row.item.line_total_excl_vat)}
                         </td>
                       </tr>
                     ))}
