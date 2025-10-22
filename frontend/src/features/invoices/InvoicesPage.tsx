@@ -13,7 +13,8 @@ import { useNotification } from "../../NotificationContext";
 import { API_URL } from "../../apiConfig";
 import { useAuth } from "../../AuthContext";
 import { useNavigate } from "react-router-dom";
-import { deleteInvoice } from "./api";
+import { createInvoice, deleteInvoice } from "./api";
+import Modal from "react-bootstrap/Modal";
 
 export default function InvoicesPage() {
   const [rows, setRows] = useState(null);
@@ -26,6 +27,18 @@ export default function InvoicesPage() {
   const [celebrationMeta, setCelebrationMeta] = useState(null);
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const [showNew, setShowNew] = useState(false);
+  const [form, setForm] = useState({
+    projectId: "" as string,
+    quoteNumber: "" as string,
+    invoiceType: "deposit" as "deposit" | "delivery" | "final",
+    percent: (JSON.parse(
+      localStorage.getItem("invoiceTermsPerc") || "[65,25,10]"
+    )[0] || 65) as number,
+    dueInDays: 7 as number,
+  });
+  const [submitting, setSubmitting] = useState(false);
 
   const loadInvoices = async () => {
     setLoading(true);
@@ -89,7 +102,7 @@ export default function InvoicesPage() {
     <>
       <div className="d-flex justify-content-between align-items-center mb-3 p-3">
         <h3>Invoices</h3>
-        <Button variant="primary" size="sm">
+        <Button variant="primary" size="sm" onClick={() => setShowNew(true)}>
           <i className="bi bi-plus me-1"></i> New Invoice
         </Button>
       </div>
@@ -196,6 +209,130 @@ export default function InvoicesPage() {
           ))}
         </tbody>
       </Table>
+
+      <Modal show={showNew} onHide={() => setShowNew(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Create Invoice from Quote</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form className="d-grid gap-2">
+            <Form.Group>
+              <Form.Label>Project ID</Form.Label>
+              <Form.Control
+                type="number"
+                value={form.projectId}
+                onChange={(e) =>
+                  setForm({ ...form, projectId: e.target.value })
+                }
+                placeholder="e.g. 67"
+              />
+            </Form.Group>
+            <Form.Group>
+              <Form.Label>Quote Number</Form.Label>
+              <Form.Control
+                value={form.quoteNumber}
+                onChange={(e) =>
+                  setForm({ ...form, quoteNumber: e.target.value })
+                }
+                placeholder="e.g. Orka_Solar_QTE_P67_2025-0001"
+              />
+            </Form.Group>
+            <Form.Group>
+              <Form.Label>Invoice Type</Form.Label>
+              <Form.Select
+                value={form.invoiceType}
+                onChange={(e) => {
+                  const type = e.target.value as
+                    | "deposit"
+                    | "delivery"
+                    | "final";
+                  const defaults = { deposit: 65, delivery: 25, final: 10 };
+                  setForm({
+                    ...form,
+                    invoiceType: type,
+                    percent: defaults[type],
+                  });
+                }}
+              >
+                <option value="deposit">Deposit</option>
+                <option value="delivery">Delivery</option>
+                <option value="final">Final</option>
+              </Form.Select>
+            </Form.Group>
+            {form.invoiceType !== "final" && (
+              <Form.Group>
+                <Form.Label>Percent of Quote</Form.Label>
+                <Form.Control
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={form.percent}
+                  onChange={(e) =>
+                    setForm({ ...form, percent: Number(e.target.value) })
+                  }
+                />
+              </Form.Group>
+            )}
+            <Form.Group>
+              <Form.Label>Due in (days)</Form.Label>
+              <Form.Control
+                type="number"
+                min={1}
+                value={form.dueInDays}
+                onChange={(e) =>
+                  setForm({ ...form, dueInDays: Number(e.target.value) })
+                }
+              />
+            </Form.Group>
+            <div className="text-muted small">
+              Tip: You can set your default term split in localStorage key{" "}
+              <code>invoiceTermsPerc</code> as <code>[65,25,10]</code>.
+            </div>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowNew(false)}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            disabled={!form.projectId || !form.quoteNumber || submitting}
+            onClick={async () => {
+              try {
+                setSubmitting(true);
+                const payload: any = {
+                  type: form.invoiceType,
+                  quote_number: form.quoteNumber,
+                  due_in_days: form.dueInDays,
+                };
+                if (form.invoiceType !== "final")
+                  payload.percent = form.percent;
+                const res = await createInvoice(
+                  Number(form.projectId),
+                  payload
+                );
+                showNotification(
+                  `Invoice ${res.invoice_number} created`,
+                  "success"
+                );
+                setShowNew(false);
+                loadInvoices();
+              } catch (err) {
+                console.error(err);
+                showNotification("Failed to create invoice", "danger");
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+          >
+            {submitting ? "Creating…" : "Create"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 }

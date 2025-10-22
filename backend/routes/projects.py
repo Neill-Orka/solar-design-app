@@ -298,7 +298,7 @@ def delete_project(project_id):
             return jsonify({"error": "Project already deleted"}), 400
 
         project.is_deleted = True
-        project.deleted_at = datetime.now()
+        project.deleted_at = datetime.now(SA_TZ)
         project.deleted_by_id = user.id
         # Bulk delete children to avoid per-row cascade overhead
         # db.session.query(EnergyData).filter_by(project_id=project_id).delete(synchronize_session=False)

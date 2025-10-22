@@ -446,3 +446,14 @@ code {
 .view-toggle-button:hover {
   transform: translateY(-1px);
 }
+
+/* Add to your CSS file */
+.payment-due {
+  font-weight: bold;
+  color: #cf636e; /* Bootstrap danger red */
+}
+
+.highlight {
+  color: #cf636e; /* Bootstrap danger red */
+  font-size: 1.1em;
+}

@@ -1,27 +1,35 @@
 import axios from "axios";
 import { API_URL } from "../../apiConfig";
 
-export async function createInvoice(
-  projectId: number,
-  payload: {
-    type: "deposit" | "delivery" | "final";
-    quote_number?: string;
-    quote_version?: number;
-    percent?: number;
-    due_in_days?: number;
-    billing?: {
-      name?: string;
-      company?: string;
-      vat_no?: string;
-      address?: string;
-    };
-  }
-) {
+// export async function createInvoice(
+//   projectId: number,
+//   payload: {
+//     type: "deposit" | "delivery" | "final";
+//     quote_number?: string;
+//     quote_version?: number;
+//     percent?: number;
+//     due_in_days?: number;
+//     billing?: {
+//       name?: string;
+//       company?: string;
+//       vat_no?: string;
+//       address?: string;
+//     };
+//   }
+// ) {
+//   const { data } = await axios.post(
+//     `${API_URL}/api/projects/${projectId}/invoices`,
+//     payload
+//   );
+//   return data as { invoice_id: number; invoice_number: string };
+// }
+
+export async function createInvoice(projectId: number, payload: any) {
   const { data } = await axios.post(
     `${API_URL}/api/projects/${projectId}/invoices`,
     payload
   );
-  return data as { invoice_id: number; invoice_number: string };
+  return data;
 }
 
 export async function getInvoice(invoiceId: number) {
