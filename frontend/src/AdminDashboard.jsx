@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from './AuthContext';
-import { API_URL } from './apiConfig';
-import './AdminDashboard.css';
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "./AuthContext";
+import { API_URL } from "./apiConfig";
+import "./AdminDashboard.css";
 import axios from "axios";
 
 const AdminDashboard = () => {
@@ -9,25 +9,33 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [registrationTokens, setRegistrationTokens] = useState([]);
-  const [tokenRole, setTokenRole] = useState('design');
+  const [tokenRole, setTokenRole] = useState("design");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [message, setMessage] = useState('');
-  const [activeTab, setActiveTab] = useState('users');
+  const [message, setMessage] = useState("");
+  const [activeTab, setActiveTab] = useState("users");
 
   // User management modals
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [newRole, setNewRole] = useState('');
+  const [newRole, setNewRole] = useState("");
   const [userActionLoading, setUserActionLoading] = useState(false);
+
+  // States for the notification test form
+  const [notificationForm, setNotificationForm] = useState({
+    to: "neill@orkasolar.co.za",
+    subject: "Test Email from Orka Solar App",
+    body: "This is a test email sent from the admin dashboard.",
+  });
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // System settings variables
   const [vehicles, setVehicles] = useState([]);
   const [categories, setCategories] = useState([]);
   const [bums, setBums] = useState([]);
   const [technicians, setTechnicians] = useState([]);
-  const [settingsSection, setSettingsSection] = useState('vehicles');
+  const [settingsSection, setSettingsSection] = useState("vehicles");
   const [loadingUsers, setLoadingUsers] = useState(false);
 
   // Add loading states
@@ -43,30 +51,57 @@ const AdminDashboard = () => {
   const [editingTechnician, setEditingTechnician] = useState(null);
 
   const getAuthHeaders = useCallback(() => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem("access_token");
     return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     };
   }, []);
 
+  // Handler for the new notification form
+  const handleSendTestEmail = async (e) => {
+    e.preventDefault();
+    setSendingEmail(true);
+    setMessage(""); // Clear previous messages
+
+    try {
+      const response = await fetch(`${API_URL}/api/notify/test`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(notificationForm),
+      });
+
+      if (response.ok) {
+        setMessage(`Test email sent successfully to ${notificationForm.to}`);
+      } else {
+        const errorData = await response.json();
+        setMessage(
+          `Failed to send email: ${errorData.message || "Unknown error"}`
+        );
+      }
+    } catch (error) {
+      console.error("Error sending test email:", error);
+      setMessage("An error occurred while sending the email.");
+    } finally {
+      setSendingEmail(false);
+    }
+  };
 
   const fetchVehicles = useCallback(async () => {
     setLoadingVehicles(true);
     try {
       const response = await fetch(`${API_URL}/api/vehicles`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
       });
       if (response.ok) {
         const data = await response.json();
         setVehicles(data);
       } else {
-        setMessage('Failed to fetch vehicles');
-
+        setMessage("Failed to fetch vehicles");
       }
     } catch (error) {
-      console.error('Error fetching vehicles:', error);
-      setMessage('Error loading vehicles');
+      console.error("Error fetching vehicles:", error);
+      setMessage("Error loading vehicles");
     } finally {
       setLoadingVehicles(false);
     }
@@ -76,17 +111,17 @@ const AdminDashboard = () => {
     setLoadingCategories(true);
     try {
       const response = await fetch(`${API_URL}/api/jobcategories`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
       });
       if (response.ok) {
         const data = await response.json();
         setCategories(data);
       } else {
-        setMessage('Failed to fetch job categories');
+        setMessage("Failed to fetch job categories");
       }
     } catch (error) {
-      console.error('Error fetching job categories:', error);
-      setMessage('Error loading job categories');
+      console.error("Error fetching job categories:", error);
+      setMessage("Error loading job categories");
     } finally {
       setLoadingCategories(false);
     }
@@ -96,17 +131,17 @@ const AdminDashboard = () => {
     setLoadingBums(true);
     try {
       const response = await fetch(`${API_URL}/api/auth/users?is_bum=1`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
       });
       if (response.ok) {
         const data = await response.json();
         setBums(data);
       } else {
-        setMessage('Failed to fetch BUMs');
+        setMessage("Failed to fetch BUMs");
       }
     } catch (error) {
-      console.error('Error fetching BUMs:', error);
-      setMessage('Error loading BUMs');
+      console.error("Error fetching BUMs:", error);
+      setMessage("Error loading BUMs");
     } finally {
       setLoadingBums(false);
     }
@@ -116,46 +151,46 @@ const AdminDashboard = () => {
     setLoadingUsers(true);
     try {
       const response = await fetch(`${API_URL}/api/auth/admin/users`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
         const data = await response.json();
         setUsers(data.users);
       } else {
-        console.error('Failed to fetch users');
+        console.error("Failed to fetch users");
       }
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error("Error fetching users:", error);
     } finally {
       setLoadingUsers(false);
     }
   }, [getAuthHeaders]);
 
-const fetchTechnicians = useCallback(async () => {
-  setLoadingTechnicians(true);
-  try {
-    // Use the correct endpoint - it should be under jobcards API, not auth
-    const response = await fetch(`${API_URL}/api/technicians`, {
-      headers: getAuthHeaders()
-    });
+  const fetchTechnicians = useCallback(async () => {
+    setLoadingTechnicians(true);
+    try {
+      // Use the correct endpoint - it should be under jobcards API, not auth
+      const response = await fetch(`${API_URL}/api/technicians`, {
+        headers: getAuthHeaders(),
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      setTechnicians(data);
-    } else {
-      setMessage('Failed to fetch technicians');
+      if (response.ok) {
+        const data = await response.json();
+        setTechnicians(data);
+      } else {
+        setMessage("Failed to fetch technicians");
+      }
+    } catch (error) {
+      console.error("Error fetching technicians:", error);
+      setMessage("Error loading technicians");
+    } finally {
+      setLoadingTechnicians(false);
     }
-  } catch (error) {
-    console.error('Error fetching technicians:', error);
-    setMessage('Error loading technicians');
-  } finally {
-    setLoadingTechnicians(false);
-  }
-}, [getAuthHeaders]);
+  }, [getAuthHeaders]);
 
   useEffect(() => {
-    if (activeTab === 'settings') {
+    if (activeTab === "settings") {
       // Load all settings data
       fetchVehicles();
       fetchCategories();
@@ -166,255 +201,297 @@ const fetchTechnicians = useCallback(async () => {
       //   fetchUsers();
       // }
     }
-  }, [activeTab, settingsSection, fetchVehicles, fetchCategories, fetchBums, fetchTechnicians, fetchUsers]);
+  }, [
+    activeTab,
+    settingsSection,
+    fetchVehicles,
+    fetchCategories,
+    fetchBums,
+    fetchTechnicians,
+    fetchUsers,
+  ]);
 
   // Add these handlers for vehicles
-const handleSaveVehicle = async (vehicle) => {
-  try {
-    const method = vehicle.id ? 'PUT' : 'POST';
-    const url = vehicle.id ?
-      `${API_URL}/api/vehicles/${vehicle.id}` :
-      `${API_URL}/api/vehicles`;
+  const handleSaveVehicle = async (vehicle) => {
+    try {
+      const method = vehicle.id ? "PUT" : "POST";
+      const url = vehicle.id
+        ? `${API_URL}/api/vehicles/${vehicle.id}`
+        : `${API_URL}/api/vehicles`;
 
-    const response = await fetch(url, {
-      method,
-      headers: getAuthHeaders(),
-      body: JSON.stringify(vehicle)
-    });
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(vehicle),
+      });
 
-    if (response.ok) {
-      setMessage(`Vehicle ${vehicle.id ? 'updated' : 'added'} successfully`);
-      fetchVehicles();
-      setEditingVehicle(null);
-    } else {
-      const error = await response.json();
-      setMessage(error.message || `Failed to ${vehicle.id ? 'update' : 'add'} vehicle`);
+      if (response.ok) {
+        setMessage(`Vehicle ${vehicle.id ? "updated" : "added"} successfully`);
+        fetchVehicles();
+        setEditingVehicle(null);
+      } else {
+        const error = await response.json();
+        setMessage(
+          error.message || `Failed to ${vehicle.id ? "update" : "add"} vehicle`
+        );
+      }
+    } catch (error) {
+      console.error(
+        `Error ${vehicle.id ? "updating" : "adding"} vehicle:`,
+        error
+      );
+      setMessage(`Error ${vehicle.id ? "updating" : "adding"} vehicle`);
     }
-  } catch (error) {
-    console.error(`Error ${vehicle.id ? 'updating' : 'adding'} vehicle:`, error);
-    setMessage(`Error ${vehicle.id ? 'updating' : 'adding'} vehicle`);
-  }
-};
+  };
 
-const handleDeleteVehicle = async (id) => {
-  if (!confirm('Are you sure you want to delete this vehicle?')) return;
+  const handleDeleteVehicle = async (id) => {
+    if (!confirm("Are you sure you want to delete this vehicle?")) return;
 
-  try {
-    const response = await fetch(`${API_URL}/api/vehicles/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
-    });
+    try {
+      const response = await fetch(`${API_URL}/api/vehicles/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
 
-    if (response.ok) {
-      setMessage('Vehicle deleted successfully');
-      fetchVehicles();
-    } else {
-      const error = await response.json();
-      setMessage(error.message || 'Failed to delete vehicle');
+      if (response.ok) {
+        setMessage("Vehicle deleted successfully");
+        fetchVehicles();
+      } else {
+        const error = await response.json();
+        setMessage(error.message || "Failed to delete vehicle");
+      }
+    } catch (error) {
+      console.error("Error deleting vehicle:", error);
+      setMessage("Error deleting vehicle");
     }
-  } catch (error) {
-    console.error('Error deleting vehicle:', error);
-    setMessage('Error deleting vehicle');
-  }
-};
+  };
 
-// Add handlers for categories
-const handleSaveCategory = async (category) => {
-  try {
-    const method = category.id ? 'PUT' : 'POST';
-    const url = category.id ?
-      `${API_URL}/api/jobcategories/${category.id}` :
-      `${API_URL}/api/jobcategories`;
+  // Add handlers for categories
+  const handleSaveCategory = async (category) => {
+    try {
+      const method = category.id ? "PUT" : "POST";
+      const url = category.id
+        ? `${API_URL}/api/jobcategories/${category.id}`
+        : `${API_URL}/api/jobcategories`;
 
-    const response = await fetch(url, {
-      method,
-      headers: getAuthHeaders(),
-      body: JSON.stringify(category)
-    });
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(category),
+      });
 
-    if (response.ok) {
-      setMessage(`Category ${category.id ? 'updated' : 'added'} successfully`);
-      fetchCategories();
-      setEditingCategory(null);
-    } else {
-      const error = await response.json();
-      setMessage(error.message || `Failed to ${category.id ? 'update' : 'add'} category`);
+      if (response.ok) {
+        setMessage(
+          `Category ${category.id ? "updated" : "added"} successfully`
+        );
+        fetchCategories();
+        setEditingCategory(null);
+      } else {
+        const error = await response.json();
+        setMessage(
+          error.message ||
+            `Failed to ${category.id ? "update" : "add"} category`
+        );
+      }
+    } catch (error) {
+      console.error(
+        `Error ${category.id ? "updating" : "adding"} category:`,
+        error
+      );
+      setMessage(`Error ${category.id ? "updating" : "adding"} category`);
     }
-  } catch (error) {
-    console.error(`Error ${category.id ? 'updating' : 'adding'} category:`, error);
-    setMessage(`Error ${category.id ? 'updating' : 'adding'} category`);
-  }
-};
+  };
 
-const handleDeleteCategory = async (id) => {
-  if (!confirm('Are you sure you want to delete this category? This may affect existing job cards.')) return;
-
-  try {
-    const response = await fetch(`${API_URL}/api/jobcategories/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
-    });
-
-    if (response.ok) {
-      setMessage('Category deleted successfully');
-      fetchCategories();
-    } else {
-      const error = await response.json();
-      setMessage(error.message || 'Failed to delete category');
-    }
-  } catch (error) {
-    console.error('Error deleting category:', error);
-    setMessage('Error deleting category');
-  }
-};
-
-// Add handlers for BUMs management
-const handleToggleBumStatus = async (userId, isBum) => {
-  try {
-    // First, get the user's current role
-    const userToUpdate = users.find(u => u.id === userId);
-    if (!userToUpdate) {
-      setMessage('User not found');
+  const handleDeleteCategory = async (id) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this category? This may affect existing job cards."
+      )
+    )
       return;
+
+    try {
+      const response = await fetch(`${API_URL}/api/jobcategories/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        setMessage("Category deleted successfully");
+        fetchCategories();
+      } else {
+        const error = await response.json();
+        setMessage(error.message || "Failed to delete category");
+      }
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      setMessage("Error deleting category");
     }
+  };
 
-    // Use a dedicated endpoint for BUM status - this is more appropriate
-    const response = await fetch(`${API_URL}/api/auth/admin/users/${userId}/update-bum-status`, {
-      method: 'POST', // Changed to POST since we're performing an action
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        is_bum: !isBum   // Toggle the BUM status
-      })
-    });
+  // Add handlers for BUMs management
+  const handleToggleBumStatus = async (userId, isBum) => {
+    try {
+      // First, get the user's current role
+      const userToUpdate = users.find((u) => u.id === userId);
+      if (!userToUpdate) {
+        setMessage("User not found");
+        return;
+      }
 
-    if (response.ok) {
-      setMessage(`User ${isBum ? 'removed from' : 'set as'} BUM successfully`);
+      // Use a dedicated endpoint for BUM status - this is more appropriate
+      const response = await fetch(
+        `${API_URL}/api/auth/admin/users/${userId}/update-bum-status`,
+        {
+          method: "POST", // Changed to POST since we're performing an action
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            is_bum: !isBum, // Toggle the BUM status
+          }),
+        }
+      );
 
-      // Force a timeout before refreshing data to ensure backend has processed the change
-      setTimeout(() => {
-        fetchBums();
-        fetchUsers();
-      }, 300);
-    } else {
-      const error = await response.json();
-      setMessage(error.message || `Failed to update BUM status`);
+      if (response.ok) {
+        setMessage(
+          `User ${isBum ? "removed from" : "set as"} BUM successfully`
+        );
+
+        // Force a timeout before refreshing data to ensure backend has processed the change
+        setTimeout(() => {
+          fetchBums();
+          fetchUsers();
+        }, 300);
+      } else {
+        const error = await response.json();
+        setMessage(error.message || `Failed to update BUM status`);
+      }
+    } catch (error) {
+      console.error("Error updating BUM status:", error);
+      setMessage("Error updating BUM status");
     }
-  } catch (error) {
-    console.error('Error updating BUM status:', error);
-    setMessage('Error updating BUM status');
-  }
-};
+  };
 
-// Add handlers for technicians
-const handleSaveTechnician = async (tech) => {
-  try {
-    // Log what we're sending for debugging
-    console.log('Saving technician:', tech);
+  // Add handlers for technicians
+  const handleSaveTechnician = async (tech) => {
+    try {
+      // Log what we're sending for debugging
+      console.log("Saving technician:", tech);
 
-    const method = tech.tech_profile_id ? 'PUT' : 'POST';
+      const method = tech.tech_profile_id ? "PUT" : "POST";
 
-    // Fix the endpoint URLs - they should be under jobcards API, not auth
-    const url = tech.tech_profile_id ?
-      `${API_URL}/api/technicians/${tech.tech_profile_id}` :
-      `${API_URL}/api/technicians`;
+      // Fix the endpoint URLs - they should be under jobcards API, not auth
+      const url = tech.tech_profile_id
+        ? `${API_URL}/api/technicians/${tech.tech_profile_id}`
+        : `${API_URL}/api/technicians`;
 
-    // Clean the payload to only include what the API expects
-    const payload = {
-      user_id: tech.user_id,
-      hourly_rate: parseFloat(tech.hourly_rate),
-      active: tech.active
-    };
+      // Clean the payload to only include what the API expects
+      const payload = {
+        user_id: tech.user_id,
+        hourly_rate: parseFloat(tech.hourly_rate),
+        active: tech.active,
+      };
 
-    if (tech.tech_profile_id) {
-      payload.id = tech.tech_profile_id;
+      if (tech.tech_profile_id) {
+        payload.id = tech.tech_profile_id;
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        setMessage(
+          `Technician ${tech.tech_profile_id ? "updated" : "added"} successfully`
+        );
+        fetchTechnicians();
+        setEditingTechnician(null);
+      } else {
+        const error = await response.json();
+        setMessage(
+          error.message ||
+            `Failed to ${tech.tech_profile_id ? "update" : "add"} technician`
+        );
+      }
+    } catch (error) {
+      console.error(
+        `Error ${tech.tech_profile_id ? "updating" : "adding"} technician:`,
+        error
+      );
+      setMessage(
+        `Error ${tech.tech_profile_id ? "updating" : "adding"} technician`
+      );
     }
+  };
 
-    const response = await fetch(url, {
-      method,
-      headers: getAuthHeaders(),
-      body: JSON.stringify(payload)
-    });
+  // Update the handleDeleteTechnician function
+  const handleDeleteTechnician = async (id) => {
+    if (!confirm("Are you sure you want to remove this technician profile?"))
+      return;
 
-    if (response.ok) {
-      setMessage(`Technician ${tech.tech_profile_id ? 'updated' : 'added'} successfully`);
-      fetchTechnicians();
-      setEditingTechnician(null);
-    } else {
-      const error = await response.json();
-      setMessage(error.message || `Failed to ${tech.tech_profile_id ? 'update' : 'add'} technician`);
+    try {
+      // Use the correct endpoint - it should be under jobcards API, not auth
+      const response = await fetch(`${API_URL}/api/technicians/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        setMessage("Technician profile removed successfully");
+        fetchTechnicians();
+      } else {
+        const error = await response.json();
+        setMessage(error.message || "Failed to remove technician profile");
+      }
+    } catch (error) {
+      console.error("Error removing technician profile:", error);
+      setMessage("Error removing technician profile");
     }
-  } catch (error) {
-    console.error(`Error ${tech.tech_profile_id ? 'updating' : 'adding'} technician:`, error);
-    setMessage(`Error ${tech.tech_profile_id ? 'updating' : 'adding'} technician`);
-  }
-};
-
-// Update the handleDeleteTechnician function
-const handleDeleteTechnician = async (id) => {
-  if (!confirm('Are you sure you want to remove this technician profile?')) return;
-
-  try {
-    // Use the correct endpoint - it should be under jobcards API, not auth
-    const response = await fetch(`${API_URL}/api/technicians/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
-    });
-
-    if (response.ok) {
-      setMessage('Technician profile removed successfully');
-      fetchTechnicians();
-    } else {
-      const error = await response.json();
-      setMessage(error.message || 'Failed to remove technician profile');
-    }
-  } catch (error) {
-    console.error('Error removing technician profile:', error);
-    setMessage('Error removing technician profile');
-  }
-};
+  };
 
   const fetchAuditLogs = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/auth/admin/audit-logs`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
         const data = await response.json();
         setAuditLogs(data.logs);
       } else {
-        console.error('Failed to fetch audit logs');
+        console.error("Failed to fetch audit logs");
       }
     } catch (error) {
-      console.error('Error fetching audit logs:', error);
+      console.error("Error fetching audit logs:", error);
     }
   }, [getAuthHeaders]);
 
   const fetchRegistrationTokens = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/auth/admin/tokens`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
         const data = await response.json();
         setRegistrationTokens(data.tokens);
       } else {
-        console.error('Failed to fetch registration tokens');
+        console.error("Failed to fetch registration tokens");
       }
     } catch (error) {
-      console.error('Error fetching registration tokens:', error);
+      console.error("Error fetching registration tokens:", error);
     }
   }, [getAuthHeaders]);
 
   useEffect(() => {
     const loadData = async () => {
-      if (currentUser && currentUser.role === 'admin' && !authLoading) {
+      if (currentUser && currentUser.role === "admin" && !authLoading) {
         setLoading(true);
         await Promise.all([
           fetchUsers(),
           fetchAuditLogs(),
-          fetchRegistrationTokens()
+          fetchRegistrationTokens(),
         ]);
         setLoading(false);
       } else {
@@ -423,47 +500,58 @@ const handleDeleteTechnician = async (id) => {
     };
 
     loadData();
-  }, [fetchUsers, fetchAuditLogs, fetchRegistrationTokens, currentUser, authLoading]);
+  }, [
+    fetchUsers,
+    fetchAuditLogs,
+    fetchRegistrationTokens,
+    currentUser,
+    authLoading,
+  ]);
 
   const handleGenerateToken = async (e) => {
     e.preventDefault();
     setGenerating(true);
-    setMessage('');
+    setMessage("");
 
     try {
       const response = await fetch(`${API_URL}/api/auth/admin/generate-token`, {
-        method: 'POST',
+        method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          role: tokenRole
-        })
+          role: tokenRole,
+        }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setMessage(`Registration token generated: ${data.token} (Role: ${data.role}, Expires: ${new Date(data.expires_at).toLocaleDateString()})`);
+        setMessage(
+          `Registration token generated: ${data.token} (Role: ${data.role}, Expires: ${new Date(data.expires_at).toLocaleDateString()})`
+        );
         fetchRegistrationTokens();
-        setTokenRole('design');
+        setTokenRole("design");
       } else {
-        setMessage(data.message || 'Failed to generate token');
+        setMessage(data.message || "Failed to generate token");
       }
     } catch (error) {
-      setMessage('Error generating token');
-      console.error('Error:', error);
+      setMessage("Error generating token");
+      console.error("Error:", error);
     } finally {
       setGenerating(false);
     }
   };
 
   const handleToggleUserStatus = async (userId, currentStatus) => {
-    const action = currentStatus ? 'deactivate' : 'activate';
+    const action = currentStatus ? "deactivate" : "activate";
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/admin/users/${userId}/${action}`, {
-        method: 'POST',
-        headers: getAuthHeaders()
-      });
+      const response = await fetch(
+        `${API_URL}/api/auth/admin/users/${userId}/${action}`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+        }
+      );
 
       if (response.ok) {
         fetchUsers();
@@ -474,7 +562,7 @@ const handleDeleteTechnician = async (id) => {
       }
     } catch (error) {
       setMessage(`Error ${action}ing user`);
-      console.error('Error:', error);
+      console.error("Error:", error);
     }
   };
 
@@ -483,10 +571,13 @@ const handleDeleteTechnician = async (id) => {
 
     setUserActionLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/admin/users/${selectedUser.id}/delete`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
+      const response = await fetch(
+        `${API_URL}/api/auth/admin/users/${selectedUser.id}/delete`,
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        }
+      );
 
       if (response.ok) {
         fetchUsers();
@@ -495,11 +586,11 @@ const handleDeleteTechnician = async (id) => {
         setSelectedUser(null);
       } else {
         const data = await response.json();
-        setMessage(data.message || 'Failed to delete user');
+        setMessage(data.message || "Failed to delete user");
       }
     } catch (error) {
-      setMessage('Error deleting user');
-      console.error('Error:', error);
+      setMessage("Error deleting user");
+      console.error("Error:", error);
     } finally {
       setUserActionLoading(false);
     }
@@ -510,25 +601,28 @@ const handleDeleteTechnician = async (id) => {
 
     setUserActionLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/admin/users/${selectedUser.id}/role`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ role: newRole })
-      });
+      const response = await fetch(
+        `${API_URL}/api/auth/admin/users/${selectedUser.id}/role`,
+        {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ role: newRole }),
+        }
+      );
 
       if (response.ok) {
         fetchUsers();
         setMessage(`User role changed successfully`);
         setShowRoleModal(false);
         setSelectedUser(null);
-        setNewRole('');
+        setNewRole("");
       } else {
         const data = await response.json();
-        setMessage(data.message || 'Failed to change user role');
+        setMessage(data.message || "Failed to change user role");
       }
     } catch (error) {
-      setMessage('Error changing user role');
-      console.error('Error:', error);
+      setMessage("Error changing user role");
+      console.error("Error:", error);
     } finally {
       setUserActionLoading(false);
     }
@@ -549,7 +643,7 @@ const handleDeleteTechnician = async (id) => {
     setShowDeleteModal(false);
     setShowRoleModal(false);
     setSelectedUser(null);
-    setNewRole('');
+    setNewRole("");
   };
 
   const formatDate = (dateString) => {
@@ -558,13 +652,20 @@ const handleDeleteTechnician = async (id) => {
 
   const getRoleBadgeClass = (role) => {
     switch (role) {
-      case 'admin': return 'role-admin';
-      case 'manager': return 'role-manager';
-      case 'sales': return 'role-sales';
-      case 'design': return 'role-design';
-      case 'team_leader': return 'role-team-leader';
-      case 'technician': return 'role-technician';
-      default: return 'role-default';
+      case "admin":
+        return "role-admin";
+      case "manager":
+        return "role-manager";
+      case "sales":
+        return "role-sales";
+      case "design":
+        return "role-design";
+      case "team_leader":
+        return "role-team-leader";
+      case "technician":
+        return "role-technician";
+      default:
+        return "role-default";
     }
   };
 
@@ -586,548 +687,770 @@ const handleDeleteTechnician = async (id) => {
 
       <div className="admin-tabs">
         <button
-          className={`tab-button ${activeTab === 'settings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('settings')}
+          className={`tab-button ${activeTab === "settings" ? "active" : ""}`}
+          onClick={() => setActiveTab("settings")}
         >
           System Settings
         </button>
         <button
-          className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveTab('users')}
+          className={`tab-button ${activeTab === "notifications" ? "active" : ""}`}
+          onClick={() => setActiveTab("notifications")}
+        >
+          Notifications
+        </button>
+        <button
+          className={`tab-button ${activeTab === "users" ? "active" : ""}`}
+          onClick={() => setActiveTab("users")}
         >
           User Management
         </button>
         <button
-          className={`tab-button ${activeTab === 'tokens' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tokens')}
+          className={`tab-button ${activeTab === "tokens" ? "active" : ""}`}
+          onClick={() => setActiveTab("tokens")}
         >
           Registration Tokens
         </button>
         <button
-          className={`tab-button ${activeTab === 'logs' ? 'active' : ''}`}
-          onClick={() => setActiveTab('logs')}
+          className={`tab-button ${activeTab === "logs" ? "active" : ""}`}
+          onClick={() => setActiveTab("logs")}
         >
           Audit Logs
         </button>
       </div>
 
       {message && (
-        <div className={`message ${message.includes('Error') || message.includes('Failed') ? 'error' : 'success'}`}>
+        <div
+          className={`message ${message.includes("Error") || message.includes("Failed") ? "error" : "success"}`}
+        >
           {message}
         </div>
       )}
 
-{activeTab === 'settings' && (
-  <div className="settings-section">
-    <div className="settings-header">
-      <h2>System Settings</h2>
-      <div className="settings-nav">
-        <button
-          className={`settings-nav-btn ${settingsSection === 'vehicles' ? 'active' : ''}`}
-          onClick={() => setSettingsSection('vehicles')}
-        >
-          <i className="bi bi-truck me-2"></i>
-          Vehicles
-        </button>
-        <button
-          className={`settings-nav-btn ${settingsSection === 'categories' ? 'active' : ''}`}
-          onClick={() => setSettingsSection('categories')}
-        >
-          <i className="bi bi-tags me-2"></i>
-          Job Categories
-        </button>
-        <button
-          className={`settings-nav-btn ${settingsSection === 'bums' ? 'active' : ''}`}
-          onClick={() => setSettingsSection('bums')}
-        >
-          <i className="bi bi-person-badge me-2"></i>
-          Business Unit Managers
-        </button>
-        <button
-          className={`settings-nav-btn ${settingsSection === 'technicians' ? 'active' : ''}`}
-          onClick={() => setSettingsSection('technicians')}
-        >
-          <i className="bi bi-tools me-2"></i>
-          Technicians
-        </button>
-      </div>
-    </div>
-
-    {/* Vehicles Management */}
-    {settingsSection === 'vehicles' && (
-      <div className="vehicles-section">
-        <div className="section-header">
-          <h3>Vehicles Management</h3>
-          <button
-            className="add-btn"
-            onClick={() => setEditingVehicle({ name: '', registration: '', rate_per_km: 0, active: true })}
-          >
-            Add New Vehicle
-          </button>
-        </div>
-
-        {loadingVehicles ? (
-          <div className="loading">Loading vehicles...</div>
-        ) : (
-          <table className="settings-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Registration</th>
-                <th>Rate (per km)</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vehicles.map(vehicle => (
-                <tr key={vehicle.id}>
-                  <td>{vehicle.name}</td>
-                  <td>{vehicle.registration || '-'}</td>
-                  <td>R{vehicle.rate_per_km.toFixed(2)}</td>
-                  <td>
-                    <span className={`status-badge ${vehicle.active ? 'active' : 'inactive'}`}>
-                      {vehicle.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className="action-button edit"
-                      onClick={() => setEditingVehicle(vehicle)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="action-button delete"
-                      onClick={() => handleDeleteVehicle(vehicle.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {vehicles.length === 0 && (
-                <tr>
-                  <td colSpan="5" className="no-data">No vehicles found</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-
-        {/* Vehicle Edit Modal */}
-        {editingVehicle && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h3>{editingVehicle.id ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
-                <button className="modal-close" onClick={() => setEditingVehicle(null)}>×</button>
-              </div>
-              <div className="modal-body">
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSaveVehicle(editingVehicle);
-                }}>
-                  <div className="form-group">
-                    <label>Name</label>
-                    <input
-                      type="text"
-                      value={editingVehicle.name}
-                      onChange={(e) => setEditingVehicle({...editingVehicle, name: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Registration</label>
-                    <input
-                      type="text"
-                      value={editingVehicle.registration || ''}
-                      onChange={(e) => setEditingVehicle({...editingVehicle, registration: e.target.value})}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Rate per km (R)</label>
-                    <div className="field-description">The rate charged per kilometer traveled</div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={editingVehicle.rate_per_km}
-                      onChange={(e) => setEditingVehicle({...editingVehicle, rate_per_km: parseFloat(e.target.value)})}
-                      required
-                    />
-                  </div>
-                  <div className="form-group checkbox">
-                    <input
-                      type="checkbox"
-                      checked={editingVehicle.active}
-                      onChange={(e) => setEditingVehicle({...editingVehicle, active: e.target.checked})}
-                      id="vehicle-active"
-                    />
-                    <label htmlFor="vehicle-active">Active</label>
-                  </div>
-                </form>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="cancel-btn" onClick={() => setEditingVehicle(null)}>
-                  Cancel
-                </button>
-                <button
-                  className="save-btn"
-                  onClick={() => handleSaveVehicle(editingVehicle)}
-                >
-                  {editingVehicle.id ? 'Update Vehicle' : 'Add Vehicle'}
-                </button>
-              </div>
-            </div>
+      {activeTab === "notifications" && (
+        <div className="settings-section">
+          <div className="section-header">
+            <h3>Send Test Notification</h3>
           </div>
-        )}
-      </div>
-    )}
-
-    {/* Job Categories Management */}
-    {settingsSection === 'categories' && (
-      <div className="categories-section">
-        <div className="section-header">
-          <h3>Job Categories Management</h3>
-          <button
-            className="add-btn"
-            onClick={() => setEditingCategory({ name: '', active: true })}
-          >
-            Add New Category
-          </button>
-        </div>
-
-        {loadingCategories ? (
-          <div className="loading">Loading categories...</div>
-        ) : (
-          <table className="settings-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map(category => (
-                <tr key={category.id}>
-                  <td>{category.name}</td>
-                  <td>
-                    <span className={`status-badge ${category.active ? 'active' : 'inactive'}`}>
-                      {category.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className="action-button edit"
-                      onClick={() => setEditingCategory(category)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="action-button delete"
-                      onClick={() => handleDeleteCategory(category.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {categories.length === 0 && (
-                <tr>
-                  <td colSpan="3" className="no-data">No categories found</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-
-        {/* Category Edit Modal */}
-        {editingCategory && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h3>{editingCategory.id ? 'Edit Category' : 'Add New Category'}</h3>
-                <button className="modal-close" onClick={() => setEditingCategory(null)}>×</button>
-              </div>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label>Name</label>
-                  <input
-                    type="text"
-                    value={editingCategory.name}
-                    onChange={(e) => setEditingCategory({...editingCategory, name: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="form-group checkbox">
-                  <input
-                    type="checkbox"
-                    id="category-active"
-                    checked={editingCategory.active}
-                    onChange={(e) => setEditingCategory({...editingCategory, active: e.target.checked})}
-                  />
-                  <label htmlFor="category-active">Active</label>
-                </div>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="cancel-btn" onClick={() => setEditingCategory(null)}>
-                  Cancel
-                </button>
-                <button
-                  className="save-btn"
-                  onClick={() => handleSaveCategory(editingCategory)}
-                >
-                  {editingCategory.id ? 'Update Category' : 'Add Category'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    )}
-
-    {/* BUM Management */}
-    {settingsSection === 'bums' && (
-      <div className="bums-section">
-        <div className="section-header">
-          <h3>Business Unit Managers (BUMs)</h3>
-          <p className="info-text">
-            To add a new BUM, first add them as a user, then assign the BUM role here.
+          <p>
+            Use this form to send a test email via the configured Microsoft
+            Graph mailer. You can enter multiple recipient emails separated by
+            commas.
           </p>
-        </div>
-
-        <div className="bums-users-section">
-          <h4>Current BUMs</h4>
-          {loadingBums ? (
-            <div className="loading">Loading BUMs...</div>
-          ) : (
-            <table className="settings-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bums.map(bum => (
-                  <tr key={bum.id}>
-                    <td>{bum.full_name}</td>
-                    <td>{bum.email}</td>
-                    <td>
-                      <button
-                        className="action-button remove"
-                        onClick={() => handleToggleBumStatus(bum.id, true)}
-                      >
-                        Remove BUM Status
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {bums.length === 0 && (
-                  <tr>
-                    <td colSpan="3" className="no-data">No BUMs assigned</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="eligible-users-section">
-          <h4>Assign BUM Role to Users</h4>
-          {!loadingUsers ? (
-            <table className="settings-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.filter(user =>
-                  // Only show active users who aren't already BUMs
-                  user.is_active && !user.is_bum
-                ).map(user => (
-                  <tr key={user.id}>
-                    <td>{user.full_name}</td>
-                    <td>{user.email}</td>
-                    <td>{user.role}</td>
-                    <td>
-                      <button
-                        className="action-button assign"
-                        onClick={() => handleToggleBumStatus(user.id, false)}
-                      >
-                        Assign as BUM
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {users.filter(user => user.is_active && !user.is_bum).length === 0 && (
-                  <tr>
-                    <td colSpan="4" className="no-data">No eligible users found</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          ) : (
-            <div className="loading">Loading users...</div>
-          )}
-        </div>
-      </div>
-    )}
-
-    {/* Technicians Management */}
-    {settingsSection === 'technicians' && (
-      <div className="technicians-section">
-        <div className="section-header">
-          <h3>Technicians Management</h3>
-          <button
-            className="add-btn"
-            onClick={() => {
-              // Create a new technician form with dropdown of eligible users
-              setEditingTechnician({
-                user_id: '',
-                hourly_rate: 0,
-                active: true,
-                eligible_users: users.filter(u => u.is_active && !technicians.some(t => t.id === u.id))
-              });
-            }}
+          <form
+            onSubmit={handleSendTestEmail}
+            className="notifications-form"
+            style={{ maxWidth: "600px", marginTop: "20px" }}
           >
-            Add New Technician
-          </button>
+            <div className="form-group">
+              <label htmlFor="notifyTo">To:</label>
+              <input
+                type="email"
+                id="notifyTo"
+                multiple
+                className="form-control"
+                value={notificationForm.to}
+                onChange={(e) =>
+                  setNotificationForm({
+                    ...notificationForm,
+                    to: e.target.value,
+                  })
+                }
+                placeholder="recipient@example.com, another@example.com"
+                required
+                disabled={sendingEmail}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="notifySubject">Subject:</label>
+              <input
+                type="text"
+                id="notifySubject"
+                className="form-control"
+                value={notificationForm.subject}
+                onChange={(e) =>
+                  setNotificationForm({
+                    ...notificationForm,
+                    subject: e.target.value,
+                  })
+                }
+                required
+                disabled={sendingEmail}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="notifyBody">Body:</label>
+              <textarea
+                id="notifyBody"
+                className="form-control"
+                rows="6"
+                value={notificationForm.body}
+                onChange={(e) =>
+                  setNotificationForm({
+                    ...notificationForm,
+                    body: e.target.value,
+                  })
+                }
+                required
+                disabled={sendingEmail}
+              ></textarea>
+            </div>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={sendingEmail}
+            >
+              {sendingEmail ? "Sending..." : "Send Test Email"}
+            </button>
+          </form>
         </div>
+      )}
 
-        {loadingTechnicians ? (
-          <div className="loading">Loading technicians...</div>
-        ) : (
-          <table className="settings-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Hourly Rate</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {technicians.map(tech => (
-                <tr key={tech.id}>
-                  <td>{tech.full_name}</td>
-                  <td>R{parseFloat(tech.hourly_rate).toFixed(2)}</td>
-                  <td>
-                    <span className={`status-badge ${tech.active ? 'active' : 'inactive'}`}>
-                      {tech.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className="action-button edit"
-                      onClick={() => setEditingTechnician({
-                        tech_profile_id: tech.tech_profile_id,
-                        user_id: tech.id,
-                        full_name: tech.full_name,
-                        hourly_rate: tech.hourly_rate,
-                        active: tech.active
-                      })}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="action-button delete"
-                      onClick={() => handleDeleteTechnician(tech.tech_profile_id)}
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {technicians.length === 0 && (
-                <tr>
-                  <td colSpan="4" className="no-data">No technicians found</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-
-        {/* Technician Edit Modal */}
-        {editingTechnician && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h3>{editingTechnician.tech_profile_id ? 'Edit Technician' : 'Add New Technician'}</h3>
-                <button className="modal-close" onClick={() => setEditingTechnician(null)}>×</button>
-              </div>
-              <div className="modal-body">
-                {!editingTechnician.tech_profile_id ? (
-                  <div className="form-group">
-                    <label>Select User</label>
-                    <select
-                      value={editingTechnician.user_id}
-                      onChange={(e) => setEditingTechnician({...editingTechnician, user_id: e.target.value})}
-                      required
-                    >
-                      <option value="">-- Select a user --</option>
-                      {editingTechnician.eligible_users.map(user => (
-                        <option key={user.id} value={user.id}>
-                          {user.full_name} ({user.email})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="form-group">
-                    <label>Technician</label>
-                    <input type="text" value={editingTechnician.full_name} disabled />
-                  </div>
-                )}
-                <div className="form-group">
-                  <label>Hourly Rate (R)</label>
-                  <div className="field-description">The rate charged per hour for this technician's work</div>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={editingTechnician.hourly_rate}
-                    onChange={(e) => setEditingTechnician({...editingTechnician, hourly_rate: parseFloat(e.target.value)})}
-                    required
-                  />
-                </div>
-                <div className="form-group checkbox">
-                  <input
-                    type="checkbox"
-                    id="technician-active"
-                    checked={editingTechnician.active}
-                    onChange={(e) => setEditingTechnician({...editingTechnician, active: e.target.checked})}
-                  />
-                  <label htmlFor="technician-active">Active</label>
-                </div>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="cancel-btn" onClick={() => setEditingTechnician(null)}>
-                  Cancel
-                </button>
-                <button
-                  className="save-btn"
-                  onClick={() => handleSaveTechnician(editingTechnician)}
-                >
-                  {editingTechnician.tech_profile_id ? 'Update Technician' : 'Add Technician'}
-                </button>
-              </div>
+      {activeTab === "settings" && (
+        <div className="settings-section">
+          <div className="settings-header">
+            <h2>System Settings</h2>
+            <div className="settings-nav">
+              <button
+                className={`settings-nav-btn ${settingsSection === "vehicles" ? "active" : ""}`}
+                onClick={() => setSettingsSection("vehicles")}
+              >
+                <i className="bi bi-truck me-2"></i>
+                Vehicles
+              </button>
+              <button
+                className={`settings-nav-btn ${settingsSection === "categories" ? "active" : ""}`}
+                onClick={() => setSettingsSection("categories")}
+              >
+                <i className="bi bi-tags me-2"></i>
+                Job Categories
+              </button>
+              <button
+                className={`settings-nav-btn ${settingsSection === "bums" ? "active" : ""}`}
+                onClick={() => setSettingsSection("bums")}
+              >
+                <i className="bi bi-person-badge me-2"></i>
+                Business Unit Managers
+              </button>
+              <button
+                className={`settings-nav-btn ${settingsSection === "technicians" ? "active" : ""}`}
+                onClick={() => setSettingsSection("technicians")}
+              >
+                <i className="bi bi-tools me-2"></i>
+                Technicians
+              </button>
             </div>
           </div>
-        )}
-      </div>
-    )}
-  </div>
-)}
 
-      {activeTab === 'tokens' && (
+          {/* Vehicles Management */}
+          {settingsSection === "vehicles" && (
+            <div className="vehicles-section">
+              <div className="section-header">
+                <h3>Vehicles Management</h3>
+                <button
+                  className="add-btn"
+                  onClick={() =>
+                    setEditingVehicle({
+                      name: "",
+                      registration: "",
+                      rate_per_km: 0,
+                      active: true,
+                    })
+                  }
+                >
+                  Add New Vehicle
+                </button>
+              </div>
+
+              {loadingVehicles ? (
+                <div className="loading">Loading vehicles...</div>
+              ) : (
+                <table className="settings-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Registration</th>
+                      <th>Rate (per km)</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vehicles.map((vehicle) => (
+                      <tr key={vehicle.id}>
+                        <td>{vehicle.name}</td>
+                        <td>{vehicle.registration || "-"}</td>
+                        <td>R{vehicle.rate_per_km.toFixed(2)}</td>
+                        <td>
+                          <span
+                            className={`status-badge ${vehicle.active ? "active" : "inactive"}`}
+                          >
+                            {vehicle.active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            className="action-button edit"
+                            onClick={() => setEditingVehicle(vehicle)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="action-button delete"
+                            onClick={() => handleDeleteVehicle(vehicle.id)}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {vehicles.length === 0 && (
+                      <tr>
+                        <td colSpan="5" className="no-data">
+                          No vehicles found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+
+              {/* Vehicle Edit Modal */}
+              {editingVehicle && (
+                <div className="modal-overlay">
+                  <div className="modal-content">
+                    <div className="modal-header">
+                      <h3>
+                        {editingVehicle.id ? "Edit Vehicle" : "Add New Vehicle"}
+                      </h3>
+                      <button
+                        className="modal-close"
+                        onClick={() => setEditingVehicle(null)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="modal-body">
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleSaveVehicle(editingVehicle);
+                        }}
+                      >
+                        <div className="form-group">
+                          <label>Name</label>
+                          <input
+                            type="text"
+                            value={editingVehicle.name}
+                            onChange={(e) =>
+                              setEditingVehicle({
+                                ...editingVehicle,
+                                name: e.target.value,
+                              })
+                            }
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Registration</label>
+                          <input
+                            type="text"
+                            value={editingVehicle.registration || ""}
+                            onChange={(e) =>
+                              setEditingVehicle({
+                                ...editingVehicle,
+                                registration: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Rate per km (R)</label>
+                          <div className="field-description">
+                            The rate charged per kilometer traveled
+                          </div>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editingVehicle.rate_per_km}
+                            onChange={(e) =>
+                              setEditingVehicle({
+                                ...editingVehicle,
+                                rate_per_km: parseFloat(e.target.value),
+                              })
+                            }
+                            required
+                          />
+                        </div>
+                        <div className="form-group checkbox">
+                          <input
+                            type="checkbox"
+                            checked={editingVehicle.active}
+                            onChange={(e) =>
+                              setEditingVehicle({
+                                ...editingVehicle,
+                                active: e.target.checked,
+                              })
+                            }
+                            id="vehicle-active"
+                          />
+                          <label htmlFor="vehicle-active">Active</label>
+                        </div>
+                      </form>
+                    </div>
+                    <div className="modal-actions">
+                      <button
+                        type="button"
+                        className="cancel-btn"
+                        onClick={() => setEditingVehicle(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="save-btn"
+                        onClick={() => handleSaveVehicle(editingVehicle)}
+                      >
+                        {editingVehicle.id ? "Update Vehicle" : "Add Vehicle"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Job Categories Management */}
+          {settingsSection === "categories" && (
+            <div className="categories-section">
+              <div className="section-header">
+                <h3>Job Categories Management</h3>
+                <button
+                  className="add-btn"
+                  onClick={() => setEditingCategory({ name: "", active: true })}
+                >
+                  Add New Category
+                </button>
+              </div>
+
+              {loadingCategories ? (
+                <div className="loading">Loading categories...</div>
+              ) : (
+                <table className="settings-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map((category) => (
+                      <tr key={category.id}>
+                        <td>{category.name}</td>
+                        <td>
+                          <span
+                            className={`status-badge ${category.active ? "active" : "inactive"}`}
+                          >
+                            {category.active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            className="action-button edit"
+                            onClick={() => setEditingCategory(category)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="action-button delete"
+                            onClick={() => handleDeleteCategory(category.id)}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {categories.length === 0 && (
+                      <tr>
+                        <td colSpan="3" className="no-data">
+                          No categories found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+
+              {/* Category Edit Modal */}
+              {editingCategory && (
+                <div className="modal-overlay">
+                  <div className="modal-content">
+                    <div className="modal-header">
+                      <h3>
+                        {editingCategory.id
+                          ? "Edit Category"
+                          : "Add New Category"}
+                      </h3>
+                      <button
+                        className="modal-close"
+                        onClick={() => setEditingCategory(null)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="modal-body">
+                      <div className="form-group">
+                        <label>Name</label>
+                        <input
+                          type="text"
+                          value={editingCategory.name}
+                          onChange={(e) =>
+                            setEditingCategory({
+                              ...editingCategory,
+                              name: e.target.value,
+                            })
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="form-group checkbox">
+                        <input
+                          type="checkbox"
+                          id="category-active"
+                          checked={editingCategory.active}
+                          onChange={(e) =>
+                            setEditingCategory({
+                              ...editingCategory,
+                              active: e.target.checked,
+                            })
+                          }
+                        />
+                        <label htmlFor="category-active">Active</label>
+                      </div>
+                    </div>
+                    <div className="modal-actions">
+                      <button
+                        type="button"
+                        className="cancel-btn"
+                        onClick={() => setEditingCategory(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="save-btn"
+                        onClick={() => handleSaveCategory(editingCategory)}
+                      >
+                        {editingCategory.id
+                          ? "Update Category"
+                          : "Add Category"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* BUM Management */}
+          {settingsSection === "bums" && (
+            <div className="bums-section">
+              <div className="section-header">
+                <h3>Business Unit Managers (BUMs)</h3>
+                <p className="info-text">
+                  To add a new BUM, first add them as a user, then assign the
+                  BUM role here.
+                </p>
+              </div>
+
+              <div className="bums-users-section">
+                <h4>Current BUMs</h4>
+                {loadingBums ? (
+                  <div className="loading">Loading BUMs...</div>
+                ) : (
+                  <table className="settings-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bums.map((bum) => (
+                        <tr key={bum.id}>
+                          <td>{bum.full_name}</td>
+                          <td>{bum.email}</td>
+                          <td>
+                            <button
+                              className="action-button remove"
+                              onClick={() =>
+                                handleToggleBumStatus(bum.id, true)
+                              }
+                            >
+                              Remove BUM Status
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {bums.length === 0 && (
+                        <tr>
+                          <td colSpan="3" className="no-data">
+                            No BUMs assigned
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              <div className="eligible-users-section">
+                <h4>Assign BUM Role to Users</h4>
+                {!loadingUsers ? (
+                  <table className="settings-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users
+                        .filter(
+                          (user) =>
+                            // Only show active users who aren't already BUMs
+                            user.is_active && !user.is_bum
+                        )
+                        .map((user) => (
+                          <tr key={user.id}>
+                            <td>{user.full_name}</td>
+                            <td>{user.email}</td>
+                            <td>{user.role}</td>
+                            <td>
+                              <button
+                                className="action-button assign"
+                                onClick={() =>
+                                  handleToggleBumStatus(user.id, false)
+                                }
+                              >
+                                Assign as BUM
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      {users.filter((user) => user.is_active && !user.is_bum)
+                        .length === 0 && (
+                        <tr>
+                          <td colSpan="4" className="no-data">
+                            No eligible users found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="loading">Loading users...</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Technicians Management */}
+          {settingsSection === "technicians" && (
+            <div className="technicians-section">
+              <div className="section-header">
+                <h3>Technicians Management</h3>
+                <button
+                  className="add-btn"
+                  onClick={() => {
+                    // Create a new technician form with dropdown of eligible users
+                    setEditingTechnician({
+                      user_id: "",
+                      hourly_rate: 0,
+                      active: true,
+                      eligible_users: users.filter(
+                        (u) =>
+                          u.is_active && !technicians.some((t) => t.id === u.id)
+                      ),
+                    });
+                  }}
+                >
+                  Add New Technician
+                </button>
+              </div>
+
+              {loadingTechnicians ? (
+                <div className="loading">Loading technicians...</div>
+              ) : (
+                <table className="settings-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Hourly Rate</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {technicians.map((tech) => (
+                      <tr key={tech.id}>
+                        <td>{tech.full_name}</td>
+                        <td>R{parseFloat(tech.hourly_rate).toFixed(2)}</td>
+                        <td>
+                          <span
+                            className={`status-badge ${tech.active ? "active" : "inactive"}`}
+                          >
+                            {tech.active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            className="action-button edit"
+                            onClick={() =>
+                              setEditingTechnician({
+                                tech_profile_id: tech.tech_profile_id,
+                                user_id: tech.id,
+                                full_name: tech.full_name,
+                                hourly_rate: tech.hourly_rate,
+                                active: tech.active,
+                              })
+                            }
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="action-button delete"
+                            onClick={() =>
+                              handleDeleteTechnician(tech.tech_profile_id)
+                            }
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {technicians.length === 0 && (
+                      <tr>
+                        <td colSpan="4" className="no-data">
+                          No technicians found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+
+              {/* Technician Edit Modal */}
+              {editingTechnician && (
+                <div className="modal-overlay">
+                  <div className="modal-content">
+                    <div className="modal-header">
+                      <h3>
+                        {editingTechnician.tech_profile_id
+                          ? "Edit Technician"
+                          : "Add New Technician"}
+                      </h3>
+                      <button
+                        className="modal-close"
+                        onClick={() => setEditingTechnician(null)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="modal-body">
+                      {!editingTechnician.tech_profile_id ? (
+                        <div className="form-group">
+                          <label>Select User</label>
+                          <select
+                            value={editingTechnician.user_id}
+                            onChange={(e) =>
+                              setEditingTechnician({
+                                ...editingTechnician,
+                                user_id: e.target.value,
+                              })
+                            }
+                            required
+                          >
+                            <option value="">-- Select a user --</option>
+                            {editingTechnician.eligible_users.map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.full_name} ({user.email})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <div className="form-group">
+                          <label>Technician</label>
+                          <input
+                            type="text"
+                            value={editingTechnician.full_name}
+                            disabled
+                          />
+                        </div>
+                      )}
+                      <div className="form-group">
+                        <label>Hourly Rate (R)</label>
+                        <div className="field-description">
+                          The rate charged per hour for this technician's work
+                        </div>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editingTechnician.hourly_rate}
+                          onChange={(e) =>
+                            setEditingTechnician({
+                              ...editingTechnician,
+                              hourly_rate: parseFloat(e.target.value),
+                            })
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="form-group checkbox">
+                        <input
+                          type="checkbox"
+                          id="technician-active"
+                          checked={editingTechnician.active}
+                          onChange={(e) =>
+                            setEditingTechnician({
+                              ...editingTechnician,
+                              active: e.target.checked,
+                            })
+                          }
+                        />
+                        <label htmlFor="technician-active">Active</label>
+                      </div>
+                    </div>
+                    <div className="modal-actions">
+                      <button
+                        type="button"
+                        className="cancel-btn"
+                        onClick={() => setEditingTechnician(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="save-btn"
+                        onClick={() => handleSaveTechnician(editingTechnician)}
+                      >
+                        {editingTechnician.tech_profile_id
+                          ? "Update Technician"
+                          : "Add Technician"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "tokens" && (
         <div className="tokens-section">
           <div className="token-generation-section">
             <h2>Generate Registration Token</h2>
@@ -1156,7 +1479,7 @@ const handleDeleteTechnician = async (id) => {
                     className="generate-button"
                     disabled={generating}
                   >
-                    {generating ? 'Generating...' : 'Generate Token'}
+                    {generating ? "Generating..." : "Generate Token"}
                   </button>
                 </div>
               </div>
@@ -1179,11 +1502,15 @@ const handleDeleteTechnician = async (id) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {registrationTokens.map(token => (
+                  {registrationTokens.map((token) => (
                     <tr key={token.id}>
-                      <td><code>{token.token}</code></td>
                       <td>
-                        <span className={`role-badge role-${token.role.toLowerCase()}`}>
+                        <code>{token.token}</code>
+                      </td>
+                      <td>
+                        <span
+                          className={`role-badge role-${token.role.toLowerCase()}`}
+                        >
                           {token.role}
                         </span>
                       </td>
@@ -1191,11 +1518,13 @@ const handleDeleteTechnician = async (id) => {
                       <td>{formatDate(token.created_at)}</td>
                       <td>{formatDate(token.expires_at)}</td>
                       <td>
-                        <span className={`status-badge ${token.is_used ? 'used' : 'active'}`}>
-                          {token.is_used ? 'Used' : 'Active'}
+                        <span
+                          className={`status-badge ${token.is_used ? "used" : "active"}`}
+                        >
+                          {token.is_used ? "Used" : "Active"}
                         </span>
                       </td>
-                      <td>{token.used_by || '-'}</td>
+                      <td>{token.used_by || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1205,7 +1534,7 @@ const handleDeleteTechnician = async (id) => {
         </div>
       )}
 
-      {activeTab === 'users' && (
+      {activeTab === "users" && (
         <div className="users-section">
           <div className="users-list">
             <h2>Current Users</h2>
@@ -1222,35 +1551,52 @@ const handleDeleteTechnician = async (id) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(user => (
+                  {users.map((user) => (
                     <tr key={user.id}>
                       <td>{user.full_name}</td>
                       <td>{user.email}</td>
                       <td>
-                        <span className={`role-badge ${getRoleBadgeClass(user.role)}`}>
+                        <span
+                          className={`role-badge ${getRoleBadgeClass(user.role)}`}
+                        >
                           {user.role}
                         </span>
                       </td>
                       <td>
-                        <span className={`status-badge ${user.is_active ? 'active' : 'inactive'}`}>
-                          {user.is_active ? 'Active' : 'Inactive'}
+                        <span
+                          className={`status-badge ${user.is_active ? "active" : "inactive"}`}
+                        >
+                          {user.is_active ? "Active" : "Inactive"}
                         </span>
                       </td>
                       <td>{formatDate(user.created_at)}</td>
                       <td>
-                        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "5px",
+                            flexWrap: "wrap",
+                          }}
+                        >
                           <button
-                            className={`action-button ${user.is_active ? 'deactivate' : 'activate'}`}
-                            onClick={() => handleToggleUserStatus(user.id, user.is_active)}
-                            style={{ fontSize: '12px', padding: '4px 8px' }}
+                            className={`action-button ${user.is_active ? "deactivate" : "activate"}`}
+                            onClick={() =>
+                              handleToggleUserStatus(user.id, user.is_active)
+                            }
+                            style={{ fontSize: "12px", padding: "4px 8px" }}
                           >
-                            {user.is_active ? 'Deactivate' : 'Activate'}
+                            {user.is_active ? "Deactivate" : "Activate"}
                           </button>
 
                           <button
                             className="action-button"
                             onClick={() => openRoleModal(user)}
-                            style={{ fontSize: '12px', padding: '4px 8px', backgroundColor: '#007bff', borderColor: '#007bff' }}
+                            style={{
+                              fontSize: "12px",
+                              padding: "4px 8px",
+                              backgroundColor: "#007bff",
+                              borderColor: "#007bff",
+                            }}
                           >
                             Change Role
                           </button>
@@ -1259,7 +1605,12 @@ const handleDeleteTechnician = async (id) => {
                             <button
                               className="action-button"
                               onClick={() => openDeleteModal(user)}
-                              style={{ fontSize: '12px', padding: '4px 8px', backgroundColor: '#dc3545', borderColor: '#dc3545' }}
+                              style={{
+                                fontSize: "12px",
+                                padding: "4px 8px",
+                                backgroundColor: "#dc3545",
+                                borderColor: "#dc3545",
+                              }}
                             >
                               Delete
                             </button>
@@ -1275,7 +1626,7 @@ const handleDeleteTechnician = async (id) => {
         </div>
       )}
 
-      {activeTab === 'logs' && (
+      {activeTab === "logs" && (
         <div className="logs-section">
           <h2>Audit Logs</h2>
           <div className="logs-table">
@@ -1291,23 +1642,25 @@ const handleDeleteTechnician = async (id) => {
                 </tr>
               </thead>
               <tbody>
-                {auditLogs.map(log => (
+                {auditLogs.map((log) => (
                   <tr key={log.id}>
                     <td>{formatDate(log.timestamp)}</td>
-                    <td>{log.user_name || 'System'}</td>
+                    <td>{log.user_name || "System"}</td>
                     <td>
-                      <span className={`action-badge action-${log.action.toLowerCase()}`}>
+                      <span
+                        className={`action-badge action-${log.action.toLowerCase()}`}
+                      >
                         {log.action}
                       </span>
                     </td>
                     <td>{log.resource_type}</td>
-                    <td>{log.resource_id || '-'}</td>
+                    <td>{log.resource_id || "-"}</td>
                     <td>
-                      {log.details ? (
-                        typeof log.details === 'object' ?
-                          JSON.stringify(log.details) :
-                          log.details
-                      ) : '-'}
+                      {log.details
+                        ? typeof log.details === "object"
+                          ? JSON.stringify(log.details)
+                          : log.details
+                        : "-"}
                     </td>
                   </tr>
                 ))}
@@ -1319,29 +1672,47 @@ const handleDeleteTechnician = async (id) => {
 
       {/* Delete User Modal */}
       {showDeleteModal && (
-        <div className="modal-overlay" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div className="modal-content" style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            maxWidth: '400px',
-            width: '90%'
-          }}>
+        <div
+          className="modal-overlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="modal-content"
+            style={{
+              backgroundColor: "white",
+              padding: "20px",
+              borderRadius: "8px",
+              maxWidth: "400px",
+              width: "90%",
+            }}
+          >
             <h3>Delete User</h3>
-            <p>Are you sure you want to delete <strong>{selectedUser?.email}</strong>?</p>
-            <p style={{ color: '#dc3545', fontSize: '14px' }}>This action cannot be undone.</p>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+            <p>
+              Are you sure you want to delete{" "}
+              <strong>{selectedUser?.email}</strong>?
+            </p>
+            <p style={{ color: "#dc3545", fontSize: "14px" }}>
+              This action cannot be undone.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+                marginTop: "20px",
+              }}
+            >
               <button
                 className="btn btn-secondary"
                 onClick={closeModals}
@@ -1354,7 +1725,7 @@ const handleDeleteTechnician = async (id) => {
                 onClick={handleDeleteUser}
                 disabled={userActionLoading}
               >
-                {userActionLoading ? 'Deleting...' : 'Delete User'}
+                {userActionLoading ? "Deleting..." : "Delete User"}
               </button>
             </div>
           </div>
@@ -1363,28 +1734,36 @@ const handleDeleteTechnician = async (id) => {
 
       {/* Change Role Modal */}
       {showRoleModal && (
-        <div className="modal-overlay" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div className="modal-content" style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            maxWidth: '400px',
-            width: '90%'
-          }}>
+        <div
+          className="modal-overlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="modal-content"
+            style={{
+              backgroundColor: "white",
+              padding: "20px",
+              borderRadius: "8px",
+              maxWidth: "400px",
+              width: "90%",
+            }}
+          >
             <h3>Change User Role</h3>
-            <p>Change role for <strong>{selectedUser?.email}</strong></p>
-            <div className="form-group" style={{ marginBottom: '20px' }}>
+            <p>
+              Change role for <strong>{selectedUser?.email}</strong>
+            </p>
+            <div className="form-group" style={{ marginBottom: "20px" }}>
               <label htmlFor="roleSelect">New Role:</label>
               <select
                 id="roleSelect"
@@ -1401,7 +1780,13 @@ const handleDeleteTechnician = async (id) => {
                 <option value="technician">Technician</option>
               </select>
             </div>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+              }}
+            >
               <button
                 className="btn btn-secondary"
                 onClick={closeModals}
@@ -1414,7 +1799,7 @@ const handleDeleteTechnician = async (id) => {
                 onClick={handleChangeRole}
                 disabled={userActionLoading || !newRole}
               >
-                {userActionLoading ? 'Changing...' : 'Change Role'}
+                {userActionLoading ? "Changing..." : "Change Role"}
               </button>
             </div>
           </div>

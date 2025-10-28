@@ -39,6 +39,9 @@ flask-socketio
 eventlet
 Flask-Cors
 Flask-Migrate
+Flask-Mail==0.9.1
+msal==1.31.0
+requests==2.32.3
 psycopg2-binary
 gunicorn
 pandas
