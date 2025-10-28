@@ -39,7 +39,7 @@ def send_job_card_assignment_to_bum(job_card: JobCard, bum: User):
         <p>Please review the details by clicking the link below:</p>
         <p><a href="{job_card_url}" style="padding: 10px 15px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">View Job Card</a></p>
         <br>
-        <p>Thank you,<br>Orka Solar App</p>
+        <p>Thank you,<br>Cool Orka Solar App</p>
         """
 
         send_email(
