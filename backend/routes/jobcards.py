@@ -9,6 +9,7 @@ import os
 from routes.auth import log_user_action
 from sqlalchemy.orm import aliased
 from zoneinfo import ZoneInfo
+from routes.notifications import send_job_card_assignment_to_bum
 
 jobcards_bp = Blueprint("jobcards", __name__)
 
@@ -148,6 +149,13 @@ def jobcards_collection():
     db.session.add(jc)
     db.session.commit()
 
+    # Notification Trigger
+    if jc.bum_id:
+        bum_user = User.query.get(jc.bum_id)
+        if bum_user:
+            send_job_card_assignment_to_bum(jc, bum_user)
+    # End Notification Trigger
+
     time_entries = data.get("time_entries") or []
     if isinstance(time_entries, list):
         for te in time_entries:
@@ -179,6 +187,13 @@ def jobcards_item(jid: int):
 
     if request.method in ("PATCH","PUT"):
         data = request.get_json() or {}
+
+        # Notification Logic: Check if BUM is being changed
+        old_bum_id = jc.bum_id
+        new_bum_id = data.get("bum_id")
+        bum_has_changed = new_bum_id is not None and new_bum_id != old_bum_id
+        # end notification logic
+
         for f in [
             "title","description","is_quoted","project_id", 'quote_id',"category_id","start_at","complete_at",
             "labourers_count","labour_hours","labour_rate_per_hour",
@@ -213,6 +228,14 @@ def jobcards_item(jid: int):
             jc.bum_reviewed_at = datetime.now(SA_TZ)
 
         db.session.commit()
+
+        # Notification Trigger
+        if bum_has_changed:
+            bum_user = User.query.get(new_bum_id)
+            if bum_user:
+                send_job_card_assignment_to_bum(jc, bum_user)
+        # End Notification Trigger
+
         return jsonify(jc.to_dict())
 
     if request.method == "DELETE":
