@@ -77,7 +77,7 @@ def send_job_card_assignment_to_bum(job_card: JobCard, bum: User):
                         <a href="{job_card_url}" class="button" style="color: #ffffff !important; text-decoration: none;">View Job Card</a>
                     </div>
                     
-                    <p>Thank you,<br>The Orka Solar Team</p>
+                    <p>Thank you,<br>Gevaarlike Orka Solar App</p>
                 </div>
                 <div class="footer">
                     &copy; {datetime.now().year} Orka Solar. All rights reserved.
