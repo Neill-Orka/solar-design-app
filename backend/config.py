@@ -39,7 +39,7 @@ class Config:
     )
 
     FRONTEND_URL = os.environ.get(
-        "FRONTEND_URL", "http://localhost:3000"
+        "FRONTEND_URL", "http://localhost:5173"
     )
 
     ALLOWED_ORIGINS = _csv(

@@ -7,41 +7,13 @@ CLIENT_SECRET = os.getenv("MS_CLIENT_SECRET")
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT}"
 SCOPES = ["https://graph.microsoft.com/.default"]
 DEFAULT_SENDER = os.getenv("MS_SENDER")
-TOKEN_CACHE_FILE = 'ms_token_cache.json'
 IS_PRODUCTION = os.getenv("FLASK_ENV") == "production"
 
 _msal_app: Optional[Any] = None
 
 # --- Token Functions ---
-
-def _get_delegated_token_from_cache() -> str:
-    """DEV ONLY: Acquires a delegated token using a file cache and refresh token."""
-    global _msal_app
-    if not _msal_app:
-        _msal_app = msal.PublicClientApplication(client_id=CLIENT_ID, authority=AUTHORITY)
-
-    try:
-        with open(TOKEN_CACHE_FILE, 'r') as f:
-            token_cache = json.load(f)
-    except FileNotFoundError:
-        raise RuntimeError(f"DEV MODE ERROR: Token cache file not found. Please run get_device_token.py first.")
-
-    accounts = _msal_app.get_accounts()
-    result = _msal_app.acquire_token_silent(scopes=["Mail.Send"], account=accounts[0]) if accounts else None
-
-    if not result:
-        result = _msal_app.acquire_token_by_refresh_token(token_cache["refresh_token"], scopes=["Mail.Send"])
-
-    if "access_token" not in result:
-        raise RuntimeError(f"Could not refresh token. Please run get_device_token.py again. Error: {result.get('error_description')}")
-
-    with open(TOKEN_CACHE_FILE, 'w') as f:
-        json.dump(result, f, indent=4)
-
-    return result["access_token"]
-
 def _get_app_token() -> str:
-    """PROD ONLY: Acquires an application token via client credentials."""
+    """PROD AND DEV: Acquires an application token via client credentials."""
     global _msal_app
     if not _msal_app:
         if not all([TENANT, CLIENT_ID, CLIENT_SECRET]):
@@ -86,15 +58,11 @@ def send_via_graph(subject, recipients, html=None, text=None, reply_to=None, att
     if atts: message["attachments"] = atts
     payload = {"message": message, "saveToSentItems": bool(save_to_sent)}
 
-    # DYNAMICALLY CHOOSE TOKEN AND URL BASED ON ENVIRONMENT
-    if IS_PRODUCTION:
-        token = _get_app_token()
-        # In production, we send from a specific user's mailbox (the shared mailbox)
-        url = f"https://graph.microsoft.com/v1.0/users/{sender}/sendMail"
-    else:
-        # In development, we use the logged-in user's delegated token
-        token = _get_delegated_token_from_cache()
-        url = "https://graph.microsoft.com/v1.0/me/sendMail"
+    # Get the app token
+    token = _get_app_token()
+    
+    # Always send from the specified sender's mailbox (e.g., hello@orkasolar.co.za)
+    url = f"https://graph.microsoft.com/v1.0/users/{sender}/sendMail"
 
     res = requests.post(url, json=payload,
                         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
