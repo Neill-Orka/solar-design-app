@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
-import { Button, Badge, Spinner, Alert, Form } from "react-bootstrap";
+import { Button, Badge, Spinner, Alert, Form, Modal } from "react-bootstrap";
 import logo from "./assets/orka_logo_text.png";
 import "./PrintableBOM.css";
 import { useAuth } from "./AuthContext";
@@ -35,6 +35,18 @@ function PrintableBOM({ projectId: propProjectId }) {
   // Project state
   const [projectData, setProjectData] = useState(null);
   const [projectLoading, setProjectLoading] = useState(false);
+
+  // NEW : State for review functionality
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewDecision, setReviewDecision] = useState("rejected");
+  const [reviewComments, setReviewComments] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  // --- NEW: State for BUM selection modal ---
+  const [showBumSelectionModal, setShowBumSelectionModal] = useState(false);
+  const [bumList, setBumList] = useState([]);
+  const [selectedBums, setSelectedBums] = useState([]);
+  const [loadingBums, setLoadingBums] = useState(false);
+  // --- END: NEW ---
 
   // Retrieve data from localStorage (project-specific key or quote-specific key)
   const dataKey = isQuoteMode
@@ -141,7 +153,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       setProjectLoading(true);
       try {
         const response = await axios.get(
-          `${API_URL}/api/projects/${projectId}`
+          `${API_URL}/api/projects/${projectId}`,
         );
         const data = response.data;
         console.log("Fetched project data:", data);
@@ -153,7 +165,7 @@ function PrintableBOM({ projectId: propProjectId }) {
         if (inverterIds.length > 0) {
           const inverterId = inverterIds[0]; // Only using first inverter
           const inverterResponse = await axios.get(
-            `${API_URL}/api/products/${inverterId}`
+            `${API_URL}/api/products/${inverterId}`,
           );
           const inverterData = inverterResponse.data;
           console.log("Fetched inverter data:", inverterData);
@@ -167,7 +179,7 @@ function PrintableBOM({ projectId: propProjectId }) {
             console.log(
               "Inverter brand and capacity:",
               brand_name,
-              power_rating_kva
+              power_rating_kva,
             );
 
             // Store in project data for title display
@@ -184,7 +196,7 @@ function PrintableBOM({ projectId: propProjectId }) {
         if (batteryIds.length > 0) {
           const batteryId = batteryIds[0]; // Only using first battery
           const batteryResponse = await axios.get(
-            `${API_URL}/api/products/${batteryId}`
+            `${API_URL}/api/products/${batteryId}`,
           );
           const batteryData = batteryResponse.data;
           console.log("Fetched battery data:", batteryData);
@@ -198,12 +210,12 @@ function PrintableBOM({ projectId: propProjectId }) {
             console.log(
               "Battery brand and capacity:",
               brand_name,
-              nominal_capacity_kwh
+              nominal_capacity_kwh,
             );
 
             console.log(
               "Battery quantity from project data:",
-              battery_quantity
+              battery_quantity,
             );
 
             // Store in project data for title display
@@ -227,132 +239,163 @@ function PrintableBOM({ projectId: propProjectId }) {
 
   // Load quote data from API when in quote mode
   useEffect(() => {
-    if (isQuoteMode && docId) {
-      const loadQuoteData = async () => {
-        setQuoteLoading(true);
-        try {
-          // Load quote envelope and latest version
-          const quoteResponse = await axios.get(
-            `${API_URL}/api/quotes/${docId}`
-          );
-          const quote = quoteResponse.data;
+    // Define the function inside useEffect to capture the correct state
+    const loadQuoteData = async () => {
+      if (!isQuoteMode || !docId) return;
 
-          // Get the latest version ID
-          const latestVersion = quote.versions[quote.versions.length - 1];
+      setQuoteLoading(true);
+      try {
+        // Load quote envelope
+        const quoteResponse = await axios.get(`${API_URL}/api/quotes/${docId}`);
+        const quote = quoteResponse.data;
 
-          // Load version details with line items
-          const versionResponse = await axios.get(
-            `${API_URL}/api/quote-versions/${latestVersion.id}`
-          );
-          const versionDetail = versionResponse.data;
+        // Get the latest version ID from the envelope
+        const latestVersionSummary = quote.versions[quote.versions.length - 1];
 
-          setQuoteData({ quote, version: versionDetail });
+        // Load the full details of the latest version
+        const versionResponse = await axios.get(
+          `${API_URL}/api/quote-versions/${latestVersionSummary.id}`,
+        );
+        const versionDetail = versionResponse.data;
 
-          // Also create the print data format and store in localStorage
-          const categoryMap = {};
-          versionDetail.lines.forEach((item) => {
-            const category =
-              item.category || item.product_snapshot?.category || "Other";
-            if (!categoryMap[category]) {
-              categoryMap[category] = { name: category, items: [] };
-            }
-            categoryMap[category].items.push({
-              product: {
-                brand: item.brand || "",
-                model: item.model || "",
-              },
-              quantity: item.qty || 0,
-              cost: item.unit_cost_locked || 0,
-              price: item.unit_price_locked || 0,
-              lineTotal: item.line_total_locked || 0,
-            });
-          });
+        setQuoteData({ quote, version: versionDetail });
 
-          // Extract inverter and battery information for title
-          let inverterBrandSize = "";
-          let batteryBrandSize = "";
+        // The rest of the logic for creating printData can be removed from here
+        // as it's now handled by the component's render logic based on quoteData.
+        // We will create the bomData structure needed for rendering.
 
-          versionDetail.lines.forEach((item) => {
-            const category = (
-              item.category ||
-              item.product_snapshot?.category ||
-              ""
-            ).toLowerCase();
-            const brand = item.brand || item.product_snapshot?.brand || "";
-            const power_w = item.product_snapshot?.power_w;
-            const rating_kva = item.product_snapshot?.rating_kva;
-            const capacity_kwh = item.product_snapshot?.capacity_kwh;
-
-            if (category === "inverter" && brand) {
-              const size = rating_kva
-                ? `${Number(rating_kva).toFixed(0)}kVA`
-                : power_w
-                  ? `${Number(power_w / 1000).toFixed(0)}kW`
-                  : "";
-              inverterBrandSize = size ? `${brand} ${size}` : brand;
-            } else if (category === "battery" && brand) {
-              const nominalSize = capacity_kwh
-                ? `${(Number(capacity_kwh) / 0.8).toFixed(0)}kWh`
-                : "";
-              batteryBrandSize = nominalSize
-                ? `${brand} ${nominalSize}`
-                : brand;
-            }
-          });
-
-          const printData = {
-            project: {
-              id: parseInt(projectId),
-              project_name: projectData?.name || `Quote ${quote.number}`,
-              name: projectData?.name || `Quote ${quote.number}`,
-              client_name:
-                projectData?.client_name ||
-                quote.client_snapshot_json?.name ||
-                "Client Name",
-              client_email:
-                projectData?.client_email ||
-                quote.client_snapshot_json?.email ||
-                "",
-              client_phone:
-                projectData?.client_phone ||
-                quote.client_snapshot_json?.phone ||
-                "",
-              location:
-                projectData?.location ||
-                quote.client_snapshot_json?.location ||
-                "",
-              created_at: versionDetail.created_at,
-              quote_number: quote.number,
-              quote_status: quote.status || "draft",
-              inverter_brand_model: inverterBrandSize,
-              battery_brand_model: batteryBrandSize,
+        const categoryMap = {};
+        (versionDetail.lines || []).forEach((item) => {
+          const snapshot = item.product_snapshot_json || {};
+          const category = snapshot.category || "Other";
+          if (!categoryMap[category]) {
+            categoryMap[category] = { name: category, items: [] };
+          }
+          categoryMap[category].items.push({
+            product: {
+              brand: snapshot.brand || "",
+              model: snapshot.model || "",
             },
-            systemSpecs: versionDetail.payload || {},
-            totals: {
-              subtotal_excl_vat:
-                versionDetail.totals?.subtotal_items_excl_vat || 0,
-              extras_excl_vat: versionDetail.totals?.extras_excl_vat || 0,
-              total_excl_vat: versionDetail.totals?.total_excl_vat || 0,
-              vat_perc: versionDetail.totals?.vat_perc || 15,
-              vat_price: versionDetail.totals?.vat_price || 0,
-              total_incl_vat: versionDetail.totals?.total_incl_vat || 0,
-            },
-            categories: Object.values(categoryMap),
-          };
+            quantity: item.qty || 0,
+            price: item.unit_price_locked || 0,
+          });
+        });
 
-          localStorage.setItem(dataKey, JSON.stringify(printData));
-          setBomData(printData); // Update the state immediately
-        } catch (error) {
-          console.error("Failed to load quote data:", error);
-          showNotification("Failed to load quote data", "danger");
-        } finally {
-          setQuoteLoading(false);
-        }
-      };
+        const printData = {
+          project: {
+            id: parseInt(projectId),
+            project_name: projectData?.name || `Quote ${quote.number}`,
+            client_name:
+              projectData?.client_name ||
+              quote.client_snapshot_json?.name ||
+              "Client Name",
+            // ... other project fields
+            quote_number: quote.number,
+          },
+          totals: versionDetail.totals_json || {},
+          categories: Object.values(categoryMap),
+        };
 
-      loadQuoteData();
+        localStorage.setItem(dataKey, JSON.stringify(printData));
+        setBomData(printData);
+      } catch (error) {
+        console.error("Failed to load quote data:", error);
+        showNotification("Failed to load quote data", "danger");
+      } finally {
+        setQuoteLoading(false);
+      }
+    };
+
+    loadQuoteData();
+  }, [isQuoteMode, docId, projectId, dataKey, showNotification, projectData]); // Added projectData dependency
+
+  // Handler for review actions
+  const handleRequestReviewClick = async () => {
+    setLoadingBums(true);
+    setShowBumSelectionModal(true);
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/auth/users?is_bum=1&active=1`,
+      );
+      setBumList(response.data);
+    } catch (error) {
+      console.error("Failed to fetch BUMs:", error);
+      showNotification("Could not load BUM list.", "danger");
+      setShowBumSelectionModal(false);
+    } finally {
+      setLoadingBums(false);
     }
-  }, [isQuoteMode, docId, projectId, dataKey, showNotification]);
+  };
+
+  const handleBumSelectionChange = (bumId) => {
+    setSelectedBums((prev) =>
+      prev.includes(bumId)
+        ? prev.filter((id) => id !== bumId)
+        : [...prev, bumId],
+    );
+  };
+
+  const handleSendReviewRequest = async () => {
+    if (selectedBums.length === 0) {
+      showNotification("Please select at least one BUM.", "warning");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const versionId = quoteData.version.id;
+      await axios.post(
+        `${API_URL}/api/quote-versions/${versionId}/request-review`,
+        { bum_ids: selectedBums },
+      );
+      showNotification("Quote sent for review successfully!", "success");
+      setShowBumSelectionModal(false);
+      setSelectedBums([]);
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to request review: ", error);
+      showNotification(
+        error.response?.data?.error || "Failed to request review",
+        "danger",
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    if (reviewDecision == "rejected" && !reviewComments.trim()) {
+      showNotification(
+        "Comments are required whe rejecting a quote.",
+        "warning",
+      );
+      return;
+    }
+    setIsSubmittingReview(true);
+    try {
+      const versionId = quoteData.version.id;
+      const payload = {
+        decision: reviewDecision,
+        comments: reviewComments,
+      };
+      await axios.post(
+        `${API_URL}/api/quote-versions/${versionId}/submit-review`,
+        payload,
+      );
+      showNotification("Review submitted successfully!", "success");
+      setShowReviewModal(false);
+      setReviewComments("");
+      // Simple reload to ensure all state is fresh
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to load quote data: ", error);
+      showNotification(
+        error.response?.data?.error || "Failed to submit review",
+        "danger",
+      );
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   // Quote action handlers
   const handleSendQuote = async () => {
@@ -368,7 +411,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       console.log("Updated quote status:", quote.status); // Debug log
       const latestVersion = quote.versions[quote.versions.length - 1];
       const versionResponse = await axios.get(
-        `${API_URL}/api/quote-versions/${latestVersion.id}`
+        `${API_URL}/api/quote-versions/${latestVersion.id}`,
       );
       const versionDetail = versionResponse.data;
       setQuoteData({ quote, version: versionDetail });
@@ -379,7 +422,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       console.error(error);
       showNotification(
         error.response?.data?.error || "Failed to send quote",
-        "danger"
+        "danger",
       );
     } finally {
       setActionLoading(false);
@@ -398,7 +441,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       const quote = quoteResponse.data;
       const latestVersion = quote.versions[quote.versions.length - 1];
       const versionResponse = await axios.get(
-        `${API_URL}/api/quote-versions/${latestVersion.id}`
+        `${API_URL}/api/quote-versions/${latestVersion.id}`,
       );
       const versionDetail = versionResponse.data;
       setQuoteData({ quote, version: versionDetail });
@@ -406,7 +449,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       console.error(error);
       showNotification(
         error.response?.data?.error || "Failed to accept quote",
-        "danger"
+        "danger",
       );
     } finally {
       setActionLoading(false);
@@ -425,7 +468,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       const quote = quoteResponse.data;
       const latestVersion = quote.versions[quote.versions.length - 1];
       const versionResponse = await axios.get(
-        `${API_URL}/api/quote-versions/${latestVersion.id}`
+        `${API_URL}/api/quote-versions/${latestVersion.id}`,
       );
       const versionDetail = versionResponse.data;
       setQuoteData({ quote, version: versionDetail });
@@ -433,7 +476,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       console.error(error);
       showNotification(
         error.response?.data?.error || "Failed to decline quote",
-        "danger"
+        "danger",
       );
     } finally {
       setActionLoading(false);
@@ -467,7 +510,7 @@ function PrintableBOM({ projectId: propProjectId }) {
     try {
       const latestVersionId = quoteData.version.id;
       const response = await axios.post(
-        `${API_URL}/api/quote-versions/${latestVersionId}/load-to-bom`
+        `${API_URL}/api/quote-versions/${latestVersionId}/load-to-bom`,
       );
       showNotification("Quote loaded to BOM for editing", "success");
 
@@ -476,7 +519,7 @@ function PrintableBOM({ projectId: propProjectId }) {
         // Store core components for SystemDesign synchronization
         sessionStorage.setItem(
           `quoteLoadCoreComponents_${projectId}`,
-          JSON.stringify(response.data.core_components)
+          JSON.stringify(response.data.core_components),
         );
       }
 
@@ -488,7 +531,7 @@ function PrintableBOM({ projectId: propProjectId }) {
   };
 
   const [priceMode, setPriceMode] = useState(
-    () => localStorage.getItem("bomPriceMode") || "all"
+    () => localStorage.getItem("bomPriceMode") || "all",
   );
   useEffect(() => localStorage.setItem("bomPriceMode", priceMode), [priceMode]);
 
@@ -498,7 +541,7 @@ function PrintableBOM({ projectId: propProjectId }) {
     (bomData.categories || []).forEach((cat) => {
       map[cat.name] = (cat.items || []).reduce(
         (s, it) => s + (it.price || 0) * (it.quantity || 0),
-        0
+        0,
       );
     });
     return map;
@@ -511,7 +554,7 @@ function PrintableBOM({ projectId: propProjectId }) {
   useEffect(() => {
     localStorage.setItem(
       `bomTermsPerc_${projectId}`,
-      JSON.stringify(termsPerc)
+      JSON.stringify(termsPerc),
     );
   }, [termsPerc, projectId]);
 
@@ -521,7 +564,7 @@ function PrintableBOM({ projectId: propProjectId }) {
   };
   const termsSum = useMemo(
     () => termsPerc.reduce((a, b) => a + (+b || 0), 0),
-    [termsPerc]
+    [termsPerc],
   );
 
   const formatCurrency = (value) =>
@@ -644,7 +687,7 @@ function PrintableBOM({ projectId: propProjectId }) {
     const usedRowsPx = last.reduce(
       (acc, r) =>
         acc + (r.type === "category" ? CAT_ROW_HEIGHT_PX : ROW_HEIGHT_PX),
-      0
+      0,
     );
     return CONTENT_HEIGHT_PX - (COL_HEADER_HEIGHT_PX + usedRowsPx);
   }, [
@@ -719,7 +762,7 @@ function PrintableBOM({ projectId: propProjectId }) {
   // Estimate whether totals fit on the last page
   const totalsBlockEstimatedRows = 9; // approx
   const ROWS_PER_PAGE_ESTIMATE = Math.floor(
-    (CONTENT_HEIGHT_PX - COL_HEADER_HEIGHT_PX) / ROW_HEIGHT_PX
+    (CONTENT_HEIGHT_PX - COL_HEADER_HEIGHT_PX) / ROW_HEIGHT_PX,
   );
 
   const needsTotalsOnNewPage = useMemo(() => {
@@ -730,7 +773,7 @@ function PrintableBOM({ projectId: propProjectId }) {
     const usedRowsPx = last.reduce(
       (acc, r) =>
         acc + (r.type === "category" ? CAT_ROW_HEIGHT_PX : ROW_HEIGHT_PX),
-      0
+      0,
     );
 
     // header (col head) + rows already on the page
@@ -764,8 +807,9 @@ function PrintableBOM({ projectId: propProjectId }) {
     const filteredCarry = carryPages
       .map((blocks) =>
         blocks.filter(
-          (k) => k === "bankingAccept" || k === "totals" || k === "termsDeposit"
-        )
+          (k) =>
+            k === "bankingAccept" || k === "totals" || k === "termsDeposit",
+        ),
       )
       .filter((b) => b.length);
     filteredCarry.forEach((blocks) => base.push({ kind: "totals", blocks }));
@@ -1316,6 +1360,41 @@ function PrintableBOM({ projectId: propProjectId }) {
               </Badge>
             </div>
 
+            {/* NEW : Review Status Badge */}
+            {quoteData.version.review_status !== "none" && (
+              <div
+                style={{
+                  backgroundColor: "white",
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                  border: "1px solid #dee2e6",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#6c757d",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Review Status
+                </div>
+                <Badge
+                  bg={
+                    quoteData.version.review_status === "approved"
+                      ? "info"
+                      : quoteData.version.review_status === "rejected"
+                        ? "warning"
+                        : "secondary"
+                  }
+                >
+                  {quoteData.version.review_status.replace("_", " ")}
+                </Badge>
+              </div>
+            )}
+
             {/* Action Buttons */}
             {quoteData.quote.status !== "sent" &&
               quoteData.quote.status !== "accepted" &&
@@ -1347,6 +1426,46 @@ function PrintableBOM({ projectId: propProjectId }) {
                     </>
                   )}
                 </Button>
+              )}
+
+            {/* Show request review if not yet requested/approved */}
+            {["none", "rejected"].includes(quoteData.version.review_status) &&
+              quoteData.quote.status === "open" && (
+                <Button
+                  variant="outline-info"
+                  size="sm"
+                  onClick={handleRequestReviewClick} // MODIFIED
+                  disabled={actionLoading}
+                >
+                  <i className="bi bi-person-check me-1"></i>Request Review
+                </Button>
+              )}
+
+            {/* Show BUM actions if user is a BUM and quote is pending review */}
+            {user.is_bum &&
+              quoteData.version.review_status === "pending_review" && (
+                <>
+                  <Button
+                    variant="success"
+                    size="sm"
+                    onClick={() => {
+                      setReviewDecision("approved");
+                      setShowReviewModal(true);
+                    }}
+                  >
+                    <i className="bi bi-check-lg me-1"></i>Approve
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => {
+                      setReviewDecision("rejected");
+                      setShowReviewModal(true);
+                    }}
+                  >
+                    <i className="bi bi-x-lg me-1"></i>Reject
+                  </Button>
+                </>
               )}
 
             {quoteData.quote.status === "sent" && (
@@ -1619,6 +1738,101 @@ function PrintableBOM({ projectId: propProjectId }) {
           </section>
         ))}
       </main>
+      {/* --- NEW: Review Modal --- */}
+      <Modal
+        show={showReviewModal}
+        onHide={() => setShowReviewModal(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Submit Quote Review ({reviewDecision})</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group>
+            <Form.Label>Comments (Required if rejecting)</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={4}
+              value={reviewComments}
+              onChange={(e) => setReviewComments(e.target.value)}
+              placeholder={
+                reviewDecision === "rejected"
+                  ? "Please provide feedback for the salesperson..."
+                  : "Optional comments..."
+              }
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowReviewModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleSubmitReview}
+            disabled={isSubmittingReview}
+          >
+            {isSubmittingReview ? (
+              <Spinner as="span" animation="border" size="sm" />
+            ) : (
+              "Submit Review"
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+      {/* --- END: NEW --- */}
+
+      {/* --- NEW: BUM Selection Modal --- */}
+      <Modal
+        show={showBumSelectionModal}
+        onHide={() => setShowBumSelectionModal(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Request BUM Review</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {loadingBums ? (
+            <div className="text-center">
+              <Spinner animation="border" />
+            </div>
+          ) : (
+            <Form>
+              <Form.Label>Select one or more BUMs to notify:</Form.Label>
+              {bumList.map((bum) => (
+                <Form.Check
+                  key={bum.id}
+                  type="checkbox"
+                  id={`bum-${bum.id}`}
+                  label={bum.full_name}
+                  checked={selectedBums.includes(bum.id)}
+                  onChange={() => handleBumSelectionChange(bum.id)}
+                />
+              ))}
+            </Form>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowBumSelectionModal(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleSendReviewRequest}
+            disabled={actionLoading || loadingBums || selectedBums.length === 0}
+          >
+            {actionLoading ? (
+              <Spinner as="span" animation="border" size="sm" />
+            ) : (
+              "Send Request"
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+      {/* --- END: NEW --- */}
     </div>
   );
 }

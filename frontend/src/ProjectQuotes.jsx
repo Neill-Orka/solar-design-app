@@ -341,6 +341,7 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
           <tr>
             <th>#</th>
             <th>Status</th>
+            <th>Review Status</th> {/* NEW COLUMN */}
             <th>Latest ver.</th>
             <th>Total (incl. VAT)</th>
             <th>Created</th>
@@ -416,6 +417,26 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
               >
                 {getStatusBadge(q.status)}
               </td>
+              {/* --- NEW: Review Status Cell --- */}
+              <td>
+                {q.latest_version?.review_status &&
+                  q.latest_version.review_status !== "none" && (
+                    <Badge
+                      bg={
+                        q.latest_version.review_status === "approved"
+                          ? "info"
+                          : q.latest_version.review_status === "rejected"
+                            ? "warning"
+                            : "secondary"
+                      }
+                    >
+                      {q.latest_version.review_status.replace("_", " ")}
+                      {q.latest_version.reviewed_by &&
+                        ` by ${q.latest_version.reviewed_by}`}
+                    </Badge>
+                  )}
+              </td>
+              {/* --- END: NEW --- */}
               <td
                 onClick={() => !editingQuote && onOpenQuote?.(q.id)}
                 style={{

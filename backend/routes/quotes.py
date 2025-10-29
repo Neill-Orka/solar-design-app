@@ -19,8 +19,10 @@ from models import (
     DocumentKind,
     DocumentStatus,
     VersionStatus,
+    QuoteReviewStatus
 )
 from routes.projects import mark_project_activity, optional_user_id
+from routes.notifications import send_quote_review_request_to_bums, send_quote_review_outcome_to_salesperson
 
 quotes_bp = Blueprint("quotes", __name__)
 SA_TZ = ZoneInfo("Africa/Johannesburg")
@@ -274,6 +276,12 @@ def list_project_quotes(project_id):
                 "version_count": d.versions.count(),  # dynamic rel
                 "latest_version_no": v.version_no if v else None,
                 "latest_totals": v.totals_json if v else None,
+                # --- NEW: Add latest version review details ---
+                "latest_version": {
+                    "review_status": v.review_status.value if v and v.review_status else 'none',
+                    "reviewed_by": v.reviewed_by.full_name if v and v.reviewed_by else None,
+                } if v else None,
+                # --- END: NEW ---                
                 "created_by": {
                     "id": d.created_by.id if d.created_by else None,
                     "full_name": d.created_by.full_name if d.created_by else "Unknown",
@@ -358,22 +366,14 @@ def get_quote_version(version_id):
             }
         )
 
-    return (
-        jsonify(
-            {
-                "id": v.id,
-                "document_id": v.document_id,
-                "version_no": v.version_no,
-                "created_at": v.created_at.isoformat() + "Z",
-                "status": v.status.value if v.status else None,
-                "totals": v.totals_json,
-                "payload": v.payload_json,
-                "lines": lines,
-                "pdf_path": v.pdf_path,
-            }
-        ),
-        200,
-    )
+    # Use the to_dict method which already includes all the fields
+    version_dict = v.to_dict(include_lines=True)
+    
+    # The frontend expects 'lines' at the top level, so we'll merge it in.
+    # The to_dict method returns 'line_items', so we rename it.
+    version_dict['lines'] = version_dict.pop('line_items', [])
+
+    return jsonify(version_dict), 200
 
 
 @quotes_bp.route("/quote-versions/<int:version_id>/load-to-bom", methods=["POST"])
@@ -832,3 +832,73 @@ def rename_quote(document_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "Failed to rename quote"}), 500
+
+@quotes_bp.route("/quote-versions/<int:version_id>/request-review", methods=["POST"])
+@jwt_required()
+def request_quote_review(version_id):
+    """Endpoint for a salesperson to request a review from a BUM."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    version = DocumentVersion.query.get_or_404(version_id)
+    data = request.get_json()
+
+    bum_ids = data.get("bum_ids")
+    if not bum_ids or not isinstance(bum_ids, list):
+        return jsonify({"error": "A list of bums is required"}), 400
+
+    if version.review_status != QuoteReviewStatus.NONE and version.review_status != QuoteReviewStatus.REJECTED:
+        return jsonify({"error": "Review has already been requested or completed."}), 400
+
+    version.review_status = QuoteReviewStatus.PENDING_REVIEW
+    version.review_requested_by_id = user_id
+    version.reviewed_by_id = None # Clear previous reviewer if re-requesting
+    version.reviewed_at = None
+    version.reviewer_comments = None
+
+    # Find all BUMs to notify them
+    bums = User.query.filter(User.id.in_(bum_ids), User.is_bum==True, User.is_active==True).all()
+    if not bums:
+        return jsonify({"error": "No bums found"}), 400
+
+    send_quote_review_request_to_bums(version, user, bums)
+
+    db.session.commit()
+    return jsonify({"message": "Review requested successfully.", "review_status": version.review_status.value})
+
+
+@quotes_bp.route("/quote-versions/<int:version_id>/submit-review", methods=["POST"])
+@jwt_required()
+def submit_quote_review(version_id):
+    """Endpoint for a BUM to approve or reject a quote."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    version = DocumentVersion.query.get_or_404(version_id)
+    data = request.get_json()
+
+    if not user or not user.is_bum:
+        return jsonify({"error": "Only Business Unit Managers can submit reviews."}), 403
+
+    if version.review_status != QuoteReviewStatus.PENDING_REVIEW:
+        return jsonify({"error": "This quote is not pending review."}), 400
+
+    decision = data.get("decision") # "approved" or "rejected"
+    comments = data.get("comments")
+
+    if decision == "approved":
+        version.review_status = QuoteReviewStatus.APPROVED
+    elif decision == "rejected":
+        version.review_status = QuoteReviewStatus.REJECTED
+    else:
+        return jsonify({"error": "Invalid decision. Must be 'approved' or 'rejected'."}), 400
+
+    version.reviewed_by_id = user_id
+    version.reviewed_at = datetime.now(SA_TZ)
+    version.reviewer_comments = comments
+
+    # Notify the original requester
+    if version.review_requested_by:
+        send_quote_review_outcome_to_salesperson(version, user)
+
+    db.session.commit()
+    return jsonify({"message": "Review submitted successfully.", "review_status": version.review_status.value})
+
