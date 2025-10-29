@@ -1,7 +1,7 @@
 from flask import Blueprint, current_app, jsonify, request
 from markupsafe import escape
 from services.mailer import send_email
-from models import User, JobCard
+from models import User, JobCard, DocumentVersion
 from datetime import datetime
 import jwt
 
@@ -97,3 +97,68 @@ def send_job_card_assignment_to_bum(job_card: JobCard, bum: User):
     except Exception as e:
         current_app.logger.error(f"Failed to send job card assignment email for JC-{job_card.id}: {e}")
 
+def send_quote_review_request_to_bums(version: DocumentVersion, requester: User, bums: list[User]):
+    """Notifies all BUMs that a quote is ready for their review."""
+    if not bums:
+        return
+
+    doc = version.document
+    project = doc.project
+    frontend_url = current_app.config.get("FRONTEND_URL", "https://app.orkasolar.co.za")
+    quote_url = f"{frontend_url}/projects/{project.id}/quotes/{doc.id}"
+
+    subject = f"Quote Review Request: {doc.number} for {project.name}"
+    recipients = [bum.email for bum in bums if bum.email]
+
+    for bum in bums:
+        html_body = f"""
+        <p>Hi {bum.first_name},</p>
+        <p>{requester.full_name} has requested a review for quote <strong>{doc.number}</strong>.</p>
+        <ul>
+            <li><strong>Project:</strong> {project.name}</li>
+            <li><strong>Client:</strong> {project.client.client_name if project.client else 'N/A'}</li>
+            <li><strong>Quote Total:</strong> R {version.totals_json.get('total_incl_vat', 0):,.2f}</li>
+        </ul>
+        <p>Please review the quote by clicking the link below:</p>
+        <p><a href="{quote_url}" style="padding: 10px 15px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Review Quote Now</a></p>
+        """
+        try:
+            send_email(subject=subject, recipients=[bum.email], html=html_body)
+        except Exception as e:
+            current_app.logger.error(f"Failed to send review request email to {bum.email}: {e}")
+
+
+def send_quote_review_outcome_to_salesperson(version: DocumentVersion, reviewer: User):
+    """Notifies the original requester of the BUM's decision."""
+    requester = version.review_requested_by
+    if not requester or not requester.email:
+        return
+
+    doc = version.document
+    project = doc.project
+    frontend_url = current_app.config.get("FRONTEND_URL", "https://app.orkasolar.co.za")
+    quote_url = f"{frontend_url}/projects/{project.id}/quotes/{doc.id}"
+
+    decision_upper = version.review_status.value.replace('_', ' ').upper()
+    subject = f"Quote {decision_upper}: {doc.number}"
+
+    html_body = f"""
+    <p>Hi {requester.first_name},</p>
+    <p>Your quote <strong>{doc.number}</strong> has been reviewed by {reviewer.full_name}.</p>
+    <p><strong>Outcome: {decision_upper}</strong></p>
+    """
+    if version.reviewer_comments:
+        html_body += f"""
+        <p><strong>Reviewer's Comments:</strong></p>
+        <div style="padding: 10px; border: 1px solid #ccc; border-radius: 4px; background-color: #f9f9f9;">
+            <p>{version.reviewer_comments}</p>
+        </div>
+        """
+    html_body += f"""
+    <p>You can view the quote by clicking the link below:</p>
+    <p><a href="{quote_url}" style="padding: 10px 15px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">View Quote</a></p>
+    """
+    try:
+        send_email(subject=subject, recipients=[requester.email], html=html_body)
+    except Exception as e:
+        current_app.logger.error(f"Failed to send review outcome email to {requester.email}: {e}")

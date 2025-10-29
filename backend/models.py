@@ -780,7 +780,6 @@ class VersionStatus(Enum):
     DECLINED = "declined"
     EXPIRED = "expired"
 
-
 class Document(db.Model):
     __tablename__ = "documents"
 
@@ -906,6 +905,12 @@ class Document(db.Model):
             "tags": self.tags,
         }
 
+# Enum for the BUM review process
+class QuoteReviewStatus(Enum):
+    NONE = 'none'
+    PENDING_REVIEW = 'pending_review'
+    APPROVED = 'approved'
+    REJECTED = 'rejected'
 
 class DocumentVersion(db.Model):
     __tablename__ = "document_versions"
@@ -923,6 +928,14 @@ class DocumentVersion(db.Model):
     valid_until = db.Column(db.DateTime, nullable=True)  # set on SENT
     price_locked_at = db.Column(db.DateTime, nullable=True)  # set on SENT/ACCEPTED
 
+    # --- NEW: BUM Review Fields ---
+    review_status = db.Column(db.Enum(QuoteReviewStatus), nullable=False, default=QuoteReviewStatus.NONE)
+    review_requested_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    reviewed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    reviewer_comments = db.Column(db.Text, nullable=True)
+    # --- END: BUM Review Fields ---
+
     # immutable payloads to fully reproduce the doc
     payload_json = db.Column(
         JSONB, nullable=False
@@ -937,6 +950,11 @@ class DocumentVersion(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ), nullable=False)
 
     created_by = db.relationship("User", foreign_keys=[created_by_id])
+
+    # --- NEW: BUM Review Relationships ---
+    review_requested_by = db.relationship("User", foreign_keys=[review_requested_by_id])
+    reviewed_by = db.relationship("User", foreign_keys=[reviewed_by_id])
+    # --- END: BUM Review Relationships ---    
 
     line_items = db.relationship(
         "DocumentLineItem",
@@ -970,6 +988,13 @@ class DocumentVersion(db.Model):
             "html_hash": self.html_hash,
             "created_by_id": self.created_by_id,
             "created_at": self.created_at.isoformat() + "Z",
+            # --- NEW: Add review fields to the response ---
+            "review_status": self.review_status.value if self.review_status else QuoteReviewStatus.NONE.value,
+            "review_requested_by": self.review_requested_by.full_name if self.review_requested_by else None,
+            "reviewed_by": self.reviewed_by.full_name if self.reviewed_by else None,
+            "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
+            "reviewer_comments": self.reviewer_comments,
+            # --- END: NEW ---            
         }
         if include_lines:
             d["line_items"] = [li.to_dict() for li in self.line_items]
