@@ -81,7 +81,7 @@ def get_projects():
                     "custom_flat_rate": p.custom_flat_rate,
                     "created_at": p.created_at.isoformat() if p.created_at else None,
                     "created_by": p.created_by.full_name if p.created_by else "",
-                    "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+                    "updated_at": p.updated_at.astimezone(SA_TZ).isoformat() if p.updated_at else None,
                     "updated_by": p.updated_by.full_name if p.updated_by else None,
                     "tariff_details": serialize_tariff(p.tariff) if p.tariff else None,
                 }
@@ -150,7 +150,7 @@ def get_project_by_id(project_id):
                 "surface_azimuth": project.surface_azimuth,
                 "use_pvgis": project.use_pvgis,
                 "updated_at": (
-                    project.updated_at.isoformat() if project.updated_at else None
+                    project.updated_at.astimezone(SA_TZ).isoformat() if project.updated_at else None
                 ),
                 "updated_by": (
                     project.updated_by.full_name if project.updated_by else None
