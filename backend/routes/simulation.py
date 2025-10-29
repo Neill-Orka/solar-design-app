@@ -53,23 +53,23 @@ def simulate_system():
                                       battery_soc_limit=battery_soc_limit,
                                       generator_config=generator_cfg)
         
-        try:
-            subj = f"Simulation complete - Project #{project_id}"
-            pv_kw = result.get("panel_kw", 0)
-            inv_kva = result.get("inverter_kva", 0)
-            batt = result.get("battery_kwh", 0)
-            html = f"""
-            <h3>Simulation Complete</h3>
-            <p><b>Project:</b> {escape(getattr(project, 'name', str(project_id)))}</p>
-            <ul>
-                <li>PV Size: {pv_kw} kWp</li>
-                <li>Inverter: {inv_kva} kVA</li>
-                <li>Battery: {batt} kWh</li>
-            </ul>                    
-            """
-            send_email(subj, html=html, text = f"PV: {pv_kw} kWp, Inverter: {inv_kva} kVA, Battery: {batt} kWh")
-        except Exception as e:
-            current_app.logger.exception(f"Failed to send simulation email: {e}")
+        # try:
+        #     subj = f"Simulation complete - Project #{project_id}"
+        #     pv_kw = result.get("panel_kw", 0)
+        #     inv_kva = result.get("inverter_kva", 0)
+        #     batt = result.get("battery_kwh", 0)
+        #     html = f"""
+        #     <h3>Simulation Complete</h3>
+        #     <p><b>Project:</b> {escape(getattr(project, 'name', str(project_id)))}</p>
+        #     <ul>
+        #         <li>PV Size: {pv_kw} kWp</li>
+        #         <li>Inverter: {inv_kva} kVA</li>
+        #         <li>Battery: {batt} kWh</li>
+        #     </ul>                    
+        #     """
+        #     send_email(subj, html=html, text = f"PV: {pv_kw} kWp, Inverter: {inv_kva} kVA, Battery: {batt} kWh")
+        # except Exception as e:
+        #     current_app.logger.exception(f"Failed to send simulation email: {e}")
 
         return jsonify(result)
     
