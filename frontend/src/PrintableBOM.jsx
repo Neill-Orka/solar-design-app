@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { Button, Badge, Spinner, Alert, Form, Modal } from "react-bootstrap";
@@ -47,6 +47,9 @@ function PrintableBOM({ projectId: propProjectId }) {
   const [selectedBums, setSelectedBums] = useState([]);
   const [loadingBums, setLoadingBums] = useState(false);
   // --- END: NEW ---
+
+  // --- NEW: Add a ref to prevent double-fetching in StrictMode ---
+  const hasFetched = useRef(false);
 
   // Retrieve data from localStorage (project-specific key or quote-specific key)
   const dataKey = isQuoteMode
@@ -234,14 +237,18 @@ function PrintableBOM({ projectId: propProjectId }) {
       }
     };
 
-    loadProjectData();
+    // --- FIX: Prevent double-fetching in StrictMode ---
+    if (!hasFetched.current) {
+      loadProjectData();
+    }
   }, [projectId, showNotification]);
 
   // Load quote data from API when in quote mode
   useEffect(() => {
     // Define the function inside useEffect to capture the correct state
     const loadQuoteData = async () => {
-      if (!isQuoteMode || !docId) return;
+      // --- FIX: Wait for projectData to be loaded before fetching quote data ---
+      if (!isQuoteMode || !docId || !projectData) return;
 
       setQuoteLoading(true);
       try {
@@ -306,8 +313,24 @@ function PrintableBOM({ projectId: propProjectId }) {
       }
     };
 
-    loadQuoteData();
-  }, [isQuoteMode, docId, projectId, dataKey, showNotification, projectData]); // Added projectData dependency
+    // --- FIX: Prevent double-fetching in StrictMode ---
+    if (!hasFetched.current) {
+      loadQuoteData();
+    }
+  }, [isQuoteMode, docId, projectId, dataKey, showNotification, projectData]); // projectData dependency is now intentional and correct
+
+  // --- NEW: Add an effect to manage the fetch lock ---
+  useEffect(() => {
+    // Set the ref to true after the initial render cycle.
+    // This ensures that subsequent re-renders (including the one from StrictMode)
+    // do not re-trigger the initial data fetches.
+    hasFetched.current = true;
+
+    // Reset the ref on unmount.
+    return () => {
+      hasFetched.current = false;
+    };
+  }, []);
 
   // Handler for review actions
   const handleRequestReviewClick = async () => {
