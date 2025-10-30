@@ -48,9 +48,6 @@ function PrintableBOM({ projectId: propProjectId }) {
   const [loadingBums, setLoadingBums] = useState(false);
   // --- END: NEW ---
 
-  // --- NEW: Add a ref to prevent double-fetching in StrictMode ---
-  const hasFetched = useRef(false);
-
   // Retrieve data from localStorage (project-specific key or quote-specific key)
   const dataKey = isQuoteMode
     ? `quoteData_${docId}`
@@ -149,188 +146,138 @@ function PrintableBOM({ projectId: propProjectId }) {
     }
   }, [shouldAutoDownload]);
 
-  // Load project data
+  // --- START: REPLACEMENT FOR ALL DATA FETCHING useEffects ---
   useEffect(() => {
-    const loadProjectData = async () => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    const fetchAllData = async () => {
       if (!projectId) return;
+
+      // 1. Fetch Project Data
       setProjectLoading(true);
+      let projData;
       try {
-        const response = await axios.get(
-          `${API_URL}/api/projects/${projectId}`
+        const projectResponse = await axios.get(
+          `${API_URL}/api/projects/${projectId}`,
+          { signal }
         );
-        const data = response.data;
-        console.log("Fetched project data:", data);
+        projData = projectResponse.data;
+        console.log("Fetched project data:", projData);
 
-        // Extract inverter ID
-        const inverterIds = data.inverter_ids || [];
-
-        // if we have inverter ID, fetch details
-        if (inverterIds.length > 0) {
-          const inverterId = inverterIds[0]; // Only using first inverter
+        // Fetch and attach inverter/battery details
+        if (projData.inverter_ids?.length > 0) {
           const inverterResponse = await axios.get(
-            `${API_URL}/api/products/${inverterId}`
+            `${API_URL}/api/products/${projData.inverter_ids[0]}`,
+            { signal }
           );
           const inverterData = inverterResponse.data;
-          console.log("Fetched inverter data:", inverterData);
-
-          if (inverterData) {
-            const brand_name = inverterData.brand || "";
-            const inverter_quantity = data.inverter_kva.quantity || 1;
-            const power_rating_kva = inverterData.rating_kva
-              ? `${formatNumber(Number(inverterData.rating_kva) * inverter_quantity)}kVA`
-              : "";
-            console.log(
-              "Inverter brand and capacity:",
-              brand_name,
-              power_rating_kva
-            );
-
-            // Store in project data for title display
-            data.inverter_brand_model = power_rating_kva
-              ? `${brand_name} ${power_rating_kva}`
-              : brand_name;
-          }
+          const brand_name = inverterData.brand || "";
+          const inverter_quantity = projData.inverter_kva?.quantity || 1;
+          const power_rating_kva = inverterData.rating_kva
+            ? `${formatNumber(Number(inverterData.rating_kva) * inverter_quantity)}kVA`
+            : "";
+          projData.inverter_brand_model = power_rating_kva
+            ? `${brand_name} ${power_rating_kva}`
+            : brand_name;
         }
-
-        // Extract battery ID
-        const batteryIds = data.battery_ids || [];
-
-        // if we have battery ID, fetch details
-        if (batteryIds.length > 0) {
-          const batteryId = batteryIds[0]; // Only using first battery
+        if (projData.battery_ids?.length > 0) {
           const batteryResponse = await axios.get(
-            `${API_URL}/api/products/${batteryId}`
+            `${API_URL}/api/products/${projData.battery_ids[0]}`,
+            { signal }
           );
           const batteryData = batteryResponse.data;
-          console.log("Fetched battery data:", batteryData);
-
-          if (batteryData) {
-            const brand_name = batteryData.brand || "";
-            const battery_quantity = data.battery_kwh.quantity || 1;
-            const nominal_capacity_kwh = batteryData.nominal_rating_kwh
-              ? `${formatNumber(Number(batteryData.nominal_rating_kwh) * battery_quantity)}kWh`
-              : "";
-            console.log(
-              "Battery brand and capacity:",
-              brand_name,
-              nominal_capacity_kwh
-            );
-
-            console.log(
-              "Battery quantity from project data:",
-              battery_quantity
-            );
-
-            // Store in project data for title display
-            data.battery_brand_model = nominal_capacity_kwh
-              ? `${brand_name} ${nominal_capacity_kwh}`
-              : brand_name;
-          }
+          const brand_name = batteryData.brand || "";
+          const battery_quantity = projData.battery_kwh?.quantity || 1;
+          const nominal_capacity_kwh = batteryData.nominal_rating_kwh
+            ? `${formatNumber(Number(batteryData.nominal_rating_kwh) * battery_quantity)}kWh`
+            : "";
+          projData.battery_brand_model = nominal_capacity_kwh
+            ? `${brand_name} ${nominal_capacity_kwh}`
+            : brand_name;
         }
 
-        setProjectData(data);
+        setProjectData(projData);
+        setProjectLoading(false);
       } catch (error) {
+        if (axios.isCancel(error)) return;
         console.error("Failed to load project data:", error);
         showNotification("Failed to load project data", "danger");
-      } finally {
         setProjectLoading(false);
+        return; // Stop if project data fails
       }
-    };
 
-    // --- FIX: Prevent double-fetching in StrictMode ---
-    if (!hasFetched.current) {
-      loadProjectData();
-    }
-  }, [projectId, showNotification]);
+      // 2. Fetch Quote Data (only if in quote mode and project data is available)
+      if (isQuoteMode && docId && projData) {
+        setQuoteLoading(true);
+        try {
+          const quoteResponse = await axios.get(
+            `${API_URL}/api/quotes/${docId}`,
+            { signal }
+          );
+          const quote = quoteResponse.data;
+          const latestVersionSummary =
+            quote.versions[quote.versions.length - 1];
+          const versionResponse = await axios.get(
+            `${API_URL}/api/quote-versions/${latestVersionSummary.id}`,
+            { signal }
+          );
+          const versionDetail = versionResponse.data;
 
-  // Load quote data from API when in quote mode
-  useEffect(() => {
-    // Define the function inside useEffect to capture the correct state
-    const loadQuoteData = async () => {
-      // --- FIX: Wait for projectData to be loaded before fetching quote data ---
-      if (!isQuoteMode || !docId || !projectData) return;
+          setQuoteData({ quote, version: versionDetail });
 
-      setQuoteLoading(true);
-      try {
-        // Load quote envelope
-        const quoteResponse = await axios.get(`${API_URL}/api/quotes/${docId}`);
-        const quote = quoteResponse.data;
-
-        // Get the latest version ID from the envelope
-        const latestVersionSummary = quote.versions[quote.versions.length - 1];
-
-        // Load the full details of the latest version
-        const versionResponse = await axios.get(
-          `${API_URL}/api/quote-versions/${latestVersionSummary.id}`
-        );
-        const versionDetail = versionResponse.data;
-
-        setQuoteData({ quote, version: versionDetail });
-
-        // The rest of the logic for creating printData can be removed from here
-        // as it's now handled by the component's render logic based on quoteData.
-        // We will create the bomData structure needed for rendering.
-
-        const categoryMap = {};
-        (versionDetail.lines || []).forEach((item) => {
-          const snapshot = item.product_snapshot_json || {};
-          const category = snapshot.category || "Other";
-          if (!categoryMap[category]) {
-            categoryMap[category] = { name: category, items: [] };
-          }
-          categoryMap[category].items.push({
-            product: {
-              brand: snapshot.brand || "",
-              model: snapshot.model || "",
-            },
-            quantity: item.qty || 0,
-            price: item.unit_price_locked || 0,
+          // Construct bomData for rendering
+          const categoryMap = {};
+          (versionDetail.lines || []).forEach((item) => {
+            const snapshot = item.product_snapshot_json || {};
+            const category = snapshot.category || "Other";
+            if (!categoryMap[category]) {
+              categoryMap[category] = { name: category, items: [] };
+            }
+            categoryMap[category].items.push({
+              product: {
+                brand: snapshot.brand || "",
+                model: snapshot.model || "",
+              },
+              quantity: item.qty || 0,
+              price: item.unit_price_locked || 0,
+            });
           });
-        });
 
-        const printData = {
-          project: {
-            id: parseInt(projectId),
-            project_name: projectData?.name || `Quote ${quote.number}`,
-            client_name:
-              projectData?.client_name ||
-              quote.client_snapshot_json?.name ||
-              "Client Name",
-            // ... other project fields
-            quote_number: quote.number,
-          },
-          totals: versionDetail.totals_json || {},
-          categories: Object.values(categoryMap),
-        };
+          const printData = {
+            project: {
+              id: parseInt(projectId),
+              project_name: projData?.name || `Quote ${quote.number}`,
+              client_name:
+                projData?.client_name ||
+                quote.client_snapshot_json?.name ||
+                "Client Name",
+              quote_number: quote.number,
+            },
+            totals: versionDetail.totals_json || {},
+            categories: Object.values(categoryMap),
+          };
 
-        localStorage.setItem(dataKey, JSON.stringify(printData));
-        setBomData(printData);
-      } catch (error) {
-        console.error("Failed to load quote data:", error);
-        showNotification("Failed to load quote data", "danger");
-      } finally {
-        setQuoteLoading(false);
+          localStorage.setItem(dataKey, JSON.stringify(printData));
+          setBomData(printData);
+        } catch (error) {
+          if (axios.isCancel(error)) return;
+          console.error("Failed to load quote data:", error);
+          showNotification("Failed to load quote data", "danger");
+        } finally {
+          setQuoteLoading(false);
+        }
       }
     };
 
-    // --- FIX: Prevent double-fetching in StrictMode ---
-    if (!hasFetched.current) {
-      loadQuoteData();
-    }
-  }, [isQuoteMode, docId, projectId, dataKey, showNotification, projectData]); // projectData dependency is now intentional and correct
+    fetchAllData();
 
-  // --- NEW: Add an effect to manage the fetch lock ---
-  useEffect(() => {
-    // Set the ref to true after the initial render cycle.
-    // This ensures that subsequent re-renders (including the one from StrictMode)
-    // do not re-trigger the initial data fetches.
-    hasFetched.current = true;
-
-    // Reset the ref on unmount.
+    // Cleanup function to cancel fetches on unmount
     return () => {
-      hasFetched.current = false;
+      controller.abort();
     };
-  }, []);
+  }, [projectId, isQuoteMode, docId, dataKey, showNotification]);
+  // --- END: REPLACEMENT ---
 
   // Handler for review actions
   const handleRequestReviewClick = async () => {
