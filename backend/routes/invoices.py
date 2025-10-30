@@ -220,6 +220,26 @@ def create_invoice(project_id):
     else:
         return jsonify({"error": "Invalid invoice type"}), 400
     
+    # --- FIX: Format address from JSON object to string ---
+    billing_address_str = None
+    if project.client and project.client.address:
+        addr = project.client.address
+        if isinstance(addr, dict):
+            # Build a formatted string from address parts
+            parts = [
+                addr.get('street'),
+                addr.get('suburb'),
+                addr.get('city') or addr.get('town'),
+                addr.get('province'),
+                addr.get('postal_code')
+            ]
+            billing_address_str = ', '.join(filter(None, parts))
+        else:
+            # Fallback for non-dict address
+            billing_address_str = str(addr)
+    elif project.location:
+        billing_address_str = project.location
+
     inv = Invoice(
         project_id=project_id,
         quote_number=quote_number,
@@ -230,10 +250,10 @@ def create_invoice(project_id):
         issue_date= datetime.now(SA_TZ).date(),
         due_date=(datetime.now(SA_TZ) + timedelta(days=due_in_days)).date(),
         percent_of_quote=percent_of_quote,
-        billing_name=data.get('billing', {}).get('name') or (project.client_name if hasattr(project, 'client_name') else None),
-        billing_company=data.get('billing', {}).get('company') or getattr(project, 'company', None),
-        billing_vat_no=data.get('billing', {}).get('vat_no'),
-        billing_address=data.get('billing', {}).get('address') or getattr(project, 'location', None),
+        billing_name=data.get('billing', {}).get('name') or (project.client.client_name if project.client else None),
+        billing_company=data.get('billing', {}).get('company') or (project.client.company if project.client else None),
+        billing_vat_no=data.get('billing', {}).get('vat_no') or (project.client.vat_number if project.client else None),
+        billing_address=data.get('billing', {}).get('address') or billing_address_str,
         vat_rate=vat_rate,
         subtotal_excl_vat=subtotal,
         vat_amount=vat_amount,

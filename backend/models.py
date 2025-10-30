@@ -818,37 +818,30 @@ class Document(db.Model):
     )
 
     def mark_sent(self, user_id=None):
-        """Mark quote as sent, lock current version, set valid_until=30 days"""
-        if self.status != DocumentStatus.OPEN:
-            raise ValueError(f"Cannot send quote with status {self.status.value}")
+        # 1) Find current version
+        v = self.versions.filter_by(version_no=self.current_version_no).first()
+        if not v:
+            raise ValueError("No current version to send")
 
-        current_version = self.versions.filter_by(
-            version_no=self.current_version_no
-        ).first()
-        if not current_version:
-            raise ValueError("No current version found")
+        # 2) Update version status
+        v.status = VersionStatus.SENT
+        v.valid_until = datetime.now(SA_TZ) + timedelta(days=30)
+        v.price_locked_at = datetime.now(SA_TZ)
 
-        if current_version.status != VersionStatus.DRAFT:
-            raise ValueError(
-                f"Cannot send version with status {current_version.status.value}"
-            )
+        # 3) Update envelope status (if it was just a draft)
+        if self.status == DocumentStatus.OPEN:
+            # The envelope remains OPEN while the version is SENT.
+            # It only moves to ACCEPTED/DECLINED later.
+            pass
 
-        # Lock the version
-        current_version.status = VersionStatus.SENT
-        current_version.valid_until = lambda: datetime.now(SA_TZ) + timedelta(days=30)
-        current_version.price_locked_at = lambda: datetime.now(SA_TZ)
-
-        # Update document status
-        self.status = DocumentStatus.OPEN  # Keep as OPEN when sent
-
-        # Add event
-        event = DocumentEvent(
-            document_version_id=current_version.id,
+        # 4) Log event
+        evt = DocumentEvent(
+            document_version_id=v.id,
             event="sent",
-            meta_json={"valid_until": current_version.valid_until.isoformat()},
+            meta_json={"to": self.client_snapshot_json.get("email")},
             created_by_id=user_id,
         )
-        db.session.add(event)
+        db.session.add(evt)
 
     def mark_accepted(self, user_id=None):
         """Mark quote as accepted"""
@@ -1317,18 +1310,35 @@ class JobCardTimeEntry(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
+class MaterialSource(Enum):
+    WAREHOUSE = "warehouse"
+    STORE = "store"
 
 class JobCardMaterial(db.Model):
     __tablename__ = "job_card_materials"
     __table_args__ = (
         db.Index('ix_materials_job_card_id', 'job_card_id'),
         db.Index('ix_materials_product_id', 'product_id'),
+        db.Index('ix_materials_source', 'source'),
     )
 
     id = db.Column(db.Integer, primary_key=True)
     job_card_id = db.Column(db.Integer, db.ForeignKey("job_cards.id"), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
+
+    # Where did this item come from?
+    source = db.Column(
+        SAEnum(
+            MaterialSource,
+            name="materialsource",
+            values_callable=lambda e: [m.value for m in e],
+            native_enum=True,
+            validate_strings=True,
+        ),
+        nullable=False,
+        default=MaterialSource.WAREHOUSE,
+    )
 
     unit_cost_at_time = db.Column(db.Numeric(12, 2), nullable=True)
     unit_price_at_time = db.Column(db.Numeric(12, 2), nullable=True)
@@ -1347,6 +1357,7 @@ class JobCardMaterial(db.Model):
                 product_name = f"{brand} {model}"
             else:
                 product_name = model
+
         return {
             "id": self.id,
             "job_card_id": self.job_card_id,
@@ -1357,6 +1368,9 @@ class JobCardMaterial(db.Model):
             "unit_price_at_time": float(self.unit_price_at_time or 0),
             "line_total": float((self.unit_price_at_time or 0) * (self.quantity or 0)),
             "note": self.note,
+            "source": self.source.value if self.source else MaterialSource.WAREHOUSE.value,
+            # expost linked receipts so the UI can show group receipts per material
+            "receipts": [r.to_dict() for r in getattr(self, "receipts", [])],
         }
 
 
@@ -1396,6 +1410,12 @@ class JobCardAttachment(db.Model):
 
 class JobCardMaterialReceipt(db.Model):
     __tablename__ = "job_card_material_receipts"
+    __table_args__ = (
+        db.Index('ix_material_receipts_material_id', 'material_id'),
+        db.Index('ix_material_receipts_attachment_id', 'attachment_id'),
+        db.UniqueConstraint('material_id', 'attachment_id', name='uq_material_receipt_link'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     material_id = db.Column(
         db.Integer, db.ForeignKey("job_card_materials.id"), nullable=False
@@ -1515,4 +1535,3 @@ class InvoiceItem(db.Model):
     vat_rate = db.Column(db.Numeric(5, 2), nullable=False, default=15.00)
     line_vat = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     line_total_incl_vat = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    
