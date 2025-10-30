@@ -418,7 +418,12 @@ export default function ProjectQuotes({ projectId, onOpenQuote }) {
                 {getStatusBadge(q.status)}
               </td>
               {/* --- NEW: Review Status Cell --- */}
-              <td>
+              <td
+                onClick={() => !editingQuote && onOpenQuote?.(q.id)}
+                style={{
+                  cursor: !editingQuote && onOpenQuote ? "pointer" : "default",
+                }}
+              >
                 {q.latest_version?.review_status &&
                   q.latest_version.review_status !== "none" && (
                     <Badge
