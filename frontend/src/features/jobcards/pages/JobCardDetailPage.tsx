@@ -20,6 +20,12 @@ export default function JobCardDetailPage() {
       if (!id) return;
       const jc = await getJobCard(Number(id));
       if (!mounted) return;
+
+      if (jc && jc.bum_status === "open") {
+        nav(`/jobcards/${jc.id}/edit`, { replace: true });
+        return;
+      }
+
       setJob(jc);
 
       // map category id -> name (backend doesn’t snapshot it)

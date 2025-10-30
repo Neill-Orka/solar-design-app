@@ -372,14 +372,13 @@ export default function PrintableInvoice() {
       <div className="bom-info-grid">
         <div>
           <span className="label">For attention:</span>{" "}
-          {inv?.billing?.name || "Client Name"}
+          {inv?.billing?.name || "Private"}
         </div>
         <div>
           <span className="label">Date:</span> {currentDate}
         </div>
         <div>
-          <span className="label">Company:</span>{" "}
-          {inv?.billing?.company || "Company Name"}
+          <span className="label">Company:</span> {inv?.billing?.company || "-"}
         </div>
         <div>
           <span className="label">Invoice #:</span>{" "}

@@ -38,6 +38,7 @@ export const JobCardFormSchema = z.object({
 
   status: z
     .enum([
+      "open",
       "draft",
       "scheduled",
       "in_progress",
@@ -47,6 +48,10 @@ export const JobCardFormSchema = z.object({
       "invoiced",
     ])
     .default("draft"),
+
+  bum_status: z
+    .enum(["open", "submitted", "invoiced", "completed"])
+    .default("open"),
 });
 
 export type JobCardFormValues = z.infer<typeof JobCardFormSchema>;
@@ -74,4 +79,5 @@ export const jobCardDefaults: JobCardFormValues = {
   travel_distance_km: 0,
   coc_required: false,
   status: "draft",
+  bum_status: "open",
 };

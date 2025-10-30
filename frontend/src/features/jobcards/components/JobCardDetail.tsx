@@ -584,7 +584,7 @@ export default function JobCardDetail({ job, categoryName, onEdit }: Props) {
         <button
           className="btn btn-sm btn-dark ms-2"
           onClick={async () => {
-            await closeJobCard(job.id);
+            // await closeJobCard(job.id);
             nav(0);
           }}
         >

@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify, abort, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 import json
-from models import Document, JobCardMaterial, db, JobCard, Clients, JobCategory, Vehicle, DocumentKind, DocumentStatus, DocumentVersion, Product, User, UserRole, JobCardTimeEntry, TechnicianProfile, JobCardReviewStatus
+from models import Document, JobCardMaterial, db, JobCard, Clients, JobCategory, Vehicle, DocumentKind, DocumentStatus, DocumentVersion, Product, User, UserRole, JobCardTimeEntry, TechnicianProfile, JobCardReviewStatus, MaterialSource, JobCardMaterialReceipt, JobCardAttachment, Invoice, InvoiceItem
 from werkzeug.utils import secure_filename
 import os
 from routes.auth import log_user_action
@@ -112,7 +112,7 @@ def jobcards_collection():
         vehicle_id=data.get("vehicle_id"),
         travel_distance_km=data.get("travel_distance_km", 0),
         coc_required=data.get("coc_required", False),
-        status=data.get("status", "draft"),
+        status=data.get("status") or "open",
         bum_comment=data.get("bum_comment"),
         created_by_id=int(get_jwt_identity()),
     )
@@ -149,8 +149,16 @@ def jobcards_collection():
     db.session.add(jc)
     db.session.commit()
 
-    # Notification Trigger
+    # Notification Trigger – only send once the card is beyond "open"/draft
+    should_notify = False
     if jc.bum_id:
+        current_status = (jc.status or "").lower()
+        if jc.bum_status and jc.bum_status != JobCardReviewStatus.OPEN:
+            should_notify = True
+        elif current_status not in ("", "open", "draft"):
+            should_notify = True
+
+    if should_notify:
         bum_user = User.query.get(jc.bum_id)
         if bum_user:
             send_job_card_assignment_to_bum(jc, bum_user)
@@ -188,10 +196,13 @@ def jobcards_item(jid: int):
     if request.method in ("PATCH","PUT"):
         data = request.get_json() or {}
 
-        # Notification Logic: Check if BUM is being changed
-        old_bum_id = jc.bum_id
+        # Notification Logic: capture prior state before changes
+        previous_status = (jc.status or "").lower()
+        previous_bum_status = jc.bum_status or JobCardReviewStatus.OPEN
+        previous_bum_id = jc.bum_id
+
         new_bum_id = data.get("bum_id")
-        bum_has_changed = new_bum_id is not None and new_bum_id != old_bum_id
+        bum_has_changed = new_bum_id is not None and new_bum_id != previous_bum_id
         # end notification logic
 
         for f in [
@@ -209,8 +220,16 @@ def jobcards_item(jid: int):
         if "bum_status" in data:
             current_user_id = int(get_jwt_identity())
             user = User.query.get(current_user_id)
-            if not user or (not user.is_bum and user.role != UserRole.ADMIN):
-                return jsonify({"error": "Only BUMs or administrators can set bum_status"}), 403
+            can_set_review = False
+            if user:
+                if user.role == UserRole.ADMIN or user.is_bum:
+                    can_set_review = True
+                elif jc.owner_id == user.id:
+                    can_set_review = True
+            if not can_set_review:
+                return jsonify(
+                    {"error": "Only the job owner or assigned BUM can update review status"}
+                ), 403
 
             raw = str(data.get("bum_status"))
             try:
@@ -224,14 +243,37 @@ def jobcards_item(jid: int):
                     return jsonify({"error": f"Invalid bum_status {raw}"}), 400
 
             jc.bum_status = new_status
-            jc.bum_reviewed_by_id = current_user_id
-            jc.bum_reviewed_at = datetime.now(SA_TZ)
+            if user and (user.is_bum or user.role == UserRole.ADMIN):
+                jc.bum_reviewed_by_id = current_user_id
+                jc.bum_reviewed_at = datetime.now(SA_TZ)
+            elif new_status in (
+                JobCardReviewStatus.OPEN,
+                JobCardReviewStatus.SUBMITTED,
+            ):
+                jc.bum_reviewed_by_id = None
+                jc.bum_reviewed_at = None
 
         db.session.commit()
 
-        # Notification Trigger
-        if bum_has_changed:
-            bum_user = User.query.get(new_bum_id)
+        # Notification Trigger – send when the card is formally submitted or moves beyond draft/open
+        current_status = (jc.status or "").lower()
+        current_bum_status = jc.bum_status or JobCardReviewStatus.OPEN
+
+        became_active = previous_status in ("", "open", "draft") and current_status not in ("", "open", "draft")
+        review_submitted = (
+            previous_bum_status == JobCardReviewStatus.OPEN
+            and current_bum_status == JobCardReviewStatus.SUBMITTED
+        )
+
+        should_notify = False
+        if jc.bum_id:
+            if review_submitted or became_active:
+                should_notify = True
+            elif bum_has_changed and current_status not in ("", "open", "draft"):
+                should_notify = True
+
+        if should_notify:
+            bum_user = User.query.get(jc.bum_id)
             if bum_user:
                 send_job_card_assignment_to_bum(jc, bum_user)
         # End Notification Trigger
@@ -337,7 +379,7 @@ def vehicles_item(vid: int):
 @jobcards_bp.route("/jobcards/<int:jid>/attachments", methods=["POST","OPTIONS"])
 @jwt_required()
 def upload_jobcard_attachment(jid: int):
-  from models import JobCard, JobCardAttachment, db
+  # from models import JobCard, JobCardAttachment, db
   jc = JobCard.query.get_or_404(jid)
   file = request.files.get('file')
   if not file:
@@ -379,7 +421,7 @@ def upload_jobcard_attachment(jid: int):
 @jobcards_bp.route("/jobcards/<int:jid>/attachments/<int:aid>/caption", methods=["PATCH"])
 @jwt_required()
 def update_jobcard_attachment_caption(jid: int, aid: int):
-    from models import JobCardAttachment, db
+    # from models import JobCardAttachment, db
     att = JobCardAttachment.query.get_or_404(aid)
     if att.job_card_id != jid:
         return jsonify({"error": "Attachment not found"}), 400
@@ -391,7 +433,7 @@ def update_jobcard_attachment_caption(jid: int, aid: int):
 @jobcards_bp.route("/jobcards/<int:jid>/attachments/<int:aid>", methods=["DELETE","OPTIONS"])
 @jwt_required()
 def delete_jobcard_attachment(jid: int, aid: int):
-  from models import JobCardAttachment, db
+  # from models import JobCardAttachment, db
   att = JobCardAttachment.query.get_or_404(aid)
   if att.job_card_id != jid:
       return {"message": "mismatch"}, 400
@@ -493,7 +535,7 @@ def get_quote_line_items(quote_id):
 @jobcards_bp.route("/jobcards/<int:jid>/material-receipts/<int:material_id>", methods=["POST"])
 @jwt_required()
 def upload_material_receipt(jid: int, material_id: int):
-    from models import JobCard, JobCardMaterial, JobCardAttachment, db
+    # from models import JobCard, JobCardMaterial, JobCardAttachment, JobCardMaterialReceipt, db
     
     # Verify job card and material exist
     jc = JobCard.query.get_or_404(jid)
@@ -539,13 +581,60 @@ def upload_material_receipt(jid: int, material_id: int):
     )
     
     db.session.add(att)
-    db.session.commit()
-    
+    db.session.flush()
+
+    # Link the receipt to this material (idempotent)
+    link_exists = (
+        db.session.query(JobCardMaterialReceipt)
+        .filter_by(material_id=material.id, attachment_id=att.id)
+        .first()
+    )
+
+    if not link_exists:
+        db.session.add(JobCardMaterialReceipt(material_id=material.id, attachment_id=att.id))
+
     # Also update the material with a note about the receipt
-    material.note = f"Receipt photo: {url}"
+    note = (material.note or "").strip()
+    if url not in note:
+        material.note = (note + f" Receipt: {url}").strip()
+
     db.session.commit()
-    
     return att.to_dict(), 201
+
+@jobcards_bp.route("/jobcards/<int:jid>/materials/assign-receipt", methods=["POST"])
+@jwt_required()
+def assign_receipt_to_materials(jid: int):
+    """Link an existing receipt attachment to multiple material rows in one shot."""
+    # from models import JobCard, JobCardAttachment, JobCardMaterial, JobCardMaterialReceipt, db
+    data = request.get_json() or {}
+    attachment_id = data.get("attachment_id")
+    material_ids = data.get("material_ids") or []
+
+    if not attachment_id or not isinstance(material_ids, list) or not material_ids:
+        return jsonify({"error": "attachment_id and material_ids[] required"}), 400
+
+    # Validate receipt belongs to this job card
+    att = JobCardAttachment.query.get_or_404(attachment_id)
+    if att.job_card_id != jid:
+        return jsonify({"error": "Attachment does not belong to this job card"}), 400
+
+    # Validate materials belong to this job card
+    materials = JobCardMaterial.query.filter_by(JobCardMaterial.id.in_(material_ids)).all()
+    bad = [m.id for m in materials if m.job_card_id != jid]
+    if bad:
+        return jsonify({"error": f"Some materials do not belong to job card {jid}", "ids": bad}), 400
+
+    # Create links idempotently
+    created = 0
+    for m in materials:
+        exists = (db.session.query(JobCardMaterialReceipt)
+                  .filter_by(material_id=m.id, attachment_id=m.att.id).first())
+        if not exists:
+            db.session.add(JobCardMaterialReceipt(material_id=m.id, attachment_id=m.att.id))
+            created += 1
+
+    db.session.commit()
+    return jsonify({"linked": created, "attachment_id": att.id, "material_ids": [m.id for m in materials]}), 200
 
 @jobcards_bp.route("/jobcards/materials", methods=["POST"])
 @jwt_required()
@@ -565,6 +654,10 @@ def create_jobcard_material():
         
         # Verify product exists
         product = Product.query.get_or_404(data["product_id"])
+
+        source_str = (data.get("source") or "warehouse").lower()
+        if source_str not in ("warehouse", "store"):
+            return jsonify({"error": f"Invalid source: {source_str}: must be warehouse or store"}), 400
         
         # Create the material entry
         material = JobCardMaterial(
@@ -573,7 +666,8 @@ def create_jobcard_material():
             quantity=data["quantity"],
             unit_cost_at_time=data.get("unit_cost_at_time"),
             unit_price_at_time=data.get("unit_price_at_time"),
-            note=data.get("note")
+            note=data.get("note"),
+            source=source_str,
         )
         
         db.session.add(material)
@@ -588,7 +682,8 @@ def create_jobcard_material():
             "quantity": material.quantity,
             "unit_cost_at_time": material.unit_cost_at_time,
             "unit_price_at_time": material.unit_price_at_time,
-            "note": material.note
+            "note": material.note,
+            "source": material.source,
         }
         
         return jsonify(response), 201
@@ -609,7 +704,7 @@ def create_invoice_for_jobcard(jid: int):
     Returns:
       { "invoice_id": number, "project_id": number|null }
     """
-    from models import JobCard, Invoice, InvoiceItem, Clients, Product, db
+    # from models import JobCard, Invoice, InvoiceItem, Clients, Product, db
     from datetime import datetime, timedelta
 
     # CORS preflight shortcut
@@ -751,4 +846,3 @@ def create_invoice_for_jobcard(jid: int):
 
     return jsonify({"invoice_id": inv.id, "project_id": inv.project_id}), 201
 
-    

@@ -153,7 +153,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       setProjectLoading(true);
       try {
         const response = await axios.get(
-          `${API_URL}/api/projects/${projectId}`,
+          `${API_URL}/api/projects/${projectId}`
         );
         const data = response.data;
         console.log("Fetched project data:", data);
@@ -165,7 +165,7 @@ function PrintableBOM({ projectId: propProjectId }) {
         if (inverterIds.length > 0) {
           const inverterId = inverterIds[0]; // Only using first inverter
           const inverterResponse = await axios.get(
-            `${API_URL}/api/products/${inverterId}`,
+            `${API_URL}/api/products/${inverterId}`
           );
           const inverterData = inverterResponse.data;
           console.log("Fetched inverter data:", inverterData);
@@ -179,7 +179,7 @@ function PrintableBOM({ projectId: propProjectId }) {
             console.log(
               "Inverter brand and capacity:",
               brand_name,
-              power_rating_kva,
+              power_rating_kva
             );
 
             // Store in project data for title display
@@ -196,7 +196,7 @@ function PrintableBOM({ projectId: propProjectId }) {
         if (batteryIds.length > 0) {
           const batteryId = batteryIds[0]; // Only using first battery
           const batteryResponse = await axios.get(
-            `${API_URL}/api/products/${batteryId}`,
+            `${API_URL}/api/products/${batteryId}`
           );
           const batteryData = batteryResponse.data;
           console.log("Fetched battery data:", batteryData);
@@ -210,12 +210,12 @@ function PrintableBOM({ projectId: propProjectId }) {
             console.log(
               "Battery brand and capacity:",
               brand_name,
-              nominal_capacity_kwh,
+              nominal_capacity_kwh
             );
 
             console.log(
               "Battery quantity from project data:",
-              battery_quantity,
+              battery_quantity
             );
 
             // Store in project data for title display
@@ -254,7 +254,7 @@ function PrintableBOM({ projectId: propProjectId }) {
 
         // Load the full details of the latest version
         const versionResponse = await axios.get(
-          `${API_URL}/api/quote-versions/${latestVersionSummary.id}`,
+          `${API_URL}/api/quote-versions/${latestVersionSummary.id}`
         );
         const versionDetail = versionResponse.data;
 
@@ -315,7 +315,7 @@ function PrintableBOM({ projectId: propProjectId }) {
     setShowBumSelectionModal(true);
     try {
       const response = await axios.get(
-        `${API_URL}/api/auth/users?is_bum=1&active=1`,
+        `${API_URL}/api/auth/users?is_bum=1&active=1`
       );
       setBumList(response.data);
     } catch (error) {
@@ -331,7 +331,7 @@ function PrintableBOM({ projectId: propProjectId }) {
     setSelectedBums((prev) =>
       prev.includes(bumId)
         ? prev.filter((id) => id !== bumId)
-        : [...prev, bumId],
+        : [...prev, bumId]
     );
   };
 
@@ -345,7 +345,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       const versionId = quoteData.version.id;
       await axios.post(
         `${API_URL}/api/quote-versions/${versionId}/request-review`,
-        { bum_ids: selectedBums },
+        { bum_ids: selectedBums }
       );
       showNotification("Quote sent for review successfully!", "success");
       setShowBumSelectionModal(false);
@@ -355,7 +355,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       console.error("Failed to request review: ", error);
       showNotification(
         error.response?.data?.error || "Failed to request review",
-        "danger",
+        "danger"
       );
     } finally {
       setActionLoading(false);
@@ -366,7 +366,7 @@ function PrintableBOM({ projectId: propProjectId }) {
     if (reviewDecision == "rejected" && !reviewComments.trim()) {
       showNotification(
         "Comments are required whe rejecting a quote.",
-        "warning",
+        "warning"
       );
       return;
     }
@@ -379,7 +379,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       };
       await axios.post(
         `${API_URL}/api/quote-versions/${versionId}/submit-review`,
-        payload,
+        payload
       );
       showNotification("Review submitted successfully!", "success");
       setShowReviewModal(false);
@@ -390,7 +390,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       console.error("Failed to load quote data: ", error);
       showNotification(
         error.response?.data?.error || "Failed to submit review",
-        "danger",
+        "danger"
       );
     } finally {
       setIsSubmittingReview(false);
@@ -411,7 +411,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       console.log("Updated quote status:", quote.status); // Debug log
       const latestVersion = quote.versions[quote.versions.length - 1];
       const versionResponse = await axios.get(
-        `${API_URL}/api/quote-versions/${latestVersion.id}`,
+        `${API_URL}/api/quote-versions/${latestVersion.id}`
       );
       const versionDetail = versionResponse.data;
       setQuoteData({ quote, version: versionDetail });
@@ -422,7 +422,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       console.error(error);
       showNotification(
         error.response?.data?.error || "Failed to send quote",
-        "danger",
+        "danger"
       );
     } finally {
       setActionLoading(false);
@@ -441,7 +441,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       const quote = quoteResponse.data;
       const latestVersion = quote.versions[quote.versions.length - 1];
       const versionResponse = await axios.get(
-        `${API_URL}/api/quote-versions/${latestVersion.id}`,
+        `${API_URL}/api/quote-versions/${latestVersion.id}`
       );
       const versionDetail = versionResponse.data;
       setQuoteData({ quote, version: versionDetail });
@@ -449,7 +449,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       console.error(error);
       showNotification(
         error.response?.data?.error || "Failed to accept quote",
-        "danger",
+        "danger"
       );
     } finally {
       setActionLoading(false);
@@ -468,7 +468,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       const quote = quoteResponse.data;
       const latestVersion = quote.versions[quote.versions.length - 1];
       const versionResponse = await axios.get(
-        `${API_URL}/api/quote-versions/${latestVersion.id}`,
+        `${API_URL}/api/quote-versions/${latestVersion.id}`
       );
       const versionDetail = versionResponse.data;
       setQuoteData({ quote, version: versionDetail });
@@ -476,7 +476,7 @@ function PrintableBOM({ projectId: propProjectId }) {
       console.error(error);
       showNotification(
         error.response?.data?.error || "Failed to decline quote",
-        "danger",
+        "danger"
       );
     } finally {
       setActionLoading(false);
@@ -510,7 +510,7 @@ function PrintableBOM({ projectId: propProjectId }) {
     try {
       const latestVersionId = quoteData.version.id;
       const response = await axios.post(
-        `${API_URL}/api/quote-versions/${latestVersionId}/load-to-bom`,
+        `${API_URL}/api/quote-versions/${latestVersionId}/load-to-bom`
       );
       showNotification("Quote loaded to BOM for editing", "success");
 
@@ -519,7 +519,7 @@ function PrintableBOM({ projectId: propProjectId }) {
         // Store core components for SystemDesign synchronization
         sessionStorage.setItem(
           `quoteLoadCoreComponents_${projectId}`,
-          JSON.stringify(response.data.core_components),
+          JSON.stringify(response.data.core_components)
         );
       }
 
@@ -531,7 +531,7 @@ function PrintableBOM({ projectId: propProjectId }) {
   };
 
   const [priceMode, setPriceMode] = useState(
-    () => localStorage.getItem("bomPriceMode") || "all",
+    () => localStorage.getItem("bomPriceMode") || "all"
   );
   useEffect(() => localStorage.setItem("bomPriceMode", priceMode), [priceMode]);
 
@@ -541,7 +541,7 @@ function PrintableBOM({ projectId: propProjectId }) {
     (bomData.categories || []).forEach((cat) => {
       map[cat.name] = (cat.items || []).reduce(
         (s, it) => s + (it.price || 0) * (it.quantity || 0),
-        0,
+        0
       );
     });
     return map;
@@ -554,7 +554,7 @@ function PrintableBOM({ projectId: propProjectId }) {
   useEffect(() => {
     localStorage.setItem(
       `bomTermsPerc_${projectId}`,
-      JSON.stringify(termsPerc),
+      JSON.stringify(termsPerc)
     );
   }, [termsPerc, projectId]);
 
@@ -564,7 +564,7 @@ function PrintableBOM({ projectId: propProjectId }) {
   };
   const termsSum = useMemo(
     () => termsPerc.reduce((a, b) => a + (+b || 0), 0),
-    [termsPerc],
+    [termsPerc]
   );
 
   const formatCurrency = (value) =>
@@ -687,7 +687,7 @@ function PrintableBOM({ projectId: propProjectId }) {
     const usedRowsPx = last.reduce(
       (acc, r) =>
         acc + (r.type === "category" ? CAT_ROW_HEIGHT_PX : ROW_HEIGHT_PX),
-      0,
+      0
     );
     return CONTENT_HEIGHT_PX - (COL_HEADER_HEIGHT_PX + usedRowsPx);
   }, [
@@ -762,7 +762,7 @@ function PrintableBOM({ projectId: propProjectId }) {
   // Estimate whether totals fit on the last page
   const totalsBlockEstimatedRows = 9; // approx
   const ROWS_PER_PAGE_ESTIMATE = Math.floor(
-    (CONTENT_HEIGHT_PX - COL_HEADER_HEIGHT_PX) / ROW_HEIGHT_PX,
+    (CONTENT_HEIGHT_PX - COL_HEADER_HEIGHT_PX) / ROW_HEIGHT_PX
   );
 
   const needsTotalsOnNewPage = useMemo(() => {
@@ -773,7 +773,7 @@ function PrintableBOM({ projectId: propProjectId }) {
     const usedRowsPx = last.reduce(
       (acc, r) =>
         acc + (r.type === "category" ? CAT_ROW_HEIGHT_PX : ROW_HEIGHT_PX),
-      0,
+      0
     );
 
     // header (col head) + rows already on the page
@@ -807,9 +807,8 @@ function PrintableBOM({ projectId: propProjectId }) {
     const filteredCarry = carryPages
       .map((blocks) =>
         blocks.filter(
-          (k) =>
-            k === "bankingAccept" || k === "totals" || k === "termsDeposit",
-        ),
+          (k) => k === "bankingAccept" || k === "totals" || k === "termsDeposit"
+        )
       )
       .filter((b) => b.length);
     filteredCarry.forEach((blocks) => base.push({ kind: "totals", blocks }));
@@ -840,14 +839,13 @@ function PrintableBOM({ projectId: propProjectId }) {
           <span className="label">For attention:</span>{" "}
           {projectData?.client_name ||
             bomData.project?.client_name ||
-            "Client Name"}
+            "Private"}
         </div>
         <div>
           <span className="label">Date:</span> {currentDate}
         </div>
         <div>
-          <span className="label">Company:</span>{" "}
-          {projectData?.company || projectData?.client_name || "Company Name"}
+          <span className="label">Company:</span> {projectData?.company || "-"}
         </div>
         <div>
           <span className="label">Quote number:</span>{" "}

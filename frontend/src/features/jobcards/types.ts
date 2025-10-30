@@ -1,4 +1,5 @@
 export type JobStatus =
+  | "open"
   | "draft"
   | "scheduled"
   | "in_progress"

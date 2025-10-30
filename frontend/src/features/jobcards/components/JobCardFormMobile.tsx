@@ -1,11 +1,6 @@
 // src/features/jobcards/components/JobCardFormMobile.tsx
-import React, { useEffect, useMemo, useState, useRef } from "react";
-import {
-  useForm,
-  Controller,
-  SubmitHandler,
-  SubmitErrorHandler,
-} from "react-hook-form";
+import React, { useCallback, useEffect, useState, useRef } from "react";
+import { useForm, Controller, SubmitErrorHandler } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -16,28 +11,30 @@ import {
 import type {
   JobCard,
   JobCategory,
-  JobStatus,
   Vehicle,
-  JobCardAttachment,
   Client,
   UserListItem,
+  JobCardAttachment,
+  JobCardMaterial,
+  Product,
 } from "../types";
 import {
-  createClient,
   listCategories,
   listClients,
   listVehicles,
   listClientProjects,
   getAcceptedQuotes,
   getQuoteLineItems,
+  deleteJobCardAttachment,
 } from "../api";
 import "./jobcard-create.mobile.css";
 import ProductPickerModal from "./ProductPickerModal";
-import type { Product } from "../types";
-import axios from "axios";
+// @ts-ignore
 import { API_URL } from "../../../apiConfig";
+// @ts-ignore
 import { useAuth } from "../../../AuthContext";
 import { http } from "../api";
+import { Button, Modal } from "react-bootstrap";
 
 /** === utilities for datetime-local <-> ISO === */
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -65,14 +62,12 @@ const normalizeISO = (v: unknown): string | null => {
   }
 };
 
-const statusClass: Record<JobStatus, string> = {
-  draft: "secondary",
-  scheduled: "info",
-  in_progress: "primary",
-  paused: "warning",
-  completed: "success",
-  cancelled: "dark",
-  invoiced: "success",
+const ensureAbsoluteUrl = (raw?: string | null) => {
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const trimmedApi = API_URL.replace(/\/$/, "");
+  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  return `${trimmedApi}${path}`;
 };
 
 type Props = {
@@ -95,7 +90,7 @@ export default function JobCardFormMobile({
     watch,
     control,
     getValues,
-    formState: { errors, isSubmitting, isDirty },
+    formState: { errors, isSubmitting },
   } = useForm<JobCardFormValues>({
     resolver: zodResolver(JobCardFormSchema),
     defaultValues: jobCardDefaults,
@@ -103,10 +98,9 @@ export default function JobCardFormMobile({
   });
 
   const navigate = useNavigate();
-
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const submittedRef = useRef(false);
   const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [clientQuery, setClientQuery] = useState("");
   const [clientOpen, setClientOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -127,6 +121,13 @@ export default function JobCardFormMobile({
   const [usedMaterials, setUsedMaterials] = useState<Record<number, boolean>>(
     {}
   );
+  const [isSaving, setIsSaving] = useState(false);
+
+  type MaterialReceiptLink = {
+    id: number;
+    url?: string | null;
+    filename?: string | null;
+  };
 
   type MatLine = {
     product_id: number;
@@ -137,10 +138,15 @@ export default function JobCardFormMobile({
     fromQuote?: boolean;
     receiptRequired?: boolean;
     used?: boolean;
+    existingId?: number;
+    existingReceipts?: MaterialReceiptLink[];
   };
 
   const [sitePhotos, setSitePhotos] = useState<SitePhotoDraft[]>([]);
   const siteFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [existingSitePhotos, setExistingSitePhotos] = useState<
+    JobCardAttachment[]
+  >([]);
 
   type SitePhotoDraft = {
     id?: string;
@@ -197,7 +203,6 @@ export default function JobCardFormMobile({
         const { data: bumData } = await http.get(
           "/auth/users?is_bum=1&active=1"
         );
-        console.log("BUM data:", bumData);
         setBumOptions(bumData);
 
         // Load technicians
@@ -210,56 +215,34 @@ export default function JobCardFormMobile({
             (bumUser: any) => bumUser.id === currentUser.id
           );
           setIsCurrentUserBum(isBum);
-
-          // Set default values based on user role
-          if (isBum) {
-            setValue("bum_id", currentUser.id, { shouldDirty: true });
-          } else {
-            setValue("owner_id", currentUser.id, { shouldDirty: true });
-          }
         }
       } catch (err) {
         console.error("Failed to load BUMs and Techs:", err);
       }
     })();
-  }, [currentUser, setValue]);
+  }, [currentUser]);
 
-  // Effect to detect if current user is bum
+  // Effect to detect if current user is bum and apply sensible defaults without overriding saved choices
   useEffect(() => {
     if (!currentUser) return;
 
-    // Don't override tech selection if it was already done by a BUM
-    const technicianAlreadySelected =
-      sessionStorage.getItem("technician_selected_by_bum") === "true";
+    const formBumId = Number(getValues("bum_id")) || 0;
+    const formOwnerId = Number(getValues("owner_id")) || 0;
 
-    // Method 1: check if user has is_bum property
-    if (currentUser.is_bum) {
-      setIsCurrentUserBum(true);
-      setValue("bum_id", currentUser.id, { shouldDirty: true });
-    } else {
-      setValue("owner_id", currentUser.id, { shouldDirty: true });
+    const userIsBum =
+      Boolean(currentUser.is_bum) ||
+      bumOptions.some((bumUser) => bumUser.id === currentUser.id);
+
+    setIsCurrentUserBum(userIsBum);
+
+    if (userIsBum && formBumId <= 0) {
+      setValue("bum_id", currentUser.id, { shouldDirty: false });
     }
 
-    // Method 2: Check if user's ID is in the bum options
-    if (bumOptions.length > 0) {
-      const isBum = bumOptions.some((bumUser) => bumUser.id === currentUser.id);
-      setIsCurrentUserBum(isBum);
-
-      // Auto select current user as BUM if they are one
-      if (isBum) {
-        setValue("bum_id", currentUser.id, { shouldDirty: true });
-
-        // Only set owner_id if no technician was manually selected
-        if (!technicianAlreadySelected) {
-          // Default owner to current BUM user until they select a technician
-          setValue("owner_id", currentUser.id, { shouldDirty: true });
-        }
-      } else {
-        // If not a BUM, set current user as job owner (technician)
-        setValue("owner_id", currentUser.id, { shouldDirty: true });
-      }
+    if (formOwnerId <= 0) {
+      setValue("owner_id", currentUser.id, { shouldDirty: false });
     }
-  }, [currentUser, bumOptions, setValue]);
+  }, [currentUser, bumOptions, getValues, setValue]);
 
   // Effect to automatically set materials used if isQuoted
   useEffect(() => {
@@ -277,6 +260,40 @@ export default function JobCardFormMobile({
     }
   }, [initial?.owner_id, setValue]);
 
+  // Auto-save on unmount is intentionally disabled in favor of explicit saves.
+
+  // This function now just opens the confirmation modal
+  const handlePreSubmit = () => {
+    if (isSaving) return;
+    // Run validation before showing the modal
+    handleSubmit(
+      () => setShowSubmitConfirm(true), // On valid, show modal
+      onInvalid // On invalid, show errors
+    )();
+  };
+
+  // This is the final submission logic, called from the modal
+  const handleFinalSubmit = async () => {
+    submittedRef.current = true;
+    setShowSubmitConfirm(false);
+
+    setValue("bum_status", "submitted", { shouldDirty: true });
+    setValue("status", "in_progress", { shouldDirty: true });
+
+    const enhancedSubmit = async (values: JobCardFormValues) => {
+      const payload: JobCardFormValues = {
+        ...values,
+        bum_status: "submitted",
+        status: "in_progress",
+      };
+      await onSubmit(payload, buildSupplementaryData());
+      setSitePhotos([]);
+      setMaterialFileUploads({});
+    };
+
+    await handleSubmit(enhancedSubmit, onInvalid)();
+  };
+
   // API CALLS
   useEffect(() => {
     const ac = new AbortController();
@@ -285,11 +302,9 @@ export default function JobCardFormMobile({
         const data = await listClients(ac.signal);
         setClients(data);
       } catch (err: any) {
-        setError(
+        console.error(
           err?.response?.data?.error || err.message || "Failed to load clients"
         );
-      } finally {
-        setLoading(false);
       }
     })();
     return () => ac.abort();
@@ -375,7 +390,7 @@ export default function JobCardFormMobile({
 
           // Initialize used state for all items
           const initialUsedState: Record<number, boolean> = {};
-          quoteItems.forEach((item: any, index: number) => {
+          quoteItems.forEach((_: unknown, index: number) => {
             initialUsedState[index] = true;
           });
           setUsedMaterials(initialUsedState);
@@ -437,96 +452,125 @@ export default function JobCardFormMobile({
   };
 
   // ensure client exists before validation
-  const onSave = async () => {
-    // Save the current values first to use later
-    const currentValues = getValues();
-    const currentBumId = currentValues.bum_id;
-    const currentOwnerId = currentValues.owner_id;
+  // const onSave = async () => {
+  //   // Save the current values first to use later
+  //   const currentValues = getValues();
+  //   const currentBumId = currentValues.bum_id;
+  //   const currentOwnerId = currentValues.owner_id;
 
-    // guarantee owner_id is present for Zod
-    if (!getValues().owner_id && initial?.owner_id) {
-      setValue("owner_id", initial.owner_id, { shouldValidate: false });
-    }
+  //   // guarantee owner_id is present for Zod
+  //   if (!getValues().owner_id && initial?.owner_id) {
+  //     setValue("owner_id", initial.owner_id, { shouldValidate: false });
+  //   }
 
-    let { client_id } = getValues();
+  //   let { client_id } = getValues();
 
-    if (!client_id || Number(client_id) <= 0) {
-      // build payload from the "visual" client fields
-      const vals = getValues();
+  //   if (!client_id || Number(client_id) <= 0) {
+  //     // build payload from the "visual" client fields
+  //     const vals = getValues();
 
-      const payload = {
-        client_name: (vals as any).client_name || "",
-        email: (vals as any).client_email || "",
-        phone: (vals as any).client_phone || "",
-        address: {
-          street: (vals as any).client_street || "",
-          town: (vals as any).client_town || "",
-          province: "",
-          country: "South Africa",
-        },
-        company: (vals as any).client_company || "",
-        vat_number: (vals as any).client_vat_number || "",
-      };
+  //     const payload = {
+  //       client_name: (vals as any).client_name || "",
+  //       email: (vals as any).client_email || "",
+  //       phone: (vals as any).client_phone || "",
+  //       address: {
+  //         street: (vals as any).client_street || "",
+  //         town: (vals as any).client_town || "",
+  //         province: "",
+  //         country: "South Africa",
+  //       },
+  //       company: (vals as any).client_company || "",
+  //       vat_number: (vals as any).client_vat_number || "",
+  //     };
 
-      // Only create if the user actually typed "something"
-      const userTypedSomething =
-        payload.client_name || payload.email || payload.phone;
-      if (userTypedSomething) {
-        try {
-          const res = await createClient(payload);
-          setValue("client_id", res.client_id, {
-            shouldDirty: true,
-            shouldValidate: true,
-          });
-        } catch (e: any) {
-          alert(e?.response?.data?.error || "Failed to create client");
-          return;
-        }
-      } else {
-        alert("Please select a client or enter details to create one.");
-        return;
-      }
-    }
+  //     // Only create if the user actually typed "something"
+  //     const userTypedSomething =
+  //       payload.client_name || payload.email || payload.phone;
+  //     if (userTypedSomething) {
+  //       try {
+  //         const res = await createClient(payload);
+  //         setValue("client_id", res.client_id, {
+  //           shouldDirty: true,
+  //           shouldValidate: true,
+  //         });
+  //       } catch (e: any) {
+  //         alert(e?.response?.data?.error || "Failed to create client");
+  //         return;
+  //       }
+  //     } else {
+  //       alert("Please select a client or enter details to create one.");
+  //       return;
+  //     }
+  //   }
 
-    // Validate receipts for manually added materials
-    if (
-      watch("materials_used") &&
-      materialLines.some(
-        (line, index) => !line.fromQuote && usedMaterials[index]
-      )
-    ) {
-      if (!validateMaterialReceipts()) {
-        return;
-      }
-    }
+  //   // Validate receipts for manually added materials
+  //   if (
+  //     watch("materials_used") &&
+  //     materialLines.some(
+  //       (line, index) => !line.fromQuote && usedMaterials[index]
+  //     )
+  //   ) {
+  //     if (!validateMaterialReceipts()) {
+  //       return;
+  //     }
+  //   }
 
-    setValue("is_quoted", isQuotedJC, { shouldDirty: true });
-    if (isQuotedJC && selectedProjectId) {
-      setValue("project_id" as any, selectedProjectId, { shouldDirty: true });
-    }
+  //   setValue("is_quoted", isQuotedJC, { shouldDirty: true });
+  //   if (isQuotedJC && selectedProjectId) {
+  //     setValue("project_id" as any, selectedProjectId, { shouldDirty: true });
+  //   }
 
-    console.log("Owner ID:", currentOwnerId);
-    console.log("BUM ID:", currentBumId);
+  //   console.log("Owner ID:", currentOwnerId);
+  //   console.log("BUM ID:", currentBumId);
 
-    // Create an enhanced version of onSubmit that includes material data and ensures values
-    const enhancedSubmit = (values: JobCardFormValues) => {
-      const time_entries = Object.entries(techHoursById)
-        .filter(([, h]) => Number(h) > 0)
-        .map(([uid, hours]) => ({
-          user_id: Number(uid),
-          hours: Number(hours),
-        }));
-      return onSubmit(values, {
-        materialLines,
-        usedMaterials,
-        materialFileUploads,
-        sitePhotos,
-        time_entries,
-      });
+  //   // Create an enhanced version of onSubmit that includes material data and ensures values
+  //   const enhancedSubmit = (values: JobCardFormValues) => {
+  //     const time_entries = Object.entries(techHoursById)
+  //       .filter(([, h]) => Number(h) > 0)
+  //       .map(([uid, hours]) => ({
+  //         user_id: Number(uid),
+  //         hours: Number(hours),
+  //       }));
+  //     return onSubmit(values, {
+  //       materialLines,
+  //       usedMaterials,
+  //       materialFileUploads,
+  //       sitePhotos,
+  //       time_entries,
+  //     });
+  //   };
+
+  //   await Promise.resolve();
+  //   await handleSubmit(enhancedSubmit, onInvalid)();
+  // };
+
+  const handleSave = async (redirectAfter: boolean) => {
+    if (isSaving || isSubmitting) return;
+
+    submittedRef.current = false;
+    setShowSubmitConfirm(false);
+    setIsSaving(true);
+
+    setValue("status", "open", { shouldDirty: true });
+    setValue("bum_status", "open", { shouldDirty: true });
+
+    const draftValues: JobCardFormValues = {
+      ...getValues(),
+      status: "open",
+      bum_status: "open",
     };
 
-    await Promise.resolve();
-    await handleSubmit(enhancedSubmit, onInvalid)();
+    try {
+      await onSubmit(draftValues, buildSupplementaryData());
+      setSitePhotos([]);
+      setMaterialFileUploads({});
+      if (redirectAfter) navigate("/jobcards");
+    } catch (err) {
+      console.error("Failed to save job card", err);
+      alert("Failed to save job card. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // lookups
@@ -542,6 +586,16 @@ export default function JobCardFormMobile({
       }
     );
   }, []);
+
+  useEffect(() => {
+    if (!vehicles.length) return;
+    const vid = initial?.vehicle_id;
+    if (vid == null) return;
+    setValue("vehicle_id", vid, {
+      shouldDirty: false,
+      shouldValidate: false,
+    });
+  }, [initial?.vehicle_id, vehicles, setValue]);
 
   const [techHoursById, setTechHoursById] = useState<Record<number, number>>(
     {}
@@ -564,6 +618,79 @@ export default function JobCardFormMobile({
       [id]: prev[id] === hours ? 0 : hours,
     }));
   };
+
+  const collectTimeEntries = () =>
+    Object.entries(techHoursById)
+      .filter(([, h]) => Number(h) > 0)
+      .map(([uid, hours]) => ({
+        user_id: Number(uid),
+        hours: Number(hours),
+      }));
+
+  const buildSupplementaryData = () => ({
+    materialLines,
+    usedMaterials,
+    materialFileUploads,
+    sitePhotos,
+    time_entries: collectTimeEntries(),
+  });
+
+  const primeClientFromJobCard = useCallback(
+    (jc?: Partial<JobCard>) => {
+      const fallbackAddress = (jc as any)?.client?.address;
+      const safeAddress =
+        typeof jc?.client_address === "object" && jc?.client_address !== null
+          ? jc.client_address
+          : fallbackAddress || {};
+
+      const resolvedName =
+        jc?.client_name || (jc as any)?.client?.client_name || "";
+      const resolvedEmail =
+        jc?.client_email || (jc as any)?.client?.email || "";
+      const resolvedPhone =
+        jc?.client_phone || (jc as any)?.client?.phone || "";
+      const resolvedStreet = (safeAddress as any)?.street || "";
+      const resolvedTown = (safeAddress as any)?.town || "";
+
+      const cid = Number(jc?.client_id ?? 0) || 0;
+
+      setClientQuery(resolvedName);
+      setClientOpen(false);
+      setValue("client_id", cid, { shouldDirty: false, shouldValidate: false });
+      setValue("client_name" as any, resolvedName);
+      setValue("client_email" as any, resolvedEmail);
+      setValue("client_phone" as any, resolvedPhone);
+      setValue("client_street" as any, resolvedStreet);
+      setValue("client_town" as any, resolvedTown);
+
+      if (cid > 0) {
+        setSelectedClient((prev) =>
+          prev && prev.id === cid
+            ? prev
+            : {
+                id: cid,
+                client_name: resolvedName,
+                email: resolvedEmail,
+                phone: resolvedPhone,
+                address: safeAddress,
+                company: (jc as any)?.client?.company,
+                vat_number: (jc as any)?.client?.vat_number,
+              }
+        );
+      } else {
+        setSelectedClient(null);
+      }
+    },
+    [setValue]
+  );
+
+  useEffect(() => {
+    if (initial) return;
+    setClientQuery("");
+    setClientOpen(false);
+    setSelectedClient(null);
+    setValue("client_id", 0, { shouldDirty: false, shouldValidate: false });
+  }, [initial, setValue]);
 
   const [materialsOpen, setMaterialsOpen] = useState(false);
 
@@ -605,6 +732,7 @@ export default function JobCardFormMobile({
             fromQuote: false,
             receiptRequired: true,
             used: true,
+            existingReceipts: [],
           });
 
           // Update used state for the new item
@@ -619,25 +747,6 @@ export default function JobCardFormMobile({
     });
   };
 
-  // Add validation for materials with required receipts
-  const validateMaterialReceipts = () => {
-    const nonQuoteMaterialsWithoutReceipt = materialLines
-      .filter(
-        (line, index) =>
-          !line.fromQuote && usedMaterials[index] && !materialFileUploads[index]
-      )
-      .map((line) => line.name);
-
-    if (nonQuoteMaterialsWithoutReceipt.length > 0) {
-      alert(
-        `Please upload receipts for the following materials:\n- ${nonQuoteMaterialsWithoutReceipt.join("\n- ")}`
-      );
-      return false;
-    }
-
-    return true;
-  };
-
   // hydrate from initial (edit mode)
   useEffect(() => {
     if (!initial) return;
@@ -645,6 +754,8 @@ export default function JobCardFormMobile({
       ...jobCardDefaults,
       client_id: Number(initial.client_id ?? 0),
       owner_id: Number(initial.owner_id ?? 1),
+      bum_id: initial.bum_id ?? null,
+      tech_id: initial.tech_id ?? null,
       category_id: initial.category_id ?? null,
       title: initial.title ?? "",
       description: initial.description ?? "",
@@ -660,32 +771,120 @@ export default function JobCardFormMobile({
       travel_distance_km: initial.travel_distance_km ?? 0,
       coc_required: !!initial.coc_required,
       status: (initial.status as JobCardFormValues["status"]) ?? "draft",
+      bum_status:
+        (initial.bum_status as JobCardFormValues["bum_status"]) ?? "open",
+      project_id: initial.project_id ?? null,
+      quote_id: initial.quote_id ?? null,
     });
-  }, [initial, reset]);
+    primeClientFromJobCard(initial);
+  }, [initial, reset, primeClientFromJobCard]);
+
+  // Hydrate client-side stores (materials, attachments, hours) whenever a job card payload arrives or refreshes
+  useEffect(() => {
+    if (!initial) {
+      setMaterialLines([]);
+      setUsedMaterials({});
+      setExistingSitePhotos([]);
+      setSitePhotos([]);
+      setMaterialFileUploads({});
+      setTechHoursById({});
+      return;
+    }
+
+    const rawMaterials = (initial.materials ?? []) as JobCardMaterial[];
+    if (rawMaterials.length) {
+      const mapped = rawMaterials.map((mat) => {
+        const receipts = Array.isArray((mat as any).receipts)
+          ? (mat as any).receipts.map((r: any, idx: number) => ({
+              id:
+                typeof r.attachment_id === "number"
+                  ? r.attachment_id
+                  : typeof r.id === "number"
+                    ? r.id
+                    : Number(`${mat.id}${idx}`),
+              url: ensureAbsoluteUrl(r.url),
+              filename: r.filename,
+            }))
+          : [];
+        const note = String(mat.note ?? "").toLowerCase();
+        const fromQuote = note.includes("quote");
+        return {
+          product_id: mat.product_id,
+          name: mat.product_name || `Product #${mat.product_id}`,
+          unit_price: Number(mat.unit_price_at_time ?? 0),
+          unit_cost: Number(mat.unit_cost_at_time ?? 0),
+          qty: Number(mat.quantity ?? 0),
+          fromQuote,
+          used: true,
+          receiptRequired: !fromQuote && receipts.length === 0,
+          existingId: mat.id,
+          existingReceipts: receipts,
+        } satisfies MatLine;
+      });
+      setMaterialLines(mapped);
+      const usedMap: Record<number, boolean> = {};
+      mapped.forEach((_, idx) => {
+        usedMap[idx] = true;
+      });
+      setUsedMaterials(usedMap);
+    } else {
+      setMaterialLines([]);
+      setUsedMaterials({});
+    }
+
+    setMaterialFileUploads({});
+
+    const attachments = (
+      (initial.attachments ?? []) as JobCardAttachment[]
+    ).map((att) => ({
+      ...att,
+      url: ensureAbsoluteUrl(att.url),
+    }));
+    const siteAtts = attachments.filter((att) => {
+      const type = ((att.attachment_type as string | undefined) ?? "site")
+        .toString()
+        .toLowerCase();
+      return type === "site" && Boolean(att.url);
+    });
+    setExistingSitePhotos(siteAtts);
+    setSitePhotos([]);
+
+    const hoursMap: Record<number, number> = {};
+    (initial.time_entries ?? []).forEach((entry: any) => {
+      if (!entry) return;
+      hoursMap[Number(entry.user_id)] = Number(entry.hours ?? 0);
+    });
+    setTechHoursById(hoursMap);
+  }, [initial]);
+
+  useEffect(() => {
+    if (!initial) return;
+    setIsQuotedJC(Boolean(initial.is_quoted));
+    setSelectedProjectId(initial.project_id ?? null);
+    setSelectedQuoteId(initial.quote_id ?? null);
+  }, [initial]);
+
+  useEffect(() => {
+    if (!initial?.client_id || !clients.length) return;
+    if (selectedClient && selectedClient.id !== initial.client_id) return;
+
+    const match = clients.find((c) => c.id === initial.client_id);
+    if (match) {
+      fillFromClient(match);
+    }
+  }, [initial?.client_id, clients, selectedClient]);
 
   // computed (badges)
   const didTravel = watch("did_travel");
-  const status = watch("status");
-  const selVehicleId = watch("vehicle_id");
-  const selVehicle = vehicles.find(
-    (v) => v.id === (selVehicleId ? Number(selVehicleId) : -1)
-  );
-  const labourersCount = Number(watch("labourers_count") || 0);
-  const labourHours = Number(watch("labour_hours") || 0);
-  const labourRate = Number(watch("labour_rate_per_hour") || 0);
-  const labourTotal = labourHours * labourRate * labourersCount;
-  const travelKm = Number(watch("travel_distance_km") || 0);
-  const travelRate = Number(selVehicle?.rate_per_km || 0);
-  const travelTotal = didTravel ? travelKm * travelRate : 0;
-  const grandTotal = labourTotal + travelTotal;
 
   return (
     <>
       <div className="jcM-appbar">
         <button
           className="jcM-back"
-          onClick={() => navigate("/jobcards")}
-          aria-label="Back to job cards"
+          onClick={() => handleSave(true)}
+          aria-label="Save and go back"
+          disabled={isSaving || isSubmitting}
         >
           <i className="bi bi-chevron-left"></i>
           <span>Back</span>
@@ -695,14 +894,6 @@ export default function JobCardFormMobile({
       </div>
 
       <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="jcM-wrap">
-        {/* header summary */}
-        {/* <div className="jcM-summary">
-        <span className={`badge bg-${statusClass[status]}`}>{status.replace("_", " ")}</span>
-        <span className="badge text-bg-light">Labour: R {labourTotal.toFixed(2)}</span>
-        {didTravel && <span className="badge text-bg-light">Travel: R {travelTotal.toFixed(2)}</span>}
-        <span className="badge text-bg-dark">Est. R {grandTotal.toFixed(2)}</span>
-      </div> */}
-
         {/* <section>
         <div className="d-flex justify-content-center align-items-center gap-5 mb-2">
           <button className={`btn btn-lg ${!isQuotedJC ? 'active btn-outline-success' : 'btn-outline-secondary'}`} type="button" onClick={() => setIsQuotedJC(false)}>Out of Scope</button>
@@ -723,19 +914,32 @@ export default function JobCardFormMobile({
           </div>
 
           <div className="bum-selection-dropdown">
-            <select
-              id="bum_id"
-              className="form-select"
-              {...register("bum_id", { valueAsNumber: true })}
-              defaultValue=""
-            >
-              <option value="">Select BUM...</option>
-              {bumOptions.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.full_name}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="bum_id"
+              control={control}
+              render={({ field }) => (
+                <select
+                  id="bum_id"
+                  className="form-select"
+                  name={field.name}
+                  value={field.value ?? ""}
+                  onChange={(event) =>
+                    field.onChange(
+                      event.target.value ? Number(event.target.value) : null
+                    )
+                  }
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                >
+                  <option value="">Select BUM...</option>
+                  {bumOptions.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.full_name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            />
           </div>
           {errors.bum_id && (
             <div className="text-danger mt-1 small">
@@ -752,19 +956,36 @@ export default function JobCardFormMobile({
             </div>
 
             <div className="bum-selection-dropdown">
-              <select
-                id="owner_id"
-                className="form-select"
-                {...register("owner_id", { valueAsNumber: true })}
-                defaultValue=""
-              >
-                <option value="">Select Technician...</option>
-                {techOptions.map((tech) => (
-                  <option key={tech.id} value={tech.id}>
-                    {tech.full_name}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                name="owner_id"
+                control={control}
+                render={({ field }) => {
+                  const currentValue =
+                    field.value != null && field.value > 0 ? field.value : "";
+                  return (
+                    <select
+                      id="owner_id"
+                      className="form-select"
+                      name={field.name}
+                      value={currentValue}
+                      onChange={(event) =>
+                        field.onChange(
+                          event.target.value ? Number(event.target.value) : null
+                        )
+                      }
+                      onBlur={field.onBlur}
+                      ref={field.ref}
+                    >
+                      <option value="">Select Technician...</option>
+                      {techOptions.map((tech) => (
+                        <option key={tech.id} value={tech.id}>
+                          {tech.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  );
+                }}
+              />
             </div>
             {errors.owner_id && (
               <div className="text-danger mt-1 small">
@@ -844,7 +1065,7 @@ export default function JobCardFormMobile({
             placeholder="Email Address"
             type="email"
             {...register("client_email" as any)}
-            onChange={(e) => setSelectedClient(null)}
+            onChange={() => setSelectedClient(null)}
           />
 
           {/* Phone */}
@@ -852,7 +1073,7 @@ export default function JobCardFormMobile({
             className="form-control form-control-sm mt-2"
             placeholder="Phone Number"
             {...register("client_phone" as any)}
-            onChange={(e) => setSelectedClient(null)}
+            onChange={() => setSelectedClient(null)}
           />
 
           <div className="jcM-grid2 mt-2">
@@ -860,13 +1081,13 @@ export default function JobCardFormMobile({
               className="form-control form-control-sm"
               placeholder="Street"
               {...register("client_street" as any)}
-              onChange={(e) => setSelectedClient(null)}
+              onChange={() => setSelectedClient(null)}
             />
             <input
               className="form-control form-control-sm"
               placeholder="City"
               {...register("client_town" as any)}
-              onChange={(e) => setSelectedClient(null)}
+              onChange={() => setSelectedClient(null)}
             />
           </div>
 
@@ -1003,25 +1224,34 @@ export default function JobCardFormMobile({
           />
 
           {/* Category as radio list (like mock) */}
-          <div className="jcM-radioList mt-2">
-            {categories.length ? (
-              categories.map((c) => (
-                <label key={c.id} className="jcM-radioItem">
-                  <input
-                    type="radio"
-                    value={c.id}
-                    {...register("category_id", { valueAsNumber: true })}
-                  />
-                  <span>{c.name}</span>
-                </label>
-              ))
-            ) : (
-              <small className="text-muted">
-                No categories loaded. Make sure you're signed in and have
-                categories configured.
-              </small>
+          <Controller
+            name="category_id"
+            control={control}
+            render={({ field }) => (
+              <div className="jcM-radioList mt-2">
+                {categories.length ? (
+                  categories.map((c) => (
+                    <label key={c.id} className="jcM-radioItem">
+                      <input
+                        type="radio"
+                        value={c.id}
+                        checked={field.value === c.id}
+                        onChange={() => field.onChange(c.id)}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                      <span>{c.name}</span>
+                    </label>
+                  ))
+                ) : (
+                  <small className="text-muted">
+                    No categories loaded. Make sure you're signed in and have
+                    categories configured.
+                  </small>
+                )}
+              </div>
             )}
-          </div>
+          />
         </section>
 
         {/* HOURS quick dots (visual like screenshot) */}
@@ -1378,6 +1608,33 @@ export default function JobCardFormMobile({
                                 </div>
                               )}
 
+                              {line.existingReceipts?.length ? (
+                                <div className="mt-2 small">
+                                  <div className="text-muted mb-1">
+                                    Receipts on file:
+                                  </div>
+                                  <ul className="list-unstyled mb-0">
+                                    {line.existingReceipts.map((rec) => (
+                                      <li key={rec.id}>
+                                        {rec.url ? (
+                                          <a
+                                            href={rec.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                          >
+                                            {rec.filename || "Receipt"}
+                                          </a>
+                                        ) : (
+                                          <span>
+                                            {rec.filename || "Receipt"}
+                                          </span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
+
                               <div className="d-flex justify-content-between align-items-center mt-1">
                                 <div
                                   className="input-group input-group-sm"
@@ -1482,7 +1739,64 @@ export default function JobCardFormMobile({
             onChange={handleSiteFilesChange}
           />
 
-          {sitePhotos.length === 0 && (
+          {existingSitePhotos.length > 0 && (
+            <div className="mb-3">
+              <div className="small text-muted mb-2">Already uploaded</div>
+              <div className="row g-3">
+                {existingSitePhotos.map((att) => (
+                  <div key={att.id} className="col-6 col-md-4">
+                    <div className="border rounded overflow-hidden">
+                      <a
+                        href={att.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ display: "block" }}
+                      >
+                        <img
+                          src={att.url}
+                          alt={att.filename || "site photo"}
+                          style={{
+                            width: "100%",
+                            aspectRatio: "4/3",
+                            objectFit: "cover",
+                          }}
+                        />
+                      </a>
+                      <div className="p-2 border-top small bg-light">
+                        {att.caption || att.filename || "Site photo"}
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-danger w-100 border-top"
+                        disabled={isSaving || isSubmitting}
+                        onClick={async () => {
+                          if (!initial?.id) return;
+                          const confirmDelete =
+                            window.confirm("Remove this photo?");
+                          if (!confirmDelete) return;
+                          try {
+                            await deleteJobCardAttachment(initial.id, att.id);
+                            setExistingSitePhotos((prev) =>
+                              prev.filter((p) => p.id !== att.id)
+                            );
+                          } catch (err) {
+                            console.error("Failed to delete site photo", err);
+                            alert(
+                              "Could not delete the photo. Please try again."
+                            );
+                          }
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {sitePhotos.length === 0 && existingSitePhotos.length === 0 && (
             <div className="alert alert-warning py-2 mb-2">
               No photos selected. You can add photos now; they will upload after
               save.
@@ -1534,12 +1848,31 @@ export default function JobCardFormMobile({
 
         {/* Sticky actions */}
         <div className="jcM-stickyBar">
+          <button
+            type="button"
+            className="btn btn-outline-secondary flex-fill"
+            onClick={() => handleSave(false)}
+            disabled={isSubmitting || isSaving}
+          >
+            {isSaving ? (
+              <>
+                <span
+                  className="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
+                Saving…
+              </>
+            ) : (
+              "Save"
+            )}
+          </button>
           {onCancel && (
             <button
               type="button"
               className="btn btn-outline-secondary flex-fill"
               onClick={onCancel}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSaving}
             >
               Cancel
             </button>
@@ -1547,8 +1880,8 @@ export default function JobCardFormMobile({
           <button
             type="button"
             className="btn btn-primary flex-fill"
-            onClick={onSave}
-            disabled={isSubmitting}
+            onClick={handlePreSubmit}
+            disabled={isSubmitting || isSaving}
           >
             {isSubmitting ? (
               <>
@@ -1557,10 +1890,10 @@ export default function JobCardFormMobile({
                   role="status"
                   aria-hidden="true"
                 ></span>
-                "Saving…"
+                Submitting…
               </>
             ) : (
-              "Save"
+              "Submit"
             )}
           </button>
         </div>
@@ -1571,6 +1904,34 @@ export default function JobCardFormMobile({
           onAdd={handleAddProducts}
         />
       </form>
+      <Modal
+        show={showSubmitConfirm}
+        onHide={() => setShowSubmitConfirm(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Submission</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Are you sure you want to submit this job card? The assigned BUM will
+          be notified.
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowSubmitConfirm(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleFinalSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Submitting..." : "Yes, Submit"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 }

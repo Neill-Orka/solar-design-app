@@ -291,6 +291,13 @@ export async function uploadMaterialReceipt(
   return data;
 }
 
+export async function deleteJobCardAttachment(
+  jobCardId: number,
+  attachmentId: number
+): Promise<void> {
+  await http.delete(`/jobcards/${jobCardId}/attachments/${attachmentId}`);
+}
+
 export async function createJobCardMaterial(payload: {
   job_card_id: number;
   product_id: number;
