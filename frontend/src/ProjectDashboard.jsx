@@ -16,6 +16,7 @@ import QuickResults from "./QuickResults";
 import TariffSelector from "./TariffSelector";
 import TariffSummary from "./TariffSummary";
 import ProjectQuotes from "./ProjectQuotes";
+import ProjectInvoices from "./features/invoices/ProjectInvoices";
 import { API_URL } from "./apiConfig"; // Adjust the import based on your project structure
 import { Spinner, Alert } from "react-bootstrap"; // Import Spinner and Alert for loading/error states
 import { useNotification } from "./NotificationContext"; // Import notification context for user feedback
@@ -376,6 +377,14 @@ function ProjectDashboard() {
         </li>
         <li className="nav-item">
           <button
+            className={`nav-link ${activeTab === "invoices" ? "active" : ""}`}
+            onClick={() => handleTabChange("invoices")}
+          >
+            Invoices
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
             className={`nav-link ${activeTab === "tariff" ? "active" : ""}`}
             onClick={() => handleTabChange("tariff")}
           >
@@ -419,6 +428,7 @@ function ProjectDashboard() {
         {activeTab === "quotes" && (
           <ProjectQuotes projectId={projectId} onOpenQuote={openQuote} />
         )}
+        {activeTab === "invoices" && <ProjectInvoices projectId={projectId} />}
         {activeTab === "finance" && <FinancialModeling projectId={projectId} />}
         {activeTab === "tariff" && (
           <div>

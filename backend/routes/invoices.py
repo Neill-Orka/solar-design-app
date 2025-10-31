@@ -125,6 +125,11 @@ def list_invoices():
     try:
         query = Invoice.query
 
+        # Filter by project_id if provided
+        project_id = request.args.get('project_id', type=int)
+        if project_id:
+            query = query.filter(Invoice.project_id == project_id)
+
         # Filter by quote number if provided
         quote_number = request.args.get('quote_number')
         if quote_number:

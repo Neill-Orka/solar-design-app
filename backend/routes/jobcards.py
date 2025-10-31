@@ -299,7 +299,7 @@ def jobcards_item(jid: int):
                 'job_card_id': jc.id,
                 'client_name': jc.client_name_snapshot,
                 'title': jc.title,
-                'created_by': jc.created_by_id
+                'created_by_id': jc.created_by_id
             }
         )
 
