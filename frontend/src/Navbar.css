@@ -94,6 +94,14 @@
   padding: 0.5rem 0;
 }
 
+/* --- RIGHT-ALIGNED CONTROLS WRAPPER --- */
+.navbar-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto; /* Pushes this group to the right */
+}
+
 /* --- MODERN ANIMATED HAMBURGER --- */
 .navbar-toggler-modern {
   display: none; /* Hidden on desktop */
@@ -229,12 +237,11 @@
   .navbar-toggler-modern {
     display: block;
   }
-  /* Move user profile to be before the toggler */
-  .navbar-user-profile {
+
+  /* On mobile, the right-aligned group should come after the brand */
+  .navbar-controls-right {
     order: 2;
-  }
-  .navbar-toggler-modern {
-    order: 3;
+    margin-left: 0; /* Reset margin, as flex order handles positioning */
   }
   .navbar-brand-group {
     order: 1;
