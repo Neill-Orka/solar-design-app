@@ -121,70 +121,6 @@ const Navbar = () => {
             <span>Orka Solar</span>
           </Link>
 
-          {/* --- USER PROFILE (MOVED FOR BETTER MOBILE LAYOUT) --- */}
-          {user && (
-            <div className="navbar-user-profile ms-auto" ref={dropdownRef}>
-              <button
-                className="nav-link dropdown-toggle d-flex align-items-center btn btn-link"
-                type="button"
-                onClick={toggleDropdown}
-              >
-                <span className="user-avatar">
-                  {user.first_name
-                    ? user.first_name.charAt(0).toUpperCase()
-                    : "U"}
-                </span>
-                <span className="d-none d-lg-inline ms-2">
-                  {user.first_name}
-                </span>
-              </button>
-              <ul
-                className={`dropdown-menu dropdown-menu-end ${
-                  isDropdownOpen ? "show" : ""
-                }`}
-              >
-                <li>
-                  <span className="dropdown-item-text">
-                    Signed in as <strong>{user.full_name}</strong>
-                    <br />
-                    <small className="text-muted">{user.email}</small>
-                  </span>
-                </li>
-                <li>
-                  <hr className="dropdown-divider" />
-                </li>
-                <li>
-                  <button
-                    className="dropdown-item"
-                    onClick={() => {
-                      handleLogout();
-                      closeDropdown();
-                    }}
-                  >
-                    <i className="bi bi-box-arrow-right me-2"></i>
-                    Sign Out
-                  </button>
-                </li>
-              </ul>
-            </div>
-          )}
-
-          {/* --- MOBILE MENU TOGGLER (BURGER) --- */}
-          <button
-            className={`navbar-toggler-modern ms-2 ${
-              isMobileMenuOpen ? "is-active" : ""
-            }`}
-            type="button"
-            onClick={toggleMobileMenu}
-            aria-controls="mobileNav"
-            aria-expanded={isMobileMenuOpen}
-            aria-label="Toggle navigation"
-          >
-            <span></span>
-            <span></span>
-            <span></span>
-          </button>
-
           {/* --- DESKTOP NAVIGATION (CENTERED) --- */}
           <div className="collapse navbar-collapse" id="desktopNav">
             <ul className="navbar-nav mx-auto">
@@ -200,6 +136,73 @@ const Navbar = () => {
                 </li>
               ))}
             </ul>
+          </div>
+
+          {/* --- RIGHT-ALIGNED CONTROLS (FOR MOBILE AND DESKTOP) --- */}
+          <div className="navbar-controls-right">
+            {/* --- USER PROFILE --- */}
+            {user && (
+              <div className="navbar-user-profile" ref={dropdownRef}>
+                <button
+                  className="nav-link dropdown-toggle d-flex align-items-center btn btn-link"
+                  type="button"
+                  onClick={toggleDropdown}
+                >
+                  <span className="user-avatar">
+                    {user.first_name
+                      ? user.first_name.charAt(0).toUpperCase()
+                      : "U"}
+                  </span>
+                  <span className="d-none d-lg-inline ms-2">
+                    {user.first_name}
+                  </span>
+                </button>
+                <ul
+                  className={`dropdown-menu dropdown-menu-end ${
+                    isDropdownOpen ? "show" : ""
+                  }`}
+                >
+                  <li>
+                    <span className="dropdown-item-text">
+                      Signed in as <strong>{user.full_name}</strong>
+                      <br />
+                      <small className="text-muted">{user.email}</small>
+                    </span>
+                  </li>
+                  <li>
+                    <hr className="dropdown-divider" />
+                  </li>
+                  <li>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        handleLogout();
+                        closeDropdown();
+                      }}
+                    >
+                      <i className="bi bi-box-arrow-right me-2"></i>
+                      Sign Out
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            )}
+
+            {/* --- MOBILE MENU TOGGLER (BURGER) --- */}
+            <button
+              className={`navbar-toggler-modern ${
+                isMobileMenuOpen ? "is-active" : ""
+              }`}
+              type="button"
+              onClick={toggleMobileMenu}
+              aria-controls="mobileNav"
+              aria-expanded={isMobileMenuOpen}
+              aria-label="Toggle navigation"
+            >
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
           </div>
         </div>
       </nav>
