@@ -1,18 +1,18 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import axios from 'axios';
-import { motion } from 'framer-motion';
-import CountUp from 'react-countup';
-import { FaProjectDiagram, FaUsers, FaTools } from 'react-icons/fa';
-import './Home.css';
-import { useAuth } from './AuthContext';
-import { API_URL } from './apiConfig'; // Adjust the import based on your project structure
+import React, { useEffect, useState, useRef } from "react";
+import { Link } from "react-router-dom";
+import axios from "axios";
+import { motion } from "framer-motion";
+import CountUp from "react-countup";
+import { FaProjectDiagram, FaUsers, FaTools } from "react-icons/fa";
+import "./Home.css";
+import { useAuth } from "./AuthContext";
+import { API_URL } from "./apiConfig"; // Adjust the import based on your project structure
 
 function Home() {
   const { user } = useAuth();
 
   // NEW JUMPSCARE
-  const [ showSurprise, setShowSurprise ] = useState(false);
+  const [showSurprise, setShowSurprise] = useState(false);
   const videoRef = useRef(null);
 
   // New JUMPSCARE
@@ -23,7 +23,7 @@ function Home() {
       if (videoRef.current) {
         videoRef.current.currentTime = 0;
         const p = videoRef.current.play();
-        if (p && typeof p.catch === 'function') p.catch(() => {});
+        if (p && typeof p.catch === "function") p.catch(() => {});
       }
     }, 0);
   };
@@ -36,36 +36,20 @@ function Home() {
   useEffect(() => {
     if (!showSurprise) return;
     const onKey = (e) => {
-      if (e.key === 'Escape') closeSurprise();
+      if (e.key === "Escape") closeSurprise();
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [showSurprise]);
 
   return (
     <>
       {/* ---------- HERO ---------- */}
-      <header
-        className="hero"
-        style={{
-          backgroundImage:
-            'url("https://images.unsplash.com/photo-1545209463-e2825498edbf?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D")',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundAttachment: 'fixed'
-        }}
-        >
+      <header className="hero">
         <h1>Design • Simulate • Profit</h1>
       </header>
 
-      {/* fancy wave divider */}
-      <svg className="wave" viewBox="0 0 1440 100" preserveAspectRatio="none">
-        <path d="M0,0 C300,100 600,0 1440,100 L1440 0 L0 0 Z"
-              fill="#ffffff" />
-      </svg>
-
       <div className="container py-5">
-              
         {/* ---------- quick links ---------- */}
         <motion.div
           className="row justify-content-center"
@@ -76,64 +60,68 @@ function Home() {
         >
           {[
             {
-              title: 'Projects',
-              text: 'Create, simulate and optimise PV systems with ease.',
-              link: '/projects',
-              color: 'primary',
+              title: "Projects",
+              text: "Create, simulate and optimise PV systems with ease.",
+              link: "/projects",
+              color: "primary",
               icon: <FaProjectDiagram size={46} />,
-              roles: ['admin', 'manager','design']
+              roles: ["admin", "manager", "design"],
             },
             {
-              title: 'Clients',
-              text: 'Keep all customer info and site details in one place.',
-              link: '/clients',
-              color: 'success',
+              title: "Clients",
+              text: "Keep all customer info and site details in one place.",
+              link: "/clients",
+              color: "success",
               icon: <FaUsers size={46} />,
-              roles: ['admin', 'manager', 'sales','design']
+              roles: ["admin", "manager", "sales", "design"],
             },
             {
-              title: 'Products',
-              text: 'Maintain your catalogue of panels, inverters & batteries.',
-              link: '/products-admin',
-              color: 'warning',
+              title: "Products",
+              text: "Maintain your catalogue of panels, inverters & batteries.",
+              link: "/products-admin",
+              color: "warning",
               icon: <FaTools size={46} />,
-              roles: ['admin', 'manager','sales']
+              roles: ["admin", "manager", "sales"],
             },
             {
-              title: 'Job Cards (DO NOT USE)',
-              text: 'Create and track electrical jobs.',
-              link: '/jobcards',
-              color: 'info',
+              title: "Job Cards (DO NOT USE)",
+              text: "Create and track electrical jobs.",
+              link: "/jobcards",
+              color: "info",
               icon: <FaTools size={46} />,
-              roles: ['admin', 'manager', 'team_leader', 'technician']
-            }
+              roles: ["admin", "manager", "team_leader", "technician"],
+            },
           ]
-            .filter(card => {
+            .filter((card) => {
               if (!user) return false; // no cards until auth resolved
               return card.roles.includes(user.role);
             })
-            .map(card => (
-            <motion.div
-              key={card.title}
-              className="col-md-4 mb-4 d-flex"
-              whileHover={{ y: -6, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-            >
-              <div className={`glass-card border-top border-3 border-${card.color} w-100`}>
-                <div className="text-center py-4 px-3 d-flex flex-column h-100">
-                  <div className={`text-${card.color} mb-3`}>{card.icon}</div>
-                  <h5 className="fw-semibold mb-2">{card.title}</h5>
-                  <p className="flex-grow-1">{card.text}</p>
-                  <Link to={card.link} className={`btn btn-outline-${card.color} mt-auto`}>
-                    Manage {card.title}
-                  </Link>
+            .map((card) => (
+              <motion.div
+                key={card.title}
+                className="col-lg-3 col-md-4 col-sm-6 mb-4 d-flex"
+                whileHover={{ y: -6, scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 200, damping: 15 }}
+              >
+                <div
+                  className={`glass-card border-top border-3 border-${card.color} w-100`}
+                >
+                  <div className="text-center py-4 px-3 d-flex flex-column h-100">
+                    <div className={`text-${card.color} mb-3`}>{card.icon}</div>
+                    <h5 className="fw-semibold mb-2">{card.title}</h5>
+                    <p className="flex-grow-1">{card.text}</p>
+                    <Link
+                      to={card.link}
+                      className={`btn btn-outline-${card.color} mt-auto`}
+                    >
+                      Manage {card.title}
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))}
         </motion.div>
       </div>
-
       {/* ---------- Mysterious button ---------- */}
       <button
         className="mystery-btn"
@@ -144,7 +132,6 @@ function Home() {
       >
         click me
       </button>
-
       {/* ---------- Fullscreen surprise overlay ---------- */}
       {showSurprise && (
         <div
@@ -156,7 +143,10 @@ function Home() {
         >
           <button
             className="surprise-close"
-            onClick={(e) => { e.stopPropagation(); closeSurprise(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              closeSurprise();
+            }}
             aria-label="Close"
             title="Close"
           >
@@ -174,9 +164,6 @@ function Home() {
           />
         </div>
       )}
-
-
-
     </>
   );
 }

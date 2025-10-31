@@ -113,39 +113,87 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-light navbar-glass fixed-top">
-      <div className="container-fluid">
-        <Link to="/" className="navbar-brand-group text-decoration-none">
-          <img src={logo} alt="Orka Logo" className="navbar-logo" />
-          <span>Orka Solar</span>
-        </Link>
+    <>
+      <nav className="navbar navbar-expand-lg navbar-light navbar-glass fixed-top">
+        <div className="container-fluid">
+          <Link to="/" className="navbar-brand-group text-decoration-none">
+            <img src={logo} alt="Orka Logo" className="navbar-logo" />
+            <span>Orka Solar</span>
+          </Link>
 
-        <button
-          className="navbar-toggler"
-          type="button"
-          onClick={toggleMobileMenu}
-          aria-controls="navbarNav"
-          aria-expanded={isMobileMenuOpen}
-          aria-label="Toggle navigation"
-        >
-          <span className="navbar-toggler-icon"></span>
-        </button>
+          {/* --- USER PROFILE (MOVED FOR BETTER MOBILE LAYOUT) --- */}
+          {user && (
+            <div className="navbar-user-profile ms-auto" ref={dropdownRef}>
+              <button
+                className="nav-link dropdown-toggle d-flex align-items-center btn btn-link"
+                type="button"
+                onClick={toggleDropdown}
+              >
+                <span className="user-avatar">
+                  {user.first_name
+                    ? user.first_name.charAt(0).toUpperCase()
+                    : "U"}
+                </span>
+                <span className="d-none d-lg-inline ms-2">
+                  {user.first_name}
+                </span>
+              </button>
+              <ul
+                className={`dropdown-menu dropdown-menu-end ${
+                  isDropdownOpen ? "show" : ""
+                }`}
+              >
+                <li>
+                  <span className="dropdown-item-text">
+                    Signed in as <strong>{user.full_name}</strong>
+                    <br />
+                    <small className="text-muted">{user.email}</small>
+                  </span>
+                </li>
+                <li>
+                  <hr className="dropdown-divider" />
+                </li>
+                <li>
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      handleLogout();
+                      closeDropdown();
+                    }}
+                  >
+                    <i className="bi bi-box-arrow-right me-2"></i>
+                    Sign Out
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
 
-        <div
-          className={`navbar-collapse justify-content-center ${isMobileMenuOpen ? "show" : "collapse"}`}
-          id="navbarNav"
-        >
-          <div className="position-absolute top-1 start-50 translate-middle-x">
-            <ul className="navbar-nav">
+          {/* --- MOBILE MENU TOGGLER (BURGER) --- */}
+          <button
+            className={`navbar-toggler-modern ms-2 ${
+              isMobileMenuOpen ? "is-active" : ""
+            }`}
+            type="button"
+            onClick={toggleMobileMenu}
+            aria-controls="mobileNav"
+            aria-expanded={isMobileMenuOpen}
+            aria-label="Toggle navigation"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+
+          {/* --- DESKTOP NAVIGATION (CENTERED) --- */}
+          <div className="collapse navbar-collapse" id="desktopNav">
+            <ul className="navbar-nav mx-auto">
               {getNavLinks().map((link) => (
                 <li className="nav-item" key={link.to}>
                   <NavLink
                     to={link.to}
                     end={link.exact}
-                    className={({ isActive }) =>
-                      `nav-link navbar-link ${isActive ? "active" : ""}`
-                    }
-                    onClick={closeMobileMenu}
+                    className="nav-link navbar-link"
                   >
                     {link.label}
                   </NavLink>
@@ -153,55 +201,32 @@ const Navbar = () => {
               ))}
             </ul>
           </div>
+        </div>
+      </nav>
 
-          {user && (
-            <div className="navbar-nav ms-auto">
-              <div className="nav-item dropdown" ref={dropdownRef}>
-                <button
-                  className="nav-link dropdown-toggle d-flex align-items-center btn btn-link"
-                  type="button"
-                  onClick={toggleDropdown}
-                  style={{ border: "none", padding: "0.5rem 0.75rem" }}
+      {/* --- MOBILE MENU OVERLAY (MOVED OUTSIDE OF NAV) --- */}
+      <div
+        className={`mobile-menu-overlay ${isMobileMenuOpen ? "is-open" : ""}`}
+        id="mobileNav"
+      >
+        <div className="mobile-menu-content">
+          <ul className="mobile-nav-links">
+            {getNavLinks().map((link) => (
+              <li key={link.to}>
+                <NavLink
+                  to={link.to}
+                  end={link.exact}
+                  className="mobile-nav-link"
+                  onClick={closeMobileMenu}
                 >
-                  <span className="user-avatar me-2">
-                    {user.first_name
-                      ? user.first_name.charAt(0).toUpperCase()
-                      : "U"}
-                  </span>
-                  <span className={`role-badge ms-2 role-${user.role}`}>
-                    {user.role}
-                  </span>
-                </button>
-                <ul
-                  className={`dropdown-menu dropdown-menu-end ${isDropdownOpen ? "show" : ""}`}
-                >
-                  <li>
-                    <span className="dropdown-item-text">
-                      <small>{user.email}</small>
-                    </span>
-                  </li>
-                  <li>
-                    <hr className="dropdown-divider" />
-                  </li>
-                  <li>
-                    <button
-                      className="dropdown-item"
-                      onClick={() => {
-                        handleLogout();
-                        closeDropdown();
-                      }}
-                    >
-                      <i className="bi bi-box-arrow-right me-2"></i>
-                      Sign Out
-                    </button>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          )}
+                  {link.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
-    </nav>
+    </>
   );
 };
 

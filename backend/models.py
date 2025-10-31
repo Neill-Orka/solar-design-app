@@ -1426,7 +1426,7 @@ class JobCardMaterialReceipt(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(SA_TZ))
 
     material = db.relationship(
-        "JobCardMaterial", backref=db.backref("receipts", lazy=True)
+        "JobCardMaterial", backref=db.backref("receipts", lazy=True, cascade="all, delete-orphan")
     )
     attachment = db.relationship("JobCardAttachment")
 

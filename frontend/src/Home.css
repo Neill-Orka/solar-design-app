@@ -1,96 +1,111 @@
 /* Home.css */
+
+/* --- Hero Section --- */
 .hero {
-    height: 40vh;               /* a bit taller */
-    padding-top: 0px;          /* navbar height so text isn't hidden */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    color: #fff;
-    text-align: center;
-    background-position: center bottom;
-  }
+  padding: 8rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  color: #fff;
+  text-align: center;
+  /* --- Background Image Styling --- */
+  background-image: url("https://images.unsplash.com/photo-1545209463-e2825498edbf?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed; /* Parallax effect for desktop */
+}
 
-  @media (max-width: 700px) {
-    .hero {
-      height: 30vh;           /* a bit shorter on mobile */
-    }
-  }
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.45));
+}
 
-  .hero::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.45));
-  }
-  .hero h1 {
-    z-index: 1;
-    font-size: 3.5rem;
-    font-weight: 700;
-    text-shadow: 0 3px 8px rgba(0,0,0,0.6);
-  }
-  .wave {
-    margin-top: -200px;
-  }
-  .card-hover {
-    transition: transform .2s ease, box-shadow .2s ease;
-  }
-  .card-hover:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
-  }
+.hero h1 {
+  z-index: 1;
+  font-size: 3.5rem;
+  font-weight: 700;
+  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+}
 
-  /* ---- glass card ---- */
+/* --- Wave Divider --- */
+.wave {
+  display: block;
+  width: 100%;
+  position: relative;
+  /* Pulls the wave up over the hero section */
+  margin-top: -100px;
+  /* Ensures it's above the hero's background but below its content */
+  z-index: 5;
+}
+
+/* --- Glass Card --- */
 .glass-card {
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(10px);
-    border-radius: 1rem !important;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.10);
-    transition: border-color .3s;
-    position: relative;
-    overflow: hidden;
-  }
-  .glass-card::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(60deg, #bbb, #ddd);
-    pointer-events: none;
-  
-    /* --- dual masks for browser compatibility --- */
-    -webkit-mask:
-      linear-gradient(#fff 0 0) content-box,
-      linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-  
-    mask:
-      linear-gradient(#fff 0 0) content-box,
-      linear-gradient(#fff 0 0);
-    mask-composite: exclude;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  transition: border-color 0.3s;
+  position: relative;
+  overflow: hidden;
+}
 
-  
-    opacity: 0;
-    transition: opacity .3s;
-  }
-  /* blue card hover */
+.glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(60deg, #bbb, #ddd);
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
 .glass-card.border-primary::before {
-    background: linear-gradient(60deg, #0d6efd, #3d8bfd);
-  }
-/* green card hover */
+  background: linear-gradient(60deg, #0d6efd, #3d8bfd);
+}
 .glass-card.border-success::before {
-    background: linear-gradient(60deg, #198754, #45b36b);
+  background: linear-gradient(60deg, #198754, #45b36b);
+}
+.glass-card.border-warning::before {
+  background: linear-gradient(60deg, #ffc107, #ffe173);
+}
+.glass-card.border-info::before {
+  background: linear-gradient(60deg, #0dcaf0, #3ee2ff);
+}
+.glass-card:hover::before {
+  opacity: 1;
+}
+
+/* --- Mobile Optimizations (screens smaller than 768px) --- */
+@media (max-width: 768px) {
+  .hero {
+    padding: 6rem 1rem;
+    /* --- THIS FIXES THE BACKGROUND IMAGE ON MOBILE --- */
+    background-attachment: scroll;
   }
-  
-  /* yellow card hover */
-  .glass-card.border-warning::before {
-    background: linear-gradient(60deg, #ffc107, #ffe173);
+
+  .hero h1 {
+    font-size: 2.5rem; /* Smaller title for mobile */
   }
-  
-  .glass-card:hover::before { opacity: 1; }
-  
-  /* --- Mysterious button --- */
+
+  .wave {
+    margin-top: -60px; /* Adjust wave position for smaller hero */
+  }
+}
+
+/* --- Mysterious button & Surprise Overlay (unchanged) --- */
 .mystery-btn {
   position: fixed;
   left: 50%;
@@ -100,9 +115,9 @@
   font-size: 0.9rem;
   letter-spacing: 0.5px;
   border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.35);
-  color: rgba(255,255,255,0.85);
-  background: rgba(20,20,20,0.55);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(20, 20, 20, 0.55);
   backdrop-filter: blur(6px);
   cursor: pointer;
   opacity: 0.65;
@@ -112,34 +127,31 @@
 .mystery-btn:hover {
   opacity: 1;
   transform: translateX(-50%) translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
-
-/* --- Fullscreen overlay --- */
 .surprise-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.92);
+  background: rgba(0, 0, 0, 0.92);
   display: grid;
   place-items: center;
   z-index: 9999;
   animation: overlayIn 200ms ease-out;
 }
-
 @keyframes overlayIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
-
-/* --- Video --- */
 .surprise-video {
   max-width: min(1200px, 96vw);
   max-height: 90vh;
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
-
-/* --- Close button --- */
 .surprise-close {
   position: absolute;
   top: 14px;
@@ -147,9 +159,9 @@
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   color: #fff;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(6px);
   cursor: pointer;
   font-size: 24px;
@@ -159,8 +171,185 @@
   transition: all 160ms ease;
 }
 .surprise-close:hover {
-  background: rgba(255,255,255,0.16);
+  background: rgba(255, 255, 255, 0.16);
   transform: scale(1.05);
 }
+```
 
-  
+These changes will result in a much cleaner, more modern, and fully functional mobile experience for your home page.// filepath: c:\Users\OrkaSolarEngineer\Documents\DesignWebApp\ClientOnboarding\frontend\src\Home.css
+/* Home.css */
+
+/* --- Hero Section --- */
+.hero {
+  padding: 8rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  color: #fff;
+  text-align: center;
+  /* --- Background Image Styling --- */
+  background-image: url("https://images.unsplash.com/photo-1545209463-e2825498edbf?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed; /* Parallax effect for desktop */
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.45));
+}
+
+.hero h1 {
+  z-index: 1;
+  font-size: 3.5rem;
+  font-weight: 700;
+  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+}
+
+/* --- Wave Divider --- */
+.wave {
+  display: block;
+  width: 100%;
+  position: relative;
+  /* Pulls the wave up over the hero section */
+  margin-top: -100px;
+  /* Ensures it's above the hero's background but below its content */
+  z-index: 5;
+}
+
+/* --- Glass Card --- */
+.glass-card {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  transition: border-color 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(60deg, #bbb, #ddd);
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.glass-card.border-primary::before {
+  background: linear-gradient(60deg, #0d6efd, #3d8bfd);
+}
+.glass-card.border-success::before {
+  background: linear-gradient(60deg, #198754, #45b36b);
+}
+.glass-card.border-warning::before {
+  background: linear-gradient(60deg, #ffc107, #ffe173);
+}
+.glass-card.border-info::before {
+  background: linear-gradient(60deg, #0dcaf0, #3ee2ff);
+}
+.glass-card:hover::before {
+  opacity: 1;
+}
+
+/* --- Mobile Optimizations (screens smaller than 768px) --- */
+@media (max-width: 768px) {
+  .hero {
+    padding: 6rem 1rem;
+    /* --- THIS FIXES THE BACKGROUND IMAGE ON MOBILE --- */
+    background-attachment: scroll;
+  }
+
+  .hero h1 {
+    font-size: 2.5rem; /* Smaller title for mobile */
+  }
+
+  .wave {
+    margin-top: -60px; /* Adjust wave position for smaller hero */
+  }
+}
+
+/* --- Mysterious button & Surprise Overlay (unchanged) --- */
+.mystery-btn {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(20, 20, 20, 0.55);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  opacity: 0.65;
+  transition: all 200ms ease;
+  z-index: 20;
+}
+.mystery-btn:hover {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.surprise-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+  animation: overlayIn 200ms ease-out;
+}
+@keyframes overlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.surprise-video {
+  max-width: min(1200px, 96vw);
+  max-height: 90vh;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.surprise-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  transition: all 160ms ease;
+}
+.surprise-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: scale(1.05);
+}

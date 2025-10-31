@@ -1,124 +1,82 @@
-/* Glassy, subtle shadow */
+/* --- BASE NAVBAR STYLES --- */
 .navbar-glass {
-    background: rgba(255, 255, 255, 0.65) !important;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  /* Ensure navbar and its contents (like the 'X' button) stay above the overlay */
+  z-index: 1045;
 }
 
-/* Brand group (logo + text) */
 .navbar-brand-group {
   display: flex;
   align-items: center;
   gap: 0.45rem;
   font-weight: 600;
   font-size: 1.15rem;
+  color: #333;
 }
 
-/* Square logo sizing */
 .navbar-logo {
   width: 34px;
   height: 34px;
   object-fit: contain;
 }
 
-/* Link styling */
+/* --- DESKTOP LINK STYLES --- */
 .navbar-link {
   position: relative;
   font-weight: 500;
-  margin-right: 0.75rem;
+  color: #555 !important;
+  margin: 0 0.5rem;
+  padding: 0.5rem 0.25rem !important;
+  transition: color 0.2s;
+}
+
+.navbar-link:hover {
+  color: #000 !important;
 }
 
 .navbar-link::after {
   content: "";
   position: absolute;
   left: 0;
-  bottom: -2px;
+  bottom: -4px;
   width: 0;
   height: 2px;
   background: currentColor;
-  transition: width 0.25s;
+  transition: width 0.25s ease-out;
 }
 
-.navbar-link:hover::after,
+.navbar-link.active {
+  color: #000 !important;
+  font-weight: 600;
+}
+
 .navbar-link.active::after {
   width: 100%;
 }
 
-/* Toggler (hamburger) color in light theme */
-.navbar-light .navbar-toggler-icon {
-  filter: invert(30%);
+/* --- USER PROFILE DROPDOWN --- */
+.navbar-user-profile {
+  position: relative;
 }
 
-.navbar-nav {
-flex-direction: row;
-padding-left: 0;
-margin-bottom: 0;
-list-style: none;
+.navbar-user-profile .btn-link {
+  color: inherit !important;
+  text-decoration: none !important;
+  padding: 0.25rem 0.5rem !important;
 }
 
-.navbar-link {
-white-space: nowrap;
+.navbar-user-profile .btn-link:focus {
+  box-shadow: none !important;
 }
 
-/* Mobile responsive navbar styles */
-@media (max-width: 991.98px) {
-  .navbar-collapse {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    z-index: 1000;
-  }
-
-  .navbar-collapse.show {
-    display: block !important;
-  }
-
-  .navbar-collapse.collapse {
-    display: none !important;
-  }
-
-  .navbar-nav {
-    flex-direction: column;
-    padding: 10px 0;
-  }
-
-  .navbar-nav .nav-item {
-    width: 100%;
-  }
-
-  .navbar-nav .nav-link {
-    padding: 12px 20px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  }
-
-  .navbar-nav .nav-link:hover {
-    background: rgba(0, 0, 0, 0.05);
-  }
-
-  .position-absolute.top-1.start-50.translate-middle-x {
-    position: static !important;
-    transform: none !important;
-  }
-
-  .dropdown-menu {
-    position: static !important;
-    float: none;
-    background: rgba(255, 255, 255, 0.9);
-    border: none;
-    box-shadow: none;
-    margin-top: 0;
-  }
-}
-
-/* User authentication styles */
 .user-avatar {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
@@ -126,94 +84,162 @@ white-space: nowrap;
   justify-content: center;
   color: white;
   font-weight: 600;
-  font-size: 14px;
-}
-
-.role-badge {
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-}
-
-.role-admin {
-  background: #fee;
-  color: #c33;
-}
-
-.role-sales {
-  background: #efe;
-  color: #3c3;
-}
-
-.role-design {
-  background: #eef;
-  color: #33c;
-}
-
-/* Custom dropdown toggle button styling */
-.dropdown .btn-link {
-  color: inherit !important;
-  text-decoration: none !important;
-}
-
-.dropdown .btn-link:hover {
-  color: inherit !important;
-  text-decoration: none !important;
-}
-
-.dropdown .btn-link:focus {
-  box-shadow: none !important;
+  font-size: 15px;
 }
 
 .dropdown-menu {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  border-radius: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+/* --- MODERN ANIMATED HAMBURGER --- */
+.navbar-toggler-modern {
+  display: none; /* Hidden on desktop */
+  width: 24px;
+  height: 20px;
+  position: relative;
+  background: transparent;
   border: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-radius: 8px;
+  cursor: pointer;
+  padding: 0;
+  z-index: 1050; /* Above overlay */
 }
 
-.dropdown-item:hover {
-  background: #f8f9fa;
+.navbar-toggler-modern span {
+  display: block;
+  position: absolute;
+  height: 2px;
+  width: 100%;
+  background: #333;
+  border-radius: 2px;
+  opacity: 1;
+  left: 0;
+  transform: rotate(0deg);
+  transition: 0.25s ease-in-out;
 }
 
-.loading-container {
+.navbar-toggler-modern span:nth-child(1) {
+  top: 0px;
+}
+.navbar-toggler-modern span:nth-child(2) {
+  top: 8px;
+}
+.navbar-toggler-modern span:nth-child(3) {
+  top: 16px;
+}
+
+.navbar-toggler-modern.is-active span:nth-child(1) {
+  top: 8px;
+  transform: rotate(135deg);
+}
+.navbar-toggler-modern.is-active span:nth-child(2) {
+  opacity: 0;
+  left: -60px;
+}
+.navbar-toggler-modern.is-active span:nth-child(3) {
+  top: 8px;
+  transform: rotate(-135deg);
+}
+
+/* --- MOBILE MENU OVERLAY (REVISED FOR TRUE FULL-SCREEN) --- */
+.mobile-menu-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(252, 252, 252, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 1040;
+  /* Use flexbox to center content */
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  background: #f8f9fa;
+  padding: 1rem; /* Add some edge padding */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(100%);
+  transition:
+    opacity 0.3s ease,
+    visibility 0.3s ease,
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #667eea;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
+.mobile-menu-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.access-denied {
-  text-align: center;
-  padding: 40px 20px;
-  max-width: 600px;
+.mobile-menu-content {
+  width: 100%;
+  max-width: 400px;
   margin: 0 auto;
+  /* Allow this container to scroll if content overflows viewport height */
+  max-height: 100%;
+  overflow-y: auto;
 }
 
-.access-denied h2 {
-  color: #721c24;
-  margin-bottom: 20px;
+.mobile-nav-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: center;
 }
 
-.access-denied p {
-  color: #666;
-  margin-bottom: 10px;
+.mobile-nav-links li {
+  /* Add a border between links */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.mobile-nav-links li:last-child {
+  /* Remove border from the last link */
+  border-bottom: none;
+}
+
+.mobile-nav-link {
+  display: block;
+  padding: 1rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+  text-decoration: none;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+  transition:
+    color 0.2s,
+    transform 0.2s;
+}
+
+.mobile-nav-link:hover {
+  color: #000;
+  transform: scale(1.05);
+}
+
+.mobile-nav-link.active {
+  color: #667eea;
+}
+
+/* --- RESPONSIVE BREAKPOINTS --- */
+@media (max-width: 991.98px) {
+  /* Hide desktop nav */
+  .navbar-collapse {
+    display: none !important;
+  }
+  /* Show mobile toggler */
+  .navbar-toggler-modern {
+    display: block;
+  }
+  /* Move user profile to be before the toggler */
+  .navbar-user-profile {
+    order: 2;
+  }
+  .navbar-toggler-modern {
+    order: 3;
+  }
+  .navbar-brand-group {
+    order: 1;
+  }
+  .container-fluid {
+    justify-content: space-between;
+  }
 }
